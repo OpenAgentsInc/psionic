@@ -72,11 +72,13 @@ into one generic engine claim.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
-- `MedPsy` / Qwen3 has one new bounded pilot in `implemented_early` metadata
-  status and `planned` execution status. Psionic now records the QVAC MedPsy
-  Qwen3 family label, tokenizer/prompt fixture, quantization admission policy,
-  and medical safety policy, but it does not yet claim Rust-native MedPsy
-  generation. The canonical lane doc is `docs/NON_GPT_OSS_MEDPSY_QWEN_PILOT.md`.
+- `MedPsy` / Qwen3 has one new bounded pilot in `implemented_early` status.
+  Psionic now records the QVAC MedPsy Qwen3 family label, tokenizer/prompt
+  fixture, quantization admission policy, medical safety policy, and one
+  Rust-native Candle Qwen3 BF16 safetensors CPU load/generate path. GGUF
+  quantized execution, CUDA/Metal acceleration, OpenAI-compatible serving, and
+  benchmark publication remain planned. The canonical lane doc is
+  `docs/NON_GPT_OSS_MEDPSY_QWEN_PILOT.md`.
 - `Gemma 4` now has one published bounded Psionic lane on this checkout.
   The canonical publication doc is
   `docs/NON_GPT_OSS_GEMMA4_PILOT.md`.

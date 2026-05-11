@@ -1,7 +1,9 @@
 # Non-GPT-OSS MedPsy Qwen3 Pilot
 
-> Status: `planned` for execution, `implemented_early` for artifact admission,
-> tokenizer/prompt fixture, quantization policy, and medical safety metadata.
+> Status: `implemented_early` for artifact admission, tokenizer/prompt fixture,
+> quantization policy, medical safety metadata, and the first Rust-native
+> Qwen3 BF16 safetensors CPU load/generate path. GGUF quantized execution,
+> OpenAI-compatible serving, and benchmark publication remain planned.
 
 This document records the bounded Psionic lane for QVAC MedPsy support.
 
@@ -79,8 +81,13 @@ The first landed scope is metadata and admission only:
 - `MedPsyMedicalSafetyPolicy` records the baseline medical safety posture.
 - `medpsy_quantization_admission` records the default medical-domain
   quantization policy.
+- `MedPsyQwen3CandleGenerator` can load BF16 safetensors through
+  Rust-native Candle Qwen3 and run greedy token-id generation on CPU when the
+  operator supplies a local `PSIONIC_MEDPSY_17B_SAFETENSORS_PATH` artifact.
 
-This landed scope does not claim model execution yet.
+This landed scope only claims the first BF16 safetensors CPU execution path. It
+does not claim GGUF quantized execution, CUDA/Metal acceleration,
+OpenAI-compatible serving, or benchmark parity yet.
 
 ## Quantization Policy
 
@@ -134,14 +141,15 @@ The implementation sequence is tracked in GitHub issues:
 
 ## Claim Boundary
 
-It is honest to say this checkout has initial MedPsy/Qwen3 admission metadata
-and policy fixtures.
+It is honest to say this checkout has initial MedPsy/Qwen3 admission metadata,
+policy fixtures, and a Rust-native Candle Qwen3 BF16 safetensors CPU
+load/generate path that runs when a local artifact is supplied.
 
 It is not yet honest to say:
 
-- Psionic serves MedPsy.
-- Psionic supports MedPsy BF16 safetensors generation.
+- Psionic serves MedPsy through the OpenAI-compatible server.
 - Psionic supports MedPsy GGUF quantized generation.
+- Psionic supports accelerated CUDA or Metal MedPsy execution.
 - Psionic is competitive with QVAC SDK, `llama.cpp`, vLLM, or Transformers for
   MedPsy.
 - MedPsy can be used for clinical decision-making.
