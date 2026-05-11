@@ -18,7 +18,7 @@ use futures_util::StreamExt;
 use psionic_models::{
     CSM_AUDIO_CODEBOOK_LANES, CSM_CPU_EXECUTION_ENGINE, CSM_MIMI_CPU_EXECUTION_ENGINE,
     CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID, CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION,
-    CSM_WATERMARK_OPERATOR_DOGFOOD, CsmCapabilityRefusal, CsmContextWindowPolicy,
+    CSM_WATERMARK_OPERATOR_DOGFOOD, CsmAudioClip, CsmCapabilityRefusal, CsmContextWindowPolicy,
     CsmCpuGeneratedWindow, CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError,
     CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiCodebookPrefix, CsmMimiDecoder,
     CsmModelArtifactDescriptor, CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture,
@@ -1576,28 +1576,38 @@ impl CsmSpeechState {
                 CSM_SPEECH_STREAM_WINDOW_FRAMES,
                 |window: CsmCpuGeneratedWindow| {
                     let decode = mimi.decode_codebook_frames(&window.codebook_frames)?;
-                    let wav_chunk = decode.clip.to_wav_pcm16()?;
                     let elapsed_ms = started.elapsed().as_millis();
                     first_audio_latency_ms.get_or_insert(elapsed_ms);
-                    wav_hasher.update(&wav_chunk);
-                    output_duration_ms =
-                        output_duration_ms.saturating_add(decode.clip.duration_ms());
-                    wav_bytes = wav_bytes.saturating_add(wav_chunk.len());
-                    let index = chunk_count;
-                    chunk_count = chunk_count.saturating_add(1);
-                    on_chunk(CsmSpeechStreamChunk {
-                        index,
-                        wav_bytes: wav_chunk,
-                        duration_ms: decode.clip.duration_ms(),
-                        generated_frame_count: window
-                            .start_frame_index
-                            .saturating_add(window.codebook_frames.len()),
-                        final_chunk: window.final_window,
-                        elapsed_ms,
-                    })
-                    .map_err(|error| CsmFrontendError::CsmGeneration {
-                        message: error.message,
-                    })?;
+                    let wav_chunks = split_csm_stream_clip_by_generated_frames(
+                        &decode.clip,
+                        window.codebook_frames.len(),
+                    )?;
+                    let subchunk_count = wav_chunks.len();
+                    for (subchunk_index, clip) in wav_chunks.into_iter().enumerate() {
+                        let wav_chunk = clip.to_wav_pcm16()?;
+                        wav_hasher.update(&wav_chunk);
+                        output_duration_ms = output_duration_ms.saturating_add(clip.duration_ms());
+                        wav_bytes = wav_bytes.saturating_add(wav_chunk.len());
+                        let index = chunk_count;
+                        chunk_count = chunk_count.saturating_add(1);
+                        let final_chunk =
+                            window.final_window && subchunk_index + 1 == subchunk_count;
+                        on_chunk(CsmSpeechStreamChunk {
+                            index,
+                            wav_bytes: wav_chunk,
+                            duration_ms: clip.duration_ms(),
+                            generated_frame_count: window
+                                .start_frame_index
+                                .saturating_add(subchunk_index + 1),
+                            final_chunk,
+                            elapsed_ms,
+                        })
+                        .map_err(|error| {
+                            CsmFrontendError::CsmGeneration {
+                                message: error.message,
+                            }
+                        })?;
+                    }
                     Ok(())
                 },
             )
@@ -1714,6 +1724,45 @@ fn csm_output_duration_ms(sample_count: usize, sample_rate_hz: u32) -> u64 {
         return 0;
     }
     ((sample_count as u128 * 1_000) / u128::from(sample_rate_hz)) as u64
+}
+
+fn split_csm_stream_clip_by_generated_frames(
+    clip: &CsmAudioClip,
+    generated_frame_count: usize,
+) -> Result<Vec<CsmAudioClip>, CsmFrontendError> {
+    let channel_count = usize::from(clip.channels.max(1));
+    let frame_count = generated_frame_count.max(1);
+    let sample_frames = clip.frames();
+    if sample_frames == 0 || frame_count <= 1 {
+        return Ok(vec![clip.clone()]);
+    }
+
+    let mut chunks = Vec::with_capacity(frame_count);
+    for index in 0..frame_count {
+        let start_frame = index.saturating_mul(sample_frames) / frame_count;
+        let end_frame = (index + 1).saturating_mul(sample_frames) / frame_count;
+        if end_frame <= start_frame {
+            continue;
+        }
+        let sample_start = start_frame.saturating_mul(channel_count);
+        let sample_end = end_frame.saturating_mul(channel_count);
+        let Some(samples) = clip.samples.get(sample_start..sample_end) else {
+            return Err(CsmFrontendError::WavEncode {
+                message: "stream subchunk sample range was invalid".to_string(),
+            });
+        };
+        chunks.push(CsmAudioClip::new(
+            clip.sample_rate_hz,
+            clip.channels,
+            samples.to_vec(),
+        ));
+    }
+
+    if chunks.is_empty() {
+        Ok(vec![clip.clone()])
+    } else {
+        Ok(chunks)
+    }
 }
 
 fn current_unix_ms() -> u128 {
