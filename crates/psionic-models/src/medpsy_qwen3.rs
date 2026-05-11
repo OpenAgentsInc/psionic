@@ -498,24 +498,17 @@ fn tensor_from_tokens(tokens: &[TokenId], device: &Device) -> Result<Tensor, Med
 
 fn argmax_token(logits: &Tensor) -> Result<TokenId, MedPsyQwen3Error> {
     let values = logits
-        .flatten_all()
-        .and_then(|tensor| tensor.to_dtype(DType::F32))
-        .and_then(|tensor| tensor.to_vec1::<f32>())
+        .argmax(candle::D::Minus1)
+        .and_then(|tensor| tensor.flatten_all())
+        .and_then(|tensor| tensor.to_vec1::<u32>())
         .map_err(|error| MedPsyQwen3Error::Generation {
             message: error.to_string(),
         })?;
-    let Some((index, _)) = values
-        .iter()
-        .enumerate()
-        .max_by(|(_, left), (_, right)| left.total_cmp(right))
-    else {
+    let Some(token_id) = values.last().copied() else {
         return Err(MedPsyQwen3Error::Generation {
             message: String::from("model returned empty logits"),
         });
     };
-    let token_id = u32::try_from(index).map_err(|error| MedPsyQwen3Error::Generation {
-        message: format!("argmax token index overflow: {error}"),
-    })?;
     Ok(TokenId(token_id))
 }
 
