@@ -17,6 +17,7 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), String> {
+    configure_cuda_quantized_kernel_policy();
     let config = BenchConfig::parse(env::args().skip(1))?;
     let report = run_benchmark(&config)?;
     if let Some(path) = config.json_out.as_ref() {
@@ -40,6 +41,18 @@ fn run() -> Result<(), String> {
         println!("{}", render_human_report(&report));
     }
     Ok(())
+}
+
+fn configure_cuda_quantized_kernel_policy() {
+    #[cfg(feature = "medpsy-cuda")]
+    {
+        if std::env::var("PSIONIC_MEDPSY_FORCE_DMMV")
+            .ok()
+            .is_some_and(|value| !value.is_empty() && value != "0")
+        {
+            candle::quantized::cuda::set_force_dmmv(true);
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
