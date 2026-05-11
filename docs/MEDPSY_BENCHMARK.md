@@ -8,7 +8,7 @@
 The direct benchmark runner is:
 
 ```bash
-cargo run --release -p psionic-serve --example medpsy_bench -- \
+cargo run --release -p psionic-models --example medpsy_bench -- \
   --model-path <path> \
   --artifact-kind safetensors \
   --model-size 1.7b \
@@ -22,7 +22,7 @@ cargo run --release -p psionic-serve --example medpsy_bench -- \
 For the first GGUF row:
 
 ```bash
-cargo run --release -p psionic-serve --example medpsy_bench -- \
+cargo run --release -p psionic-models --example medpsy_bench -- \
   --model-path <path> \
   --artifact-kind gguf \
   --model-size 1.7b \
@@ -46,7 +46,7 @@ On a CUDA host, build and run with:
 ```bash
 PSIONIC_MEDPSY_BENCH_BACKEND=cuda \
 PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH=/abs/path/model.gguf \
-  cargo run --release -p psionic-serve --features medpsy-cuda --example medpsy_bench -- \
+  cargo run --release -p psionic-models --features medpsy-cuda --example medpsy_bench -- \
     --model-path /abs/path/model.gguf \
     --artifact-kind gguf \
     --model-size 1.7b \

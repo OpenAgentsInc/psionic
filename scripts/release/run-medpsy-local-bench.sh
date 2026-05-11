@@ -14,7 +14,7 @@ run_row() {
   local backend="${5:-cpu}"
   local out_path="${out_dir}/${label}.json"
 
-  cargo run --release -p psionic-serve --example medpsy_bench -- \
+  cargo run --release -p psionic-models --example medpsy_bench -- \
     --model-path "${model_path}" \
     --artifact-kind "${artifact_kind}" \
     --model-size "${model_size}" \

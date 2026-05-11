@@ -97,7 +97,7 @@ The first landed scope is metadata and admission only:
   for MedPsy/Qwen3 rows, and the chat completions path refuses direct diagnosis,
   prescribing, dosage, and emergency-triage prompt shapes under
   `medical_model_use.medpsy.v1`.
-- `crates/psionic-serve/examples/medpsy_bench.rs` records local direct runtime
+- `crates/psionic-models/examples/medpsy_bench.rs` records local direct runtime
   benchmark JSON for BF16 safetensors or GGUF artifacts, and
   `scripts/release/run-medpsy-local-bench.sh` writes retained manual reports
   under `fixtures/medpsy/benchmarks/manual/` when local artifacts are supplied.

@@ -11,7 +11,7 @@ required_files=(
   "fixtures/medpsy/capability/medpsy_capability_matrix_v1.json"
   "fixtures/medpsy/benchmarks/medpsy_comparator_matrix_20260511_local.json"
   "crates/psionic-models/src/medpsy_qwen3.rs"
-  "crates/psionic-serve/examples/medpsy_bench.rs"
+  "crates/psionic-models/examples/medpsy_bench.rs"
 )
 
 for rel in "${required_files[@]}"; do
@@ -43,6 +43,6 @@ assert any(row["runtime"] == "llama.cpp" and row["status"] == "timeout" for row 
 PY
 
 cargo test -p psionic-models medpsy -- --nocapture
-cargo check -p psionic-serve --example medpsy_bench
+cargo check -p psionic-models --example medpsy_bench
 
 printf 'MedPsy bounded pilot gate passed.\n'
