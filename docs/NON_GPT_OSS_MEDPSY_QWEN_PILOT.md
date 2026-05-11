@@ -5,7 +5,8 @@
 > Qwen3 BF16 safetensors plus GGUF CPU load/generate paths. OpenAI-compatible
 > serving now publishes MedPsy medical policy metadata and refuses obvious
 > diagnosis/prescribing/emergency-triage prompts when a MedPsy model is loaded.
-> Benchmark publication remains planned.
+> A local direct MedPsy benchmark harness exists; comparator benchmark
+> publication remains planned.
 
 This document records the bounded Psionic lane for QVAC MedPsy support.
 
@@ -94,11 +95,16 @@ The first landed scope is metadata and admission only:
   for MedPsy/Qwen3 rows, and the chat completions path refuses direct diagnosis,
   prescribing, dosage, and emergency-triage prompt shapes under
   `medical_model_use.medpsy.v1`.
+- `crates/psionic-serve/examples/medpsy_bench.rs` records local direct runtime
+  benchmark JSON for BF16 safetensors or GGUF artifacts, and
+  `scripts/release/run-medpsy-local-bench.sh` writes retained manual reports
+  under `fixtures/medpsy/benchmarks/manual/` when local artifacts are supplied.
 
 This landed scope claims BF16 safetensors and GGUF CPU execution paths when the
 operator supplies local artifacts, plus model-card medical policy publication
 and first-pass chat safety refusals on the OpenAI-compatible surface. It does not
-claim CUDA/Metal acceleration or benchmark parity yet.
+claim CUDA/Metal acceleration or benchmark parity against Tether-recommended
+runtime paths yet.
 
 ## Quantization Policy
 
