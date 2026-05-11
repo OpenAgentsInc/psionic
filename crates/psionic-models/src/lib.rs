@@ -185,6 +185,246 @@ impl ModelDescriptor {
     }
 }
 
+/// Published MedPsy model size admitted by the bounded QVAC MedPsy lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MedPsyModelSize {
+    /// QVAC MedPsy 1.7B, derived from Qwen3-1.7B operated in thinking mode.
+    OnePointSevenB,
+    /// QVAC MedPsy 4B, derived from Qwen3-4B-Thinking-2507.
+    FourB,
+}
+
+impl MedPsyModelSize {
+    /// Returns the public Hugging Face model id for the BF16 source model.
+    #[must_use]
+    pub const fn source_model_id(self) -> &'static str {
+        match self {
+            Self::OnePointSevenB => "qvac/MedPsy-1.7B",
+            Self::FourB => "qvac/MedPsy-4B",
+        }
+    }
+
+    /// Returns the public Hugging Face model id for the GGUF model repo.
+    #[must_use]
+    pub const fn gguf_model_id(self) -> &'static str {
+        match self {
+            Self::OnePointSevenB => "qvac/MedPsy-1.7B-GGUF",
+            Self::FourB => "qvac/MedPsy-4B-GGUF",
+        }
+    }
+}
+
+/// MedPsy artifact format admitted by the model-support sequence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MedPsyArtifactKind {
+    /// Hugging Face safetensors source artifact.
+    Safetensors,
+    /// GGUF artifact, including unquantized BF16 and quantized variants.
+    Gguf,
+}
+
+/// Published MedPsy GGUF quantization tier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MedPsyQuantizationTier {
+    /// Unquantized BF16 GGUF or source safetensors.
+    Bf16,
+    /// GGML Q8_0.
+    Q8_0,
+    /// GGML Q5_K_M with imatrix calibration in the published MedPsy GGUF repos.
+    Q5KM,
+    /// GGML Q4_K_M with imatrix calibration in the published MedPsy GGUF repos.
+    Q4KM,
+    /// IQ4_NL with imatrix calibration.
+    IQ4NL,
+    /// IQ4_XS with imatrix calibration.
+    IQ4XS,
+    /// IQ3_M with imatrix calibration.
+    IQ3M,
+    /// IQ3_XXS with imatrix calibration.
+    IQ3XXS,
+}
+
+impl MedPsyQuantizationTier {
+    /// Returns the canonical published tier label.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bf16 => "BF16",
+            Self::Q8_0 => "Q8_0",
+            Self::Q5KM => "Q5_K_M",
+            Self::Q4KM => "Q4_K_M",
+            Self::IQ4NL => "IQ4_NL",
+            Self::IQ4XS => "IQ4_XS",
+            Self::IQ3M => "IQ3_M",
+            Self::IQ3XXS => "IQ3_XXS",
+        }
+    }
+}
+
+/// Admission posture for one MedPsy quantization tier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MedPsyQuantizationAdmission {
+    /// Preferred tier for medical-domain use once backend support exists.
+    Preferred,
+    /// Technically admissible only with explicit user/operator warning.
+    AllowedWithWarning,
+    /// Blocked by default for medical-domain use.
+    BlockedByDefault,
+}
+
+/// Medical-domain policy that must accompany MedPsy serving.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MedPsyMedicalSafetyPolicy {
+    /// Stable policy identifier.
+    pub policy_id: String,
+    /// Default output classification.
+    pub default_classification: String,
+    /// Whether user-facing output must include a medical disclaimer.
+    pub disclaimer_required: bool,
+    /// Whether emergency-like prompts must route to emergency-care guidance.
+    pub emergency_referral_required: bool,
+    /// Whether direct diagnosis is allowed.
+    pub direct_diagnosis_allowed: bool,
+    /// Whether prescribing or treatment-plan authority is allowed.
+    pub prescribing_or_treatment_authority_allowed: bool,
+    /// Whether human review is required for clinical workflows.
+    pub human_review_required_for_clinical_workflows: bool,
+    /// Whether static-model outputs require source citation when used with RAG.
+    pub source_citation_required_for_claims: bool,
+    /// Whether quantized routes must carry a quality warning.
+    pub quantization_warning_required: bool,
+}
+
+impl Default for MedPsyMedicalSafetyPolicy {
+    fn default() -> Self {
+        Self {
+            policy_id: String::from("medical_model_use.medpsy.v1"),
+            default_classification: String::from("medical_information_not_diagnosis"),
+            disclaimer_required: true,
+            emergency_referral_required: true,
+            direct_diagnosis_allowed: false,
+            prescribing_or_treatment_authority_allowed: false,
+            human_review_required_for_clinical_workflows: true,
+            source_citation_required_for_claims: true,
+            quantization_warning_required: true,
+        }
+    }
+}
+
+/// Bounded descriptor for one published MedPsy artifact family.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MedPsyModelSupportDescriptor {
+    /// Published size row.
+    pub size: MedPsyModelSize,
+    /// Source model id for BF16 safetensors.
+    pub source_model_id: String,
+    /// GGUF model repository id.
+    pub gguf_model_id: String,
+    /// Psionic family label.
+    pub family: String,
+    /// Architecture label from the Hugging Face config.
+    pub architecture: String,
+    /// Human-readable base model.
+    pub base_model: String,
+    /// Model domain classification.
+    pub domain: String,
+    /// Primary language validated by the model card.
+    pub language: String,
+    /// Hidden size.
+    pub hidden_size: usize,
+    /// Feed-forward width.
+    pub feed_forward_size: usize,
+    /// Layer count.
+    pub layer_count: usize,
+    /// Attention head count.
+    pub attention_head_count: usize,
+    /// Grouped-query KV head count.
+    pub kv_head_count: usize,
+    /// Vocabulary size.
+    pub vocab_size: usize,
+    /// Maximum position embeddings from the source config.
+    pub max_position_embeddings: usize,
+    /// RoPE base from the source config.
+    pub rope_theta: u64,
+    /// Supported artifact formats for this row.
+    pub artifact_kinds: Vec<MedPsyArtifactKind>,
+    /// Medical policy that gates use of this row.
+    pub medical_policy: MedPsyMedicalSafetyPolicy,
+}
+
+/// Returns the current bounded MedPsy support descriptors.
+#[must_use]
+pub fn medpsy_model_support_descriptors() -> Vec<MedPsyModelSupportDescriptor> {
+    vec![
+        MedPsyModelSupportDescriptor {
+            size: MedPsyModelSize::OnePointSevenB,
+            source_model_id: String::from(MedPsyModelSize::OnePointSevenB.source_model_id()),
+            gguf_model_id: String::from(MedPsyModelSize::OnePointSevenB.gguf_model_id()),
+            family: String::from("medpsy_qwen3"),
+            architecture: String::from("Qwen3ForCausalLM"),
+            base_model: String::from("Qwen3-1.7B thinking mode"),
+            domain: String::from("medical_healthcare"),
+            language: String::from("en"),
+            hidden_size: 2048,
+            feed_forward_size: 6144,
+            layer_count: 28,
+            attention_head_count: 16,
+            kv_head_count: 8,
+            vocab_size: 151_936,
+            max_position_embeddings: 40_960,
+            rope_theta: 1_000_000,
+            artifact_kinds: vec![MedPsyArtifactKind::Safetensors, MedPsyArtifactKind::Gguf],
+            medical_policy: MedPsyMedicalSafetyPolicy::default(),
+        },
+        MedPsyModelSupportDescriptor {
+            size: MedPsyModelSize::FourB,
+            source_model_id: String::from(MedPsyModelSize::FourB.source_model_id()),
+            gguf_model_id: String::from(MedPsyModelSize::FourB.gguf_model_id()),
+            family: String::from("medpsy_qwen3"),
+            architecture: String::from("Qwen3ForCausalLM"),
+            base_model: String::from("Qwen3-4B-Thinking-2507"),
+            domain: String::from("medical_healthcare"),
+            language: String::from("en"),
+            hidden_size: 2560,
+            feed_forward_size: 9728,
+            layer_count: 36,
+            attention_head_count: 32,
+            kv_head_count: 8,
+            vocab_size: 151_936,
+            max_position_embeddings: 262_144,
+            rope_theta: 5_000_000,
+            artifact_kinds: vec![MedPsyArtifactKind::Safetensors, MedPsyArtifactKind::Gguf],
+            medical_policy: MedPsyMedicalSafetyPolicy::default(),
+        },
+    ]
+}
+
+/// Returns the default medical-domain admission posture for a MedPsy quantization tier.
+#[must_use]
+pub const fn medpsy_quantization_admission(
+    size: MedPsyModelSize,
+    tier: MedPsyQuantizationTier,
+) -> MedPsyQuantizationAdmission {
+    match tier {
+        MedPsyQuantizationTier::Bf16
+        | MedPsyQuantizationTier::Q8_0
+        | MedPsyQuantizationTier::Q5KM
+        | MedPsyQuantizationTier::Q4KM => MedPsyQuantizationAdmission::Preferred,
+        MedPsyQuantizationTier::IQ4NL | MedPsyQuantizationTier::IQ4XS => {
+            MedPsyQuantizationAdmission::AllowedWithWarning
+        }
+        MedPsyQuantizationTier::IQ3M => match size {
+            MedPsyModelSize::OnePointSevenB => MedPsyQuantizationAdmission::BlockedByDefault,
+            MedPsyModelSize::FourB => MedPsyQuantizationAdmission::AllowedWithWarning,
+        },
+        MedPsyQuantizationTier::IQ3XXS => MedPsyQuantizationAdmission::BlockedByDefault,
+    }
+}
+
 /// How one model entered Psionic-owned descriptor/runtime space.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2491,6 +2731,8 @@ pub enum GgufTokenizerPretokenizer {
     Gemma4,
     /// Qwen2 tokenizer family.
     Qwen2,
+    /// Qwen3 tokenizer family.
+    Qwen3,
     /// Qwen3.5 tokenizer family.
     Qwen35,
     /// Refact tokenizer family.
@@ -2508,6 +2750,7 @@ impl GgufTokenizerPretokenizer {
             "llama-bpe" | "llama" => Self::Llama,
             "gemma4" => Self::Gemma4,
             "qwen2" => Self::Qwen2,
+            "qwen3" => Self::Qwen3,
             "qwen35" => Self::Qwen35,
             "refact" => Self::Refact,
             "tekken" => Self::Tekken,
@@ -2521,6 +2764,7 @@ impl GgufTokenizerPretokenizer {
             Self::Llama => Cow::Borrowed("llama"),
             Self::Gemma4 => Cow::Borrowed("gemma4"),
             Self::Qwen2 => Cow::Borrowed("qwen2"),
+            Self::Qwen3 => Cow::Borrowed("qwen3"),
             Self::Qwen35 => Cow::Borrowed("qwen35"),
             Self::Refact => Cow::Borrowed("refact"),
             Self::Tekken => Cow::Borrowed("tekken"),
@@ -2818,6 +3062,8 @@ pub enum GgufPromptTemplateFamily {
     Gemma4,
     /// Qwen2 template family.
     Qwen2,
+    /// Qwen3 text-only thinking template family used by QVAC MedPsy.
+    Qwen3,
     /// Qwen3.5 template family.
     Qwen35,
     /// Command-R template family.
@@ -2832,6 +3078,7 @@ impl GgufPromptTemplateFamily {
             Self::Phi3 => &["<|end|>", "<|system|>", "<|user|>", "<|assistant|>"],
             Self::Gemma4 => &["<turn|>"],
             Self::Qwen2 => &[],
+            Self::Qwen3 => &[],
             Self::Qwen35 => &[],
             Self::CommandR => &["<|START_OF_TURN_TOKEN|>", "<|END_OF_TURN_TOKEN|>"],
             Self::GptOss => &[],
@@ -2950,6 +3197,7 @@ impl GgufPromptTemplateRenderer {
             GgufPromptTemplateFamily::Phi3 => self.render_phi3(messages),
             GgufPromptTemplateFamily::Gemma4 => self.render_gemma4(messages, add_generation_prompt),
             GgufPromptTemplateFamily::Qwen2 => self.render_qwen2(messages, add_generation_prompt),
+            GgufPromptTemplateFamily::Qwen3 => self.render_qwen3(messages, add_generation_prompt),
             GgufPromptTemplateFamily::Qwen35 => self.render_qwen35(messages, add_generation_prompt),
             GgufPromptTemplateFamily::CommandR => {
                 self.render_command_r(messages, add_generation_prompt)
@@ -3190,14 +3438,14 @@ impl GgufPromptTemplateRenderer {
                         } else {
                             extract_qwen35_reasoning(final_content.as_str())
                         };
+                    if final_content.starts_with("<think>") {
+                        final_content = strip_qwen35_think_block(final_content.as_str());
+                    }
                     if last_user_index.is_some_and(|last_user_index| index > last_user_index) {
                         let reasoning = reasoning_content.unwrap_or_default();
                         rendered.push_str("<think>\n");
                         rendered.push_str(reasoning.as_str());
                         rendered.push_str("\n</think>\n\n");
-                        if final_content.starts_with("<think>") {
-                            final_content = strip_qwen35_think_block(final_content.as_str());
-                        }
                     }
                     rendered.push_str(final_content.trim_start_matches('\n'));
                     rendered.push_str("<|im_end|>\n");
@@ -3231,6 +3479,102 @@ impl GgufPromptTemplateRenderer {
         }
         if add_generation_prompt {
             rendered.push_str("<|im_start|>assistant\n<think>\n\n</think>\n\n");
+        }
+        Ok(rendered)
+    }
+
+    fn render_qwen3(
+        &self,
+        messages: &[PromptMessage],
+        add_generation_prompt: bool,
+    ) -> Result<String, PromptRenderError> {
+        let messages = normalize_qwen35_messages(messages)?;
+        if messages.is_empty() {
+            return Err(PromptRenderError::InvalidConversation {
+                message: String::from("qwen3 prompt rendering requires at least one message"),
+            });
+        }
+
+        let mut rendered = String::from(
+            "<|im_start|>system\nYou are MedPsy, a medical and healthcare AI assistant developed by QVAC.",
+        );
+        let mut start_index = 0usize;
+        if messages[0].role == PromptMessageRole::System {
+            let system_content = messages[0].content.trim();
+            if !system_content.is_empty() {
+                rendered.push('\n');
+                rendered.push_str(system_content);
+            }
+            start_index = 1;
+        }
+        rendered.push_str("<|im_end|>\n");
+
+        let last_user_index = messages
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(index, message)| {
+                (message.role == PromptMessageRole::User).then_some(index)
+            });
+        for (index, message) in messages.iter().enumerate().skip(start_index) {
+            match message.role {
+                PromptMessageRole::System | PromptMessageRole::User => {
+                    rendered.push_str("<|im_start|>");
+                    rendered.push_str(message.role.as_str());
+                    rendered.push('\n');
+                    rendered.push_str(message.content.trim());
+                    rendered.push_str("<|im_end|>\n");
+                }
+                PromptMessageRole::Assistant => {
+                    rendered.push_str("<|im_start|>assistant");
+                    let mut final_content = message.content.trim().to_string();
+                    let reasoning_content =
+                        if let Some(reasoning) = message.reasoning_content.as_deref() {
+                            Some(reasoning.trim().to_string())
+                        } else {
+                            extract_qwen35_reasoning(final_content.as_str())
+                        };
+                    if final_content.starts_with("<think>") {
+                        final_content = strip_qwen35_think_block(final_content.as_str());
+                    }
+                    if last_user_index.is_some_and(|last_user_index| index > last_user_index) {
+                        let reasoning = reasoning_content.unwrap_or_default();
+                        rendered.push_str("<think>\n");
+                        rendered.push_str(reasoning.as_str());
+                        rendered.push_str("\n</think>\n\n");
+                    }
+                    rendered.push_str(final_content.trim_start_matches('\n'));
+                    rendered.push_str("<|im_end|>\n");
+                }
+                PromptMessageRole::Tool => {
+                    if !matches!(
+                        messages.get(index.wrapping_sub(1)).map(|value| value.role),
+                        Some(PromptMessageRole::Tool)
+                    ) {
+                        rendered.push_str("<|im_start|>user");
+                    }
+                    rendered.push('\n');
+                    rendered.push_str("<tool_response>\n");
+                    rendered.push_str(message.content.trim());
+                    rendered.push_str("\n</tool_response>");
+                    if !matches!(
+                        messages.get(index + 1).map(|value| value.role),
+                        Some(PromptMessageRole::Tool)
+                    ) {
+                        rendered.push_str("<|im_end|>\n");
+                    }
+                }
+                PromptMessageRole::Developer => {
+                    return Err(PromptRenderError::InvalidConversation {
+                        message: String::from(
+                            "qwen3 developer messages must be normalized before rendering",
+                        ),
+                    });
+                }
+            }
+        }
+        if add_generation_prompt {
+            rendered.push_str("<|im_start|>assistant\n");
         }
         Ok(rendered)
     }
@@ -3324,6 +3668,9 @@ fn supported_prompt_template_family(digest: &str) -> Option<GgufPromptTemplateFa
         "af9c0233881b083b52ff773580215222b5440ac3d0beeeca99b76329b048f8db" => {
             Some(GgufPromptTemplateFamily::Qwen2)
         }
+        "8d51e8f9694b24924c7795050ecb7a605fcbd0d7980b40c56ad3e0561d465de7" => {
+            Some(GgufPromptTemplateFamily::Qwen3)
+        }
         "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80" => {
             Some(GgufPromptTemplateFamily::Qwen35)
         }
@@ -3407,6 +3754,8 @@ pub enum GgufDecoderFamily {
     Gemma4,
     /// Qwen-family decoder behavior backed by the `qwen2` GGUF architecture today.
     Qwen,
+    /// Qwen3-family decoder behavior used by QVAC MedPsy artifacts.
+    Qwen3,
     /// Qwen3.5 family decoder behavior backed by the `qwen35` GGUF architecture.
     Qwen35,
     /// Mistral-family decoder behavior, including legacy Mistral models carried through `llama` GGUF metadata.
@@ -3421,6 +3770,7 @@ impl GgufDecoderFamily {
             Self::Llama => "llama",
             Self::Gemma4 => "gemma4",
             Self::Qwen => "qwen",
+            Self::Qwen3 => "qwen3",
             Self::Qwen35 => "qwen35",
             Self::Mistral => "mistral",
             Self::GptOss => "gpt_oss",
@@ -5478,6 +5828,7 @@ fn classify_gguf_decoder_family(
         "gemma4" => Ok(GgufDecoderFamily::Gemma4),
         "mistral" | "mistral3" => Ok(GgufDecoderFamily::Mistral),
         "qwen2" => Ok(GgufDecoderFamily::Qwen),
+        "qwen3" => Ok(GgufDecoderFamily::Qwen3),
         "qwen35" => Ok(GgufDecoderFamily::Qwen35),
         "gpt-oss" => Ok(GgufDecoderFamily::GptOss),
         other => Err(ModelLoadError::UnsupportedGgufArchitecture {
@@ -8561,6 +8912,13 @@ fn collect_decoder_family_facts(
             format!("{architecture}.vision_end_token_id"),
             format!("{architecture}.image_token_id"),
         ],
+        GgufDecoderFamily::Qwen3 => vec![
+            format!("{architecture}.attention.head_count_kv"),
+            format!("{architecture}.rope.freq_base"),
+            format!("{architecture}.rope.scaling.factor"),
+            format!("{architecture}.rope.scaling.original_context_length"),
+            format!("{architecture}.sliding_window"),
+        ],
         GgufDecoderFamily::Llama
         | GgufDecoderFamily::Qwen
         | GgufDecoderFamily::Mistral
@@ -9399,7 +9757,8 @@ mod tests {
         GgufPromptTemplateRenderer, GgufRuntimeTokenizer, GgufTensorType, GgufTokenizerMetadata,
         GgufTokenizerModel, GgufTokenizerPretokenizer, GgufVersion, GgufWeightBundleLoader,
         GptOssHarmonyParseOptions, GptOssHarmonyParseSource, GptOssHarmonyStreamParser,
-        LoadedWeightTensor, LocalBlobOpenOptions, LocalWeightBundleLoader, ParsedReasoningResponse,
+        LoadedWeightTensor, LocalBlobOpenOptions, LocalWeightBundleLoader, MedPsyModelSize,
+        MedPsyQuantizationAdmission, MedPsyQuantizationTier, ParsedReasoningResponse,
         PromptMessage, PromptMessageRole, PromptRenderOptions, QuantizedTensorStorage,
         Qwen35MultimodalProjectionConfig, ReasoningParser, ReasoningResponsePartKind,
         ReferenceWordDecoder, SafeTensorsDecoderLoader, SafeTensorsWeightBundleLoader,
@@ -9409,6 +9768,7 @@ mod tests {
         assert_prompt_window_case, assert_rendered_prompt_case, assert_tokenizer_fixture_matches,
         collect_decoder_family_facts, digest_chat_template, golden_prompt_fixture,
         golden_prompt_fixtures, golden_tokenizer_fixture, golden_tokenizer_fixtures,
+        medpsy_model_support_descriptors, medpsy_quantization_admission,
         parse_gpt_oss_harmony_text, parse_gpt_oss_harmony_tokens,
         parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
     };
@@ -10110,6 +10470,7 @@ mod tests {
                 "gemma4_e4b",
                 "qwen2",
                 "qwen35_0_8b",
+                "medpsy_qwen3",
                 "gpt_oss_20b"
             ]
         );
@@ -10127,6 +10488,13 @@ mod tests {
         assert_eq!(qwen35.eos_token_ids, &[TokenId(248046)]);
         assert_eq!(qwen35.sample_tokens.len(), 6);
 
+        let medpsy = golden_tokenizer_fixture("medpsy_qwen3").expect("medpsy fixture");
+        assert_eq!(medpsy.family, "medpsy_qwen3");
+        assert_eq!(medpsy.pretokenizer, Some("qwen2"));
+        assert_eq!(medpsy.vocabulary_len, 151_936);
+        assert_eq!(medpsy.eos_token_ids, &[TokenId(151645)]);
+        assert_eq!(medpsy.sample_tokens.len(), 6);
+
         let gpt_oss = golden_tokenizer_fixture("gpt_oss_20b").expect("gpt-oss fixture");
         assert_eq!(gpt_oss.pretokenizer, Some("gpt-4o"));
         assert_eq!(gpt_oss.sample_tokens.len(), 3);
@@ -10135,7 +10503,7 @@ mod tests {
     #[test]
     fn golden_prompt_fixtures_hash_to_expected_digests() -> Result<(), Box<dyn std::error::Error>> {
         let prompt_fixtures = golden_prompt_fixtures();
-        assert_eq!(prompt_fixtures.len(), 6);
+        assert_eq!(prompt_fixtures.len(), 7);
 
         for fixture in prompt_fixtures {
             for variant in fixture.template_variants {
@@ -10165,6 +10533,13 @@ mod tests {
             "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
         );
         assert_eq!(qwen35.template_variants[0].render_cases.len(), 2);
+
+        let medpsy = golden_prompt_fixture("medpsy_qwen3").expect("medpsy fixture");
+        assert_eq!(
+            medpsy.template_variants[0].template_digest,
+            "8d51e8f9694b24924c7795050ecb7a605fcbd0d7980b40c56ad3e0561d465de7"
+        );
+        assert_eq!(medpsy.template_variants[0].render_cases.len(), 2);
 
         let gpt_oss = golden_prompt_fixture("gpt_oss").expect("gpt-oss fixture");
         assert_eq!(gpt_oss.template_variants[0].render_cases.len(), 2);
@@ -10402,6 +10777,85 @@ mod tests {
             )
         );
         Ok(())
+    }
+
+    #[test]
+    fn gguf_prompt_template_renderer_matches_medpsy_qwen3_text_only_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(
+            super::supported_prompt_template_family(
+                "8d51e8f9694b24924c7795050ecb7a605fcbd0d7980b40c56ad3e0561d465de7"
+            ),
+            Some(GgufPromptTemplateFamily::Qwen3)
+        );
+        let fixture = golden_prompt_fixture("medpsy_qwen3").expect("medpsy fixture");
+        let variant = fixture
+            .template_variant("medpsy_qwen3.default")
+            .expect("variant");
+        let render_case = variant
+            .render_case("medpsy_qwen3.with_history")
+            .expect("render case");
+        let renderer = GgufPromptTemplateRenderer::new(
+            medpsy_qwen3_prompt_tokenizer_metadata(),
+            super::GgufChatTemplateMetadata::new(
+                Some(String::from("medpsy-qwen3-fixture-template")),
+                BTreeMap::new(),
+            ),
+        );
+
+        let rendered = renderer.render_qwen3(
+            prompt_messages_from_fixture(render_case.messages).as_slice(),
+            render_case.add_generation_prompt,
+        )?;
+
+        assert_eq!(rendered, render_case.expected_rendered);
+        Ok(())
+    }
+
+    #[test]
+    fn medpsy_qwen3_family_and_policy_are_admitted_for_metadata_only() {
+        let family =
+            super::classify_gguf_decoder_family(&BTreeMap::new(), "qwen3").expect("qwen3 family");
+        assert_eq!(family, GgufDecoderFamily::Qwen3);
+        assert!(
+            super::validate_supported_decoder_family_features(&BTreeMap::new(), family, "qwen3")
+                .is_ok()
+        );
+
+        let descriptors = medpsy_model_support_descriptors();
+        assert_eq!(descriptors.len(), 2);
+        let one_point_seven = descriptors
+            .iter()
+            .find(|descriptor| descriptor.size == MedPsyModelSize::OnePointSevenB)
+            .expect("1.7B descriptor");
+        assert_eq!(one_point_seven.source_model_id, "qvac/MedPsy-1.7B");
+        assert_eq!(one_point_seven.family, "medpsy_qwen3");
+        assert_eq!(one_point_seven.hidden_size, 2048);
+        assert!(one_point_seven.medical_policy.disclaimer_required);
+        assert!(!one_point_seven.medical_policy.direct_diagnosis_allowed);
+
+        assert_eq!(
+            medpsy_quantization_admission(
+                MedPsyModelSize::OnePointSevenB,
+                MedPsyQuantizationTier::Q4KM,
+            ),
+            MedPsyQuantizationAdmission::Preferred
+        );
+        assert_eq!(
+            medpsy_quantization_admission(
+                MedPsyModelSize::OnePointSevenB,
+                MedPsyQuantizationTier::IQ3M,
+            ),
+            MedPsyQuantizationAdmission::BlockedByDefault
+        );
+        assert_eq!(
+            medpsy_quantization_admission(MedPsyModelSize::FourB, MedPsyQuantizationTier::IQ3M),
+            MedPsyQuantizationAdmission::AllowedWithWarning
+        );
+        assert_eq!(
+            medpsy_quantization_admission(MedPsyModelSize::FourB, MedPsyQuantizationTier::IQ3XXS,),
+            MedPsyQuantizationAdmission::BlockedByDefault
+        );
     }
 
     #[test]
@@ -12544,6 +12998,34 @@ mod tests {
             pretokenizer: Some(GgufTokenizerPretokenizer::Qwen35),
             token_type_count: None,
             digest: String::from("qwen35-fixture"),
+        }
+    }
+
+    fn medpsy_qwen3_prompt_tokenizer_metadata() -> GgufTokenizerMetadata {
+        GgufTokenizerMetadata {
+            model: GgufTokenizerModel::Gpt2Bpe,
+            vocabulary: super::GgufTokenizerVocabulary {
+                tokens: vec![
+                    String::from("<|endoftext|>"),
+                    String::from("<|im_start|>"),
+                    String::from("<|im_end|>"),
+                    String::from("<think>"),
+                    String::from("</think>"),
+                    String::from("MedPsy"),
+                ],
+                bos_token_id: Some(TokenId(0)),
+                eos_token_ids: vec![TokenId(2)],
+                pad_token_id: Some(TokenId(0)),
+                unknown_token_id: None,
+            },
+            scores: Vec::new(),
+            token_types: Vec::new(),
+            merges: Vec::new(),
+            add_bos: false,
+            add_eos: false,
+            pretokenizer: Some(GgufTokenizerPretokenizer::Qwen2),
+            token_type_count: None,
+            digest: String::from("medpsy-qwen3-fixture"),
         }
     }
 

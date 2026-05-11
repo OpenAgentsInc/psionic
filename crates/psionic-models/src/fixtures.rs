@@ -291,6 +291,33 @@ const QWEN35_SAMPLES: [GoldenTokenizerSample; 6] = [
     },
 ];
 
+const MEDPSY_QWEN3_SAMPLES: [GoldenTokenizerSample; 6] = [
+    GoldenTokenizerSample {
+        token_id: TokenId(0),
+        token: "!",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(1),
+        token: "\"",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(2),
+        token: "#",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(151643),
+        token: "<|endoftext|>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(151644),
+        token: "<|im_start|>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(151645),
+        token: "<|im_end|>",
+    },
+];
+
 const GPT_OSS_SAMPLES: [GoldenTokenizerSample; 3] = [
     GoldenTokenizerSample {
         token_id: TokenId(199998),
@@ -307,7 +334,7 @@ const GPT_OSS_SAMPLES: [GoldenTokenizerSample; 3] = [
 ];
 
 /// Golden tokenizer fixtures sourced from local real GGUF artifacts.
-pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 5] = [
+pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 6] = [
     GoldenTokenizerFixture {
         id: "llama_spm",
         family: "llama_spm",
@@ -375,6 +402,23 @@ pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 5] = [
         add_eos: false,
         sample_tokens: &QWEN35_SAMPLES,
         notes: "Real qwen3.5:0.8b GGUF tokenizer facts from the downloaded Ollama artifact that Psionic targets for the qwen35 pilot.",
+    },
+    GoldenTokenizerFixture {
+        id: "medpsy_qwen3",
+        family: "medpsy_qwen3",
+        source_path: "hf://qvac/MedPsy-1.7B-GGUF or hf://qvac/MedPsy-4B-GGUF",
+        source_sha256: None,
+        vocabulary_len: 151936,
+        model: GgufTokenizerModel::Gpt2Bpe,
+        pretokenizer: Some("qwen2"),
+        bos_token_id: Some(TokenId(151643)),
+        eos_token_ids: &[TokenId(151645)],
+        pad_token_id: Some(TokenId(151643)),
+        unknown_token_id: None,
+        add_bos: false,
+        add_eos: false,
+        sample_tokens: &MEDPSY_QWEN3_SAMPLES,
+        notes: "MedPsy tokenizer_config.json facts from qvac/MedPsy-1.7B and qvac/MedPsy-4B. The tokenizer class is Qwen2Tokenizer while the model architecture is Qwen3ForCausalLM.",
     },
     GoldenTokenizerFixture {
         id: "gpt_oss_20b",
@@ -507,6 +551,36 @@ const QWEN35_MESSAGES_WITH_HISTORY: [GoldenPromptMessage; 4] = [
     },
 ];
 
+const MEDPSY_QWEN3_MESSAGES_DEFAULT_SYSTEM: [GoldenPromptMessage; 2] = [
+    GoldenPromptMessage {
+        role: GoldenPromptRole::System,
+        content: "Use one sentence and include the medical disclaimer posture.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "What is community-acquired pneumonia?",
+    },
+];
+
+const MEDPSY_QWEN3_MESSAGES_WITH_HISTORY: [GoldenPromptMessage; 4] = [
+    GoldenPromptMessage {
+        role: GoldenPromptRole::Developer,
+        content: "Answer as medical information, not diagnosis.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "What are common pneumonia symptoms?",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::Assistant,
+        content: "<think>\nbrief reasoning\n</think>\nCommon symptoms include cough, fever, and shortness of breath.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "What should trigger urgent care?",
+    },
+];
+
 const COMMAND_R_MESSAGES_USER_ONLY: [GoldenPromptMessage; 1] = [GoldenPromptMessage {
     role: GoldenPromptRole::User,
     content: "Hello",
@@ -636,6 +710,23 @@ const QWEN35_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
     },
 ];
 
+const MEDPSY_QWEN3_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
+    GoldenPromptRenderCase {
+        id: "medpsy_qwen3.default_system",
+        messages: &MEDPSY_QWEN3_MESSAGES_DEFAULT_SYSTEM,
+        harmony_context: None,
+        add_generation_prompt: true,
+        expected_rendered: "<|im_start|>system\nYou are MedPsy, a medical and healthcare AI assistant developed by QVAC.\nUse one sentence and include the medical disclaimer posture.<|im_end|>\n<|im_start|>user\nWhat is community-acquired pneumonia?<|im_end|>\n<|im_start|>assistant\n",
+    },
+    GoldenPromptRenderCase {
+        id: "medpsy_qwen3.with_history",
+        messages: &MEDPSY_QWEN3_MESSAGES_WITH_HISTORY,
+        harmony_context: None,
+        add_generation_prompt: true,
+        expected_rendered: "<|im_start|>system\nYou are MedPsy, a medical and healthcare AI assistant developed by QVAC.\nAnswer as medical information, not diagnosis.<|im_end|>\n<|im_start|>user\nWhat are common pneumonia symptoms?<|im_end|>\n<|im_start|>assistantCommon symptoms include cough, fever, and shortness of breath.<|im_end|>\n<|im_start|>user\nWhat should trigger urgent care?<|im_end|>\n<|im_start|>assistant\n",
+    },
+];
+
 const COMMAND_R_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
     GoldenPromptRenderCase {
         id: "command_r.user_only",
@@ -679,8 +770,7 @@ const PHI3_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVar
     ollama_stop_source: Some("/home/christopherdavid/code/ollama/template/phi-3.json"),
     template_digest: "268b6082ceb7176dc6ed80557a2f7837f9f0339592fbee677d405a553af15f88",
     raw_template: Some(PHI3_TEMPLATE),
-    template_excerpt:
-        "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}...",
+    template_excerpt: "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}...",
     stop_sequences: &["<|end|>", "<|system|>", "<|user|>", "<|assistant|>"],
     render_cases: &PHI3_RENDER_CASES,
     notes: "Small redistributable prompt family with real BOS insertion and Ollama stop defaults.",
@@ -723,6 +813,19 @@ const QWEN35_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateV
     stop_sequences: &[],
     render_cases: &QWEN35_RENDER_CASES,
     notes: "Real qwen3.5 multimodal-aware chat-template digest from the downloaded 0.8B GGUF. The pilot render cases cover the text-only subset Psionic serves today.",
+}];
+
+const MEDPSY_QWEN3_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVariant {
+    id: "medpsy_qwen3.default",
+    gguf_key: "tokenizer.chat_template",
+    ollama_template_name: None,
+    ollama_stop_source: None,
+    template_digest: "8d51e8f9694b24924c7795050ecb7a605fcbd0d7980b40c56ad3e0561d465de7",
+    raw_template: None,
+    template_excerpt: "{%- set persona = 'You are MedPsy, a medical and healthcare AI assistant developed by QVAC.' %}...",
+    stop_sequences: &[],
+    render_cases: &MEDPSY_QWEN3_RENDER_CASES,
+    notes: "MedPsy Qwen3 thinking template digest from qvac/MedPsy tokenizer_config.json. The render cases cover the text-only subset Psionic admits first.",
 }];
 
 const COMMAND_R_VARIANTS: [GoldenPromptTemplateVariant; 3] = [
@@ -850,6 +953,27 @@ const QWEN35_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
     },
 ];
 
+const MEDPSY_QWEN3_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
+    GoldenPromptWindowCase {
+        id: "medpsy_qwen3.default_system_within_medium_window",
+        surface: GoldenPromptSurface::Generate,
+        template_variant_id: "medpsy_qwen3.default",
+        render_case_id: "medpsy_qwen3.default_system",
+        max_rendered_bytes: 320,
+        expected_over_budget: false,
+        note: "Keeps the first MedPsy medical-information prompt inside a moderate render budget.",
+    },
+    GoldenPromptWindowCase {
+        id: "medpsy_qwen3.history_over_small_window",
+        surface: GoldenPromptSurface::Generate,
+        template_variant_id: "medpsy_qwen3.default",
+        render_case_id: "medpsy_qwen3.with_history",
+        max_rendered_bytes: 256,
+        expected_over_budget: true,
+        note: "Forces a MedPsy history prompt over a small render budget while preserving the persona and no-clinical-authority instruction.",
+    },
+];
+
 const COMMAND_R_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
     GoldenPromptWindowCase {
         id: "command_r.user_only_within_medium_window",
@@ -874,7 +998,7 @@ const COMMAND_R_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
 const GPT_OSS_WINDOW_CASES: [GoldenPromptWindowCase; 0] = [];
 
 /// Golden prompt fixtures sourced from local real GGUF artifacts.
-pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 6] = [
+pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 7] = [
     GoldenPromptFixture {
         id: "phi3",
         family: "phi3",
@@ -910,6 +1034,15 @@ pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 6] = [
         template_variants: &QWEN35_VARIANTS,
         window_cases: &QWEN35_WINDOW_CASES,
         notes: "Real qwen3.5:0.8b prompt-family anchor. The canonical artifact is multimodal-aware; the current pilot asserts only the text-only render subset Psionic serves.",
+    },
+    GoldenPromptFixture {
+        id: "medpsy_qwen3",
+        family: "medpsy_qwen3",
+        source_path: "hf://qvac/MedPsy-1.7B or hf://qvac/MedPsy-4B",
+        source_sha256: None,
+        template_variants: &MEDPSY_QWEN3_VARIANTS,
+        window_cases: &MEDPSY_QWEN3_WINDOW_CASES,
+        notes: "MedPsy prompt-family anchor from the published tokenizer_config.json. This fixture preserves the QVAC persona and text-only Qwen3 thinking prompt shape without adding runtime support yet.",
     },
     GoldenPromptFixture {
         id: "command_r",
@@ -1133,6 +1266,7 @@ fn pretokenizer_fixture_label(pretokenizer: &GgufTokenizerPretokenizer) -> Cow<'
         GgufTokenizerPretokenizer::Llama => Cow::Borrowed("llama"),
         GgufTokenizerPretokenizer::Gemma4 => Cow::Borrowed("gemma4"),
         GgufTokenizerPretokenizer::Qwen2 => Cow::Borrowed("qwen2"),
+        GgufTokenizerPretokenizer::Qwen3 => Cow::Borrowed("qwen3"),
         GgufTokenizerPretokenizer::Qwen35 => Cow::Borrowed("qwen35"),
         GgufTokenizerPretokenizer::Refact => Cow::Borrowed("refact"),
         GgufTokenizerPretokenizer::Tekken => Cow::Borrowed("tekken"),

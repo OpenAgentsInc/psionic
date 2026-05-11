@@ -872,13 +872,14 @@ fn byte_level_bpe_pattern(
         | Some(GgufTokenizerPretokenizer::Llama)
         | Some(GgufTokenizerPretokenizer::Gemma4)
         | Some(GgufTokenizerPretokenizer::Qwen2)
+        | Some(GgufTokenizerPretokenizer::Qwen3)
         | Some(GgufTokenizerPretokenizer::Qwen35)
         | Some(GgufTokenizerPretokenizer::Refact)
         | Some(GgufTokenizerPretokenizer::Tekken) => Ok(GENERIC_BYTE_LEVEL_BPE_PATTERN),
         Some(GgufTokenizerPretokenizer::Custom(value))
             if matches!(
                 value.as_str(),
-                "gpt-4o" | "default" | "qwen2" | "qwen35" | "llama-bpe" | "llama"
+                "gpt-4o" | "default" | "qwen2" | "qwen3" | "qwen35" | "llama-bpe" | "llama"
             ) =>
         {
             Ok(GENERIC_BYTE_LEVEL_BPE_PATTERN)

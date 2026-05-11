@@ -1,0 +1,100 @@
+{
+  "schema": "psionic.medpsy.admission_policy.v1",
+  "status": "implemented_early_metadata_planned_execution",
+  "source_refs": [
+    "https://huggingface.co/blog/qvac/medpsy",
+    "https://huggingface.co/qvac/MedPsy-1.7B",
+    "https://huggingface.co/qvac/MedPsy-4B",
+    "https://huggingface.co/qvac/MedPsy-1.7B-GGUF",
+    "https://huggingface.co/qvac/MedPsy-4B-GGUF"
+  ],
+  "runtime_boundary": {
+    "target_runtime": "rust_native_psionic",
+    "disallowed_runtime_dependencies": [
+      "qvac_sdk",
+      "llama_cpp_service",
+      "vllm_service",
+      "transformers_python_runtime",
+      "cxx_sidecar"
+    ],
+    "comparator_paths_only": [
+      "llama.cpp",
+      "QVAC SDK",
+      "vLLM",
+      "Transformers"
+    ]
+  },
+  "models": [
+    {
+      "model_id": "qvac/MedPsy-1.7B",
+      "gguf_model_id": "qvac/MedPsy-1.7B-GGUF",
+      "family": "medpsy_qwen3",
+      "architecture": "Qwen3ForCausalLM",
+      "base_model": "Qwen3-1.7B thinking mode",
+      "hidden_size": 2048,
+      "ffn_hidden_size": 6144,
+      "layers": 28,
+      "attention_heads": 16,
+      "kv_groups": 8,
+      "vocab_size": 151936,
+      "max_position_embeddings": 40960,
+      "rope_theta": 1000000,
+      "precision": "bfloat16"
+    },
+    {
+      "model_id": "qvac/MedPsy-4B",
+      "gguf_model_id": "qvac/MedPsy-4B-GGUF",
+      "family": "medpsy_qwen3",
+      "architecture": "Qwen3ForCausalLM",
+      "base_model": "Qwen3-4B-Thinking-2507",
+      "hidden_size": 2560,
+      "ffn_hidden_size": 9728,
+      "layers": 36,
+      "attention_heads": 32,
+      "kv_groups": 8,
+      "vocab_size": 151936,
+      "max_position_embeddings": 262144,
+      "rope_theta": 5000000,
+      "precision": "bfloat16"
+    }
+  ],
+  "prompt_template": {
+    "digest": "8d51e8f9694b24924c7795050ecb7a605fcbd0d7980b40c56ad3e0561d465de7",
+    "persona": "You are MedPsy, a medical and healthcare AI assistant developed by QVAC.",
+    "admitted_first_surface": "text_only_qwen3_thinking_prompt_render"
+  },
+  "quantization_admission": {
+    "preferred": ["BF16", "Q8_0", "Q5_K_M", "Q4_K_M"],
+    "allowed_with_warning": ["IQ4_NL", "IQ4_XS", "4B IQ3_M"],
+    "blocked_by_default": ["1.7B IQ3_M", "IQ3_XXS"],
+    "requires_explicit_override": ["any 3-bit medical route"],
+    "requires_receipt_warning": ["all quantized medical routes"]
+  },
+  "medical_policy": {
+    "policy_id": "medical_model_use.medpsy.v1",
+    "default_classification": "medical_information_not_diagnosis",
+    "disclaimer_required": true,
+    "emergency_referral_required": true,
+    "direct_diagnosis_allowed": false,
+    "prescribing_or_treatment_authority_allowed": false,
+    "human_review_required_for_clinical_workflows": true,
+    "source_citation_required_for_claims": true,
+    "quantization_warning_required": true
+  },
+  "current_claim_boundary": {
+    "implemented": [
+      "model_family_metadata",
+      "tokenizer_fixture_metadata",
+      "prompt_template_digest_admission",
+      "quantization_policy_metadata",
+      "medical_safety_policy_metadata"
+    ],
+    "planned": [
+      "bf16_safetensors_generation",
+      "gguf_quantized_generation",
+      "openai_compatible_serving",
+      "medpsy_benchmark_matrix",
+      "capability_release_gate"
+    ]
+  }
+}

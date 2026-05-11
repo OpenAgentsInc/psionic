@@ -6799,6 +6799,7 @@ fn decoder_family_label(family: GgufDecoderFamily) -> &'static str {
     match family {
         GgufDecoderFamily::Llama => "llama",
         GgufDecoderFamily::Qwen => "qwen",
+        GgufDecoderFamily::Qwen3 => "qwen3",
         GgufDecoderFamily::Qwen35 => "qwen35",
         GgufDecoderFamily::Gemma4 => "gemma4",
         GgufDecoderFamily::Mistral => "mistral",

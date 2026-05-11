@@ -253,6 +253,7 @@ impl CpuGgufTextGenerationService {
             ),
             GgufDecoderFamily::Llama
             | GgufDecoderFamily::Qwen
+            | GgufDecoderFamily::Qwen3
             | GgufDecoderFamily::Mistral
             | GgufDecoderFamily::Gemma4 => {
                 CpuGgufServiceKind::Dense(CpuDenseGgufTextGenerationService::from_gguf_path(path)?)
