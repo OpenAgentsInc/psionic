@@ -13248,6 +13248,21 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_matmul_with_dims(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _left: &MetalBuffer,
+            _right: &MetalBuffer,
+            _output: &MetalBuffer,
+            _m: usize,
+            _k: usize,
+            _n: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_gelu_glu_f32(
             &mut self,
             _submission: &mut PlatformSubmission,
@@ -13431,6 +13446,34 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_top_k_single_row_f32(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _input: &MetalBuffer,
+            _selected_ids: &MetalBuffer,
+            _selected_values: &MetalBuffer,
+            _column_count: usize,
+            _top_k: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_top_k_softmax_single_row_f32(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _input: &MetalBuffer,
+            _selected_ids: &MetalBuffer,
+            _selected_weights: &MetalBuffer,
+            _column_count: usize,
+            _top_k: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_quantized_matvec(
             &mut self,
             _submission: &mut PlatformSubmission,
@@ -13480,6 +13523,24 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_grouped_quantized_matvec_buffer_ids(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _weights: &MetalBuffer,
+            _mode: QuantizationMode,
+            _row_stride: usize,
+            _rows_per_expert: usize,
+            _columns: usize,
+            _selected_ids: &MetalBuffer,
+            _selected_count: usize,
+            _input: &MetalBuffer,
+            _output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_expert_matvec_f32_ids(
             &mut self,
             _submission: &mut PlatformSubmission,
@@ -13491,6 +13552,54 @@ mod platform {
             _selected_ids: &[i32],
             _input: &MetalBuffer,
             _output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_expert_matvec_f32_ids_buffer(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _weights: &MetalBuffer,
+            _mode: QuantizationMode,
+            _row_stride: usize,
+            _rows_per_expert: usize,
+            _columns: usize,
+            _selected_ids: &MetalBuffer,
+            _selected_count: usize,
+            _input: &MetalBuffer,
+            _output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_add_selected_expert_bias_f32(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _bias: &MetalBuffer,
+            _selected_ids: &MetalBuffer,
+            _rows_per_expert: usize,
+            _selected_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_aggregate_selected_expert_rows_f32(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _input: &MetalBuffer,
+            _selected_ids: &MetalBuffer,
+            _selected_weights: &MetalBuffer,
+            _expert_scales: &MetalBuffer,
+            _output: &MetalBuffer,
+            _rows_per_expert: usize,
+            _selected_count: usize,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
