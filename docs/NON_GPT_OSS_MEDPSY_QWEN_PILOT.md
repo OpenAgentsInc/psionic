@@ -3,7 +3,9 @@
 > Status: `implemented_early` for artifact admission, tokenizer/prompt fixture,
 > quantization policy, medical safety metadata, and the first Rust-native
 > Qwen3 BF16 safetensors plus GGUF CPU load/generate paths. OpenAI-compatible
-> serving and benchmark publication remain planned.
+> serving now publishes MedPsy medical policy metadata and refuses obvious
+> diagnosis/prescribing/emergency-triage prompts when a MedPsy model is loaded.
+> Benchmark publication remains planned.
 
 This document records the bounded Psionic lane for QVAC MedPsy support.
 
@@ -88,10 +90,15 @@ The first landed scope is metadata and admission only:
   Rust-native Candle quantized Qwen3 and run greedy token-id generation on CPU
   when the operator supplies a local `PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH`
   artifact.
+- The generic OpenAI-compatible model card can publish `psionic_medical_policy`
+  for MedPsy/Qwen3 rows, and the chat completions path refuses direct diagnosis,
+  prescribing, dosage, and emergency-triage prompt shapes under
+  `medical_model_use.medpsy.v1`.
 
-This landed scope only claims BF16 safetensors and GGUF CPU execution paths when
-the operator supplies local artifacts. It does not claim CUDA/Metal acceleration,
-OpenAI-compatible serving, or benchmark parity yet.
+This landed scope claims BF16 safetensors and GGUF CPU execution paths when the
+operator supplies local artifacts, plus model-card medical policy publication
+and first-pass chat safety refusals on the OpenAI-compatible surface. It does not
+claim CUDA/Metal acceleration or benchmark parity yet.
 
 ## Quantization Policy
 
@@ -151,7 +158,6 @@ load/generate paths that run when local artifacts are supplied.
 
 It is not yet honest to say:
 
-- Psionic serves MedPsy through the OpenAI-compatible server.
 - Psionic supports accelerated CUDA or Metal MedPsy execution.
 - Psionic is competitive with QVAC SDK, `llama.cpp`, vLLM, or Transformers for
   MedPsy.

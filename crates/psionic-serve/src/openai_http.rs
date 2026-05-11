@@ -4782,6 +4782,19 @@ struct ModelCard {
     psionic_embedding_dimensions: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_embedding_normalization: Option<EmbeddingNormalization>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_medical_policy: Option<MedicalModelPolicyCard>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct MedicalModelPolicyCard {
+    policy_id: &'static str,
+    default_classification: &'static str,
+    disclaimer_required: bool,
+    emergency_referral_required: bool,
+    direct_diagnosis_allowed: bool,
+    prescribing_or_treatment_authority_allowed: bool,
+    human_review_required_for_clinical_workflows: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -5272,6 +5285,83 @@ fn published_model_embedding_normalization(
         .and_then(OpenAiCompatLoadedModel::embedding_normalization)
 }
 
+fn published_model_medical_policy(model: &PublishedGenericModel) -> Option<MedicalModelPolicyCard> {
+    is_medpsy_published_model(model).then_some(MedicalModelPolicyCard {
+        policy_id: "medical_model_use.medpsy.v1",
+        default_classification: "medical_information_not_diagnosis",
+        disclaimer_required: true,
+        emergency_referral_required: true,
+        direct_diagnosis_allowed: false,
+        prescribing_or_treatment_authority_allowed: false,
+        human_review_required_for_clinical_workflows: true,
+    })
+}
+
+fn is_medpsy_published_model(model: &PublishedGenericModel) -> bool {
+    model.family == "qwen3"
+        && (model.canonical_name.to_ascii_lowercase().contains("medpsy")
+            || model
+                .aliases
+                .iter()
+                .any(|alias| alias.to_ascii_lowercase().contains("medpsy")))
+}
+
+fn is_medpsy_decoder_model(model: &OpenAiCompatLoadedDecoderModel) -> bool {
+    model.family == GgufDecoderFamily::Qwen3
+        && model
+            .descriptor
+            .model
+            .model_id
+            .to_ascii_lowercase()
+            .contains("medpsy")
+}
+
+fn enforce_medpsy_medical_request_policy(
+    model: &OpenAiCompatLoadedDecoderModel,
+    messages: &[ChatCompletionMessage],
+) -> Result<(), OpenAiCompatHttpError> {
+    if !is_medpsy_decoder_model(model) {
+        return Ok(());
+    }
+    let text = messages
+        .iter()
+        .flat_map(|message| chat_message_text_parts(&message.content))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .to_ascii_lowercase();
+    let blocked = [
+        "diagnose me",
+        "diagnose my",
+        "prescribe",
+        "what dose",
+        "dosage should i take",
+        "i have chest pain",
+        "stroke symptoms",
+        "should i go to the emergency room",
+    ];
+    if blocked.iter().any(|needle| text.contains(needle)) {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "MedPsy requests that ask for diagnosis, prescribing, dosage, or emergency triage are refused by Psionic medical_model_use.medpsy.v1 policy; use qualified medical care and attach a governed RAG/human-review workflow before clinical use",
+        )));
+    }
+    Ok(())
+}
+
+fn chat_message_text_parts(content: &ChatCompletionMessageContent) -> Vec<&str> {
+    match content {
+        ChatCompletionMessageContent::Text(text) => vec![text.as_str()],
+        ChatCompletionMessageContent::Parts(parts) => parts
+            .iter()
+            .filter_map(|part| match part {
+                ChatCompletionContentPart::Text { text } => Some(text.as_str()),
+                ChatCompletionContentPart::ImageUrl { .. }
+                | ChatCompletionContentPart::InputAudio { .. }
+                | ChatCompletionContentPart::VideoUrl { .. } => None,
+            })
+            .collect(),
+    }
+}
+
 fn published_model_backend_label(model: &PublishedGenericModel) -> Option<&'static str> {
     single_known_route_label(model.route_backends.as_slice(), known_backend_label)
 }
@@ -5375,6 +5465,7 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_audio_input_parts: None,
             psionic_embedding_dimensions: None,
             psionic_embedding_normalization: None,
+            psionic_medical_policy: None,
         }],
     })
 }
@@ -6272,6 +6363,7 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                         state.as_ref(),
                         &model,
                     ),
+                    psionic_medical_policy: published_model_medical_policy(&model),
                 }
             })
             .collect(),
@@ -8124,6 +8216,7 @@ async fn handle_generic_chat_completions(
             reason,
         ));
     }
+    enforce_medpsy_medical_request_policy(model, &request.messages)?;
     let reasoning_request =
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
     let mut tool_contract = tool_contract;
