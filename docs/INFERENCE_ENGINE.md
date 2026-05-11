@@ -79,8 +79,10 @@ into one generic engine claim.
   OpenAI-compatible model card now publishes MedPsy medical policy metadata for
   MedPsy rows, and chat completions refuse obvious diagnosis, prescribing,
   dosage, and emergency-triage prompts under that policy. CUDA/Metal
-  acceleration and benchmark publication remain planned. The canonical lane doc is
-  `docs/NON_GPT_OSS_MEDPSY_QWEN_PILOT.md`.
+  acceleration and full comparator publication remain planned. The canonical
+  lane doc is `docs/NON_GPT_OSS_MEDPSY_QWEN_PILOT.md`; the bounded release gate
+  is `scripts/release/check-psionic-medpsy-pilot.sh`; the capability envelope is
+  `fixtures/medpsy/capability/medpsy_capability_matrix_v1.json`.
 - `Gemma 4` now has one published bounded Psionic lane on this checkout.
   The canonical publication doc is
   `docs/NON_GPT_OSS_GEMMA4_PILOT.md`.

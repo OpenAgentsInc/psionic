@@ -1,0 +1,45 @@
+{
+  "schema": "psionic.medpsy.capability_matrix.v1",
+  "status": "implemented_early_bounded",
+  "model_family": "medpsy_qwen3",
+  "implemented_refs": {
+    "admission_policy": "fixtures/medpsy/capability/medpsy_admission_policy_v1.json",
+    "comparator_matrix": "fixtures/medpsy/benchmarks/medpsy_comparator_matrix_20260511_local.json",
+    "pilot_doc": "docs/NON_GPT_OSS_MEDPSY_QWEN_PILOT.md",
+    "benchmark_doc": "docs/MEDPSY_BENCHMARK.md"
+  },
+  "supported": [
+    {"capability": "artifact_metadata_admission", "models": ["qvac/MedPsy-1.7B", "qvac/MedPsy-4B"], "posture": "implemented_early"},
+    {"capability": "qwen3_text_prompt_rendering", "template_digest": "8d51e8f9694b24924c7795050ecb7a605fcbd0d7980b40c56ad3e0561d465de7", "posture": "implemented_early"},
+    {"capability": "bf16_safetensors_cpu_load_generate", "backend": "cpu", "execution_engine": "rust_candle_qwen3_cpu", "posture": "implemented_early_when_local_artifact_supplied"},
+    {"capability": "gguf_cpu_load_generate", "backend": "cpu", "execution_engine": "rust_candle_qwen3_cpu", "posture": "implemented_early_when_local_artifact_supplied"},
+    {"capability": "openai_model_card_medical_policy", "posture": "implemented_early_for_medpsy_qwen3_rows"},
+    {"capability": "chat_completion_medical_refusal_guard", "posture": "implemented_early_keyword_guard_for_direct_diagnosis_prescribing_dosage_emergency_triage"},
+    {"capability": "direct_local_runtime_benchmark", "posture": "implemented_early"},
+    {"capability": "comparator_matrix", "posture": "partial_with_llama_cpp_timeout_blocker"}
+  ],
+  "allow_with_warning": [
+    {"capability": "quantized_medical_model_use", "tiers": ["IQ4_NL", "IQ4_XS", "4B IQ3_M"], "warning": "requires medical quantization warning and retained safety benchmark evidence before product use"}
+  ],
+  "refusal_required": [
+    {"region": "clinical_authority", "examples": ["direct diagnosis", "prescribing", "dosage selection", "emergency triage as ordinary Q&A"], "reason": "MedPsy is medical information only and not a substitute for professional medical judgment"},
+    {"region": "blocked_quantization", "examples": ["1.7B IQ3_M", "any IQ3_XXS"], "reason": "published MedPsy guidance marks these as materially degraded for medical use"},
+    {"region": "unsupported_backend", "examples": ["CUDA MedPsy", "Metal MedPsy"], "reason": "only CPU Candle paths are implemented in this lane today"},
+    {"region": "fresh_clinical_guidelines", "examples": ["latest drug approval", "current guideline query without RAG"], "reason": "static model weights have no real-time medical knowledge"}
+  ],
+  "unsupported": [
+    "HealthBench reproduction in Psionic",
+    "closed-ended medical benchmark reproduction in Psionic",
+    "QVAC SDK comparator row",
+    "BF16 vLLM or Transformers comparator row",
+    "CUDA or Metal MedPsy acceleration",
+    "clinical decision support deployment",
+    "MedPsy training reproduction"
+  ],
+  "release_gate": {
+    "checker": "scripts/release/check-psionic-medpsy-pilot.sh",
+    "status": "green_for_bounded_metadata_cpu_runtime_and_partial_comparator_matrix",
+    "competitive_claim_allowed": false,
+    "clinical_claim_allowed": false
+  }
+}

@@ -103,6 +103,9 @@ The first landed scope is metadata and admission only:
   records one completed Psionic CPU row for the downloaded 1.7B Q4_K_M GGUF and
   one timed-out `llama-cli` comparator row. That proves the comparator harness
   shape but does not prove competitive parity.
+- `fixtures/medpsy/capability/medpsy_capability_matrix_v1.json` publishes the
+  bounded capability/refusal envelope and ties the lane to
+  `scripts/release/check-psionic-medpsy-pilot.sh`.
 
 This landed scope claims BF16 safetensors and GGUF CPU execution paths when the
 operator supplies local artifacts, plus model-card medical policy publication
@@ -175,3 +178,17 @@ It is not yet honest to say:
 
 Those claims require the later issues in the sequence to land with retained
 benchmark and safety evidence.
+
+## Release Gate
+
+Run:
+
+```bash
+scripts/release/check-psionic-medpsy-pilot.sh
+```
+
+The gate validates the retained admission policy, capability matrix, comparator
+matrix, MedPsy docs, focused MedPsy model tests, and the benchmark example
+compile path. It is green for the bounded metadata, CPU runtime, medical-policy,
+and partial-comparator lane. It does not allow a competitive MedPsy claim or a
+clinical-use claim.
