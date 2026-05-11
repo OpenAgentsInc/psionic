@@ -12,6 +12,7 @@ cargo run --release -p psionic-serve --example medpsy_bench -- \
   --model-path <path> \
   --artifact-kind safetensors \
   --model-size 1.7b \
+  --backend cpu \
   --prompt-token-ids 151644 \
   --max-new-tokens 1 \
   --repeats 1 \
@@ -25,6 +26,7 @@ cargo run --release -p psionic-serve --example medpsy_bench -- \
   --model-path <path> \
   --artifact-kind gguf \
   --model-size 1.7b \
+  --backend cpu \
   --prompt-token-ids 151644 \
   --max-new-tokens 1 \
   --repeats 1 \
@@ -37,6 +39,22 @@ The convenience wrapper is:
 PSIONIC_MEDPSY_17B_SAFETENSORS_PATH=/abs/path/model.safetensors \
 PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH=/abs/path/model.gguf \
   scripts/release/run-medpsy-local-bench.sh
+```
+
+On a CUDA host, build and run with:
+
+```bash
+PSIONIC_MEDPSY_BENCH_BACKEND=cuda \
+PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH=/abs/path/model.gguf \
+  cargo run --release -p psionic-serve --features medpsy-cuda --example medpsy_bench -- \
+    --model-path /abs/path/model.gguf \
+    --artifact-kind gguf \
+    --model-size 1.7b \
+    --backend cuda \
+    --prompt-token-ids 151644 \
+    --max-new-tokens 1 \
+    --repeats 1 \
+    --json-out fixtures/medpsy/benchmarks/manual/medpsy_17b_q4_k_m_gguf_cuda.json
 ```
 
 The report schema is `psionic.medpsy.bench.v1`. It records:

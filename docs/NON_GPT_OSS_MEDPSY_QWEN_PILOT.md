@@ -2,7 +2,9 @@
 
 > Status: `implemented_early` for artifact admission, tokenizer/prompt fixture,
 > quantization policy, medical safety metadata, and the first Rust-native
-> Qwen3 BF16 safetensors plus GGUF CPU load/generate paths. OpenAI-compatible
+> Qwen3 BF16 safetensors plus GGUF CPU load/generate paths. A feature-gated
+> Candle CUDA backend is available for the same direct benchmark harness on
+> NVIDIA hosts with `--features medpsy-cuda`. OpenAI-compatible
 > serving now publishes MedPsy medical policy metadata and refuses obvious
 > diagnosis/prescribing/emergency-triage prompts when a MedPsy model is loaded.
 > A local direct MedPsy benchmark harness exists; comparator benchmark
@@ -108,10 +110,11 @@ The first landed scope is metadata and admission only:
   `scripts/release/check-psionic-medpsy-pilot.sh`.
 
 This landed scope claims BF16 safetensors and GGUF CPU execution paths when the
-operator supplies local artifacts, plus model-card medical policy publication
-and first-pass chat safety refusals on the OpenAI-compatible surface. It does not
-claim CUDA/Metal acceleration or benchmark parity against Tether-recommended
-runtime paths yet.
+operator supplies local artifacts, exposes a feature-gated direct CUDA benchmark
+path, plus model-card medical policy publication and first-pass chat safety
+refusals on the OpenAI-compatible surface. It does not claim CUDA parity,
+Metal acceleration, or benchmark parity against Tether-recommended runtime paths
+yet.
 
 ## Quantization Policy
 

@@ -2,7 +2,7 @@ use std::{env, fs, path::PathBuf, process::ExitCode, time::Instant};
 
 use psionic_models::{
     MedPsyModelSize, MedPsyQwen3CandleConfig, MedPsyQwen3CandleGenerator,
-    MedPsyQwen3GgufGenerator, TokenId,
+    MedPsyQwen3GgufGenerator, MedPsyQwen3RuntimeBackend, TokenId,
 };
 use serde::Serialize;
 
@@ -73,6 +73,7 @@ struct BenchConfig {
     model_path: PathBuf,
     artifact_kind: ArtifactKind,
     model_size: MedPsyModelSize,
+    backend: BenchBackend,
     prompt_tokens: Vec<TokenId>,
     max_new_tokens: usize,
     repeats: usize,
@@ -88,6 +89,7 @@ impl BenchConfig {
         let mut model_path = None::<PathBuf>;
         let mut artifact_kind = ArtifactKind::Gguf;
         let mut model_size = MedPsyModelSize::OnePointSevenB;
+        let mut backend = BenchBackend::Cpu;
         let mut prompt_tokens = vec![TokenId(151644)];
         let mut max_new_tokens = 1usize;
         let mut repeats = 1usize;
@@ -113,6 +115,13 @@ impl BenchConfig {
                     model_size = parse_model_size(
                         args.next()
                             .ok_or_else(|| String::from("missing value for --model-size"))?
+                            .as_str(),
+                    )?;
+                }
+                "--backend" => {
+                    backend = BenchBackend::parse(
+                        args.next()
+                            .ok_or_else(|| String::from("missing value for --backend"))?
                             .as_str(),
                     )?;
                 }
@@ -164,12 +173,55 @@ impl BenchConfig {
             model_path,
             artifact_kind,
             model_size,
+            backend,
             prompt_tokens,
             max_new_tokens,
             repeats,
             json_stdout,
             json_out,
         })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum BenchBackend {
+    Cpu,
+    Cuda,
+}
+
+impl BenchBackend {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "cpu" => Ok(Self::Cpu),
+            "cuda" => Ok(Self::Cuda),
+            other => Err(format!("unsupported --backend `{other}`; expected cpu or cuda")),
+        }
+    }
+
+    fn runtime_backend(self) -> Result<MedPsyQwen3RuntimeBackend, String> {
+        match self {
+            Self::Cpu => Ok(MedPsyQwen3RuntimeBackend::Cpu),
+            Self::Cuda => {
+                #[cfg(feature = "medpsy-cuda")]
+                {
+                    Ok(MedPsyQwen3RuntimeBackend::Cuda { device_ordinal: 0 })
+                }
+                #[cfg(not(feature = "medpsy-cuda"))]
+                {
+                    Err(String::from(
+                        "--backend cuda requires building psionic-serve with --features medpsy-cuda",
+                    ))
+                }
+            }
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Cuda => "cuda",
+        }
     }
 }
 
@@ -219,10 +271,11 @@ fn run_benchmark(config: &BenchConfig) -> Result<MedPsyBenchReport, String> {
         let report = match config.artifact_kind {
             ArtifactKind::Safetensors => {
                 let qwen_config = MedPsyQwen3CandleConfig::from_size(config.model_size);
-                let mut generator = MedPsyQwen3CandleGenerator::from_safetensors_file(
+                let mut generator = MedPsyQwen3CandleGenerator::from_safetensors_file_with_backend(
                     qwen_config,
                     &config.model_path,
                     None,
+                    config.backend.runtime_backend()?,
                 )
                 .map_err(|error| error.to_string())?;
                 generator
@@ -230,8 +283,12 @@ fn run_benchmark(config: &BenchConfig) -> Result<MedPsyBenchReport, String> {
                     .map_err(|error| error.to_string())?
             }
             ArtifactKind::Gguf => {
-                let mut generator = MedPsyQwen3GgufGenerator::from_gguf_file(&config.model_path, None)
-                    .map_err(|error| error.to_string())?;
+                let mut generator = MedPsyQwen3GgufGenerator::from_gguf_file_with_backend(
+                    &config.model_path,
+                    None,
+                    config.backend.runtime_backend()?,
+                )
+                .map_err(|error| error.to_string())?;
                 generator
                     .generate_greedy_token_ids(&config.prompt_tokens, config.max_new_tokens, &[TokenId(151645)])
                     .map_err(|error| error.to_string())?
@@ -265,7 +322,7 @@ fn run_benchmark(config: &BenchConfig) -> Result<MedPsyBenchReport, String> {
         model_path: config.model_path.display().to_string(),
         model_size: model_size_label(config.model_size),
         artifact_kind: config.artifact_kind.label(),
-        backend: "cpu",
+        backend: config.backend.label(),
         execution_engine,
         prompt_tokens: config.prompt_tokens.iter().map(|token| token.as_u32()).collect(),
         max_new_tokens: config.max_new_tokens,
@@ -325,5 +382,5 @@ fn render_human_report(report: &MedPsyBenchReport) -> String {
 }
 
 fn usage() -> &'static str {
-    "usage: cargo run -p psionic-serve --example medpsy_bench -- --model-path <path> [--artifact-kind safetensors|gguf] [--model-size 1.7b|4b] [--prompt-token-ids 151644] [--max-new-tokens 1] [--repeats 1] [--json|--json-out path]"
+    "usage: cargo run -p psionic-serve --example medpsy_bench -- --model-path <path> [--artifact-kind safetensors|gguf] [--model-size 1.7b|4b] [--backend cpu|cuda] [--prompt-token-ids 151644] [--max-new-tokens 1] [--repeats 1] [--json|--json-out path]"
 }

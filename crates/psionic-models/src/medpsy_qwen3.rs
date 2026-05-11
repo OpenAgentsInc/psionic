@@ -67,12 +67,24 @@ pub enum MedPsyQwen3Error {
 pub enum MedPsyQwen3RuntimeBackend {
     /// CPU reference execution through Candle.
     Cpu,
+    /// CUDA execution through Candle on one NVIDIA device.
+    #[cfg(feature = "medpsy-cuda")]
+    Cuda {
+        /// CUDA device ordinal.
+        device_ordinal: usize,
+    },
 }
 
 impl MedPsyQwen3RuntimeBackend {
-    fn device(self) -> Device {
+    fn device(self) -> Result<Device, MedPsyQwen3Error> {
         match self {
-            Self::Cpu => Device::Cpu,
+            Self::Cpu => Ok(Device::Cpu),
+            #[cfg(feature = "medpsy-cuda")]
+            Self::Cuda { device_ordinal } => {
+                Device::new_cuda(device_ordinal).map_err(|error| MedPsyQwen3Error::ModelLoad {
+                    message: format!("failed to initialize CUDA device {device_ordinal}: {error}"),
+                })
+            }
         }
     }
 
@@ -81,6 +93,18 @@ impl MedPsyQwen3RuntimeBackend {
     pub const fn execution_engine(self) -> &'static str {
         match self {
             Self::Cpu => "rust_candle_qwen3_cpu",
+            #[cfg(feature = "medpsy-cuda")]
+            Self::Cuda { .. } => "rust_candle_qwen3_cuda",
+        }
+    }
+
+    /// Stable backend label.
+    #[must_use]
+    pub const fn backend_label(self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            #[cfg(feature = "medpsy-cuda")]
+            Self::Cuda { .. } => "cuda",
         }
     }
 }
@@ -211,7 +235,7 @@ impl MedPsyQwen3CandleGenerator {
                 });
             }
         }
-        let device = backend.device();
+        let device = backend.device()?;
         let weights = [path];
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&weights, DType::BF16, &device) }
             .map_err(|error| MedPsyQwen3Error::ModelLoad {
@@ -351,7 +375,7 @@ impl MedPsyQwen3GgufGenerator {
                 });
             }
         }
-        let device = backend.device();
+        let device = backend.device()?;
         let mut file = File::open(path).map_err(|error| MedPsyQwen3Error::ArtifactRead {
             artifact: path.display().to_string(),
             message: error.to_string(),

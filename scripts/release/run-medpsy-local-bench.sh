@@ -11,12 +11,14 @@ run_row() {
   local artifact_kind="$2"
   local model_size="$3"
   local model_path="$4"
+  local backend="${5:-cpu}"
   local out_path="${out_dir}/${label}.json"
 
   cargo run --release -p psionic-serve --example medpsy_bench -- \
     --model-path "${model_path}" \
     --artifact-kind "${artifact_kind}" \
     --model-size "${model_size}" \
+    --backend "${backend}" \
     --prompt-token-ids "151644" \
     --max-new-tokens "1" \
     --repeats "1" \
@@ -25,12 +27,14 @@ run_row() {
   printf 'wrote %s\n' "${out_path}"
 }
 
+backend="${PSIONIC_MEDPSY_BENCH_BACKEND:-cpu}"
+
 if [[ -n "${PSIONIC_MEDPSY_17B_SAFETENSORS_PATH:-}" ]]; then
-  run_row "medpsy_17b_safetensors_cpu" "safetensors" "1.7b" "${PSIONIC_MEDPSY_17B_SAFETENSORS_PATH}"
+  run_row "medpsy_17b_safetensors_${backend}" "safetensors" "1.7b" "${PSIONIC_MEDPSY_17B_SAFETENSORS_PATH}" "${backend}"
 fi
 
 if [[ -n "${PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH:-}" ]]; then
-  run_row "medpsy_17b_q4_k_m_gguf_cpu" "gguf" "1.7b" "${PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH}"
+  run_row "medpsy_17b_q4_k_m_gguf_${backend}" "gguf" "1.7b" "${PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH}" "${backend}"
 fi
 
 if [[ -z "${PSIONIC_MEDPSY_17B_SAFETENSORS_PATH:-}" && -z "${PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH:-}" ]]; then
