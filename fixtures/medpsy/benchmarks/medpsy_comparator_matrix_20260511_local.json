@@ -1,20 +1,20 @@
 {
   "schema": "psionic.medpsy.comparator_matrix.v1",
-  "status": "partial_with_comparator_timeout",
+  "status": "partial_with_cuda_gap",
   "created_at": "2026-05-11T02:00:00Z",
-  "host": "macos-local",
+  "host": "macbook-pro-m5_and_archlinux_rtx4080",
   "artifact": {
     "repo": "qvac/MedPsy-1.7B-GGUF",
     "file": "medpsy-1.7b-q4_k_m-imat.gguf",
     "sha256": "41ee947d9cce72ec657577219fd1798fabeabf0d832217fe23c9d6d3d18d5880",
-    "source_path": "/var/folders/v2/0ls5nf1j509db69fk73k7ms40000gn/T/opencode/medpsy-artifacts/medpsy-1.7b-q4_k_m-imat.gguf",
+    "source_path": "/var/folders/v2/0ls5nf1j509db69fk73k7ms40000gn/T/opencode/medpsy-artifacts/medpsy-1.7b-q4_k_m-imat.gguf and /tmp/medpsy-1.7b-q4_k_m-imat.gguf on archlinux",
     "tracked_in_repo": false
   },
   "prompt_contract": {
     "kind": "single_token_smoke",
     "psionic_prompt_tokens": [151644],
     "llama_cli_prompt": "<|im_start|>",
-    "max_new_tokens": 1,
+    "max_new_tokens": 512,
     "claim_boundary": "runtime smoke benchmark only; not clinical quality, HealthBench, or closed-ended medical benchmark evidence"
   },
   "rows": [
@@ -29,6 +29,57 @@
       "total_ms": 2890.593167,
       "decode_tokens_per_second": 0.3459497557166958,
       "report_ref": "/var/folders/v2/0ls5nf1j509db69fk73k7ms40000gn/T/opencode/medpsy-artifacts/psionic-medpsy-17b-q4.json"
+    },
+    {
+      "runtime": "psionic",
+      "artifact_kind": "gguf",
+      "backend": "cuda",
+      "host": "archlinux",
+      "gpu": "NVIDIA GeForce RTX 4080 16GB",
+      "execution_engine": "rust_candle_qwen3_cuda",
+      "status": "completed_below_ollama",
+      "max_new_tokens": 512,
+      "repeats": 3,
+      "mean_total_ms": 2032.10,
+      "mean_decode_tokens_per_second": 239.19,
+      "best_warm_decode_tokens_per_second": 253.80,
+      "optimizations_applied": [
+        "model_loaded_once_across_repeats",
+        "device_argmax",
+        "feature_gated_medpsy_cuda_backend"
+      ],
+      "negative_trials": [
+        {
+          "variant": "CANDLE_DEQUANTIZE_ALL_F16=1",
+          "mean_decode_tokens_per_second": 127.46,
+          "result": "slower"
+        },
+        {
+          "variant": "CANDLE_DEQUANTIZE_ALL=1",
+          "mean_decode_tokens_per_second": 78.57,
+          "result": "slower"
+        },
+        {
+          "variant": "PSIONIC_MEDPSY_FORCE_DMMV=1",
+          "mean_decode_tokens_per_second": 250.26,
+          "result": "no parity improvement"
+        }
+      ],
+      "report_ref": "/tmp/psionic-medpsy-gpu/medpsy_17b_q4_cuda_device_argmax_512.json"
+    },
+    {
+      "runtime": "ollama_llama_cpp_runner",
+      "binary": "/usr/local/bin/ollama",
+      "version": "0.17.5",
+      "host": "archlinux",
+      "gpu": "NVIDIA GeForce RTX 4080 16GB",
+      "status": "completed_baseline_faster_than_psionic",
+      "max_new_tokens": 512,
+      "repeats": 3,
+      "mean_decode_tokens_per_second": 369.49,
+      "best_warm_decode_tokens_per_second": 369.66,
+      "model": "medpsy-17b-q4-local",
+      "report_ref": "/tmp/ollama_medpsy_bench_512.json"
     },
     {
       "runtime": "llama.cpp",
@@ -58,8 +109,8 @@
     "prescribing_or_treatment_authority_allowed": false
   },
   "decision": {
-    "psionic_runtime_smoke": "available_on_cpu",
-    "comparator_publication": "blocked_on_llama_cli_timeout_and_missing_qvac_sdk_bf16_rows",
+    "psionic_runtime_smoke": "available_on_cpu_and_cuda",
+    "comparator_publication": "partial_archlinux_cuda_matrix_available_but_psionic_below_ollama_llama_cpp_runner_and_qvac_sdk_bf16_rows_missing",
     "can_claim_competitive_medpsy": false
   }
 }

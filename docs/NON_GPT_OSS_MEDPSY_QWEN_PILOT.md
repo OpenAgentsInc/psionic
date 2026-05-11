@@ -102,9 +102,10 @@ The first landed scope is metadata and admission only:
   `scripts/release/run-medpsy-local-bench.sh` writes retained manual reports
   under `fixtures/medpsy/benchmarks/manual/` when local artifacts are supplied.
 - `fixtures/medpsy/benchmarks/medpsy_comparator_matrix_20260511_local.json`
-  records one completed Psionic CPU row for the downloaded 1.7B Q4_K_M GGUF and
-  one timed-out `llama-cli` comparator row. That proves the comparator harness
-  shape but does not prove competitive parity.
+  records one completed Psionic CPU row, one completed Psionic CUDA row on the
+  Tailnet `archlinux` RTX 4080, and one completed Ollama llama.cpp-runner row on
+  the same host. The current CUDA row is below the comparator and does not prove
+  competitive parity.
 - `fixtures/medpsy/capability/medpsy_capability_matrix_v1.json` publishes the
   bounded capability/refusal envelope and ties the lane to
   `scripts/release/check-psionic-medpsy-pilot.sh`.
@@ -175,8 +176,8 @@ load/generate paths that run when local artifacts are supplied.
 It is not yet honest to say:
 
 - Psionic supports accelerated CUDA or Metal MedPsy execution.
-- Psionic is competitive with QVAC SDK, `llama.cpp`, vLLM, or Transformers for
-  MedPsy.
+- Psionic is competitive with QVAC SDK, `llama.cpp`, Ollama's llama.cpp runner,
+  vLLM, or Transformers for MedPsy.
 - MedPsy can be used for clinical decision-making.
 
 Those claims require the later issues in the sequence to land with retained
