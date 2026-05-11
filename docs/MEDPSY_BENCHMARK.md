@@ -56,3 +56,24 @@ The report schema is `psionic.medpsy.bench.v1`. It records:
 The benchmark is runtime evidence only. It is not a clinical quality claim and
 does not replace medical safety evaluation, HealthBench, closed-ended medical
 benchmarks, or the comparator matrix planned for `#982`.
+
+## Current Comparator Matrix
+
+The first retained comparator matrix is:
+
+```text
+fixtures/medpsy/benchmarks/medpsy_comparator_matrix_20260511_local.json
+```
+
+It records one completed Psionic CPU row on
+`medpsy-1.7b-q4_k_m-imat.gguf` and one attempted `llama-cli` comparator row.
+The `llama-cli` row timed out after `300s` on the special-token smoke prompt, so
+the matrix is `partial_with_comparator_timeout`. It is valid harness evidence,
+not a competitive throughput claim.
+
+Follow-up comparator work must:
+
+- switch the llama.cpp row to a normal rendered MedPsy prompt;
+- parse llama.cpp timing output into the same JSON fields as Psionic;
+- add QVAC SDK when the local Node/Bare runtime harness is available;
+- add a BF16 vLLM or Transformers row when the source model is available.

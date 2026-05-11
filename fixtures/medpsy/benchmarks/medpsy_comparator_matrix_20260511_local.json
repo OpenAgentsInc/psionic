@@ -1,0 +1,65 @@
+{
+  "schema": "psionic.medpsy.comparator_matrix.v1",
+  "status": "partial_with_comparator_timeout",
+  "created_at": "2026-05-11T02:00:00Z",
+  "host": "macos-local",
+  "artifact": {
+    "repo": "qvac/MedPsy-1.7B-GGUF",
+    "file": "medpsy-1.7b-q4_k_m-imat.gguf",
+    "sha256": "41ee947d9cce72ec657577219fd1798fabeabf0d832217fe23c9d6d3d18d5880",
+    "source_path": "/var/folders/v2/0ls5nf1j509db69fk73k7ms40000gn/T/opencode/medpsy-artifacts/medpsy-1.7b-q4_k_m-imat.gguf",
+    "tracked_in_repo": false
+  },
+  "prompt_contract": {
+    "kind": "single_token_smoke",
+    "psionic_prompt_tokens": [151644],
+    "llama_cli_prompt": "<|im_start|>",
+    "max_new_tokens": 1,
+    "claim_boundary": "runtime smoke benchmark only; not clinical quality, HealthBench, or closed-ended medical benchmark evidence"
+  },
+  "rows": [
+    {
+      "runtime": "psionic",
+      "artifact_kind": "gguf",
+      "backend": "cpu",
+      "execution_engine": "rust_candle_qwen3_cpu",
+      "status": "completed",
+      "output_tokens": 1,
+      "generated_tokens": [339],
+      "total_ms": 2890.593167,
+      "decode_tokens_per_second": 0.3459497557166958,
+      "report_ref": "/var/folders/v2/0ls5nf1j509db69fk73k7ms40000gn/T/opencode/medpsy-artifacts/psionic-medpsy-17b-q4.json"
+    },
+    {
+      "runtime": "llama.cpp",
+      "binary": "/opt/homebrew/bin/llama-cli",
+      "status": "timeout",
+      "timeout_ms": 300000,
+      "command": "llama-cli -m <artifact> -p '<|im_start|>' -n 1 --temp 0 --top-k 1 --top-p 1 --no-display-prompt",
+      "output_ref": "/Users/christopherdavid/.local/share/opencode/tool-output/tool_e152023be0017Ygp3SDhN2i1h6",
+      "notes": "The installed llama-cli did not terminate within the 300s harness timeout on the single-token special-token smoke prompt. Treat this row as a comparator-harness blocker, not as a throughput number. A follow-up should switch to a normal rendered MedPsy prompt and a parser around llama.cpp timing output."
+    },
+    {
+      "runtime": "QVAC SDK",
+      "status": "not_run",
+      "reason": "No QVAC SDK comparator harness exists in this checkout yet. Issue #982 retains this as follow-on comparator work after the llama.cpp row is stable."
+    },
+    {
+      "runtime": "vLLM_or_Transformers_BF16",
+      "status": "not_run",
+      "reason": "The BF16 source model was not downloaded for this matrix. This row remains required before any BF16 source-model comparison claim."
+    }
+  ],
+  "medical_policy": {
+    "policy_id": "medical_model_use.medpsy.v1",
+    "default_classification": "medical_information_not_diagnosis",
+    "disclaimer_required": true,
+    "direct_diagnosis_allowed": false,
+    "prescribing_or_treatment_authority_allowed": false
+  },
+  "decision": {
+    "psionic_runtime_smoke": "available_on_cpu",
+    "comparator_publication": "blocked_on_llama_cli_timeout_and_missing_qvac_sdk_bf16_rows",
+    "can_claim_competitive_medpsy": false
+  }
+}

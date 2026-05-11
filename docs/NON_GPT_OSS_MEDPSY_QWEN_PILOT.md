@@ -6,7 +6,7 @@
 > serving now publishes MedPsy medical policy metadata and refuses obvious
 > diagnosis/prescribing/emergency-triage prompts when a MedPsy model is loaded.
 > A local direct MedPsy benchmark harness exists; comparator benchmark
-> publication remains planned.
+> publication has one retained partial matrix with a llama.cpp timeout blocker.
 
 This document records the bounded Psionic lane for QVAC MedPsy support.
 
@@ -99,6 +99,10 @@ The first landed scope is metadata and admission only:
   benchmark JSON for BF16 safetensors or GGUF artifacts, and
   `scripts/release/run-medpsy-local-bench.sh` writes retained manual reports
   under `fixtures/medpsy/benchmarks/manual/` when local artifacts are supplied.
+- `fixtures/medpsy/benchmarks/medpsy_comparator_matrix_20260511_local.json`
+  records one completed Psionic CPU row for the downloaded 1.7B Q4_K_M GGUF and
+  one timed-out `llama-cli` comparator row. That proves the comparator harness
+  shape but does not prove competitive parity.
 
 This landed scope claims BF16 safetensors and GGUF CPU execution paths when the
 operator supplies local artifacts, plus model-card medical policy publication
