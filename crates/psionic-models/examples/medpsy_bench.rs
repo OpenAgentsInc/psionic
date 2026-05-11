@@ -251,6 +251,7 @@ struct MedPsyBenchRun {
     total_ms: f64,
     decode_tokens_per_second: f64,
     model_artifact_sha256: String,
+    execution_engine: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -266,50 +267,50 @@ struct MedPsyBenchMedicalPolicy {
 fn run_benchmark(config: &BenchConfig) -> Result<MedPsyBenchReport, String> {
     let mut runs = Vec::with_capacity(config.repeats);
     let mut execution_engine = String::new();
-    for run_index in 0..config.repeats {
-        let started = Instant::now();
-        let report = match config.artifact_kind {
-            ArtifactKind::Safetensors => {
-                let qwen_config = MedPsyQwen3CandleConfig::from_size(config.model_size);
-                let mut generator = MedPsyQwen3CandleGenerator::from_safetensors_file_with_backend(
-                    qwen_config,
-                    &config.model_path,
-                    None,
-                    config.backend.runtime_backend()?,
-                )
-                .map_err(|error| error.to_string())?;
-                generator
-                    .generate_greedy_token_ids(&config.prompt_tokens, config.max_new_tokens, &[TokenId(151645)])
-                    .map_err(|error| error.to_string())?
+    match config.artifact_kind {
+        ArtifactKind::Safetensors => {
+            let qwen_config = MedPsyQwen3CandleConfig::from_size(config.model_size);
+            let mut generator = MedPsyQwen3CandleGenerator::from_safetensors_file_with_backend(
+                qwen_config,
+                &config.model_path,
+                None,
+                config.backend.runtime_backend()?,
+            )
+            .map_err(|error| error.to_string())?;
+            for run_index in 0..config.repeats {
+                let started = Instant::now();
+                let report = generator
+                    .generate_greedy_token_ids(
+                        &config.prompt_tokens,
+                        config.max_new_tokens,
+                        &[TokenId(151645)],
+                    )
+                    .map_err(|error| error.to_string())?;
+                push_run(&mut runs, run_index, report, started.elapsed().as_secs_f64() * 1000.0);
             }
-            ArtifactKind::Gguf => {
-                let mut generator = MedPsyQwen3GgufGenerator::from_gguf_file_with_backend(
-                    &config.model_path,
-                    None,
-                    config.backend.runtime_backend()?,
-                )
-                .map_err(|error| error.to_string())?;
-                generator
-                    .generate_greedy_token_ids(&config.prompt_tokens, config.max_new_tokens, &[TokenId(151645)])
-                    .map_err(|error| error.to_string())?
+        }
+        ArtifactKind::Gguf => {
+            let mut generator = MedPsyQwen3GgufGenerator::from_gguf_file_with_backend(
+                &config.model_path,
+                None,
+                config.backend.runtime_backend()?,
+            )
+            .map_err(|error| error.to_string())?;
+            for run_index in 0..config.repeats {
+                let started = Instant::now();
+                let report = generator
+                    .generate_greedy_token_ids(
+                        &config.prompt_tokens,
+                        config.max_new_tokens,
+                        &[TokenId(151645)],
+                    )
+                    .map_err(|error| error.to_string())?;
+                push_run(&mut runs, run_index, report, started.elapsed().as_secs_f64() * 1000.0);
             }
-        };
-        let elapsed = started.elapsed().as_secs_f64() * 1000.0;
-        execution_engine = report.execution_engine.clone();
-        let output_tokens = report.generated_tokens.len();
-        runs.push(MedPsyBenchRun {
-            run_index,
-            generated_tokens: report.generated_tokens.iter().map(|token| token.as_u32()).collect(),
-            output_tokens,
-            stopped_on_eos: report.stopped_on_eos,
-            total_ms: elapsed,
-            decode_tokens_per_second: if elapsed > 0.0 {
-                (output_tokens as f64) / (elapsed / 1000.0)
-            } else {
-                0.0
-            },
-            model_artifact_sha256: report.model_artifact_sha256,
-        });
+        }
+    }
+    if let Some(first) = runs.first() {
+        execution_engine = first.execution_engine.clone();
     }
     let mean_total_ms = runs.iter().map(|run| run.total_ms).sum::<f64>() / runs.len() as f64;
     let mean_decode_tokens_per_second = runs
@@ -339,6 +340,33 @@ fn run_benchmark(config: &BenchConfig) -> Result<MedPsyBenchReport, String> {
             benchmark_claim_boundary: "local_runtime_benchmark_only_not_clinical_quality_claim",
         },
     })
+}
+
+fn push_run(
+    runs: &mut Vec<MedPsyBenchRun>,
+    run_index: usize,
+    report: psionic_models::MedPsyQwen3GenerationReport,
+    elapsed: f64,
+) {
+    let output_tokens = report.generated_tokens.len();
+    runs.push(MedPsyBenchRun {
+        run_index,
+        generated_tokens: report
+            .generated_tokens
+            .iter()
+            .map(|token| token.as_u32())
+            .collect(),
+        output_tokens,
+        stopped_on_eos: report.stopped_on_eos,
+        total_ms: elapsed,
+        decode_tokens_per_second: if elapsed > 0.0 {
+            (output_tokens as f64) / (elapsed / 1000.0)
+        } else {
+            0.0
+        },
+        model_artifact_sha256: report.model_artifact_sha256,
+        execution_engine: report.execution_engine,
+    });
 }
 
 fn parse_model_size(value: &str) -> Result<MedPsyModelSize, String> {
