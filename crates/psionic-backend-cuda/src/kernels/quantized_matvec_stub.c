@@ -1692,3 +1692,172 @@ int psionic_cuda_moe_down_aggregate_q8_1(
     (void)stream;
     return 1;
 }
+
+int psionic_cuda_cast_f32_to_bf16(
+    const void *input,
+    int element_count,
+    void *output,
+    void *stream
+) {
+    (void)input;
+    (void)element_count;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_cast_bf16_to_f32(
+    const void *input,
+    int element_count,
+    void *output,
+    void *stream
+) {
+    (void)input;
+    (void)element_count;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_parameter_golf_projection_token_losses(
+    const void *logits,
+    const void *target_ids,
+    int row_count,
+    int vocab_size,
+    float logit_softcap,
+    void *output,
+    void *stream
+) {
+    (void)logits;
+    (void)target_ids;
+    (void)row_count;
+    (void)vocab_size;
+    (void)logit_softcap;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_parameter_golf_token_embedding_lookup_bf16_to_f32(
+    const void *token_ids,
+    const void *token_embedding,
+    int row_count,
+    int vocab_size,
+    int width,
+    void *output,
+    void *stream
+) {
+    (void)token_ids;
+    (void)token_embedding;
+    (void)row_count;
+    (void)vocab_size;
+    (void)width;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_reduce_sum_axis1_rank3_f32(
+    const void *input,
+    int dim0,
+    int dim1,
+    int dim2,
+    void *output,
+    void *stream
+) {
+    (void)input;
+    (void)dim0;
+    (void)dim1;
+    (void)dim2;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_attention_causal_sequence_f32(
+    const void *query,
+    const void *key,
+    const void *value,
+    int batch_size,
+    int head_count,
+    int kv_head_count,
+    int sequence_length,
+    int head_dim,
+    void *output,
+    void *stream
+) {
+    (void)query;
+    (void)key;
+    (void)value;
+    (void)batch_size;
+    (void)head_count;
+    (void)kv_head_count;
+    (void)sequence_length;
+    (void)head_dim;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_attention_causal_row_softmax_in_place_f32(
+    void *logits,
+    int row_count,
+    int sequence_length,
+    float scale,
+    void *stream
+) {
+    (void)logits;
+    (void)row_count;
+    (void)sequence_length;
+    (void)scale;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_attention_causal_row_softmax_backward_in_place_f32(
+    const void *probabilities,
+    void *grad_probabilities,
+    int row_count,
+    int sequence_length,
+    float post_scale,
+    void *stream
+) {
+    (void)probabilities;
+    (void)grad_probabilities;
+    (void)row_count;
+    (void)sequence_length;
+    (void)post_scale;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_attention_causal_sequence_backward_f32(
+    const void *query,
+    const void *key,
+    const void *value,
+    const void *grad_output,
+    int batch_size,
+    int head_count,
+    int kv_head_count,
+    int sequence_length,
+    int head_dim,
+    void *query_gradient,
+    void *key_gradient,
+    void *value_gradient,
+    void *stream
+) {
+    (void)query;
+    (void)key;
+    (void)value;
+    (void)grad_output;
+    (void)batch_size;
+    (void)head_count;
+    (void)kv_head_count;
+    (void)sequence_length;
+    (void)head_dim;
+    (void)query_gradient;
+    (void)key_gradient;
+    (void)value_gradient;
+    (void)stream;
+    return 1;
+}
