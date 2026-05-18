@@ -17,14 +17,15 @@ use crate::{
     PSION_CS336_A1_DEMO_RETAINED_SUMMARY_SCHEMA_VERSION, PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT,
     PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
     PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION,
-    PSIONIC_TRAIN_RUNTIME_ATTESTATION_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-    PSIONIC_TRAIN_WINDOW_STATUS_PACKET_SCHEMA_VERSION, PsionCs336A1DemoAutomaticExecutionRequest,
-    PsionCs336A1DemoCurrentRunStatus, PsionCs336A1DemoLaunchManifest,
-    PsionCs336A1DemoRetainedSummary, PsionicTrainArtifactSurfaceRefs, PsionicTrainAuthorityOwner,
-    PsionicTrainCapabilityProjection, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainInvocationManifest, PsionicTrainOperation,
-    PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRunStatusPacket,
+    PSIONIC_TRAIN_PACKAGED_RUNTIME_DIRTY_TREE_ADMISSION,
+    PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE, PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION,
+    PSIONIC_TRAIN_RUNTIME_ATTESTATION_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_ROOT_ENV,
+    PSIONIC_TRAIN_RUNTIME_SURFACE_ID, PSIONIC_TRAIN_WINDOW_STATUS_PACKET_SCHEMA_VERSION,
+    PsionCs336A1DemoAutomaticExecutionRequest, PsionCs336A1DemoCurrentRunStatus,
+    PsionCs336A1DemoLaunchManifest, PsionCs336A1DemoRetainedSummary,
+    PsionicTrainArtifactSurfaceRefs, PsionicTrainAuthorityOwner, PsionicTrainCapabilityProjection,
+    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainInvocationManifest,
+    PsionicTrainOperation, PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRunStatusPacket,
     PsionicTrainRuntimeAttestation, PsionicTrainWindowStatusPacket,
     build_psion_cs336_a1_demo_launch_manifest, inspect_psionic_train_checkpoint_surface,
     load_cs336_a1_reference_checkpoint, psion_cs336_a1_demo_retained_paths,
@@ -990,9 +991,21 @@ fn write_runtime_packets(
 fn runtime_attestation_for_manifest(
     manifest: &PsionicTrainInvocationManifest,
 ) -> Result<PsionicTrainRuntimeAttestation, PsionCs336A1DemoOperatorError> {
-    let git_commit_sha =
-        git_stdout(["rev-parse", "HEAD"]).unwrap_or_else(|| String::from("unknown_git_commit"));
-    let workspace_status_sha256 = if manifest.allow_dirty_tree {
+    let packaged_revision = packaged_runtime_revision(repo_root().as_path())?;
+    let git_commit_sha = packaged_revision
+        .clone()
+        .or_else(|| git_stdout(["rev-parse", "HEAD"]))
+        .unwrap_or_else(|| String::from("unknown_git_commit"));
+    let dirty_tree_admission = if packaged_revision.is_some() {
+        String::from(PSIONIC_TRAIN_PACKAGED_RUNTIME_DIRTY_TREE_ADMISSION)
+    } else if manifest.allow_dirty_tree {
+        String::from("allowed_by_operator_override")
+    } else {
+        String::from("refuse_by_default")
+    };
+    let workspace_status_sha256 = if packaged_revision.is_some() {
+        None
+    } else if manifest.allow_dirty_tree {
         git_stdout(["status", "--porcelain=v1"])
             .map(|value| sha256_hex(value.as_bytes()))
             .or_else(|| Some(sha256_hex(b"dirty_tree_status_unavailable")))
@@ -1004,11 +1017,7 @@ fn runtime_attestation_for_manifest(
         release_id: manifest.admission_identity.release_id.clone(),
         build_digest: manifest.admission_identity.build_digest.clone(),
         git_commit_sha,
-        dirty_tree_admission: String::from(if manifest.allow_dirty_tree {
-            "allowed_by_operator_override"
-        } else {
-            "refuse_by_default"
-        }),
+        dirty_tree_admission,
         workspace_status_sha256,
         environment_ref: manifest.admission_identity.environment_ref.clone(),
     })
@@ -1053,10 +1062,49 @@ fn default_output_root(run_id: &str) -> String {
 }
 
 fn repo_root() -> PathBuf {
+    if let Ok(value) = env::var(PSIONIC_TRAIN_RUNTIME_ROOT_ENV) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            if let Ok(root) = PathBuf::from(trimmed).canonicalize() {
+                return root;
+            }
+        }
+    }
+    if let Ok(current_exe) = env::current_exe() {
+        for ancestor in current_exe.ancestors().skip(1) {
+            let root = ancestor.to_path_buf();
+            if packaged_runtime_revision(root.as_path()).is_ok_and(|revision| revision.is_some())
+                || root
+                    .join(crate::CS336_A1_REFERENCE_TINY_CORPUS_FIXTURE_PATH)
+                    .is_file()
+            {
+                if let Ok(root) = root.canonicalize() {
+                    return root;
+                }
+            }
+        }
+    }
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))
+}
+
+fn packaged_runtime_revision(root: &Path) -> Result<Option<String>, PsionCs336A1DemoOperatorError> {
+    let revision_path = root.join(PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE);
+    if !revision_path.exists() {
+        return Ok(None);
+    }
+    let revision = fs::read_to_string(revision_path.as_path())?;
+    let revision = revision.trim();
+    if revision.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{} is empty", revision_path.display()),
+        )
+        .into());
+    }
+    Ok(Some(revision.to_string()))
 }
 
 fn print_usage() {

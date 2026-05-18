@@ -572,6 +572,22 @@ checkpoint handoff receipt plus its nested checkpoint pointer and manifest from
 the canonical local cache under `artifacts/resolved/` when only logical
 artifact ids are available.
 
+Packaged machine runtimes do not require a Git worktree on the target host.
+When the runtime root contains `.openagents-psionic-revision`, `psionic-train`
+uses that marker as the resolved commit SHA, requires
+`selected_git_ref = packaged-runtime`, and records
+`dirty_tree_admission = packaged_clean_release`. Source-checkout runtimes still
+resolve the selected ref with Git and still refuse dirty trees by default. This
+lets `Pylon` ship the minimal `/var/lib/pylon/psionic` runtime package while
+keeping the same build-digest and runtime-attestation contract.
+
+Packaged Pylon runtimes must also include every runtime fixture consumed by the
+admitted paid-work smoke lanes. The current CS336 A1 lane reads
+`fixtures/training/cs336_a1_reference_tiny_corpus.txt` through
+`OPENAGENTS_PSIONIC_REPO`, so the packaged runtime root is the only filesystem
+authority used on a hosted worker. Developer checkout paths are not valid
+runtime dependencies.
+
 For the strong actual-pretraining lane, the same module now also exposes one
 typed packaging layer above that generic manifest:
 `psion.actual_pretraining_automatic_execution_request.v1` plus

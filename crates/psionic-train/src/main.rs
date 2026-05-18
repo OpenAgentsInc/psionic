@@ -12,7 +12,10 @@ use sha2::Digest;
 use psionic_train::{
     PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSION_CS336_A1_DEMO_LANE_ID,
     PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionicTrainArtifactSurfaceRefs,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSIONIC_TRAIN_PACKAGED_RUNTIME_DIRTY_TREE_ADMISSION,
+    PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE, PSIONIC_TRAIN_PACKAGED_RUNTIME_SELECTED_REF,
+    PSIONIC_TRAIN_RUNTIME_ROOT_ENV, PsionicTrainArtifactSurfaceRefs,
     PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
     PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainGroupedReplicaCheckpointError, PsionicTrainGroupedReplicaRecoverySourceKind,
@@ -40,6 +43,12 @@ mod psion_actual_pretraining_operator;
 struct MachineRuntimeIdentity {
     attestation: PsionicTrainRuntimeAttestation,
     capability_projection: PsionicTrainCapabilityProjection,
+}
+
+#[derive(Clone, Debug)]
+struct MachineRuntimeSource {
+    repo_root: PathBuf,
+    packaged_revision: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -980,11 +989,102 @@ fn validator_disposition_label(
     }
 }
 
-fn machine_repo_root() -> Result<PathBuf, String> {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .map_err(|error| format!("failed to resolve psionic repo root: {error}"))
+fn machine_runtime_source() -> Result<MachineRuntimeSource, String> {
+    machine_runtime_source_from_candidates(machine_runtime_source_candidates())
+}
+
+fn machine_runtime_source_candidates() -> Vec<(String, PathBuf)> {
+    let mut candidates = Vec::new();
+    if let Ok(value) = env::var(PSIONIC_TRAIN_RUNTIME_ROOT_ENV) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            candidates.push((
+                PSIONIC_TRAIN_RUNTIME_ROOT_ENV.to_string(),
+                PathBuf::from(trimmed),
+            ));
+        }
+    }
+
+    if let Ok(current_exe) = env::current_exe() {
+        for ancestor in current_exe.ancestors().skip(1) {
+            candidates.push(("current_exe_ancestor".to_string(), ancestor.to_path_buf()));
+        }
+    }
+
+    candidates.push((
+        "compile_time_manifest_dir".to_string(),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+    ));
+    candidates
+}
+
+fn machine_runtime_source_from_candidates(
+    candidates: Vec<(String, PathBuf)>,
+) -> Result<MachineRuntimeSource, String> {
+    let mut errors = Vec::new();
+    for (source, candidate) in candidates {
+        let repo_root = match candidate.canonicalize() {
+            Ok(repo_root) => repo_root,
+            Err(error) => {
+                errors.push(format!("{} {}: {error}", source, candidate.display()));
+                continue;
+            }
+        };
+        match packaged_revision_for_runtime_root(repo_root.as_path()) {
+            Ok(Some(packaged_revision)) => {
+                return Ok(MachineRuntimeSource {
+                    repo_root,
+                    packaged_revision: Some(packaged_revision),
+                });
+            }
+            Ok(None) => {}
+            Err(error) => {
+                errors.push(format!("{} {}: {error}", source, repo_root.display()));
+                continue;
+            }
+        }
+        if repo_root.join("Cargo.toml").is_file()
+            && repo_root.join("crates/psionic-train/src/main.rs").is_file()
+            && repo_root
+                .join("crates/psionic-train/src/train_runtime.rs")
+                .is_file()
+        {
+            return Ok(MachineRuntimeSource {
+                repo_root,
+                packaged_revision: None,
+            });
+        }
+        errors.push(format!(
+            "{} {}: not a Psionic checkout or packaged runtime",
+            source,
+            repo_root.display()
+        ));
+    }
+    Err(format!(
+        "failed to resolve psionic runtime source: {}",
+        errors.join("; ")
+    ))
+}
+
+fn packaged_revision_for_runtime_root(repo_root: &Path) -> Result<Option<String>, String> {
+    let revision_path = repo_root.join(PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE);
+    if !revision_path.exists() {
+        return Ok(None);
+    }
+    let revision = fs::read_to_string(revision_path.as_path()).map_err(|error| {
+        format!(
+            "failed to read packaged runtime revision marker {}: {error}",
+            revision_path.display()
+        )
+    })?;
+    let revision = revision.trim();
+    if revision.is_empty() {
+        return Err(format!(
+            "packaged runtime revision marker {} is empty",
+            revision_path.display()
+        ));
+    }
+    Ok(Some(revision.to_string()))
 }
 
 fn git_output(repo_root: &Path, args: &[&str]) -> Result<String, String> {
@@ -1044,7 +1144,7 @@ fn resolve_runtime_identity(
     manifest: &PsionicTrainInvocationManifest,
     manifest_path: &Path,
 ) -> Result<MachineRuntimeIdentity, PsionicTrainStatusPacket> {
-    let repo_root = machine_repo_root().map_err(|detail| {
+    let runtime_source = machine_runtime_source().map_err(|detail| {
         PsionicTrainStatusPacket::refusal(
             Some(manifest),
             PsionicTrainRefusalClass::InternalError,
@@ -1072,8 +1172,52 @@ fn resolve_runtime_identity(
             "machine runtime manifest is missing selected_git_ref",
         )
     })?;
-    let git_commit_sha =
-        git_output(&repo_root, &["rev-parse", selected_git_ref]).map_err(|detail| {
+    let (git_commit_sha, dirty_tree_admission, workspace_status_sha256) = if let Some(
+        packaged_revision,
+    ) =
+        runtime_source.packaged_revision.clone()
+    {
+        if selected_git_ref != PSIONIC_TRAIN_PACKAGED_RUNTIME_SELECTED_REF {
+            return Err(PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::BadConfig,
+                Some(manifest_path.display().to_string()),
+                None,
+                None,
+                manifest.run_id.clone(),
+                manifest_run_root(manifest).map(|value| value.display().to_string()),
+                None,
+                None,
+                format!(
+                    "packaged machine runtime requires selected_git_ref `{PSIONIC_TRAIN_PACKAGED_RUNTIME_SELECTED_REF}` but found `{selected_git_ref}`"
+                ),
+            ));
+        }
+        if manifest.allow_dirty_tree {
+            return Err(PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::BadConfig,
+                Some(manifest_path.display().to_string()),
+                None,
+                None,
+                manifest.run_id.clone(),
+                manifest_run_root(manifest).map(|value| value.display().to_string()),
+                None,
+                None,
+                "packaged machine runtime cannot enable dirty-tree override",
+            ));
+        }
+        (
+            packaged_revision,
+            PSIONIC_TRAIN_PACKAGED_RUNTIME_DIRTY_TREE_ADMISSION.to_string(),
+            None,
+        )
+    } else {
+        let git_commit_sha = git_output(
+            runtime_source.repo_root.as_path(),
+            &["rev-parse", selected_git_ref],
+        )
+        .map_err(|detail| {
             PsionicTrainStatusPacket::refusal(
                 Some(manifest),
                 PsionicTrainRefusalClass::BadConfig,
@@ -1087,8 +1231,11 @@ fn resolve_runtime_identity(
                 detail,
             )
         })?;
-    let (dirty_tree_admission, workspace_status_sha256) =
-        dirty_tree_posture(&repo_root, manifest.allow_dirty_tree).map_err(|detail| {
+        let (dirty_tree_admission, workspace_status_sha256) = dirty_tree_posture(
+            runtime_source.repo_root.as_path(),
+            manifest.allow_dirty_tree,
+        )
+        .map_err(|detail| {
             PsionicTrainStatusPacket::refusal(
                 Some(manifest),
                 PsionicTrainRefusalClass::BadConfig,
@@ -1102,6 +1249,12 @@ fn resolve_runtime_identity(
                 detail,
             )
         })?;
+        (
+            git_commit_sha,
+            dirty_tree_admission,
+            workspace_status_sha256,
+        )
+    };
     let expected_release_id =
         admitted_release_id_for_lane(manifest.lane_id.as_str()).map_err(|error| {
             PsionicTrainStatusPacket::refusal(
@@ -2393,4 +2546,52 @@ fn print_usage() {
         psionic_train::PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION,
         psionic_train::PSIONIC_TRAIN_STATUS_PACKET_SCHEMA_VERSION
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packaged_runtime_source_reads_revision_marker() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        fs::write(
+            temp.path()
+                .join(PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE),
+            "0123456789abcdef\n",
+        )
+        .expect("write revision marker");
+
+        let source = machine_runtime_source_from_candidates(vec![(
+            "test_packaged_runtime".to_string(),
+            temp.path().to_path_buf(),
+        )])
+        .expect("packaged runtime source should resolve");
+
+        assert_eq!(source.repo_root, temp.path().canonicalize().unwrap());
+        assert_eq!(
+            source.packaged_revision.as_deref(),
+            Some("0123456789abcdef")
+        );
+    }
+
+    #[test]
+    fn packaged_runtime_source_rejects_empty_revision_marker() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        fs::write(
+            temp.path()
+                .join(PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE),
+            "\n",
+        )
+        .expect("write revision marker");
+
+        let error = machine_runtime_source_from_candidates(vec![(
+            "test_packaged_runtime".to_string(),
+            temp.path().to_path_buf(),
+        )])
+        .expect_err("empty revision marker should be rejected");
+
+        assert!(error.contains("packaged runtime revision marker"));
+        assert!(error.contains("is empty"));
+    }
 }

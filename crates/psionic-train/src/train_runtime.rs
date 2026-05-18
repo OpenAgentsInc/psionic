@@ -38,6 +38,18 @@ pub const PSIONIC_TRAIN_RUNTIME_SURFACE_ID: &str = "psionic-train.runtime.v1";
 /// Canonical local cache directory where resolver-backed artifacts are materialized for runtime use.
 pub const PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR: &str = "artifacts/resolved";
 
+/// Environment variable pointing a packaged machine runtime at its runtime root.
+pub const PSIONIC_TRAIN_RUNTIME_ROOT_ENV: &str = "OPENAGENTS_PSIONIC_REPO";
+
+/// Revision marker included in packaged machine runtimes that are not Git checkouts.
+pub const PSIONIC_TRAIN_PACKAGED_RUNTIME_REVISION_FILE: &str = ".openagents-psionic-revision";
+
+/// Synthetic selected ref used when a packaged runtime is identified by its revision marker.
+pub const PSIONIC_TRAIN_PACKAGED_RUNTIME_SELECTED_REF: &str = "packaged-runtime";
+
+/// Dirty-tree posture recorded for packaged runtimes built from clean source.
+pub const PSIONIC_TRAIN_PACKAGED_RUNTIME_DIRTY_TREE_ADMISSION: &str = "packaged_clean_release";
+
 /// Stable admitted release id for the actual pretraining lane on the first machine runtime.
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID: &str =
     "psionic-train.psion_actual_pretraining.release.v1";
