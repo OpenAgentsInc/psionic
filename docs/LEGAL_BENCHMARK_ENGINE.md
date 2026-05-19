@@ -180,8 +180,19 @@ and writes `config.json`, `transcript.jsonl`, `metrics.json`,
 `output_artifact_manifest.json`, `extraction_receipts.json`,
 `tool_receipts.json`, `run_record.json`, and `run_receipt.json`.
 
+## Evaluator And Judge Interface
+
+The criterion-scoped evaluator is documented in
+`docs/LEGAL_BENCHMARK_EVALUATOR.md` and implemented in
+`crates/psionic-eval/src/legal_benchmark_evaluator.rs`.
+
+It loads completed task/run/output-manifest artifacts, runs deterministic
+manifest and deliverable prechecks, extracts output text per criterion, calls a
+provider-neutral judge adapter, and emits `ScoreReport` values with all-pass
+status, criterion pass rate, judge provenance, confidence, latency, cost,
+document coverage, failure diagnostics, and extraction receipt refs.
+
 ## Next Work
 
-The next implementation issue is the criterion-scoped evaluator and judge
-interface. It should consume completed run directories and produce score
-reports with criterion provenance.
+The next implementation issue is static report and comparison generation. It
+should consume score reports and run receipts from the runner/evaluator path.
