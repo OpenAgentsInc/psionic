@@ -169,8 +169,19 @@ Routes record provider family, model id, model config hash, elapsed time,
 retry count, raw response hash, and secret reference id without writing raw
 credentials into run artifacts.
 
+## Agent Runner
+
+The Rust agent loop is documented in `docs/LEGAL_BENCHMARK_RUNNER.md` and
+implemented in `crates/psionic-eval/src/legal_benchmark_agent.rs`.
+
+It builds policy/task prompts, drives provider turns, executes tool calls,
+requires explicit JSON submit/finalize semantics, classifies terminal states,
+and writes `config.json`, `transcript.jsonl`, `metrics.json`,
+`output_artifact_manifest.json`, `extraction_receipts.json`,
+`tool_receipts.json`, `run_record.json`, and `run_receipt.json`.
+
 ## Next Work
 
-The next implementation issue is the Rust agent loop. It should consume the
-provider adapter and closed tool surface to produce complete run records,
-transcripts, metrics, output manifests, and receipts.
+The next implementation issue is the criterion-scoped evaluator and judge
+interface. It should consume completed run directories and produce score
+reports with criterion provenance.

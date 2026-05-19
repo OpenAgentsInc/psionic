@@ -157,6 +157,8 @@ pub struct ModelMessage {
     pub role: ModelMessageRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ModelToolCall>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -170,6 +172,18 @@ impl ModelMessage {
         Self {
             role,
             content: Some(content.into()),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
+            tool_name: None,
+            metadata: Metadata::new(),
+        }
+    }
+
+    pub fn assistant_response(content: Option<String>, tool_calls: Vec<ModelToolCall>) -> Self {
+        Self {
+            role: ModelMessageRole::Assistant,
+            content,
+            tool_calls,
             tool_call_id: None,
             tool_name: None,
             metadata: Metadata::new(),
@@ -180,6 +194,7 @@ impl ModelMessage {
         Self {
             role: ModelMessageRole::Tool,
             content: Some(result.content),
+            tool_calls: Vec::new(),
             tool_call_id: Some(result.tool_call_id),
             tool_name: Some(result.tool_name),
             metadata: result.metadata,
@@ -722,11 +737,27 @@ fn openai_message_json(message: &ModelMessage) -> Value {
             "tool_call_id": message.tool_call_id,
             "content": message.content.clone().unwrap_or_default(),
         }),
+        ModelMessageRole::Assistant if !message.tool_calls.is_empty() => json!({
+            "role": "assistant",
+            "content": message.content.clone().unwrap_or_default(),
+            "tool_calls": message.tool_calls.iter().map(openai_tool_call_message_json).collect::<Vec<_>>(),
+        }),
         _ => json!({
             "role": message.role.as_str(),
             "content": message.content.clone().unwrap_or_default(),
         }),
     }
+}
+
+fn openai_tool_call_message_json(tool_call: &ModelToolCall) -> Value {
+    json!({
+        "id": tool_call.tool_call_id.clone(),
+        "type": "function",
+        "function": {
+            "name": tool_call.tool_name.clone(),
+            "arguments": tool_call.arguments.to_string(),
+        }
+    })
 }
 
 fn build_anthropic_request(
@@ -797,6 +828,10 @@ fn anthropic_message_json(message: &ModelMessage) -> Value {
                     .unwrap_or(false)
             }]
         }),
+        ModelMessageRole::Assistant if !message.tool_calls.is_empty() => json!({
+            "role": "assistant",
+            "content": message.tool_calls.iter().map(anthropic_tool_use_message_json).collect::<Vec<_>>(),
+        }),
         ModelMessageRole::Assistant => json!({
             "role": "assistant",
             "content": message.content.clone().unwrap_or_default(),
@@ -806,6 +841,15 @@ fn anthropic_message_json(message: &ModelMessage) -> Value {
             "content": message.content.clone().unwrap_or_default(),
         }),
     }
+}
+
+fn anthropic_tool_use_message_json(tool_call: &ModelToolCall) -> Value {
+    json!({
+        "type": "tool_use",
+        "id": tool_call.tool_call_id.clone(),
+        "name": tool_call.tool_name.clone(),
+        "input": tool_call.arguments.clone(),
+    })
 }
 
 fn send_with_retries<T>(
