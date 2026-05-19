@@ -198,6 +198,31 @@ deliverable completeness, fine-tune data selection, and task-intake routing to
 the phase-three RL window while preserving judge-adjudication and scorecard
 requirements for every family.
 
+## Phase-Five Retained Rehearsal
+
+The lane now also emits `QwenLegalRlRetainedRehearsalReport` with schema
+`psionic.qwen_legal_rl_retained_rehearsal.v1`. It consumes the phase-four
+perfect-score push report and the Blueprint retained rehearsal plan:
+
+- phase-four target carried forward: 8500 bps
+- phase-five conservative target: 9000 bps
+- retained rehearsal task-runs: 60
+- accepted rollout minimum: 194
+- quarantine budget: 24
+- adversarial holdout task-runs: 36
+- holdout regression allowance: 0 bps
+- calibrated judge disagreement budget: 50 bps
+- family coverage: all nine Blueprint optimizer frontier families
+- Blueprint plan ref:
+  `blueprint://harvey_legal_qwen_phase_five_retained_rehearsal_plan/optimizer_plan.harvey_legal_qwen.phase_005.retained_rehearsal`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-005`
+
+This is the first high-confidence rehearsal gate after the 8500 bps target. It
+requires three retained-slice passes, an adversarial holdout, and a tighter
+judge panel before Autopilot4 should import a candidate as ready for a public
+retained campaign.
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:

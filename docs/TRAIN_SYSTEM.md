@@ -189,9 +189,14 @@ holdout regression. The lane now also emits a phase-four perfect-score push
 report that consumes the Blueprint perfect-score push plan, covers all nine
 frontier families, raises the next local benchmark target to 8500 bps,
 requires 140 accepted rollouts, caps quarantine at 20 rollouts, and requires a
-75 bps calibrated judge-disagreement budget. Those reports are readiness
-evidence only; retained score claims still require the actual retained slice
-and Autopilot4 release-gate approval.
+75 bps calibrated judge-disagreement budget. The lane now also emits a
+phase-five retained rehearsal report that consumes the Blueprint retained
+rehearsal plan, carries the 8500 bps target forward, raises the next local
+benchmark target to 9000 bps, requires 60 retained rehearsal task-runs, 194
+accepted rollouts, 24 quarantined rollouts, 36 adversarial holdout task-runs,
+zero holdout regression, and a 50 bps calibrated judge-disagreement budget.
+Those reports are readiness evidence only; retained score claims still require
+the actual retained slice and Autopilot4 release-gate approval.
 The paired serving/eval metadata path is in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
 compare base and tuned Qwen candidates through one OpenAI-compatible route

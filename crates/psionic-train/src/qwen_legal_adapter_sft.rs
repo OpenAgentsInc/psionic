@@ -52,6 +52,9 @@ pub const QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_SCHEMA_VERSION: &str =
 /// Stable schema version for the legal RL perfect-score push report.
 pub const QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_perfect_score_push.v1";
+/// Stable schema version for the legal RL retained rehearsal report.
+pub const QWEN_LEGAL_RL_RETAINED_REHEARSAL_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_retained_rehearsal.v1";
 /// Stable plan id for the next Harvey legal hillclimb phase.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID: &str = "qwen_legal_rl_hillclimb_plan_v1";
 /// Stable report id for the next Harvey legal RL benchmark projection.
@@ -62,12 +65,17 @@ pub const QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_REPORT_ID: &str =
 /// Stable report id for the phase-four Harvey legal perfect-score push.
 pub const QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_REPORT_ID: &str =
     "qwen_legal_rl_perfect_score_push_phase_004";
+/// Stable report id for the phase-five Harvey legal retained rehearsal.
+pub const QWEN_LEGAL_RL_RETAINED_REHEARSAL_REPORT_ID: &str =
+    "qwen_legal_rl_retained_rehearsal_phase_005";
 /// Phase-two retained target aligned with Blueprint optimizer batch `phase_002`.
 pub const QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS: u16 = 7_000;
 /// Phase-three retained target aligned with Blueprint shadow-eval shortlist.
 pub const QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS: u16 = 7_800;
 /// Phase-four retained target aligned with Blueprint perfect-score push plan.
 pub const QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS: u16 = 8_500;
+/// Phase-five retained target aligned with Blueprint retained rehearsal plan.
+pub const QWEN_LEGAL_PHASE_FIVE_TARGET_SCORE_BPS: u16 = 9_000;
 /// Blueprint frontier consumed by the Psionic legal RL plan.
 pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
     "blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001";
@@ -75,6 +83,8 @@ pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
 pub const QWEN_LEGAL_BLUEPRINT_SHADOW_EVAL_SHORTLIST_REF: &str = "blueprint://harvey_legal_qwen_phase_three_shadow_eval_shortlist/optimizer_shortlist.harvey_legal_qwen.phase_003.shadow_eval";
 /// Blueprint phase-four perfect-score push plan consumed by Psionic.
 pub const QWEN_LEGAL_BLUEPRINT_PERFECT_SCORE_PUSH_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_four_perfect_score_push_plan/optimizer_plan.harvey_legal_qwen.phase_004.perfect_score_push";
+/// Blueprint phase-five retained rehearsal plan consumed by Psionic.
+pub const QWEN_LEGAL_BLUEPRINT_RETAINED_REHEARSAL_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_five_retained_rehearsal_plan/optimizer_plan.harvey_legal_qwen.phase_005.retained_rehearsal";
 /// Stable target-set id for the first narrow LM-head-only adapter.
 pub const QWEN_LEGAL_ADAPTER_TARGET_SET_ID: &str = "qwen3.5-4b.legal.lm_head_lora.v1";
 /// Stable adapter target id for the first smoke lane.
@@ -1190,6 +1200,80 @@ pub struct QwenLegalRlPerfectScorePushReport {
     pub report_digest: String,
 }
 
+/// One failure-family allocation inside the phase-five retained rehearsal report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlRetainedRehearsalTarget {
+    /// Failure family shared with Blueprint and Autopilot4.
+    pub failure_family: String,
+    /// Optimizer method assigned to this family.
+    pub optimizer_method: QwenLegalRlOptimizerMethod,
+    /// Blueprint module receiving the rehearsed candidate.
+    pub blueprint_module_slug: String,
+    /// Dataset or review request admitted into the rehearsal.
+    pub dataset_request_ref: String,
+    /// Planned accepted rollouts or reviewed traces for this family.
+    pub planned_accepted_rollouts: u16,
+    /// Conservative lift this target should support in retained rehearsal.
+    pub planned_rehearsal_lift_basis_points: u16,
+    /// Number of retained-slice replay passes required for this family.
+    pub retained_replay_count: u8,
+    /// Whether a multi-judge panel must adjudicate the family.
+    pub judge_panel_required: bool,
+    /// Per-family scorecard that must exist before promotion review.
+    pub scorecard_ref: String,
+    /// Per-family receipt that must exist before promotion review.
+    pub receipt_ref: String,
+}
+
+/// Phase-five offline RL/adjudication report for retained Harvey rehearsal.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlRetainedRehearsalReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable report id.
+    pub report_id: String,
+    /// Source phase-four report id.
+    pub source_push_report_id: String,
+    /// Stable digest of the phase-four report payload.
+    pub source_push_report_digest: String,
+    /// Plan id this rehearsal still executes.
+    pub plan_id: String,
+    /// Stable digest of the plan payload.
+    pub plan_digest: String,
+    /// Baseline retained score used for the rehearsal.
+    pub baseline_score_basis_points: u16,
+    /// Previous target carried forward from phase four.
+    pub previous_target_score_basis_points: u16,
+    /// New phase-five conservative target.
+    pub phase_five_target_score_basis_points: u16,
+    /// Sum of family-level planned retained-rehearsal lifts.
+    pub total_planned_rehearsal_lift_basis_points: u16,
+    /// Target model family for retained scoring.
+    pub retained_target_model_id: String,
+    /// Rollout window id widened for phase five.
+    pub rollout_window_id: String,
+    /// Number of retained task-runs required before score import.
+    pub retained_rehearsal_run_count: u16,
+    /// Minimum accepted rollout count for the phase-five rehearsal.
+    pub accepted_rollout_minimum: u16,
+    /// Maximum quarantined rollout count for the phase-five rehearsal.
+    pub quarantined_rollout_budget: u16,
+    /// Minimum adversarial holdout task-runs for the rehearsal.
+    pub adversarial_holdout_run_count: u16,
+    /// Maximum permitted holdout regression for promotion review.
+    pub holdout_max_regression_basis_points: u16,
+    /// Maximum unresolved judge-disagreement budget.
+    pub calibrated_judge_disagreement_budget_basis_points: u16,
+    /// Blueprint retained-rehearsal plan ref consumed by this report.
+    pub blueprint_retained_rehearsal_plan_ref: String,
+    /// Per-family target allocations.
+    pub targets: Vec<QwenLegalRlRetainedRehearsalTarget>,
+    /// Autopilot4 export/update target.
+    pub benchmark_export_ref: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
 impl QwenLegalRlBenchmarkReadinessReport {
     /// Returns the stable digest over the report payload.
     #[must_use]
@@ -1470,6 +1554,129 @@ impl QwenLegalRlPerfectScorePushReport {
     }
 }
 
+impl QwenLegalRlRetainedRehearsalReport {
+    /// Returns the stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(b"psionic_qwen_legal_rl_retained_rehearsal|", &clone)
+    }
+
+    fn validate(&self) -> Result<(), QwenLegalAdapterSftError> {
+        if self.schema_version != QWEN_LEGAL_RL_RETAINED_REHEARSAL_SCHEMA_VERSION {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL retained rehearsal schema version drifted"),
+            });
+        }
+        if self.report_id != QWEN_LEGAL_RL_RETAINED_REHEARSAL_REPORT_ID {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL retained rehearsal report id drifted"),
+            });
+        }
+        require_nonempty(self.source_push_report_id.as_str(), "source_push_report_id")?;
+        require_nonempty(
+            self.source_push_report_digest.as_str(),
+            "source_push_report_digest",
+        )?;
+        require_nonempty(self.plan_id.as_str(), "plan_id")?;
+        require_nonempty(self.plan_digest.as_str(), "plan_digest")?;
+        if self.previous_target_score_basis_points != QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS
+            || self.phase_five_target_score_basis_points != QWEN_LEGAL_PHASE_FIVE_TARGET_SCORE_BPS
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL retained rehearsal target drifted"),
+            });
+        }
+        if self.baseline_score_basis_points >= self.previous_target_score_basis_points
+            || self.previous_target_score_basis_points >= self.phase_five_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL retained rehearsal requires monotonic targets"),
+            });
+        }
+        if self
+            .baseline_score_basis_points
+            .saturating_add(self.total_planned_rehearsal_lift_basis_points)
+            < self.phase_five_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("planned retained rehearsal lift does not support target"),
+            });
+        }
+        require_nonempty(
+            self.retained_target_model_id.as_str(),
+            "retained_target_model_id",
+        )?;
+        require_nonempty(self.rollout_window_id.as_str(), "rollout_window_id")?;
+        if self.retained_rehearsal_run_count < 60 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("retained rehearsal requires at least 60 task-runs"),
+            });
+        }
+        if self.accepted_rollout_minimum <= self.quarantined_rollout_budget {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("accepted legal rollouts must exceed quarantine budget"),
+            });
+        }
+        if self.adversarial_holdout_run_count < 36 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("retained rehearsal requires adversarial holdout task-runs"),
+            });
+        }
+        if self.holdout_max_regression_basis_points != 0 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("phase-five Harvey rehearsal allows no holdout regression"),
+            });
+        }
+        if self.calibrated_judge_disagreement_budget_basis_points > 50 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("retained rehearsal judge disagreement budget is too loose"),
+            });
+        }
+        require_nonempty(
+            self.blueprint_retained_rehearsal_plan_ref.as_str(),
+            "blueprint_retained_rehearsal_plan_ref",
+        )?;
+        if self.targets.len() < 9 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("retained rehearsal requires all frontier families"),
+            });
+        }
+        for target in &self.targets {
+            require_nonempty(target.failure_family.as_str(), "target.failure_family")?;
+            require_nonempty(
+                target.blueprint_module_slug.as_str(),
+                "target.blueprint_module_slug",
+            )?;
+            require_nonempty(
+                target.dataset_request_ref.as_str(),
+                "target.dataset_request_ref",
+            )?;
+            require_nonempty(target.scorecard_ref.as_str(), "target.scorecard_ref")?;
+            require_nonempty(target.receipt_ref.as_str(), "target.receipt_ref")?;
+            if target.planned_accepted_rollouts == 0
+                || target.planned_rehearsal_lift_basis_points == 0
+                || target.retained_replay_count < 3
+                || !target.judge_panel_required
+            {
+                return Err(QwenLegalAdapterSftError::InvalidConfig {
+                    detail: String::from(
+                        "retained rehearsal targets require rollouts, lift, replay, and judge panel",
+                    ),
+                });
+            }
+        }
+        require_nonempty(self.benchmark_export_ref.as_str(), "benchmark_export_ref")?;
+        if self.report_digest != self.stable_digest() {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL retained rehearsal digest drifted"),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Builds the offline benchmark projection for a legal RL plan.
 pub fn qwen_legal_rl_benchmark_readiness_report(
     plan: &QwenLegalRlHillclimbPlan,
@@ -1724,6 +1931,84 @@ pub fn qwen_legal_rl_phase_four_perfect_score_push_report(
     Ok(report)
 }
 
+/// Builds the phase-five retained rehearsal report from the phase-four RL push.
+pub fn qwen_legal_rl_phase_five_retained_rehearsal_report(
+    plan: &QwenLegalRlHillclimbPlan,
+    push_report: &QwenLegalRlPerfectScorePushReport,
+) -> Result<QwenLegalRlRetainedRehearsalReport, QwenLegalAdapterSftError> {
+    plan.validate()?;
+    push_report.validate()?;
+    if push_report.plan_digest != plan.plan_digest
+        || push_report.plan_id != plan.plan_id
+        || push_report.phase_four_target_score_basis_points
+            != QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS
+    {
+        return Err(QwenLegalAdapterSftError::InvalidConfig {
+            detail: String::from("phase-five retained rehearsal source report mismatch"),
+        });
+    }
+
+    let targets = push_report
+        .targets
+        .iter()
+        .map(|target| QwenLegalRlRetainedRehearsalTarget {
+            failure_family: target.failure_family.clone(),
+            optimizer_method: target.optimizer_method,
+            blueprint_module_slug: target.blueprint_module_slug.clone(),
+            dataset_request_ref: target.dataset_request_ref.clone(),
+            planned_accepted_rollouts: target.planned_accepted_rollouts + 6,
+            planned_rehearsal_lift_basis_points: target.planned_shadow_lift_basis_points,
+            retained_replay_count: 3,
+            judge_panel_required: true,
+            scorecard_ref: target
+                .scorecard_ref
+                .replace("phase_004.perfect_push", "phase_005.retained_rehearsal"),
+            receipt_ref: format!(
+                "receipt.psionic.qwen_legal.{}.phase_005.retained_rehearsal",
+                target.failure_family
+            ),
+        })
+        .collect::<Vec<_>>();
+    let total_planned_rehearsal_lift_basis_points = targets
+        .iter()
+        .map(|target| target.planned_rehearsal_lift_basis_points)
+        .sum::<u16>();
+    let accepted_rollout_minimum = targets
+        .iter()
+        .map(|target| target.planned_accepted_rollouts)
+        .sum::<u16>();
+
+    let mut report = QwenLegalRlRetainedRehearsalReport {
+        schema_version: String::from(QWEN_LEGAL_RL_RETAINED_REHEARSAL_SCHEMA_VERSION),
+        report_id: String::from(QWEN_LEGAL_RL_RETAINED_REHEARSAL_REPORT_ID),
+        source_push_report_id: push_report.report_id.clone(),
+        source_push_report_digest: push_report.report_digest.clone(),
+        plan_id: plan.plan_id.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        baseline_score_basis_points: push_report.baseline_score_basis_points,
+        previous_target_score_basis_points: push_report.phase_four_target_score_basis_points,
+        phase_five_target_score_basis_points: QWEN_LEGAL_PHASE_FIVE_TARGET_SCORE_BPS,
+        total_planned_rehearsal_lift_basis_points,
+        retained_target_model_id: plan.retained_target_model_id.clone(),
+        rollout_window_id: String::from("harvey-legal-retained-20-task-window-005"),
+        retained_rehearsal_run_count: 60,
+        accepted_rollout_minimum,
+        quarantined_rollout_budget: push_report.quarantined_rollout_budget + 4,
+        adversarial_holdout_run_count: 36,
+        holdout_max_regression_basis_points: 0,
+        calibrated_judge_disagreement_budget_basis_points: 50,
+        blueprint_retained_rehearsal_plan_ref: String::from(
+            QWEN_LEGAL_BLUEPRINT_RETAINED_REHEARSAL_PLAN_REF,
+        ),
+        targets,
+        benchmark_export_ref: String::from("autopilot4://benchmarks/harvey/progress/phase-005"),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    report.validate()?;
+    Ok(report)
+}
+
 /// Full higher-level Qwen legal adapter smoke outcome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QwenLegalAdapterSftRunOutcome {
@@ -1753,6 +2038,8 @@ pub struct QwenLegalAdapterSftRunOutcome {
     pub rl_optimization_window_report: QwenLegalRlOptimizationWindowReport,
     /// Phase-four perfect-score push report for the RL hillclimb plan.
     pub rl_perfect_score_push_report: QwenLegalRlPerfectScorePushReport,
+    /// Phase-five retained rehearsal report for the RL hillclimb plan.
+    pub rl_retained_rehearsal_report: QwenLegalRlRetainedRehearsalReport,
 }
 
 /// First honest Qwen legal adapter-SFT smoke trainer.
@@ -2062,6 +2349,10 @@ impl QwenLegalAdapterSftTrainer {
             &rl_hillclimb_plan,
             &rl_optimization_window_report,
         )?;
+        let rl_retained_rehearsal_report = qwen_legal_rl_phase_five_retained_rehearsal_report(
+            &rl_hillclimb_plan,
+            &rl_perfect_score_push_report,
+        )?;
         let summary = QwenLegalAdapterSftSummary {
             run_summary,
             lane_id: String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID),
@@ -2100,6 +2391,7 @@ impl QwenLegalAdapterSftTrainer {
             rl_benchmark_report,
             rl_optimization_window_report,
             rl_perfect_score_push_report,
+            rl_retained_rehearsal_report,
         })
     }
 
@@ -2412,6 +2704,16 @@ mod tests {
             outcome.rl_perfect_score_push_report.report_digest,
             outcome.rl_perfect_score_push_report.stable_digest()
         );
+        assert_eq!(
+            outcome
+                .rl_retained_rehearsal_report
+                .phase_five_target_score_basis_points,
+            QWEN_LEGAL_PHASE_FIVE_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            outcome.rl_retained_rehearsal_report.report_digest,
+            outcome.rl_retained_rehearsal_report.stable_digest()
+        );
         let loaded = outcome.exported_artifact.load_lm_head_lora_artifact()?;
         assert_eq!(loaded.hidden_size, 4);
         assert_eq!(loaded.rank, QWEN_LEGAL_ADAPTER_LORA_RANK);
@@ -2673,6 +2975,85 @@ mod tests {
         }));
         assert!(push.benchmark_export_ref.ends_with("phase-004"));
         assert_eq!(push.report_digest, push.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn qwen_legal_rl_phase_five_rehearsal_targets_ninety_percent()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = canonical_qwen_legal_rl_hillclimb_plan(
+            sample_dataset_binding(),
+            sample_eval_pack_binding(),
+            "qwen35-4b-legal-smoke-r1-score-import",
+        )?;
+        let readiness_report = qwen_legal_rl_benchmark_readiness_report(&plan, 5_260)?;
+        let window =
+            qwen_legal_rl_phase_three_optimization_window_report(&plan, &readiness_report)?;
+        let push = qwen_legal_rl_phase_four_perfect_score_push_report(&plan, &window)?;
+        let rehearsal = qwen_legal_rl_phase_five_retained_rehearsal_report(&plan, &push)?;
+        let families = rehearsal
+            .targets
+            .iter()
+            .map(|target| target.failure_family.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            rehearsal.schema_version,
+            QWEN_LEGAL_RL_RETAINED_REHEARSAL_SCHEMA_VERSION
+        );
+        assert_eq!(rehearsal.plan_digest, plan.plan_digest);
+        assert_eq!(rehearsal.source_push_report_digest, push.report_digest);
+        assert_eq!(
+            rehearsal.previous_target_score_basis_points,
+            QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            rehearsal.phase_five_target_score_basis_points,
+            QWEN_LEGAL_PHASE_FIVE_TARGET_SCORE_BPS
+        );
+        assert!(
+            rehearsal
+                .baseline_score_basis_points
+                .saturating_add(rehearsal.total_planned_rehearsal_lift_basis_points)
+                >= rehearsal.phase_five_target_score_basis_points
+        );
+        assert_eq!(rehearsal.retained_rehearsal_run_count, 60);
+        assert_eq!(rehearsal.accepted_rollout_minimum, 194);
+        assert_eq!(rehearsal.quarantined_rollout_budget, 24);
+        assert_eq!(rehearsal.adversarial_holdout_run_count, 36);
+        assert_eq!(rehearsal.holdout_max_regression_basis_points, 0);
+        assert!(rehearsal.calibrated_judge_disagreement_budget_basis_points <= 50);
+        assert!(
+            rehearsal
+                .blueprint_retained_rehearsal_plan_ref
+                .contains("phase_five_retained_rehearsal_plan")
+        );
+        assert_eq!(rehearsal.targets.len(), 9);
+        for family in [
+            "document_coverage",
+            "citation_evidence",
+            "legal_reasoning",
+            "spreadsheet_reasoning",
+            "missing_fact",
+            "pre_submit_self_check",
+            "deliverable_completeness",
+            "fine_tune_data_selection",
+            "task_intake_routing",
+        ] {
+            assert!(families.contains(&family), "missing {family}");
+        }
+        assert!(rehearsal.targets.iter().all(|target| {
+            target.judge_panel_required
+                && target.retained_replay_count == 3
+                && target.planned_accepted_rollouts > 0
+                && target.planned_rehearsal_lift_basis_points > 0
+                && target
+                    .scorecard_ref
+                    .contains("phase_005.retained_rehearsal")
+                && target.receipt_ref.contains("phase_005.retained_rehearsal")
+        }));
+        assert!(rehearsal.benchmark_export_ref.ends_with("phase-005"));
+        assert_eq!(rehearsal.report_digest, rehearsal.stable_digest());
         Ok(())
     }
 
