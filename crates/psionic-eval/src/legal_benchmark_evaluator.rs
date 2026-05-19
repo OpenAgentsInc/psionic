@@ -3,17 +3,16 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::{
-    ArtifactKind, ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, CriterionResult,
-    CriterionSpec, CriterionVerdict, DataClassification, DeliverableKind, DeliverableSpec,
-    JudgePolicy, Metadata, RunRecord, ScoreReport, SourceArtifact, artifact_from_file,
-    artifact_manifest_digest, run_record_digest, score_report_digest, stable_json_digest,
+    ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, CriterionResult, CriterionSpec,
+    CriterionVerdict, DeliverableKind, DeliverableSpec, JudgePolicy, Metadata, RunRecord,
+    ScoreReport, SourceArtifact, artifact_from_file, artifact_manifest_digest, run_record_digest,
+    score_report_digest, stable_json_digest,
 };
 
 pub const LEGAL_BENCHMARK_EVALUATOR_SCHEMA_VERSION: u16 = 1;
@@ -472,8 +471,9 @@ fn default_judge_prompt_template(policy: &JudgePolicy) -> String {
     )
 }
 
+#[cfg(test)]
 fn now_ms() -> u64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
+    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
         Ok(duration) => u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
         Err(_) => 0,
     }
@@ -483,8 +483,8 @@ fn now_ms() -> u64 {
 mod tests {
     use super::*;
     use crate::{
-        ArtifactManifestRole, CriterionKind, DeliverableKind, JudgeMode, RunMetrics,
-        RunTerminalState, ToolPolicy, TranscriptEvent, TranscriptEventKind,
+        ArtifactKind, ArtifactManifestRole, CriterionKind, DataClassification, DeliverableKind,
+        JudgeMode, RunMetrics, RunTerminalState, ToolPolicy, TranscriptEvent, TranscriptEventKind,
         build_output_artifact_manifest,
     };
 
