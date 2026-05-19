@@ -17,6 +17,7 @@ mod legal_benchmark_extraction;
 mod legal_benchmark_harvey;
 mod legal_benchmark_provider;
 mod legal_benchmark_reports;
+mod legal_benchmark_sweeps;
 mod legal_benchmark_tools;
 
 pub use legal_benchmark::*;
@@ -26,6 +27,7 @@ pub use legal_benchmark_extraction::*;
 pub use legal_benchmark_harvey::*;
 pub use legal_benchmark_provider::*;
 pub use legal_benchmark_reports::*;
+pub use legal_benchmark_sweeps::*;
 pub use legal_benchmark_tools::*;
 
 #[cfg(feature = "full")]
