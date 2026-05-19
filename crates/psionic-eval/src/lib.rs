@@ -10,6 +10,10 @@
     allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)
 )]
 
+mod legal_benchmark;
+
+pub use legal_benchmark::*;
+
 #[cfg(feature = "full")]
 mod full;
 
