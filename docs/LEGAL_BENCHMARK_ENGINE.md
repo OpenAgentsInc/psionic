@@ -28,6 +28,18 @@ The `psionic-eval` legal benchmark module defines:
 - `ScoreReport`
 - `ComparisonReport`
 
+The first fine-tuning export path is now split across:
+
+- `crates/psionic-data/src/legal_benchmark_training_record.rs`
+- `crates/psionic-eval/src/legal_benchmark_training_records.rs`
+- `docs/LEGAL_BENCHMARK_TRAINING_RECORDS.md`
+
+That path exports legal task, run, coverage, transcript, and score artifacts
+into `legal_benchmark_training_record.v1` bundles for Qwen-family adapter
+smoke work. The exporter keeps judge-only scoring data separate from
+model-visible examples and excludes model-visible examples when a run exposed
+hidden criteria.
+
 Every top-level contract has an explicit schema version. The run contract
 requires task identity, task version, input artifact manifest hash, run config
 hash, and output artifact manifest hash, so later runner work cannot produce a

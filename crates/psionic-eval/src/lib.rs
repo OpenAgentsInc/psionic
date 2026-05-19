@@ -23,6 +23,8 @@ mod legal_benchmark_regression;
 mod legal_benchmark_reports;
 mod legal_benchmark_sweeps;
 mod legal_benchmark_tools;
+#[cfg(feature = "full")]
+mod legal_benchmark_training_records;
 
 pub use legal_benchmark::*;
 pub use legal_benchmark_agent::*;
@@ -35,6 +37,8 @@ pub use legal_benchmark_regression::*;
 pub use legal_benchmark_reports::*;
 pub use legal_benchmark_sweeps::*;
 pub use legal_benchmark_tools::*;
+#[cfg(feature = "full")]
+pub use legal_benchmark_training_records::*;
 
 #[cfg(feature = "full")]
 mod full;
