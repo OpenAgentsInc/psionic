@@ -8,7 +8,10 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::PsionicTrainGroupedReplicaStageAssignment;
-use crate::{PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_CS336_A1_DEMO_LANE_ID};
+use crate::{
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_CS336_A1_DEMO_LANE_ID,
+    QWEN_LEGAL_ADAPTER_SFT_LANE_ID,
+};
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -66,6 +69,10 @@ pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID: &str =
 pub const PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID: &str =
     "psionic-train.psion_cs336_a1_demo.release.v1";
 
+/// Stable admitted release id for the Qwen legal adapter smoke lane.
+pub const PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_RELEASE_ID: &str =
+    "psionic-train.qwen_legal_adapter_sft.release.v1";
+
 /// Stable admitted environment ref for the first Apple machine lane on the runtime surface.
 pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF: &str =
     "psionic.environment.psion_apple_windowed_training.metal_mlx.operator@v1";
@@ -73,6 +80,10 @@ pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF: &str =
 /// Stable admitted environment ref for the bounded packaged CS336 A1 demo lane.
 pub const PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF: &str =
     "psionic.environment.psion_cs336_a1_demo.host_cpu.operator@v1";
+
+/// Stable admitted environment ref for the Qwen legal adapter smoke lane.
+pub const PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_ENVIRONMENT_REF: &str =
+    "psionic.environment.qwen_legal_adapter_sft.cuda.operator@v1";
 
 /// Stable backend family projected by the first admitted actual-lane runtime.
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY: &str = "cuda";
@@ -93,6 +104,13 @@ pub const PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY: &str = "cpu";
 
 /// Stable topology class projected by the packaged CS336 A1 demo runtime.
 pub const PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS: &str = "single_host_cpu_reference";
+
+/// Stable backend family projected by the Qwen legal adapter smoke runtime.
+pub const PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_BACKEND_FAMILY: &str = "cuda";
+
+/// Stable topology class projected by the Qwen legal adapter smoke runtime.
+pub const PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_TOPOLOGY_CLASS: &str =
+    "single_host_cuda_adapter_smoke";
 
 /// One stable machine role consumed by `psionic-train`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1299,6 +1317,14 @@ fn canonical_lane_contract_for_lane(
             minimum_machine_class:
                 PsionicTrainMinimumMachineClass::CrossPlatformCpuCompatibleOperator,
         }),
+        QWEN_LEGAL_ADAPTER_SFT_LANE_ID => Ok(PsionicTrainLaneContractStatic {
+            lane_id: QWEN_LEGAL_ADAPTER_SFT_LANE_ID,
+            release_id: PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_RELEASE_ID,
+            environment_ref: PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_ENVIRONMENT_REF,
+            backend_family: PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_BACKEND_FAMILY,
+            topology_class: PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_TOPOLOGY_CLASS,
+            minimum_machine_class: PsionicTrainMinimumMachineClass::StrongCudaTrainer,
+        }),
         PSION_APPLE_WINDOWED_TRAINING_LANE_ID => Ok(PsionicTrainLaneContractStatic {
             lane_id: PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
             release_id: PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
@@ -1864,6 +1890,43 @@ mod tests {
         assert_eq!(
             contract.minimum_machine_class.label(),
             "cross_platform_cpu_compatible_operator"
+        );
+    }
+
+    #[test]
+    fn qwen_legal_adapter_lane_is_admitted_by_machine_contract() {
+        let mut manifest = base_manifest();
+        manifest.lane_id = String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID);
+        manifest.work_class = PsionicTrainWorkClass::AdapterTraining;
+        manifest.admission_identity = PsionicTrainAdmissionIdentity {
+            release_id: String::from(PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_RELEASE_ID),
+            build_digest: String::from("sha256:qwen-legal-adapter-smoke"),
+            environment_ref: String::from(PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_ENVIRONMENT_REF),
+        };
+        manifest
+            .validate_machine_contract()
+            .expect("Qwen legal adapter smoke manifests should validate");
+        let contract = PsionicTrainLaneContract::for_lane(QWEN_LEGAL_ADAPTER_SFT_LANE_ID)
+            .expect("Qwen legal adapter lane contract should exist");
+        assert_eq!(
+            contract.release_id,
+            PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_RELEASE_ID
+        );
+        assert_eq!(
+            contract.environment_ref,
+            PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_ENVIRONMENT_REF
+        );
+        assert_eq!(
+            contract.backend_family,
+            PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_BACKEND_FAMILY
+        );
+        assert_eq!(
+            contract.topology_class,
+            PSIONIC_TRAIN_QWEN_LEGAL_ADAPTER_SFT_TOPOLOGY_CLASS
+        );
+        assert_eq!(
+            contract.minimum_machine_class,
+            PsionicTrainMinimumMachineClass::StrongCudaTrainer
         );
     }
 

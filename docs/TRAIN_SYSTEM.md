@@ -166,6 +166,14 @@ fresh bounded run wrote the retained status packets, generic checkpoint
 surface, accepted checkpoint, and closeout bundle before calling the lane
 demo-ready.
 
+The repo now also owns the first legal benchmark Qwen adapter-SFT smoke lane in
+`crates/psionic-train/src/qwen_legal_adapter_sft.rs`, with the focused runbook
+in `docs/QWEN_LEGAL_FINETUNE_LANE.md`. The lane admits
+`qwen_legal_adapter_sft_v1` through the machine-runtime contract as a CUDA
+adapter-training smoke, binds #1018 legal training records, exports a typed
+LM-head LoRA artifact and exact checkpoint, and emits score-import metadata
+for Autopilot4 without claiming a retained Harvey score improvement.
+
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs`, the focused doc

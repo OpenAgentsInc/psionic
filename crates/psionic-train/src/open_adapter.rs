@@ -34,10 +34,18 @@ pub const OPEN_ADAPTER_CUDA_BACKEND_LABEL: &str = "open_adapter_backend.cuda.gpt
 /// Canonical backend label for the first Mac MLX + Metal open-adapter contributor.
 pub const OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL: &str =
     "open_adapter_backend.mlx.metal.gpt_oss_lm_head";
+/// Canonical backend label for the Qwen legal adapter smoke lane.
+pub const OPEN_ADAPTER_QWEN35_LEGAL_CUDA_BACKEND_LABEL: &str =
+    "open_adapter_backend.cuda.qwen35_legal_lm_head";
 /// Canonical adapter family for the first non-Apple decentralized adapter lane.
 pub const OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY: &str = "gpt_oss.decoder_lm_head_lora";
 /// Canonical adapter format for the first non-Apple decentralized adapter lane.
 pub const OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT: &str = "safetensors";
+/// Canonical adapter family for the first Qwen legal benchmark adapter lane.
+pub const OPEN_ADAPTER_QWEN35_LEGAL_ADAPTER_FAMILY: &str =
+    "qwen35.legal.decoder_lm_head_lora";
+/// Canonical adapter format for the first Qwen legal benchmark adapter lane.
+pub const OPEN_ADAPTER_QWEN35_LEGAL_ADAPTER_FORMAT: &str = "safetensors";
 
 const OPEN_ADAPTER_SAFETENSORS_MANIFEST_KEY: &str = "openagents.open_adapter.manifest";
 
@@ -49,6 +57,8 @@ pub enum OpenAdapterAdmissibleModelFamily {
     GptOssDecoderLmHeadLora,
     /// Gemma 4 e4b decoder LM-head LoRA adapters exported as `safetensors`.
     Gemma4E4bDecoderLmHeadLora,
+    /// Qwen3.5 legal benchmark decoder LM-head LoRA adapters exported as `safetensors`.
+    Qwen35LegalDecoderLmHeadLora,
 }
 
 impl OpenAdapterAdmissibleModelFamily {
@@ -58,6 +68,7 @@ impl OpenAdapterAdmissibleModelFamily {
         match self {
             Self::GptOssDecoderLmHeadLora => OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY,
             Self::Gemma4E4bDecoderLmHeadLora => GEMMA_E4B_FINETUNING_MVP_ADAPTER_FAMILY,
+            Self::Qwen35LegalDecoderLmHeadLora => OPEN_ADAPTER_QWEN35_LEGAL_ADAPTER_FAMILY,
         }
     }
 
@@ -67,6 +78,7 @@ impl OpenAdapterAdmissibleModelFamily {
         match self {
             Self::GptOssDecoderLmHeadLora => OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT,
             Self::Gemma4E4bDecoderLmHeadLora => GEMMA_E4B_FINETUNING_MVP_ADAPTER_FORMAT,
+            Self::Qwen35LegalDecoderLmHeadLora => OPEN_ADAPTER_QWEN35_LEGAL_ADAPTER_FORMAT,
         }
     }
 }
@@ -679,7 +691,10 @@ impl OpenAdapterTrainingExecutionBackend {
         let a_values = dense_values(group_a, group_a_id.as_str())?;
         let b_values = dense_values(group_b, group_b_id.as_str())?;
         let (mut grad_a, mut grad_b, mut mean_loss) =
-            if self.config.execution_backend_label == OPEN_ADAPTER_CUDA_BACKEND_LABEL {
+            if matches!(
+                self.config.execution_backend_label.as_str(),
+                OPEN_ADAPTER_CUDA_BACKEND_LABEL | OPEN_ADAPTER_QWEN35_LEGAL_CUDA_BACKEND_LABEL
+            ) {
                 let accumulated = batch
                     .samples
                     .par_iter()
@@ -1725,6 +1740,11 @@ fn open_adapter_logical_device(
             0,
             Some(String::from("cuda:0")),
         )),
+        OPEN_ADAPTER_QWEN35_LEGAL_CUDA_BACKEND_LABEL => Ok(Device::new(
+            DeviceKind::Cuda,
+            0,
+            Some(String::from("cuda:0")),
+        )),
         OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL => Ok(Device::new(
             DeviceKind::Metal,
             0,
@@ -2001,6 +2021,9 @@ fn open_adapter_family_label(family: OpenAdapterAdmissibleModelFamily) -> &'stat
         }
         OpenAdapterAdmissibleModelFamily::Gemma4E4bDecoderLmHeadLora => {
             b"gemma4_e4b_decoder_lm_head_lora"
+        }
+        OpenAdapterAdmissibleModelFamily::Qwen35LegalDecoderLmHeadLora => {
+            b"qwen35_legal_decoder_lm_head_lora"
         }
     }
 }
