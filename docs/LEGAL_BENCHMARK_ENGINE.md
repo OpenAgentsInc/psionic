@@ -214,8 +214,18 @@ wall-time, token, and failure budgets, keeps going through individual
 task/model failures, and emits a manifest with skipped, resumed, succeeded,
 failed, blocked, and budget-exhausted job states for Autopilot4 import.
 
+## CI And Golden Fixtures
+
+Repo-native compatibility checks are documented in
+`docs/LEGAL_BENCHMARK_CI.md` and run with
+`scripts/check-legal-benchmark-ci.sh`.
+
+The check target pins the audited Harvey corpus metadata, verifies the minimal
+normalization snapshot, covers sandbox traversal and symlink escape behavior,
+and exercises mock report and sweep fixtures without live provider credentials.
+
 ## Next Work
 
-The next implementation issue is Harvey parity CI and golden corpus checks. It
-should pin the audited corpus shape and run mock runner/evaluator/report/sweep
-fixtures without live provider credentials.
+The next implementation issue is high-score legal document tooling. It should
+improve document inventory, evidence coverage, and deliverable validation
+without exposing hidden rubric data.

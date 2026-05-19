@@ -1088,6 +1088,15 @@ fn resolve_existing_path(
     if !path.exists() {
         return Err("path does not exist".to_string());
     }
+    let canonical_root = root_path(workspace, root)
+        .canonicalize()
+        .map_err(|error| format!("failed to canonicalize root: {error}"))?;
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|error| format!("failed to canonicalize path: {error}"))?;
+    if !canonical_path.starts_with(canonical_root.as_path()) {
+        return Err("path escapes selected root".to_string());
+    }
     Ok(path)
 }
 
