@@ -243,6 +243,19 @@ Matrix exports summarize every recorded config hash by all-pass score,
 criterion pass rate, document coverage, reliability, cost, and latency, then
 mark Pareto-front configs for promotion-gate review.
 
+## Product Regression Guardrails
+
+Product regression guardrails are documented in
+`docs/LEGAL_BENCHMARK_REGRESSION_GUARDRAILS.md` and implemented in
+`crates/psionic-eval/src/legal_benchmark_regression.rs`.
+
+The guardrail suite uses synthetic fixtures for chat, Coder, Work Orders,
+GitHub provider, CRM, memory, and provider/tool routing. Gate reports include
+both benchmark target scores and product regression scores, export Autopilot4
+release-gate import JSON, create blocking Work Orders for failed product
+regressions, and disallow live user data or Harvey hidden criteria in the
+regression fixture suite.
+
 ## CI And Golden Fixtures
 
 Repo-native compatibility checks are documented in
@@ -251,9 +264,10 @@ Repo-native compatibility checks are documented in
 
 The check target pins the audited Harvey corpus metadata, verifies the minimal
 normalization snapshot, covers sandbox traversal and symlink escape behavior,
-and exercises mock report and sweep fixtures without live provider credentials.
+and exercises mock report, sweep, and product-regression fixtures without live
+provider credentials.
 
 ## Next Work
 
-The next implementation issue is production regression guardrails before
-benchmark-optimized modules can affect Autopilot agents.
+The next implementation issue is the Autopilot4-side release-gate import and
+operator surface for these Psionic reports.
