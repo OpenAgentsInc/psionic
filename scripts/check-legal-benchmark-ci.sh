@@ -15,3 +15,4 @@ python3 -m json.tool fixtures/legal_benchmark/normalization_snapshot_minimal.jso
 python3 -m json.tool fixtures/legal_benchmark/evaluator_mock_score_report.json >/dev/null
 python3 -m json.tool fixtures/legal_benchmark/report_export_mock.json >/dev/null
 python3 -m json.tool fixtures/legal_benchmark/sweep_smoke_config.json >/dev/null
+python3 -m json.tool fixtures/legal_benchmark/sweep_matrix_smoke_config.json >/dev/null

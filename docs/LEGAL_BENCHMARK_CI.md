@@ -21,6 +21,7 @@ The check script runs:
 - sandbox traversal and symlink escape checks
 - mock report generation checks
 - mock sweep manifest checks
+- mock sweep matrix fixture validation
 - JSON validation for the legal benchmark fixtures used by the runner,
   evaluator, report, and sweep path
 
