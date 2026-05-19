@@ -106,9 +106,21 @@ For the audited Harvey checkout, the expected summary is:
 - 74,990 criteria
 - 9,537 source documents
 
+## Sandbox Boundary
+
+The local sandbox boundary for extraction and tool execution is documented in
+`docs/PODMAN_SANDBOX_BACKEND.md` and implemented in
+`crates/psionic-sandbox/src/podman.rs`.
+
+For legal benchmark runs, the default Podman config disables network access,
+mounts source documents read-only at `/workspace/inputs`, and exposes writable
+scratch and output paths at `/workspace/scratch` and `/workspace/output`.
+Path validation canonicalizes host roots and rejects traversal or symlink
+escapes before a container command is built.
+
 ## Next Work
 
-The next implementation issue is document extraction receipts. It should attach
-versioned extractor identity, input hashes, output hashes, warnings, and
-coverage metadata to derived artifacts before runner and evaluator work depends
-on extracted text.
+The next implementation issue is document extraction receipts. It should run
+extractors through the sandbox boundary, attach versioned extractor identity,
+input hashes, output hashes, warnings, and coverage metadata to derived
+artifacts before runner and evaluator work depends on extracted text.

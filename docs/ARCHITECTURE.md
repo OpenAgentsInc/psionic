@@ -55,6 +55,10 @@ This doc should be read together with:
   - legal-agent benchmark schema contract for Harvey-compatible task specs,
     artifact manifests, run records, transcripts, score reports, and
     comparison reports
+- `docs/PODMAN_SANDBOX_BACKEND.md`
+  - local Podman sandbox backend contract for no-network legal benchmark
+    extraction and tool execution with read-only inputs, writable
+    scratch/output paths, path-safety checks, and structured command receipts
 
 The Psionic Train system builds on Psionic runtime, cluster, datastream,
 sandbox, and collective layers defined in this document.
