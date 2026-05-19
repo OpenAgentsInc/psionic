@@ -43,8 +43,15 @@ pub const QWEN_LEGAL_SCORE_IMPORT_BUNDLE_SCHEMA_VERSION: &str =
 /// Stable schema version for the legal RL hillclimb plan.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_hillclimb_plan.v1";
+/// Stable schema version for the legal RL benchmark readiness report.
+pub const QWEN_LEGAL_RL_BENCHMARK_REPORT_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_benchmark_report.v1";
 /// Stable plan id for the next Harvey legal hillclimb phase.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID: &str = "qwen_legal_rl_hillclimb_plan_v1";
+/// Stable report id for the next Harvey legal RL benchmark projection.
+pub const QWEN_LEGAL_RL_BENCHMARK_REPORT_ID: &str = "qwen_legal_rl_benchmark_report_phase_002";
+/// Phase-two retained target aligned with Blueprint optimizer batch `phase_002`.
+pub const QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS: u16 = 7_000;
 /// Blueprint frontier consumed by the Psionic legal RL plan.
 pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
     "blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001";
@@ -992,6 +999,174 @@ pub fn canonical_qwen_legal_rl_hillclimb_plan(
     Ok(plan)
 }
 
+/// Offline benchmark projection and readiness report for the legal RL plan.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlBenchmarkReadinessReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable report id.
+    pub report_id: String,
+    /// Plan id this report evaluates.
+    pub plan_id: String,
+    /// Stable digest of the plan payload.
+    pub plan_digest: String,
+    /// Baseline retained score used for the projection.
+    pub baseline_score_basis_points: u16,
+    /// Conservative target score for the next retained run.
+    pub conservative_target_score_basis_points: u16,
+    /// Unconstrained score if all target-family lifts land.
+    pub unconstrained_projected_score_basis_points: u16,
+    /// Sum of target lifts in the plan.
+    pub total_target_lift_basis_points: u16,
+    /// Retained model target.
+    pub retained_target_model_id: String,
+    /// Whether retained slices are required before a score claim.
+    pub retained_slice_required: bool,
+    /// Minimum accepted rollout count.
+    pub accepted_rollout_minimum: u16,
+    /// Maximum quarantined rollout count.
+    pub quarantined_rollout_budget: u16,
+    /// Count of GRPO targets.
+    pub grpo_target_count: usize,
+    /// Count of GEPA trace-selection targets.
+    pub gepa_target_count: usize,
+    /// Count of MIPRO prompt-search targets.
+    pub mipro_target_count: usize,
+    /// Count of supervised fine-tune refresh targets.
+    pub supervised_refresh_target_count: usize,
+    /// Dataset request count emitted by target families.
+    pub dataset_request_count: usize,
+    /// Autopilot4 export/update target.
+    pub benchmark_export_ref: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
+impl QwenLegalRlBenchmarkReadinessReport {
+    /// Returns the stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(b"psionic_qwen_legal_rl_benchmark_report|", &clone)
+    }
+
+    fn validate(&self) -> Result<(), QwenLegalAdapterSftError> {
+        if self.schema_version != QWEN_LEGAL_RL_BENCHMARK_REPORT_SCHEMA_VERSION {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL benchmark report schema version drifted"),
+            });
+        }
+        if self.report_id != QWEN_LEGAL_RL_BENCHMARK_REPORT_ID {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL benchmark report id drifted"),
+            });
+        }
+        require_nonempty(self.plan_id.as_str(), "plan_id")?;
+        require_nonempty(self.plan_digest.as_str(), "plan_digest")?;
+        if self.baseline_score_basis_points == 0
+            || self.baseline_score_basis_points >= self.conservative_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL benchmark report requires a target above baseline"),
+            });
+        }
+        if self.conservative_target_score_basis_points
+            > self.unconstrained_projected_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("conservative target cannot exceed unconstrained projection"),
+            });
+        }
+        if !self.retained_slice_required {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("retained slice is required for legal RL benchmark report"),
+            });
+        }
+        if self.accepted_rollout_minimum <= self.quarantined_rollout_budget {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("accepted rollout minimum must exceed quarantine budget"),
+            });
+        }
+        if self.grpo_target_count == 0
+            || self.gepa_target_count == 0
+            || self.mipro_target_count == 0
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL benchmark report requires GRPO, GEPA, and MIPRO"),
+            });
+        }
+        if self.dataset_request_count == 0 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL benchmark report requires dataset requests"),
+            });
+        }
+        require_nonempty(self.benchmark_export_ref.as_str(), "benchmark_export_ref")?;
+        if self.report_digest != self.stable_digest() {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL benchmark report digest drifted"),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Builds the offline benchmark projection for a legal RL plan.
+pub fn qwen_legal_rl_benchmark_readiness_report(
+    plan: &QwenLegalRlHillclimbPlan,
+    baseline_score_basis_points: u16,
+) -> Result<QwenLegalRlBenchmarkReadinessReport, QwenLegalAdapterSftError> {
+    plan.validate()?;
+    if baseline_score_basis_points == 0 || baseline_score_basis_points > 10_000 {
+        return Err(QwenLegalAdapterSftError::InvalidConfig {
+            detail: String::from("baseline score must be in basis points"),
+        });
+    }
+    let total_target_lift_basis_points = plan
+        .targets
+        .iter()
+        .map(|target| target.target_lift_basis_points)
+        .fold(0_u16, u16::saturating_add);
+    let unconstrained_projected_score_basis_points = baseline_score_basis_points
+        .saturating_add(total_target_lift_basis_points)
+        .min(10_000);
+    let conservative_target_score_basis_points = QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS
+        .min(unconstrained_projected_score_basis_points)
+        .max(baseline_score_basis_points.saturating_add(100));
+    let count_method = |method| {
+        plan.targets
+            .iter()
+            .filter(|target| target.optimizer_method == method)
+            .count()
+    };
+    let mut report = QwenLegalRlBenchmarkReadinessReport {
+        schema_version: String::from(QWEN_LEGAL_RL_BENCHMARK_REPORT_SCHEMA_VERSION),
+        report_id: String::from(QWEN_LEGAL_RL_BENCHMARK_REPORT_ID),
+        plan_id: plan.plan_id.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        baseline_score_basis_points,
+        conservative_target_score_basis_points,
+        unconstrained_projected_score_basis_points,
+        total_target_lift_basis_points,
+        retained_target_model_id: plan.retained_target_model_id.clone(),
+        retained_slice_required: plan.rollout_policy.retained_slice_required,
+        accepted_rollout_minimum: plan.rollout_policy.min_accepted_rollouts,
+        quarantined_rollout_budget: plan.rollout_policy.max_quarantined_rollouts,
+        grpo_target_count: count_method(QwenLegalRlOptimizerMethod::Grpo),
+        gepa_target_count: count_method(QwenLegalRlOptimizerMethod::GepaTraceSelection),
+        mipro_target_count: count_method(QwenLegalRlOptimizerMethod::MiproPromptSearch),
+        supervised_refresh_target_count: count_method(
+            QwenLegalRlOptimizerMethod::SupervisedFineTuneRefresh,
+        ),
+        dataset_request_count: plan.targets.len(),
+        benchmark_export_ref: String::from("autopilot4://benchmarks/harvey/progress/phase-002"),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    report.validate()?;
+    Ok(report)
+}
+
 /// Full higher-level Qwen legal adapter smoke outcome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QwenLegalAdapterSftRunOutcome {
@@ -1015,6 +1190,8 @@ pub struct QwenLegalAdapterSftRunOutcome {
     pub score_import_bundle: QwenLegalScoreImportBundle,
     /// Next-phase RL hillclimb plan bound to this smoke run.
     pub rl_hillclimb_plan: QwenLegalRlHillclimbPlan,
+    /// Offline benchmark projection for the RL hillclimb plan.
+    pub rl_benchmark_report: QwenLegalRlBenchmarkReadinessReport,
 }
 
 /// First honest Qwen legal adapter-SFT smoke trainer.
@@ -1314,6 +1491,8 @@ impl QwenLegalAdapterSftTrainer {
             request.eval_pack_binding.clone(),
             score_import_bundle.bundle_id.clone(),
         )?;
+        let rl_benchmark_report =
+            qwen_legal_rl_benchmark_readiness_report(&rl_hillclimb_plan, 5_260)?;
         let summary = QwenLegalAdapterSftSummary {
             run_summary,
             lane_id: String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID),
@@ -1349,6 +1528,7 @@ impl QwenLegalAdapterSftTrainer {
             final_checkpoint,
             score_import_bundle,
             rl_hillclimb_plan,
+            rl_benchmark_report,
         })
     }
 
@@ -1631,6 +1811,16 @@ mod tests {
             outcome.rl_hillclimb_plan.plan_digest,
             outcome.rl_hillclimb_plan.stable_digest()
         );
+        assert_eq!(
+            outcome
+                .rl_benchmark_report
+                .conservative_target_score_basis_points,
+            QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            outcome.rl_benchmark_report.report_digest,
+            outcome.rl_benchmark_report.stable_digest()
+        );
         let loaded = outcome.exported_artifact.load_lm_head_lora_artifact()?;
         assert_eq!(loaded.hidden_size, 4);
         assert_eq!(loaded.rank, QWEN_LEGAL_ADAPTER_LORA_RANK);
@@ -1699,6 +1889,45 @@ mod tests {
                 .contains("harvey_legal_qwen_optimizer_frontier")
         );
         assert_eq!(plan.plan_digest, plan.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn qwen_legal_rl_benchmark_report_projects_phase_two_retained_target()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = canonical_qwen_legal_rl_hillclimb_plan(
+            sample_dataset_binding(),
+            sample_eval_pack_binding(),
+            "qwen35-4b-legal-smoke-r1-score-import",
+        )?;
+        let report = qwen_legal_rl_benchmark_readiness_report(&plan, 5_260)?;
+
+        assert_eq!(
+            report.schema_version,
+            QWEN_LEGAL_RL_BENCHMARK_REPORT_SCHEMA_VERSION
+        );
+        assert_eq!(report.plan_id, QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID);
+        assert_eq!(report.plan_digest, plan.plan_digest);
+        assert_eq!(report.baseline_score_basis_points, 5_260);
+        assert_eq!(
+            report.conservative_target_score_basis_points,
+            QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS
+        );
+        assert!(report.unconstrained_projected_score_basis_points > 9_000);
+        assert!(report.total_target_lift_basis_points >= 4_000);
+        assert_eq!(
+            report.retained_target_model_id,
+            QWEN36_35B_A3B_LEGAL_RETAINED_MODEL_ID
+        );
+        assert!(report.retained_slice_required);
+        assert!(report.accepted_rollout_minimum > report.quarantined_rollout_budget);
+        assert!(report.grpo_target_count >= 2);
+        assert!(report.gepa_target_count >= 2);
+        assert!(report.mipro_target_count >= 1);
+        assert!(report.supervised_refresh_target_count >= 1);
+        assert_eq!(report.dataset_request_count, plan.targets.len());
+        assert!(report.benchmark_export_ref.contains("autopilot4"));
+        assert_eq!(report.report_digest, report.stable_digest());
         Ok(())
     }
 

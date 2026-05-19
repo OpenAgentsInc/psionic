@@ -178,7 +178,12 @@ run now also emits a typed RL hillclimb plan that points Pylon/Nexus at
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and
 pre-submit self-check failures across GRPO, GEPA trace selection, MIPRO prompt
-search, and supervised fine-tune refresh work.
+search, and supervised fine-tune refresh work. It now also emits an offline
+RL benchmark readiness report with the retained baseline at 5260 bps, the
+phase-two target at 7000 bps, accepted/quarantined rollout budgets, and an
+Autopilot4 export ref for the public progress page. That report is readiness
+evidence only; retained score claims still require the actual retained slice
+and Autopilot4 release-gate approval.
 The paired serving/eval metadata path is in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
 compare base and tuned Qwen candidates through one OpenAI-compatible route

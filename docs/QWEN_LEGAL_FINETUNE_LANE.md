@@ -68,6 +68,7 @@ The run emits:
 - final checkpoint id
 - score-import bundle digest
 - RL hillclimb plan digest
+- RL benchmark readiness report digest
 
 ## Artifact Gate
 
@@ -131,6 +132,26 @@ Each target carries a reward signal, baseline miss value, target lift value,
 and dataset request ref. Operators should treat the plan as a routing and
 admission contract for Pylon work, not as proof that RL training has already
 improved the retained score.
+
+## Offline RL Benchmark Report
+
+The lane now also emits `QwenLegalRlBenchmarkReadinessReport` with schema
+`psionic.qwen_legal_rl_benchmark_report.v1`. It turns the plan into the local
+benchmark numbers Autopilot4 can publish safely:
+
+- baseline retained slice: 5260 bps
+- phase-two conservative target: 7000 bps
+- unconstrained projection if all family lifts land: above 9000 bps
+- minimum accepted rollouts: 60
+- quarantine budget: 12
+- required method mix: GRPO, GEPA trace selection, MIPRO prompt search, and
+  supervised fine-tune refresh
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-002`
+
+This report is still local readiness evidence. A retained score claim requires
+the actual retained 20-task run, immutable score reports, and Autopilot4
+release-gate approval.
 
 ## Runtime Admission
 
