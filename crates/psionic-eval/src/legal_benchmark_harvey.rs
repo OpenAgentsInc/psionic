@@ -5,14 +5,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ArtifactKind, BenchmarkTaskSpec, CriterionKind, CriterionSpec, DataClassification,
-    DeliverableKind, DeliverableSpec, JudgeMode, JudgePolicy, LEGAL_BENCHMARK_SCHEMA_VERSION,
-    SourceArtifact, SourceCompatibility, ToolPolicy, task_spec_digest,
+    task_spec_digest, ArtifactKind, BenchmarkTaskSpec, CriterionKind, CriterionSpec,
+    DataClassification, DeliverableKind, DeliverableSpec, JudgeMode, JudgePolicy, SourceArtifact,
+    SourceCompatibility, ToolPolicy, LEGAL_BENCHMARK_SCHEMA_VERSION,
 };
 
 const HARVEY_UPSTREAM_SUITE: &str = "harvey_labs";
@@ -546,6 +546,12 @@ fn default_harvey_tool_policy() -> ToolPolicy {
             String::from("edit"),
             String::from("glob"),
             String::from("grep"),
+            String::from("inventory"),
+            String::from("email_summary"),
+            String::from("spreadsheet_summary"),
+            String::from("pdf_search"),
+            String::from("evidence_table"),
+            String::from("validate_deliverables"),
         ],
         network_allowed: false,
         source_artifacts_read_only: true,
@@ -700,6 +706,18 @@ mod tests {
         assert_eq!(task.task_version, "fixturecommit");
         assert_eq!(task.criteria.len(), 2);
         assert_eq!(task.source_artifacts.len(), 2);
+        assert!(task
+            .tool_policy
+            .allowed_tools
+            .contains(&String::from("inventory")));
+        assert!(task
+            .tool_policy
+            .allowed_tools
+            .contains(&String::from("evidence_table")));
+        assert!(task
+            .tool_policy
+            .allowed_tools
+            .contains(&String::from("validate_deliverables")));
         assert_eq!(
             task.deliverables[0].deliverable_id,
             "deliverable.risk_memo_docx"

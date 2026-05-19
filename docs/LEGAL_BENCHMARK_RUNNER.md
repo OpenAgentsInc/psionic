@@ -13,8 +13,11 @@ The runner:
 
 - builds a system prompt from run policy, allowed tools, and module
   instructions
-- sends task instructions, deliverables, and criteria as the first user
-  message
+- renders a tool-policy-aware benchmark operating protocol for document
+  inventory, source inspection, evidence capture, and deliverable validation
+  when those tools are available
+- sends task instructions and deliverables as the first user message without
+  exposing hidden criteria text
 - calls a provider-neutral `ModelAdapter`
 - records every model response as a transcript event
 - executes model tool calls through `execute_legal_benchmark_tool`

@@ -161,7 +161,8 @@ High-score document helpers now extend the same receipt-backed surface with
 inventory, EML summary, spreadsheet summary, page-targeted PDF search, evidence
 table construction, and deliverable validation. These tools improve source
 coverage, evidence traceability, and pre-judge output checks without exposing
-hidden criteria.
+hidden criteria. Normalized Harvey tasks enable this full document-tool set by
+default so live runs do not fall back to the older read/write/grep-only surface.
 
 ## Provider Adapter Layer
 
