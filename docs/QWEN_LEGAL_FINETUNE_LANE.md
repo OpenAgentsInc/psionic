@@ -16,6 +16,9 @@ It does not claim a Harvey retained score lift. The serious retained attempt
 should move to `Qwen3.6-35B-A3B` after this lane, the Qwen model-admission
 update, and the Autopilot4 import loop are green.
 
+The Qwen replacement model set and the current `qwen36_alias_qwen35`
+conformance decision live in `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`.
+
 ## Rust API
 
 The implementation lives in:

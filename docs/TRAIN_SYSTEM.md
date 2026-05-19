@@ -178,6 +178,12 @@ The paired serving/eval metadata path is in
 compare base and tuned Qwen candidates through one OpenAI-compatible route
 while preserving base, adapter, template, dataset, and eval-pack digests in
 receipts.
+The replacement-model conformance layer is in
+`crates/psionic-models/src/qwen_replacement_conformance.rs` with the focused
+doc `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`; it covers the required
+Qwen3.5/Qwen3.6 target set and records Qwen3.6 as a versioned
+`qwen36_alias_qwen35` decision until real artifact metadata requires a new
+runtime branch.
 
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in

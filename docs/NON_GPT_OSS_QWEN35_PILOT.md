@@ -77,6 +77,11 @@ The base-plus-adapter legal evaluation path is documented in
 the OpenAI-compatible `/chat/completions` surface while carrying base, adapter,
 template, dataset, and eval-pack digests into response and run receipts.
 
+The replacement-model conformance set for legal fine-tuning is documented in
+`docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`. Qwen3.6 rows are currently
+recorded as `qwen36_alias_qwen35`, not silently as plain `qwen35`, until real
+artifact metadata proves whether a separate runtime branch is needed.
+
 The source artifact itself is not text-only. It carries:
 
 - `qwen35.vision.*` metadata
