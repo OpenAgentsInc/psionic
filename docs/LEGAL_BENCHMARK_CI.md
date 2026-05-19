@@ -22,8 +22,9 @@ The check script runs:
 - mock report generation checks
 - mock sweep manifest checks
 - mock sweep matrix fixture validation
+- product regression guardrail fixture and blocked-promotion simulation checks
 - JSON validation for the legal benchmark fixtures used by the runner,
-  evaluator, report, and sweep path
+  evaluator, report, sweep, and product-regression paths
 
 The audited Harvey corpus fixture pins:
 
