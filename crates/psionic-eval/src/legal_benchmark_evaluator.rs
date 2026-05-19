@@ -11,8 +11,9 @@ use thiserror::Error;
 use crate::{
     ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, CriterionResult, CriterionSpec,
     CriterionVerdict, DeliverableKind, DeliverableSpec, JudgePolicy, Metadata, RunRecord,
-    ScoreReport, SourceArtifact, artifact_from_file, artifact_manifest_digest, run_record_digest,
-    score_report_digest, stable_json_digest,
+    ScoreReport, SourceArtifact, artifact_from_file, artifact_manifest_digest,
+    classify_criterion_failures, document_coverage_bps_from_snapshot, fallback_coverage_snapshot,
+    run_record_digest, score_report_digest, stable_json_digest,
 };
 
 pub const LEGAL_BENCHMARK_EVALUATOR_SCHEMA_VERSION: u16 = 1;
@@ -202,6 +203,15 @@ where
     metrics.wall_time_ms = metrics.wall_time_ms.saturating_add(total_judge_latency);
     let output_manifest_hash = artifact_manifest_digest(&input.output_artifact_manifest)?;
     let run_record_hash = run_record_digest(&input.run_record)?;
+    let coverage_snapshot = input
+        .run_record
+        .coverage_snapshot
+        .clone()
+        .unwrap_or_else(|| {
+            fallback_coverage_snapshot(&input.task_spec, &input.output_artifact_manifest)
+        });
+    let failure_comparisons =
+        classify_criterion_failures(&input.task_spec, &criterion_results, &coverage_snapshot);
     let mut metadata = Metadata::new();
     metadata.insert(
         String::from("precheck_count"),
@@ -226,9 +236,14 @@ where
         criterion_pass_rate_bps,
         criterion_results,
         metrics,
-        document_coverage_bps: document_coverage_bps(input),
+        document_coverage_bps: document_coverage_bps_from_snapshot(
+            &input.task_spec,
+            &coverage_snapshot,
+        ),
         failure_diagnostics,
         extraction_receipt_refs: input.run_record.extraction_receipt_refs.clone(),
+        coverage_snapshot: Some(coverage_snapshot),
+        failure_comparisons,
         metadata,
     };
     let score_report_hash = score_report_digest(&score_report)?;
@@ -449,21 +464,6 @@ fn deliverable_type_matches(deliverable: &DeliverableSpec, path: &Path) -> bool 
     }
 }
 
-fn document_coverage_bps(input: &LegalBenchmarkEvaluationInput) -> u32 {
-    if input.task_spec.source_artifacts.is_empty() {
-        return 10_000;
-    }
-    let referenced = input
-        .task_spec
-        .criteria
-        .iter()
-        .flat_map(|criterion| criterion.source_artifact_ids.iter())
-        .collect::<BTreeSet<_>>();
-    u32::try_from((referenced.len() * 10_000) / input.task_spec.source_artifacts.len())
-        .unwrap_or(0)
-        .min(10_000)
-}
-
 fn default_judge_prompt_template(policy: &JudgePolicy) -> String {
     format!(
         "Judge each legal benchmark criterion using all-pass semantics. template={} mode={:?} samples={}",
@@ -576,6 +576,7 @@ mod tests {
                 estimated_cost_micro_usd: 12,
             },
             extraction_receipt_refs: vec![String::from("extract.1")],
+            coverage_snapshot: None,
             metadata: Metadata::new(),
         }
     }

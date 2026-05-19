@@ -14,6 +14,7 @@ mod legal_benchmark;
 mod legal_benchmark_agent;
 #[cfg(test)]
 mod legal_benchmark_ci;
+mod legal_benchmark_coverage;
 mod legal_benchmark_evaluator;
 mod legal_benchmark_extraction;
 mod legal_benchmark_harvey;
@@ -24,6 +25,7 @@ mod legal_benchmark_tools;
 
 pub use legal_benchmark::*;
 pub use legal_benchmark_agent::*;
+pub use legal_benchmark_coverage::*;
 pub use legal_benchmark_evaluator::*;
 pub use legal_benchmark_extraction::*;
 pub use legal_benchmark_harvey::*;

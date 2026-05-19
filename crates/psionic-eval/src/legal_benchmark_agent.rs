@@ -20,9 +20,9 @@ use crate::{
     ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole, ModelRequest,
     ModelResponse, ModelStopReason, ModelToolCall, RunConfig, RunMetrics, RunRecord,
     RunTerminalState, SourceArtifact, ToolCallRecord, ToolResultMessage, TranscriptEvent,
-    TranscriptEventKind, artifact_from_file, artifact_manifest_digest,
-    build_output_artifact_manifest, execute_legal_benchmark_tool, run_config_digest,
-    run_record_digest, stable_json_digest, task_spec_digest, transcript_digest,
+    TranscriptEventKind, agent_visible_checklist, artifact_from_file, artifact_manifest_digest,
+    build_coverage_snapshot, build_output_artifact_manifest, execute_legal_benchmark_tool,
+    run_config_digest, run_record_digest, stable_json_digest, task_spec_digest, transcript_digest,
 };
 
 pub const LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION: u16 = 1;
@@ -278,6 +278,13 @@ where
         output_artifacts,
     );
     let output_manifest_hash = artifact_manifest_digest(&output_manifest)?;
+    let coverage_snapshot = build_coverage_snapshot(
+        &request.task_spec,
+        &request.run_config,
+        &tool_calls,
+        &transcript,
+        &output_manifest,
+    )?;
     let run_record = RunRecord {
         schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
         run_id: run_id.clone(),
@@ -291,6 +298,7 @@ where
         tool_calls,
         metrics,
         extraction_receipt_refs: request.extraction_receipt_refs.clone(),
+        coverage_snapshot: Some(coverage_snapshot),
         metadata: Metadata::new(),
     };
     let run_receipt = LegalBenchmarkRunReceipt {
@@ -385,12 +393,12 @@ pub fn legal_benchmark_user_prompt(request: &LegalBenchmarkAgentRunRequest) -> S
             deliverable.deliverable_id, deliverable.required_path, deliverable.description
         ));
     }
-    prompt.push_str("\nCriteria:\n");
-    for criterion in &request.task_spec.criteria {
-        prompt.push_str(&format!(
-            "- {}: {}\n",
-            criterion.criterion_id, criterion.description
-        ));
+    let checklist = agent_visible_checklist(&request.run_config);
+    if !checklist.items.is_empty() {
+        prompt.push_str("\nApproved checklist:\n");
+        for item in checklist.items {
+            prompt.push_str(&format!("- {}: {}\n", item.item_id, item.prompt));
+        }
     }
     prompt
 }
@@ -906,6 +914,16 @@ mod tests {
         .expect("run record json");
         assert_eq!(decoded.terminal_state, RunTerminalState::Submitted);
         assert_eq!(decoded.extraction_receipt_refs, vec!["extract.mock.1"]);
+        let coverage = decoded.coverage_snapshot.expect("coverage snapshot");
+        assert!(!coverage.hidden_criteria_visible);
+        assert_eq!(coverage.deliverable_sections.len(), 2);
+        let user_prompt = decoded
+            .transcript
+            .iter()
+            .find(|event| event.event_kind == TranscriptEventKind::User)
+            .and_then(|event| event.content.as_deref())
+            .expect("user prompt");
+        assert!(!user_prompt.contains("The memo exists."));
     }
 
     #[test]

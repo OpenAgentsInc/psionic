@@ -23,6 +23,7 @@ The `psionic-eval` legal benchmark module defines:
 - `TranscriptEvent`
 - `ToolCallRecord`
 - `RunMetrics`
+- `CoverageSnapshot`
 - `CriterionResult`
 - `ScoreReport`
 - `ComparisonReport`
@@ -180,6 +181,22 @@ and writes `config.json`, `transcript.jsonl`, `metrics.json`,
 `output_artifact_manifest.json`, `extraction_receipts.json`,
 `tool_receipts.json`, `run_record.json`, and `run_receipt.json`.
 
+Integrity mode is the default prompt policy. The runner does not render hidden
+criteria into model-visible messages; hill-climb runs may render only
+policy-approved derived checklist items from run config metadata.
+
+## Coverage Tracker
+
+Criterion-adjacent coverage tracking is documented in
+`docs/LEGAL_BENCHMARK_COVERAGE.md` and implemented in
+`crates/psionic-eval/src/legal_benchmark_coverage.rs`.
+
+Run records persist `CoverageSnapshot` values covering discovered/read
+documents, extracted facts, evidence refs, drafted deliverable sections,
+validations, self-checks, and the policy mode used. Score reports copy the
+snapshot and add post-judge failure comparisons that classify missed criteria
+as coverage, extraction, drafting, or reasoning gaps for Autopilot4 import.
+
 ## Evaluator And Judge Interface
 
 The criterion-scoped evaluator is documented in
@@ -190,7 +207,8 @@ It loads completed task/run/output-manifest artifacts, runs deterministic
 manifest and deliverable prechecks, extracts output text per criterion, calls a
 provider-neutral judge adapter, and emits `ScoreReport` values with all-pass
 status, criterion pass rate, judge provenance, confidence, latency, cost,
-document coverage, failure diagnostics, and extraction receipt refs.
+document coverage, failure diagnostics, extraction receipt refs, coverage
+snapshots, and missed-criterion failure classifications.
 
 ## Static Reports
 

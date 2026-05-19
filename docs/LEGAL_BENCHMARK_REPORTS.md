@@ -17,10 +17,12 @@ The generator produces:
 - per-model-config summaries
 - pairwise comparison reports
 - failure cluster exports
+- coverage failure comparisons
 
 Reports include all-pass state, missed criteria, judge reasoning summaries,
 artifact/run hashes, cost, latency, token usage, document coverage, extraction
-receipt refs, and failure diagnostics.
+receipt refs, coverage snapshots, coverage-vs-criterion failure classes, and
+failure diagnostics.
 
 ## Failure Clusters
 
@@ -34,6 +36,14 @@ Failure clusters group missed criteria by family:
 Each cluster records task ids, criterion ids, failure count, score delta,
 affected modules, diagnostics, and a repro command. Autopilot4 can import the
 JSON directly for dashboards, Work Orders, and issue generation.
+
+## Coverage Failure Comparisons
+
+Score reports may include `failure_comparisons` generated after judging. Each
+comparison classifies a missed criterion as `coverage_gap`, `extraction_gap`,
+`drafting_gap`, or `reasoning_gap`. The Autopilot export copies these rows so
+failure clusters can be imported without replaying hidden rubric text through
+model-visible prompts.
 
 ## Command
 

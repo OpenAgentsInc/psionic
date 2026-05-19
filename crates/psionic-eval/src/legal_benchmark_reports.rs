@@ -6,8 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ArtifactManifest, ComparisonReport, CriterionResult, CriterionVerdict, Metadata, RunRecord,
-    ScoreReport, comparison_report_digest, score_report_digest, stable_json_digest,
+    ArtifactManifest, ComparisonReport, CriterionCoverageFailure, CriterionResult,
+    CriterionVerdict, Metadata, RunRecord, ScoreReport, comparison_report_digest,
+    score_report_digest, stable_json_digest,
 };
 
 pub const LEGAL_BENCHMARK_REPORT_SCHEMA_VERSION: u16 = 1;
@@ -77,6 +78,8 @@ pub struct LegalBenchmarkAutopilotReportExport {
     pub by_task: Vec<LegalBenchmarkTaskSummary>,
     pub by_model_config: Vec<LegalBenchmarkModelConfigSummary>,
     pub failure_clusters: Vec<LegalBenchmarkFailureCluster>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub coverage_failure_comparisons: Vec<CriterionCoverageFailure>,
     pub score_report_hashes: Vec<String>,
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,
@@ -96,6 +99,11 @@ pub fn generate_legal_benchmark_static_report(
     let by_task = summarize_by_task(&input.score_reports)?;
     let by_model_config = summarize_by_model_config(&input.score_reports, &input.run_records);
     let failure_clusters = failure_clusters(&input.score_reports);
+    let coverage_failure_comparisons = input
+        .score_reports
+        .iter()
+        .flat_map(|report| report.failure_comparisons.iter().cloned())
+        .collect::<Vec<_>>();
     let score_report_hashes = input
         .score_reports
         .iter()
@@ -110,6 +118,7 @@ pub fn generate_legal_benchmark_static_report(
         by_task,
         by_model_config,
         failure_clusters,
+        coverage_failure_comparisons,
         score_report_hashes,
         metadata: Metadata::new(),
     };
@@ -385,9 +394,15 @@ fn render_markdown_report(
         } else {
             markdown.push_str("Missed criteria:\n\n");
             for criterion in missed {
+                let coverage_class = report
+                    .failure_comparisons
+                    .iter()
+                    .find(|comparison| comparison.criterion_id == criterion.criterion_id)
+                    .map(|comparison| format!("; coverage={:?}", comparison.failure_class))
+                    .unwrap_or_default();
                 markdown.push_str(&format!(
-                    "- {}: {:?}; {}\n",
-                    criterion.criterion_id, criterion.verdict, criterion.reasoning
+                    "- {}: {:?}{}; {}\n",
+                    criterion.criterion_id, criterion.verdict, coverage_class, criterion.reasoning
                 ));
             }
             markdown.push('\n');
@@ -485,7 +500,7 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CriterionResult, RunMetrics};
+    use crate::{CriterionCoverageFailure, CriterionFailureClass, CriterionResult, RunMetrics};
 
     fn fixture_score_report() -> ScoreReport {
         serde_json::from_str(include_str!(
@@ -532,6 +547,14 @@ mod tests {
             judge_latency_ms: Some(2),
             judge_cost_micro_usd: Some(1),
         }];
+        score.failure_comparisons = vec![CriterionCoverageFailure {
+            criterion_id: String::from("criterion.reasoning"),
+            failure_class: CriterionFailureClass::CoverageGap,
+            missing_source_artifact_ids: vec![String::from("source.contract")],
+            missing_deliverable_ids: Vec::new(),
+            evidence_refs: Vec::new(),
+            diagnostic: String::from("missed source material"),
+        }];
         score.metrics = RunMetrics {
             model_turns: 1,
             tool_call_count: 0,
@@ -553,6 +576,11 @@ mod tests {
             report.autopilot_export.failure_clusters[0].failure_family,
             "judge_fail"
         );
+        assert_eq!(
+            report.autopilot_export.coverage_failure_comparisons.len(),
+            1
+        );
         assert!(report.markdown.contains("Missed criteria"));
+        assert!(report.markdown.contains("coverage=CoverageGap"));
     }
 }
