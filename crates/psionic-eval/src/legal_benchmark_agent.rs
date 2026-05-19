@@ -17,8 +17,8 @@ use crate::{
     ArtifactKind, ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, DataClassification,
     LegalBenchmarkToolExecution, LegalBenchmarkToolFailureKind, LegalBenchmarkToolInput,
     LegalBenchmarkToolReceipt, LegalBenchmarkToolWorkspace, Metadata, ModelAdapter,
-    ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole, ModelRequest,
-    ModelResponse, ModelStopReason, ModelToolCall, RunConfig, RunMetrics, RunRecord,
+    ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole, ModelProviderRoute,
+    ModelRequest, ModelResponse, ModelStopReason, ModelToolCall, RunConfig, RunMetrics, RunRecord,
     RunTerminalState, SourceArtifact, ToolCallRecord, ToolResultMessage, TranscriptEvent,
     TranscriptEventKind, agent_visible_checklist, artifact_from_file, artifact_manifest_digest,
     build_coverage_snapshot, build_output_artifact_manifest, execute_legal_benchmark_tool,
@@ -285,6 +285,7 @@ where
         &transcript,
         &output_manifest,
     )?;
+    let provider_metadata = provider_route_run_metadata(adapter.route())?;
     let run_record = RunRecord {
         schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
         run_id: run_id.clone(),
@@ -299,7 +300,7 @@ where
         metrics,
         extraction_receipt_refs: request.extraction_receipt_refs.clone(),
         coverage_snapshot: Some(coverage_snapshot),
-        metadata: Metadata::new(),
+        metadata: provider_metadata.clone(),
     };
     let run_receipt = LegalBenchmarkRunReceipt {
         schema_version: LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION,
@@ -324,7 +325,7 @@ where
         output_artifact_count: u64::try_from(output_manifest.artifacts.len()).unwrap_or(u64::MAX),
         tool_receipt_count: u64::try_from(tool_receipts.len()).unwrap_or(u64::MAX),
         created_at_ms: now_ms(),
-        metadata: Metadata::new(),
+        metadata: provider_metadata,
     };
 
     write_run_artifacts(
@@ -563,8 +564,32 @@ fn push_model_response_event(transcript: &mut Vec<TranscriptEvent>, response: &M
             "elapsed_ms": response.elapsed_ms,
             "retry_count": response.retry_count,
             "raw_response_hash": response.raw_response_hash.clone(),
+            "metadata": response.metadata.clone(),
         })),
     );
+}
+
+fn provider_route_run_metadata(
+    route: &ModelProviderRoute,
+) -> Result<Metadata, LegalBenchmarkAgentRunError> {
+    let mut metadata = route.metadata.clone();
+    metadata.insert(
+        String::from("route_id"),
+        Value::String(route.route_id.clone()),
+    );
+    metadata.insert(
+        String::from("route_model_id"),
+        Value::String(route.model_id.clone()),
+    );
+    metadata.insert(
+        String::from("route_config_hash"),
+        Value::String(
+            route
+                .config_hash()
+                .map_err(LegalBenchmarkAgentRunError::Provider)?,
+        ),
+    );
+    Ok(metadata)
 }
 
 fn push_transcript_event(
@@ -969,6 +994,18 @@ mod tests {
         )
         .expect("run record json");
         assert_eq!(decoded.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(
+            decoded.metadata.get("route_id").and_then(Value::as_str),
+            Some("mock.agent")
+        );
+        assert_eq!(
+            result
+                .run_receipt
+                .metadata
+                .get("route_model_id")
+                .and_then(Value::as_str),
+            Some("deterministic-legal-mock")
+        );
         assert_eq!(decoded.extraction_receipt_refs, vec!["extract.mock.1"]);
         let coverage = decoded.coverage_snapshot.expect("coverage snapshot");
         assert!(!coverage.hidden_criteria_visible);

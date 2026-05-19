@@ -72,6 +72,11 @@ uses the same `qwen35` family acceptance label, and proves legal training
 records -> adapter checkpoint/export -> eval import metadata without claiming
 full adapter serving or a retained Harvey score lift.
 
+The base-plus-adapter legal evaluation path is documented in
+`docs/QWEN_TUNED_ADAPTER_SERVING.md`. It keeps the legal benchmark provider on
+the OpenAI-compatible `/chat/completions` surface while carrying base, adapter,
+template, dataset, and eval-pack digests into response and run receipts.
+
 The source artifact itself is not text-only. It carries:
 
 - `qwen35.vision.*` metadata
@@ -166,7 +171,9 @@ The pilot is intentionally bounded:
 - it does not claim full structured-output acceleration; the bounded native
   lane is still limited to greedy no-penalty requests and the wider surface can
   still fall back to explicit dense `raw_logits`
-- it does not claim adapter serving
+- it does not claim general adapter serving; the legal benchmark path admits a
+  bounded base-plus-adapter sidecar route with explicit digest receipts and no
+  public retained score claim from local smoke fixtures
 
 ## Current Throughput
 

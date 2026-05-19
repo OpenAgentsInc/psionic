@@ -173,6 +173,11 @@ in `docs/QWEN_LEGAL_FINETUNE_LANE.md`. The lane admits
 adapter-training smoke, binds #1018 legal training records, exports a typed
 LM-head LoRA artifact and exact checkpoint, and emits score-import metadata
 for Autopilot4 without claiming a retained Harvey score improvement.
+The paired serving/eval metadata path is in
+`docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
+compare base and tuned Qwen candidates through one OpenAI-compatible route
+while preserving base, adapter, template, dataset, and eval-pack digests in
+receipts.
 
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in

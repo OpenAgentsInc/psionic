@@ -11,9 +11,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{LegalBenchmarkToolName, Metadata, stable_json_digest};
+use crate::{
+    LegalBenchmarkToolName, Metadata, ScoreReport, score_report_digest, stable_json_digest,
+};
 
 pub const LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION: u16 = 1;
+pub const QWEN_LEGAL_CANDIDATE_SCHEMA_VERSION: u16 = 1;
+pub const QWEN_LEGAL_BASE_MODEL_ID: &str = "Qwen/Qwen3.5-4B";
+pub const QWEN_LEGAL_SERVED_MODEL_ID: &str = "qwen3.5-4b";
+pub const QWEN_LEGAL_MODEL_FAMILY_ACCEPTANCE_LABEL: &str = "qwen35";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -22,6 +28,547 @@ pub enum ModelProviderFamily {
     Anthropic,
     PsionicCompatible,
     Mock,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LegalBenchmarkModelCandidateKind {
+    Base,
+    TunedAdapter,
+    MockLocalSmoke,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LegalBenchmarkScoreClaimKind {
+    NoPublicClaim,
+    MockLocalSmokeOnly,
+    RetainedScoreClaim,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LegalBenchmarkCandidateScoreClass {
+    BaseModel,
+    TunedAdapter,
+    MockLocalSmoke,
+    RetainedClaim,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalBasePlusAdapterCandidateIdentity {
+    pub schema_version: u16,
+    pub candidate_id: String,
+    pub candidate_kind: LegalBenchmarkModelCandidateKind,
+    pub serving_model_id: String,
+    pub base_model_id: String,
+    pub served_model_id: String,
+    pub model_family_acceptance_label: String,
+    pub base_served_artifact_digest: String,
+    pub tokenizer_digest: String,
+    pub tokenizer_contract_digest: String,
+    pub prompt_template_digest: String,
+    pub dataset_digest: String,
+    pub eval_pack_digest: String,
+    pub serving_revision: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adapter_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adapter_revision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adapter_artifact_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adapter_identity_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_known_good_adapter_revision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollback_adapter_revision: Option<String>,
+    pub score_claim_kind: LegalBenchmarkScoreClaimKind,
+}
+
+impl QwenLegalBasePlusAdapterCandidateIdentity {
+    pub fn base(
+        candidate_id: impl Into<String>,
+        serving_model_id: impl Into<String>,
+        base_served_artifact_digest: impl Into<String>,
+        tokenizer_digest: impl Into<String>,
+        tokenizer_contract_digest: impl Into<String>,
+        prompt_template_digest: impl Into<String>,
+        dataset_digest: impl Into<String>,
+        eval_pack_digest: impl Into<String>,
+        serving_revision: impl Into<String>,
+    ) -> Result<Self, ModelAdapterError> {
+        let candidate = Self {
+            schema_version: QWEN_LEGAL_CANDIDATE_SCHEMA_VERSION,
+            candidate_id: candidate_id.into(),
+            candidate_kind: LegalBenchmarkModelCandidateKind::Base,
+            serving_model_id: serving_model_id.into(),
+            base_model_id: String::from(QWEN_LEGAL_BASE_MODEL_ID),
+            served_model_id: String::from(QWEN_LEGAL_SERVED_MODEL_ID),
+            model_family_acceptance_label: String::from(QWEN_LEGAL_MODEL_FAMILY_ACCEPTANCE_LABEL),
+            base_served_artifact_digest: base_served_artifact_digest.into(),
+            tokenizer_digest: tokenizer_digest.into(),
+            tokenizer_contract_digest: tokenizer_contract_digest.into(),
+            prompt_template_digest: prompt_template_digest.into(),
+            dataset_digest: dataset_digest.into(),
+            eval_pack_digest: eval_pack_digest.into(),
+            serving_revision: serving_revision.into(),
+            adapter_id: None,
+            adapter_revision: None,
+            adapter_artifact_digest: None,
+            adapter_identity_digest: None,
+            last_known_good_adapter_revision: None,
+            rollback_adapter_revision: None,
+            score_claim_kind: LegalBenchmarkScoreClaimKind::NoPublicClaim,
+        };
+        candidate.validate()?;
+        Ok(candidate)
+    }
+
+    pub fn tuned_adapter(
+        candidate_id: impl Into<String>,
+        serving_model_id: impl Into<String>,
+        base_served_artifact_digest: impl Into<String>,
+        tokenizer_digest: impl Into<String>,
+        tokenizer_contract_digest: impl Into<String>,
+        prompt_template_digest: impl Into<String>,
+        dataset_digest: impl Into<String>,
+        eval_pack_digest: impl Into<String>,
+        serving_revision: impl Into<String>,
+        adapter_id: impl Into<String>,
+        adapter_revision: impl Into<String>,
+        adapter_artifact_digest: impl Into<String>,
+        adapter_identity_digest: impl Into<String>,
+        last_known_good_adapter_revision: Option<String>,
+        rollback_adapter_revision: Option<String>,
+    ) -> Result<Self, ModelAdapterError> {
+        let candidate = Self {
+            schema_version: QWEN_LEGAL_CANDIDATE_SCHEMA_VERSION,
+            candidate_id: candidate_id.into(),
+            candidate_kind: LegalBenchmarkModelCandidateKind::TunedAdapter,
+            serving_model_id: serving_model_id.into(),
+            base_model_id: String::from(QWEN_LEGAL_BASE_MODEL_ID),
+            served_model_id: String::from(QWEN_LEGAL_SERVED_MODEL_ID),
+            model_family_acceptance_label: String::from(QWEN_LEGAL_MODEL_FAMILY_ACCEPTANCE_LABEL),
+            base_served_artifact_digest: base_served_artifact_digest.into(),
+            tokenizer_digest: tokenizer_digest.into(),
+            tokenizer_contract_digest: tokenizer_contract_digest.into(),
+            prompt_template_digest: prompt_template_digest.into(),
+            dataset_digest: dataset_digest.into(),
+            eval_pack_digest: eval_pack_digest.into(),
+            serving_revision: serving_revision.into(),
+            adapter_id: Some(adapter_id.into()),
+            adapter_revision: Some(adapter_revision.into()),
+            adapter_artifact_digest: Some(adapter_artifact_digest.into()),
+            adapter_identity_digest: Some(adapter_identity_digest.into()),
+            last_known_good_adapter_revision,
+            rollback_adapter_revision,
+            score_claim_kind: LegalBenchmarkScoreClaimKind::NoPublicClaim,
+        };
+        candidate.validate()?;
+        Ok(candidate)
+    }
+
+    pub fn mock_local_smoke(
+        mut candidate: Self,
+    ) -> Result<QwenLegalBasePlusAdapterCandidateIdentity, ModelAdapterError> {
+        candidate.candidate_kind = LegalBenchmarkModelCandidateKind::MockLocalSmoke;
+        candidate.score_claim_kind = LegalBenchmarkScoreClaimKind::MockLocalSmokeOnly;
+        candidate.validate()?;
+        Ok(candidate)
+    }
+
+    pub fn validate(&self) -> ModelAdapterResult<()> {
+        require_candidate_field(self.candidate_id.as_str(), "candidate_id")?;
+        require_candidate_field(self.serving_model_id.as_str(), "serving_model_id")?;
+        require_candidate_field(
+            self.base_served_artifact_digest.as_str(),
+            "base_served_artifact_digest",
+        )?;
+        require_candidate_field(self.tokenizer_digest.as_str(), "tokenizer_digest")?;
+        require_candidate_field(
+            self.tokenizer_contract_digest.as_str(),
+            "tokenizer_contract_digest",
+        )?;
+        require_candidate_field(
+            self.prompt_template_digest.as_str(),
+            "prompt_template_digest",
+        )?;
+        require_candidate_field(self.dataset_digest.as_str(), "dataset_digest")?;
+        require_candidate_field(self.eval_pack_digest.as_str(), "eval_pack_digest")?;
+        require_candidate_field(self.serving_revision.as_str(), "serving_revision")?;
+        if self.schema_version != QWEN_LEGAL_CANDIDATE_SCHEMA_VERSION {
+            return Err(candidate_error("candidate schema version drifted"));
+        }
+        if self.base_model_id != QWEN_LEGAL_BASE_MODEL_ID
+            || self.served_model_id != QWEN_LEGAL_SERVED_MODEL_ID
+            || self.model_family_acceptance_label != QWEN_LEGAL_MODEL_FAMILY_ACCEPTANCE_LABEL
+        {
+            return Err(candidate_error(
+                "candidate does not target the admitted Qwen3.5-4B qwen35 lane",
+            ));
+        }
+        match self.candidate_kind {
+            LegalBenchmarkModelCandidateKind::Base => {
+                if self.adapter_id.is_some()
+                    || self.adapter_revision.is_some()
+                    || self.adapter_artifact_digest.is_some()
+                    || self.adapter_identity_digest.is_some()
+                {
+                    return Err(candidate_error(
+                        "base candidate cannot carry adapter identity",
+                    ));
+                }
+                if self.score_claim_kind == LegalBenchmarkScoreClaimKind::RetainedScoreClaim {
+                    return Err(candidate_error(
+                        "base candidate cannot emit a tuned retained score claim",
+                    ));
+                }
+            }
+            LegalBenchmarkModelCandidateKind::TunedAdapter => {
+                require_candidate_option(self.adapter_id.as_deref(), "adapter_id")?;
+                require_candidate_option(self.adapter_revision.as_deref(), "adapter_revision")?;
+                require_candidate_option(
+                    self.adapter_artifact_digest.as_deref(),
+                    "adapter_artifact_digest",
+                )?;
+                require_candidate_option(
+                    self.adapter_identity_digest.as_deref(),
+                    "adapter_identity_digest",
+                )?;
+            }
+            LegalBenchmarkModelCandidateKind::MockLocalSmoke => {
+                if self.score_claim_kind != LegalBenchmarkScoreClaimKind::MockLocalSmokeOnly {
+                    return Err(candidate_error(
+                        "mock/local smoke candidates cannot emit public retained score claims",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn identity_digest(&self) -> ModelAdapterResult<String> {
+        stable_json_digest("psionic.legal_benchmark.qwen_candidate_identity.v1", self).map_err(
+            |err| {
+                ModelAdapterError::new(
+                    ModelAdapterFailureKind::InternalError,
+                    format!("failed to hash Qwen candidate identity: {err}"),
+                )
+            },
+        )
+    }
+
+    pub fn receipt_metadata(&self) -> ModelAdapterResult<Metadata> {
+        self.validate()?;
+        let mut metadata = Metadata::new();
+        metadata.insert(
+            String::from("legal_candidate_id"),
+            Value::String(self.candidate_id.clone()),
+        );
+        metadata.insert(
+            String::from("legal_candidate_kind"),
+            json!(self.candidate_kind),
+        );
+        metadata.insert(
+            String::from("legal_candidate_identity_digest"),
+            Value::String(self.identity_digest()?),
+        );
+        metadata.insert(
+            String::from("base_model_id"),
+            Value::String(self.base_model_id.clone()),
+        );
+        metadata.insert(
+            String::from("served_model_id"),
+            Value::String(self.served_model_id.clone()),
+        );
+        metadata.insert(
+            String::from("base_served_artifact_digest"),
+            Value::String(self.base_served_artifact_digest.clone()),
+        );
+        metadata.insert(
+            String::from("tokenizer_digest"),
+            Value::String(self.tokenizer_digest.clone()),
+        );
+        metadata.insert(
+            String::from("tokenizer_contract_digest"),
+            Value::String(self.tokenizer_contract_digest.clone()),
+        );
+        metadata.insert(
+            String::from("prompt_template_digest"),
+            Value::String(self.prompt_template_digest.clone()),
+        );
+        metadata.insert(
+            String::from("dataset_digest"),
+            Value::String(self.dataset_digest.clone()),
+        );
+        metadata.insert(
+            String::from("eval_pack_digest"),
+            Value::String(self.eval_pack_digest.clone()),
+        );
+        metadata.insert(
+            String::from("serving_revision"),
+            Value::String(self.serving_revision.clone()),
+        );
+        metadata.insert(
+            String::from("score_claim_kind"),
+            json!(self.score_claim_kind),
+        );
+        if let Some(value) = &self.adapter_id {
+            metadata.insert(String::from("adapter_id"), Value::String(value.clone()));
+        }
+        if let Some(value) = &self.adapter_revision {
+            metadata.insert(
+                String::from("adapter_revision"),
+                Value::String(value.clone()),
+            );
+        }
+        if let Some(value) = &self.adapter_artifact_digest {
+            metadata.insert(
+                String::from("adapter_artifact_digest"),
+                Value::String(value.clone()),
+            );
+        }
+        if let Some(value) = &self.adapter_identity_digest {
+            metadata.insert(
+                String::from("adapter_identity_digest"),
+                Value::String(value.clone()),
+            );
+        }
+        if let Some(value) = &self.last_known_good_adapter_revision {
+            metadata.insert(
+                String::from("last_known_good_adapter_revision"),
+                Value::String(value.clone()),
+            );
+        }
+        if let Some(value) = &self.rollback_adapter_revision {
+            metadata.insert(
+                String::from("rollback_adapter_revision"),
+                Value::String(value.clone()),
+            );
+        }
+        Ok(metadata)
+    }
+
+    pub fn openai_compatible_route(
+        &self,
+        route_id: impl Into<String>,
+        base_url: impl Into<String>,
+        secret_reference_id: Option<String>,
+    ) -> ModelAdapterResult<ModelProviderRoute> {
+        let mut route = ModelProviderRoute::openai_compatible(
+            route_id,
+            base_url,
+            self.serving_model_id.clone(),
+            secret_reference_id,
+        );
+        route.metadata = self.receipt_metadata()?;
+        route.redacted_headers.insert(
+            String::from("x-psionic-base-artifact-digest"),
+            self.base_served_artifact_digest.clone(),
+        );
+        route.redacted_headers.insert(
+            String::from("x-psionic-template-digest"),
+            self.prompt_template_digest.clone(),
+        );
+        route.redacted_headers.insert(
+            String::from("x-psionic-dataset-digest"),
+            self.dataset_digest.clone(),
+        );
+        route.redacted_headers.insert(
+            String::from("x-psionic-eval-pack-digest"),
+            self.eval_pack_digest.clone(),
+        );
+        if let Some(adapter_digest) = &self.adapter_artifact_digest {
+            route.redacted_headers.insert(
+                String::from("x-psionic-adapter-artifact-digest"),
+                adapter_digest.clone(),
+            );
+        }
+        Ok(route)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkCandidateScoreEntry {
+    pub score_class: LegalBenchmarkCandidateScoreClass,
+    pub candidate_id: String,
+    pub candidate_identity_digest: String,
+    pub score_report_id: String,
+    pub score_report_hash: String,
+    pub criterion_pass_rate_bps: u32,
+    pub all_pass: bool,
+    pub public_retained_claim: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkQwenAdapterScoreBundle {
+    pub schema_version: u16,
+    pub bundle_id: String,
+    pub base_model_score: LegalBenchmarkCandidateScoreEntry,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tuned_adapter_score: Option<LegalBenchmarkCandidateScoreEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mock_local_smoke_score: Option<LegalBenchmarkCandidateScoreEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retained_score_claim: Option<LegalBenchmarkCandidateScoreEntry>,
+    pub bundle_digest: String,
+}
+
+impl LegalBenchmarkQwenAdapterScoreBundle {
+    pub fn stable_digest(&self) -> ModelAdapterResult<String> {
+        let mut clone = self.clone();
+        clone.bundle_digest.clear();
+        stable_json_digest(
+            "psionic.legal_benchmark.qwen_adapter_score_bundle.v1",
+            &clone,
+        )
+        .map_err(|err| {
+            ModelAdapterError::new(
+                ModelAdapterFailureKind::InternalError,
+                format!("failed to hash Qwen adapter score bundle: {err}"),
+            )
+        })
+    }
+}
+
+pub fn qwen_legal_base_vs_adapter_score_bundle(
+    bundle_id: impl Into<String>,
+    base_candidate: &QwenLegalBasePlusAdapterCandidateIdentity,
+    base_score: &ScoreReport,
+    tuned_candidate: Option<&QwenLegalBasePlusAdapterCandidateIdentity>,
+    tuned_score: Option<&ScoreReport>,
+) -> ModelAdapterResult<LegalBenchmarkQwenAdapterScoreBundle> {
+    base_candidate.validate()?;
+    if base_candidate.candidate_kind != LegalBenchmarkModelCandidateKind::Base {
+        return Err(candidate_error(
+            "base score entry requires a base candidate",
+        ));
+    }
+    let base_entry = candidate_score_entry(
+        LegalBenchmarkCandidateScoreClass::BaseModel,
+        base_candidate,
+        base_score,
+        false,
+    )?;
+    let tuned_entry = match (tuned_candidate, tuned_score) {
+        (Some(candidate), Some(score)) => {
+            ensure_qwen_candidate_pair_compatible(base_candidate, candidate)?;
+            let score_class = match candidate.candidate_kind {
+                LegalBenchmarkModelCandidateKind::MockLocalSmoke => {
+                    LegalBenchmarkCandidateScoreClass::MockLocalSmoke
+                }
+                LegalBenchmarkModelCandidateKind::TunedAdapter => {
+                    LegalBenchmarkCandidateScoreClass::TunedAdapter
+                }
+                LegalBenchmarkModelCandidateKind::Base => {
+                    return Err(candidate_error(
+                        "tuned score entry cannot be a base candidate",
+                    ));
+                }
+            };
+            Some(candidate_score_entry(score_class, candidate, score, false)?)
+        }
+        (None, None) => None,
+        _ => {
+            return Err(candidate_error(
+                "tuned candidate and tuned score must be provided together",
+            ));
+        }
+    };
+    let retained_score_claim = match (&tuned_entry, tuned_candidate) {
+        (Some(_), Some(candidate))
+            if candidate.score_claim_kind == LegalBenchmarkScoreClaimKind::RetainedScoreClaim =>
+        {
+            Some(candidate_score_entry(
+                LegalBenchmarkCandidateScoreClass::RetainedClaim,
+                candidate,
+                tuned_score.expect("checked above"),
+                true,
+            )?)
+        }
+        _ => None,
+    };
+    if let Some(candidate) = tuned_candidate
+        && candidate.candidate_kind == LegalBenchmarkModelCandidateKind::MockLocalSmoke
+        && retained_score_claim.is_some()
+    {
+        return Err(candidate_error(
+            "mock/local smoke scores cannot be emitted as retained score claims",
+        ));
+    }
+    let mut bundle = LegalBenchmarkQwenAdapterScoreBundle {
+        schema_version: QWEN_LEGAL_CANDIDATE_SCHEMA_VERSION,
+        bundle_id: bundle_id.into(),
+        base_model_score: base_entry,
+        tuned_adapter_score: tuned_entry
+            .clone()
+            .filter(|entry| entry.score_class == LegalBenchmarkCandidateScoreClass::TunedAdapter),
+        mock_local_smoke_score: tuned_entry
+            .filter(|entry| entry.score_class == LegalBenchmarkCandidateScoreClass::MockLocalSmoke),
+        retained_score_claim,
+        bundle_digest: String::new(),
+    };
+    bundle.bundle_digest = bundle.stable_digest()?;
+    Ok(bundle)
+}
+
+pub fn ensure_qwen_candidate_pair_compatible(
+    base: &QwenLegalBasePlusAdapterCandidateIdentity,
+    candidate: &QwenLegalBasePlusAdapterCandidateIdentity,
+) -> ModelAdapterResult<()> {
+    base.validate()?;
+    candidate.validate()?;
+    let checks = [
+        (
+            "base_model_id",
+            base.base_model_id.as_str(),
+            candidate.base_model_id.as_str(),
+        ),
+        (
+            "served_model_id",
+            base.served_model_id.as_str(),
+            candidate.served_model_id.as_str(),
+        ),
+        (
+            "base_served_artifact_digest",
+            base.base_served_artifact_digest.as_str(),
+            candidate.base_served_artifact_digest.as_str(),
+        ),
+        (
+            "tokenizer_digest",
+            base.tokenizer_digest.as_str(),
+            candidate.tokenizer_digest.as_str(),
+        ),
+        (
+            "tokenizer_contract_digest",
+            base.tokenizer_contract_digest.as_str(),
+            candidate.tokenizer_contract_digest.as_str(),
+        ),
+        (
+            "prompt_template_digest",
+            base.prompt_template_digest.as_str(),
+            candidate.prompt_template_digest.as_str(),
+        ),
+        (
+            "dataset_digest",
+            base.dataset_digest.as_str(),
+            candidate.dataset_digest.as_str(),
+        ),
+        (
+            "eval_pack_digest",
+            base.eval_pack_digest.as_str(),
+            candidate.eval_pack_digest.as_str(),
+        ),
+    ];
+    for (field, expected, actual) in checks {
+        if expected != actual {
+            return Err(candidate_error(format!(
+                "candidate {field} drifted from the base route"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -537,7 +1084,11 @@ impl ModelAdapter for MockModelAdapter {
 
     fn complete(&mut self, _request: &ModelRequest) -> ModelAdapterResult<ModelResponse> {
         match self.responses.pop_front() {
-            Some(response) => response,
+            Some(Ok(mut response)) => {
+                merge_route_metadata(&self.route, &mut response.metadata);
+                Ok(response)
+            }
+            Some(Err(error)) => Err(error),
             None => Err(ModelAdapterError::new(
                 ModelAdapterFailureKind::ProviderError,
                 "mock adapter has no queued response",
@@ -1099,7 +1650,7 @@ fn parse_openai_response(
         retry_count,
         raw_response_hash: raw_response_hash(&response.body)?,
         created_at_ms: now_ms(),
-        metadata: Metadata::new(),
+        metadata: response_metadata_for_route(route),
     })
 }
 
@@ -1211,7 +1762,7 @@ fn parse_anthropic_response(
         retry_count,
         raw_response_hash: raw_response_hash(&response.body)?,
         created_at_ms: now_ms(),
-        metadata: Metadata::new(),
+        metadata: response_metadata_for_route(route),
     })
 }
 
@@ -1267,6 +1818,74 @@ fn raw_response_hash(value: &Value) -> ModelAdapterResult<String> {
     })
 }
 
+fn candidate_score_entry(
+    score_class: LegalBenchmarkCandidateScoreClass,
+    candidate: &QwenLegalBasePlusAdapterCandidateIdentity,
+    score: &ScoreReport,
+    public_retained_claim: bool,
+) -> ModelAdapterResult<LegalBenchmarkCandidateScoreEntry> {
+    if candidate.candidate_kind == LegalBenchmarkModelCandidateKind::MockLocalSmoke
+        && public_retained_claim
+    {
+        return Err(candidate_error(
+            "mock/local smoke scores cannot be emitted as retained score claims",
+        ));
+    }
+    let score_report_hash = score_report_digest(score).map_err(|err| {
+        ModelAdapterError::new(
+            ModelAdapterFailureKind::InternalError,
+            format!("failed to hash score report: {err}"),
+        )
+    })?;
+    Ok(LegalBenchmarkCandidateScoreEntry {
+        score_class,
+        candidate_id: candidate.candidate_id.clone(),
+        candidate_identity_digest: candidate.identity_digest()?,
+        score_report_id: score.score_report_id.clone(),
+        score_report_hash,
+        criterion_pass_rate_bps: score.criterion_pass_rate_bps,
+        all_pass: score.all_pass,
+        public_retained_claim,
+    })
+}
+
+fn response_metadata_for_route(route: &ModelProviderRoute) -> Metadata {
+    let mut metadata = route.metadata.clone();
+    merge_route_metadata(route, &mut metadata);
+    metadata
+}
+
+fn merge_route_metadata(route: &ModelProviderRoute, metadata: &mut Metadata) {
+    metadata
+        .entry(String::from("route_id"))
+        .or_insert_with(|| Value::String(route.route_id.clone()));
+    metadata
+        .entry(String::from("route_model_id"))
+        .or_insert_with(|| Value::String(route.model_id.clone()));
+}
+
+fn require_candidate_field(value: &str, field: &'static str) -> ModelAdapterResult<()> {
+    if value.trim().is_empty() {
+        return Err(candidate_error(format!(
+            "candidate {field} must be present"
+        )));
+    }
+    Ok(())
+}
+
+fn require_candidate_option(value: Option<&str>, field: &'static str) -> ModelAdapterResult<()> {
+    match value {
+        Some(value) => require_candidate_field(value, field),
+        None => Err(candidate_error(format!(
+            "candidate {field} must be present"
+        ))),
+    }
+}
+
+fn candidate_error(detail: impl Into<String>) -> ModelAdapterError {
+    ModelAdapterError::new(ModelAdapterFailureKind::InvalidRequest, detail)
+}
+
 fn trim_url(url: String) -> String {
     url.trim_end_matches('/').to_owned()
 }
@@ -1281,6 +1900,71 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn qwen_base_candidate() -> QwenLegalBasePlusAdapterCandidateIdentity {
+        QwenLegalBasePlusAdapterCandidateIdentity::base(
+            "candidate.qwen35.base",
+            "qwen3.5-4b",
+            "sha256:qwen35-4b-base",
+            "sha256:qwen35-tokenizer",
+            "sha256:qwen35-tokenizer-contract",
+            "sha256:qwen35-template",
+            "sha256:legal-dataset",
+            "sha256:legal-eval-pack",
+            "serving.qwen35.base.r1",
+        )
+        .expect("base candidate")
+    }
+
+    fn qwen_tuned_candidate() -> QwenLegalBasePlusAdapterCandidateIdentity {
+        QwenLegalBasePlusAdapterCandidateIdentity::tuned_adapter(
+            "candidate.qwen35.legal.r1",
+            "qwen3.5-4b-legal-r1",
+            "sha256:qwen35-4b-base",
+            "sha256:qwen35-tokenizer",
+            "sha256:qwen35-tokenizer-contract",
+            "sha256:qwen35-template",
+            "sha256:legal-dataset",
+            "sha256:legal-eval-pack",
+            "serving.qwen35.legal.r1",
+            "qwen35-legal-adapter",
+            "r1",
+            "sha256:qwen35-legal-adapter-artifact",
+            "sha256:qwen35-legal-adapter-identity",
+            Some(String::from("r1")),
+            Some(String::from("base")),
+        )
+        .expect("tuned candidate")
+    }
+
+    fn score_report(id: &str, rate: u32) -> ScoreReport {
+        ScoreReport {
+            schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
+            score_report_id: id.to_string(),
+            run_id: format!("run.{id}"),
+            task_id: String::from("legal.task"),
+            task_version: String::from("v1"),
+            run_record_hash: format!("hash.run.{id}"),
+            output_artifact_manifest_hash: format!("hash.output.{id}"),
+            all_pass: rate == 10_000,
+            criterion_pass_rate_bps: rate,
+            criterion_results: Vec::new(),
+            metrics: crate::RunMetrics {
+                model_turns: 1,
+                tool_call_count: 0,
+                input_tokens: 1,
+                output_tokens: 1,
+                wall_time_ms: 1,
+                estimated_cost_micro_usd: 0,
+            },
+            document_coverage_bps: rate,
+            failure_diagnostics: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            coverage_snapshot: None,
+            failure_comparisons: Vec::new(),
+            metadata: Metadata::new(),
+        }
+    }
 
     fn request() -> ModelRequest {
         ModelRequest::new(
@@ -1373,6 +2057,102 @@ mod tests {
             Some("Bearer <secret_ref:secret.openai.local>")
         );
         assert!(!sent.body.to_string().contains("sk-"));
+    }
+
+    #[test]
+    fn qwen_tuned_candidate_route_carries_adapter_receipt_metadata() {
+        let candidate = qwen_tuned_candidate();
+        let route = candidate
+            .openai_compatible_route(
+                "qwen.legal.tuned",
+                "http://127.0.0.1:8000/v1",
+                Some(String::from("secret.psionic.local")),
+            )
+            .expect("route");
+        let transport = MockHttpTransport::new(vec![Ok(ProviderHttpResponse {
+            status: 200,
+            headers: BTreeMap::new(),
+            body: json!({
+                "id": "chatcmpl_qwen_tuned",
+                "choices": [{
+                    "finish_reason": "stop",
+                    "message": {"role": "assistant", "content": "{\"action\":\"submit\",\"deliverables\":[\"memo.md\"]}"}
+                }],
+                "usage": {"prompt_tokens": 13, "completion_tokens": 8, "total_tokens": 21}
+            }),
+            elapsed_ms: 25,
+        })]);
+        let mut adapter =
+            OpenAiCompatibleAdapter::new(route.clone(), transport, ModelRetryPolicy::default());
+        let response = adapter.complete(&request()).expect("response");
+        assert_eq!(response.model_id, "qwen3.5-4b-legal-r1");
+        assert_eq!(
+            response.metadata.get("adapter_artifact_digest"),
+            Some(&Value::String(String::from(
+                "sha256:qwen35-legal-adapter-artifact"
+            )))
+        );
+        assert_eq!(
+            response.metadata.get("base_served_artifact_digest"),
+            Some(&Value::String(String::from("sha256:qwen35-4b-base")))
+        );
+        assert!(
+            response
+                .metadata
+                .get("legal_candidate_identity_digest")
+                .and_then(Value::as_str)
+                .is_some()
+        );
+        let sent = &adapter.into_transport().requests[0];
+        assert_eq!(
+            sent.body["model"],
+            Value::String(String::from("qwen3.5-4b-legal-r1"))
+        );
+        assert_eq!(
+            sent.headers.get("x-psionic-adapter-artifact-digest"),
+            Some(&String::from("sha256:qwen35-legal-adapter-artifact"))
+        );
+    }
+
+    #[test]
+    fn qwen_candidate_pair_refuses_template_drift() {
+        let base = qwen_base_candidate();
+        let mut tuned = qwen_tuned_candidate();
+        tuned.prompt_template_digest = String::from("sha256:wrong-template");
+        let error = ensure_qwen_candidate_pair_compatible(&base, &tuned)
+            .expect_err("template drift must refuse");
+        assert_eq!(error.kind, ModelAdapterFailureKind::InvalidRequest);
+        assert!(error.detail.contains("prompt_template_digest"));
+    }
+
+    #[test]
+    fn qwen_score_bundle_separates_mock_smoke_from_retained_claim() {
+        let base = qwen_base_candidate();
+        let mock =
+            QwenLegalBasePlusAdapterCandidateIdentity::mock_local_smoke(qwen_tuned_candidate())
+                .expect("mock");
+        let bundle = qwen_legal_base_vs_adapter_score_bundle(
+            "bundle.qwen.mock",
+            &base,
+            &score_report("score.base", 8_000),
+            Some(&mock),
+            Some(&score_report("score.mock", 8_500)),
+        )
+        .expect("bundle");
+        assert!(bundle.mock_local_smoke_score.is_some());
+        assert!(bundle.tuned_adapter_score.is_none());
+        assert!(bundle.retained_score_claim.is_none());
+        assert_eq!(
+            bundle.bundle_digest,
+            bundle.stable_digest().expect("digest")
+        );
+
+        let mut invalid_mock = mock;
+        invalid_mock.score_claim_kind = LegalBenchmarkScoreClaimKind::RetainedScoreClaim;
+        let error = invalid_mock
+            .validate()
+            .expect_err("mock retained claim must refuse");
+        assert!(error.detail.contains("mock/local smoke"));
     }
 
     #[test]
