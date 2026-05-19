@@ -192,7 +192,20 @@ provider-neutral judge adapter, and emits `ScoreReport` values with all-pass
 status, criterion pass rate, judge provenance, confidence, latency, cost,
 document coverage, failure diagnostics, and extraction receipt refs.
 
+## Static Reports
+
+Static reporting is documented in `docs/LEGAL_BENCHMARK_REPORTS.md` and
+implemented in `crates/psionic-eval/src/legal_benchmark_reports.rs`.
+
+It generates Markdown reports for humans plus stable Autopilot4 import JSON
+with global, per-task, per-model-config, comparison, and failure-cluster
+summaries. The example command
+`cargo run -p psionic-eval --example legal_benchmark_report -- <score.json> <out-dir>`
+writes `report.md`, `autopilot_report.json`, and `failure_clusters.json`
+without live provider credentials.
+
 ## Next Work
 
-The next implementation issue is static report and comparison generation. It
-should consume score reports and run receipts from the runner/evaluator path.
+The next implementation issue is resumable sweep orchestration. It should run
+task/model slices, call the runner/evaluator/report path, and emit sweep
+manifests for Autopilot4 import.

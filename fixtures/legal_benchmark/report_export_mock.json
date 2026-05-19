@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "report_id": "report.mock",
+  "generated_at_ms": 1,
+  "global": {
+    "run_count": 1,
+    "all_pass_count": 1,
+    "all_pass_rate_bps": 10000,
+    "criterion_pass_rate_bps": 10000,
+    "total_cost_micro_usd": 12,
+    "total_wall_time_ms": 101,
+    "input_tokens": 10,
+    "output_tokens": 5,
+    "document_coverage_bps": 10000
+  },
+  "by_task": [
+    {
+      "task_id": "legal.eval.mock",
+      "run_count": 1,
+      "best_all_pass": true,
+      "best_criterion_pass_rate_bps": 10000,
+      "latest_score_report_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "by_model_config": [
+    {
+      "run_config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "run_count": 1,
+      "all_pass_rate_bps": 10000,
+      "criterion_pass_rate_bps": 10000,
+      "total_cost_micro_usd": 12,
+      "total_wall_time_ms": 101
+    }
+  ],
+  "failure_clusters": [],
+  "score_report_hashes": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ]
+}
