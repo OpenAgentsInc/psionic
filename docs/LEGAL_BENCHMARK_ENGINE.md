@@ -118,9 +118,34 @@ scratch and output paths at `/workspace/scratch` and `/workspace/output`.
 Path validation canonicalizes host roots and rejects traversal or symlink
 escapes before a container command is built.
 
+## Document Extraction
+
+The extraction contract lives in
+`crates/psionic-eval/src/legal_benchmark_extraction.rs`.
+
+It defines:
+
+- `ArtifactExtractor`
+- `ArtifactExtractionPolicy`
+- `ArtifactExtractionResult`
+- `ExtractionReceipt`
+- `ExtractionCoverage`
+- `ExtractionFailureKind`
+- `ArtifactExtractorRegistry`
+
+Day-one native extraction handles text, Markdown, JSON, CSV/TSV, XML/HTML,
+YAML, TOML, and log-like UTF-8 inputs without external tools. The registry also
+declares pinned sandboxed external adapter specs for DOCX, PDF, PPTX, XLSX,
+and EML. Until a live sandbox command executor is attached, those external
+adapters return structured `external_tool_unavailable` or policy-denied
+receipts instead of panicking or crashing a sweep.
+
+Run records and score reports now retain `extraction_receipt_refs` so operator
+surfaces can distinguish extraction failure, missing content, and bad
+reasoning.
+
 ## Next Work
 
-The next implementation issue is document extraction receipts. It should run
-extractors through the sandbox boundary, attach versioned extractor identity,
-input hashes, output hashes, warnings, and coverage metadata to derived
-artifacts before runner and evaluator work depends on extracted text.
+The next implementation issue is the benchmark tool bundle. It should consume
+the extraction receipts here and keep every search, quote, citation, draft,
+and validation call receipt-backed.
