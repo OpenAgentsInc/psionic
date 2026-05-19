@@ -525,6 +525,15 @@ pub struct CriterionResult {
     pub judge_prompt_hash: String,
     /// Raw judge response hash.
     pub raw_response_hash: String,
+    /// Optional judge confidence in basis points.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence_bps: Option<u16>,
+    /// Judge latency for this criterion.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub judge_latency_ms: Option<u64>,
+    /// Estimated criterion judging cost in microdollars.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub judge_cost_micro_usd: Option<u64>,
 }
 
 /// Criterion verdict family.
@@ -566,6 +575,12 @@ pub struct ScoreReport {
     pub criterion_results: Vec<CriterionResult>,
     /// Run metrics copied into the report.
     pub metrics: RunMetrics,
+    /// Output/source document coverage in basis points.
+    #[serde(default)]
+    pub document_coverage_bps: u32,
+    /// Human-readable failure diagnostics retained for reporting.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failure_diagnostics: Vec<String>,
     /// Extraction receipt ids or hashes considered by the scorer.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extraction_receipt_refs: Vec<String>,
