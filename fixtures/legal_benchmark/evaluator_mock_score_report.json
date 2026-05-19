@@ -34,6 +34,48 @@
   "document_coverage_bps": 10000,
   "failure_diagnostics": [],
   "extraction_receipt_refs": ["extract.1"],
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "source.memo",
+        "relative_path": "case.txt",
+        "discovered": true,
+        "read": true,
+        "used_extracted_text": true
+      }
+    ],
+    "facts": [
+      {
+        "fact_id": "fact.case.0",
+        "source_ref": "case.txt",
+        "text_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "method": "read"
+      }
+    ],
+    "evidence_refs": [],
+    "deliverable_sections": [
+      {
+        "deliverable_id": "memo",
+        "relative_path": "memo.md",
+        "section_id": "output_manifest.artifact.output.0",
+        "drafted": true
+      }
+    ],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.memo",
+        "target_ref": "memo",
+        "passed": true,
+        "detail": "deliverable memo.md exists"
+      }
+    ],
+    "self_checks": []
+  },
+  "failure_comparisons": [],
   "metadata": {
     "precheck_count": 2,
     "judge_prompt_template_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"

@@ -396,6 +396,9 @@ pub struct RunRecord {
     /// Extraction receipt ids or hashes retained by this run.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extraction_receipt_refs: Vec<String>,
+    /// Criterion-adjacent coverage state captured during the run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage_snapshot: Option<CoverageSnapshot>,
     /// Additional owned metadata.
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,
@@ -506,6 +509,178 @@ pub struct RunMetrics {
     pub estimated_cost_micro_usd: u64,
 }
 
+/// Policy mode for agent-visible coverage guidance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoverageMode {
+    /// No rubric-derived hints are visible to the running agent.
+    Integrity,
+    /// Policy-approved derived checklist items may be visible for training.
+    HillClimb,
+}
+
+/// One policy-approved derived checklist item.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DerivedChecklistItem {
+    /// Stable checklist item id.
+    pub item_id: String,
+    /// Agent-visible checklist text.
+    pub prompt: String,
+    /// Policy or artifact source for this derived item.
+    pub source: String,
+    /// Whether the item is allowed in model-visible training prompts.
+    pub agent_visible: bool,
+}
+
+/// Checklist payload that can be safely rendered to the running agent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentVisibleChecklist {
+    /// Coverage mode used to construct the checklist.
+    pub mode: CoverageMode,
+    /// Policy-approved items visible to the agent.
+    pub items: Vec<DerivedChecklistItem>,
+    /// Whether hidden rubric criteria were exposed.
+    pub hidden_criteria_visible: bool,
+}
+
+/// Per-document coverage state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocumentCoverageEntry {
+    /// Source artifact id when known.
+    pub artifact_id: String,
+    /// Relative document path.
+    pub relative_path: String,
+    /// Whether the agent discovered the document.
+    pub discovered: bool,
+    /// Whether the agent read the document.
+    pub read: bool,
+    /// Whether extracted text was used instead of raw bytes.
+    pub used_extracted_text: bool,
+}
+
+/// One extracted fact or candidate fact trace.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactCoverageEntry {
+    /// Stable fact id.
+    pub fact_id: String,
+    /// Source artifact id or relative path.
+    pub source_ref: String,
+    /// Hash of the extracted text span or summary.
+    pub text_hash: String,
+    /// Extraction mechanism.
+    pub method: String,
+}
+
+/// One evidence reference captured by a tool or self-check.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceCoverageEntry {
+    /// Stable evidence id.
+    pub evidence_id: String,
+    /// Source artifact id or relative path.
+    pub source_ref: String,
+    /// Optional line number or page label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locator: Option<String>,
+    /// Hash of the evidence span.
+    pub span_hash: String,
+}
+
+/// Deliverable drafting coverage state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeliverableSectionCoverage {
+    /// Deliverable id when matched to the task spec.
+    pub deliverable_id: String,
+    /// Output or workspace path touched by the agent.
+    pub relative_path: String,
+    /// Section or draft id.
+    pub section_id: String,
+    /// Whether the section was drafted or edited.
+    pub drafted: bool,
+}
+
+/// Validation coverage state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationCoverageEntry {
+    /// Stable validation id.
+    pub validation_id: String,
+    /// Validation target such as a deliverable id or path.
+    pub target_ref: String,
+    /// Whether validation passed.
+    pub passed: bool,
+    /// Human-readable validation summary.
+    pub detail: String,
+}
+
+/// Self-check coverage state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SelfCheckCoverageEntry {
+    /// Stable self-check id.
+    pub self_check_id: String,
+    /// Area being checked.
+    pub area: String,
+    /// Self-check outcome.
+    pub outcome: String,
+}
+
+/// Criterion-adjacent coverage snapshot captured without exposing hidden rubric
+/// criteria to the model in integrity mode.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CoverageSnapshot {
+    /// Schema version for coverage snapshots.
+    pub schema_version: u16,
+    /// Policy mode used for the run.
+    pub mode: CoverageMode,
+    /// Whether hidden criteria were included in model-visible messages.
+    pub hidden_criteria_visible: bool,
+    /// Agent-visible derived checklist items.
+    pub derived_checklist_items: Vec<DerivedChecklistItem>,
+    /// Documents discovered or read by the agent.
+    pub documents: Vec<DocumentCoverageEntry>,
+    /// Facts extracted from source documents.
+    pub facts: Vec<FactCoverageEntry>,
+    /// Evidence spans captured during the run.
+    pub evidence_refs: Vec<EvidenceCoverageEntry>,
+    /// Deliverable sections drafted or edited.
+    pub deliverable_sections: Vec<DeliverableSectionCoverage>,
+    /// Validations run before scoring.
+    pub validations: Vec<ValidationCoverageEntry>,
+    /// Agent self-check outcomes.
+    pub self_checks: Vec<SelfCheckCoverageEntry>,
+}
+
+/// Failure class after missed criteria are compared to coverage state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CriterionFailureClass {
+    /// The agent did not discover or read required source material.
+    CoverageGap,
+    /// The agent read source material but did not extract usable facts/evidence.
+    ExtractionGap,
+    /// The agent extracted relevant material but did not draft the target output.
+    DraftingGap,
+    /// The agent had apparent coverage but reasoned or applied law incorrectly.
+    ReasoningGap,
+    /// The criterion was not a failure.
+    Passed,
+}
+
+/// Post-judge comparison between a missed criterion and run coverage.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CriterionCoverageFailure {
+    /// Criterion id.
+    pub criterion_id: String,
+    /// Failure classification.
+    pub failure_class: CriterionFailureClass,
+    /// Source artifacts that were expected but not read.
+    pub missing_source_artifact_ids: Vec<String>,
+    /// Deliverables that were expected but not drafted.
+    pub missing_deliverable_ids: Vec<String>,
+    /// Evidence ids considered for this comparison.
+    pub evidence_refs: Vec<String>,
+    /// Human-readable diagnostic.
+    pub diagnostic: String,
+}
+
 /// Result for one criterion.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CriterionResult {
@@ -584,6 +759,12 @@ pub struct ScoreReport {
     /// Extraction receipt ids or hashes considered by the scorer.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extraction_receipt_refs: Vec<String>,
+    /// Coverage snapshot considered by the scorer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage_snapshot: Option<CoverageSnapshot>,
+    /// Post-judge failure classifications derived from coverage state.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failure_comparisons: Vec<CriterionCoverageFailure>,
     /// Additional owned metadata.
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,

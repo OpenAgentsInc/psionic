@@ -16,6 +16,7 @@ The check script runs:
 
 - Harvey corpus metadata fixture checks
 - minimal normalized task snapshot checks
+- coverage tracker integrity and hill-climb policy checks
 - sandbox traversal and symlink escape checks
 - mock report generation checks
 - mock sweep manifest checks

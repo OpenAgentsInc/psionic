@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 cargo test -p psionic-eval --no-default-features --lib legal_benchmark_ci
+cargo test -p psionic-eval --no-default-features --lib legal_benchmark_coverage
 cargo test -p psionic-eval --no-default-features --lib legal_benchmark_reports
 cargo test -p psionic-eval --no-default-features --lib legal_benchmark_sweeps
 
