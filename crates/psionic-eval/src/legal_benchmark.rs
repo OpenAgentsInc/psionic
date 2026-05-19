@@ -393,6 +393,9 @@ pub struct RunRecord {
     pub tool_calls: Vec<ToolCallRecord>,
     /// Aggregate run metrics.
     pub metrics: RunMetrics,
+    /// Extraction receipt ids or hashes retained by this run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extraction_receipt_refs: Vec<String>,
     /// Additional owned metadata.
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,
@@ -561,6 +564,9 @@ pub struct ScoreReport {
     pub criterion_results: Vec<CriterionResult>,
     /// Run metrics copied into the report.
     pub metrics: RunMetrics,
+    /// Extraction receipt ids or hashes considered by the scorer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extraction_receipt_refs: Vec<String>,
     /// Additional owned metadata.
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,
