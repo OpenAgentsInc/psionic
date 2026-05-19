@@ -6,10 +6,13 @@
 //! immutable hashes and receipts Psionic and Autopilot consume.
 
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 
 /// Current schema version for the owned legal benchmark contracts.
 pub const LEGAL_BENCHMARK_SCHEMA_VERSION: u16 = 1;
@@ -90,6 +93,58 @@ pub struct ArtifactManifest {
     /// Additional owned metadata.
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,
+}
+
+/// Comparison between two artifact manifests.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtifactManifestComparison {
+    /// Stable digest of the old manifest.
+    pub old_manifest_hash: String,
+    /// Stable digest of the new manifest.
+    pub new_manifest_hash: String,
+    /// Artifact ids that exist only in the new manifest.
+    pub added_artifact_ids: Vec<String>,
+    /// Artifact ids that exist only in the old manifest.
+    pub removed_artifact_ids: Vec<String>,
+    /// Artifact ids whose path, size, media type, classification, or digest changed.
+    pub changed_artifact_ids: Vec<String>,
+    /// Artifact ids that are unchanged.
+    pub unchanged_artifact_ids: Vec<String>,
+}
+
+impl ArtifactManifestComparison {
+    /// Returns true when the manifests have no effective artifact changes.
+    #[must_use]
+    pub fn is_unchanged(&self) -> bool {
+        self.added_artifact_ids.is_empty()
+            && self.removed_artifact_ids.is_empty()
+            && self.changed_artifact_ids.is_empty()
+    }
+}
+
+/// Errors raised while creating file-backed artifacts or manifest comparisons.
+#[derive(Debug, Error)]
+pub enum ArtifactManifestError {
+    /// File-system operation failed.
+    #[error("I/O error at {path}: {source}")]
+    Io {
+        /// Path that failed.
+        path: PathBuf,
+        /// Source error.
+        #[source]
+        source: std::io::Error,
+    },
+    /// Relative path conversion failed.
+    #[error("failed to compute relative path for {path} from root {root}")]
+    RelativePath {
+        /// Root path.
+        root: PathBuf,
+        /// Child path.
+        path: PathBuf,
+    },
+    /// JSON digest calculation failed.
+    #[error("failed to calculate manifest digest: {0}")]
+    Digest(#[from] serde_json::Error),
 }
 
 /// Artifact manifest role.
@@ -594,6 +649,205 @@ pub fn comparison_report_digest(
     )
 }
 
+/// Builds a deterministic input artifact manifest from a task spec.
+#[must_use]
+pub fn build_input_artifact_manifest(task_spec: &BenchmarkTaskSpec) -> ArtifactManifest {
+    let mut artifacts = task_spec.source_artifacts.clone();
+    sort_artifacts(&mut artifacts);
+    ArtifactManifest {
+        schema_version: LEGAL_BENCHMARK_SCHEMA_VERSION,
+        manifest_id: format!(
+            "manifest.input.{}.{}",
+            task_spec.task_id, task_spec.task_version
+        ),
+        task_id: task_spec.task_id.clone(),
+        task_version: task_spec.task_version.clone(),
+        manifest_role: ArtifactManifestRole::Input,
+        artifacts,
+        metadata: BTreeMap::new(),
+    }
+}
+
+/// Builds a deterministic output artifact manifest from generated artifacts.
+#[must_use]
+pub fn build_output_artifact_manifest(
+    task_id: impl Into<String>,
+    task_version: impl Into<String>,
+    run_id: impl Into<String>,
+    mut artifacts: Vec<SourceArtifact>,
+) -> ArtifactManifest {
+    let task_id = task_id.into();
+    let task_version = task_version.into();
+    let run_id = run_id.into();
+    sort_artifacts(&mut artifacts);
+    ArtifactManifest {
+        schema_version: LEGAL_BENCHMARK_SCHEMA_VERSION,
+        manifest_id: format!("manifest.output.{task_id}.{task_version}.{run_id}"),
+        task_id,
+        task_version,
+        manifest_role: ArtifactManifestRole::Output,
+        artifacts,
+        metadata: BTreeMap::new(),
+    }
+}
+
+/// Builds a deterministic derived artifact manifest from extraction or
+/// intermediate artifacts.
+#[must_use]
+pub fn build_derived_artifact_manifest(
+    task_id: impl Into<String>,
+    task_version: impl Into<String>,
+    manifest_id_suffix: impl Into<String>,
+    mut artifacts: Vec<SourceArtifact>,
+) -> ArtifactManifest {
+    let task_id = task_id.into();
+    let task_version = task_version.into();
+    let manifest_id_suffix = manifest_id_suffix.into();
+    sort_artifacts(&mut artifacts);
+    ArtifactManifest {
+        schema_version: LEGAL_BENCHMARK_SCHEMA_VERSION,
+        manifest_id: format!("manifest.derived.{task_id}.{task_version}.{manifest_id_suffix}"),
+        task_id,
+        task_version,
+        manifest_role: ArtifactManifestRole::Derived,
+        artifacts,
+        metadata: BTreeMap::new(),
+    }
+}
+
+/// Creates a file-backed artifact with SHA-256, byte length, relative path, and
+/// media type.
+pub fn artifact_from_file(
+    artifact_id: impl Into<String>,
+    artifact_kind: ArtifactKind,
+    root: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    data_classification: DataClassification,
+    provenance: Option<String>,
+) -> Result<SourceArtifact, ArtifactManifestError> {
+    let root = root.as_ref();
+    let path = path.as_ref();
+    let bytes = fs::read(path).map_err(|source| ArtifactManifestError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let relative_path = path
+        .strip_prefix(root)
+        .map_err(|_| ArtifactManifestError::RelativePath {
+            root: root.to_path_buf(),
+            path: path.to_path_buf(),
+        })?
+        .to_string_lossy()
+        .to_string();
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let original_filename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("artifact")
+        .to_owned();
+
+    Ok(SourceArtifact {
+        artifact_id: artifact_id.into(),
+        artifact_kind,
+        relative_path: relative_path.clone(),
+        original_filename,
+        media_type: infer_media_type(&relative_path, &bytes).to_owned(),
+        byte_size: bytes.len().try_into().unwrap_or(u64::MAX),
+        sha256: hex::encode(hasher.finalize()),
+        data_classification,
+        provenance,
+    })
+}
+
+/// Compares two manifests by artifact id and stable artifact identity fields.
+pub fn compare_artifact_manifests(
+    old_manifest: &ArtifactManifest,
+    new_manifest: &ArtifactManifest,
+) -> Result<ArtifactManifestComparison, ArtifactManifestError> {
+    let old_manifest_hash = artifact_manifest_digest(old_manifest)?;
+    let new_manifest_hash = artifact_manifest_digest(new_manifest)?;
+    let old_by_id = old_manifest
+        .artifacts
+        .iter()
+        .map(|artifact| (artifact.artifact_id.clone(), artifact))
+        .collect::<BTreeMap<_, _>>();
+    let new_by_id = new_manifest
+        .artifacts
+        .iter()
+        .map(|artifact| (artifact.artifact_id.clone(), artifact))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut added_artifact_ids = Vec::new();
+    let mut removed_artifact_ids = Vec::new();
+    let mut changed_artifact_ids = Vec::new();
+    let mut unchanged_artifact_ids = Vec::new();
+
+    for artifact_id in old_by_id.keys() {
+        if !new_by_id.contains_key(artifact_id) {
+            removed_artifact_ids.push(artifact_id.clone());
+        }
+    }
+    for (artifact_id, new_artifact) in &new_by_id {
+        match old_by_id.get(artifact_id) {
+            Some(old_artifact) if artifact_identity_changed(old_artifact, new_artifact) => {
+                changed_artifact_ids.push(artifact_id.clone());
+            }
+            Some(_) => unchanged_artifact_ids.push(artifact_id.clone()),
+            None => added_artifact_ids.push(artifact_id.clone()),
+        }
+    }
+
+    Ok(ArtifactManifestComparison {
+        old_manifest_hash,
+        new_manifest_hash,
+        added_artifact_ids,
+        removed_artifact_ids,
+        changed_artifact_ids,
+        unchanged_artifact_ids,
+    })
+}
+
+fn artifact_identity_changed(old_artifact: &SourceArtifact, new_artifact: &SourceArtifact) -> bool {
+    old_artifact.artifact_kind != new_artifact.artifact_kind
+        || old_artifact.relative_path != new_artifact.relative_path
+        || old_artifact.media_type != new_artifact.media_type
+        || old_artifact.byte_size != new_artifact.byte_size
+        || old_artifact.sha256 != new_artifact.sha256
+        || old_artifact.data_classification != new_artifact.data_classification
+}
+
+fn sort_artifacts(artifacts: &mut [SourceArtifact]) {
+    artifacts.sort_by(|left, right| {
+        left.relative_path
+            .cmp(&right.relative_path)
+            .then_with(|| left.artifact_id.cmp(&right.artifact_id))
+    });
+}
+
+fn infer_media_type(path: &str, bytes: &[u8]) -> &'static str {
+    match file_extension(path).as_deref() {
+        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        Some("eml") => "message/rfc822",
+        Some("json") => "application/json",
+        Some("md" | "markdown") => "text/markdown",
+        Some("pdf") => "application/pdf",
+        Some("pptx") => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        Some("txt") => "text/plain",
+        Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        _ if std::str::from_utf8(bytes).is_ok() => "text/plain",
+        _ => "application/octet-stream",
+    }
+}
+
+fn file_extension(path: &str) -> Option<String> {
+    Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_ascii_lowercase())
+        .filter(|extension| !extension.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -656,6 +910,95 @@ mod tests {
         assert_eq!(transcript_hash.len(), 64);
         assert_eq!(score_hash.len(), 64);
         assert_eq!(comparison_hash.len(), 64);
+    }
+
+    #[test]
+    fn input_manifest_builder_is_deterministic() {
+        let fixture = fixture_bundle();
+        let mut reversed_task = fixture.task_spec.clone();
+        reversed_task.source_artifacts.reverse();
+
+        let manifest_a = build_input_artifact_manifest(&fixture.task_spec);
+        let manifest_b = build_input_artifact_manifest(&reversed_task);
+
+        assert_eq!(manifest_a, manifest_b);
+        assert_eq!(manifest_a.manifest_role, ArtifactManifestRole::Input);
+        assert_eq!(
+            manifest_a.artifacts.len(),
+            fixture.task_spec.source_artifacts.len()
+        );
+        assert_eq!(
+            artifact_manifest_digest(&manifest_a).expect("manifest digest"),
+            artifact_manifest_digest(&manifest_b).expect("manifest digest repeat")
+        );
+    }
+
+    #[test]
+    fn output_manifest_builder_sorts_generated_artifacts() {
+        let fixture = fixture_bundle();
+        let artifact = fixture.output_manifest.artifacts[0].clone();
+        let manifest = build_output_artifact_manifest(
+            fixture.task_spec.task_id,
+            fixture.task_spec.task_version,
+            "run.fixture",
+            vec![artifact.clone()],
+        );
+
+        assert_eq!(manifest.manifest_role, ArtifactManifestRole::Output);
+        assert_eq!(manifest.artifacts, vec![artifact]);
+        assert!(manifest.manifest_id.contains("manifest.output."));
+        assert_eq!(
+            artifact_manifest_digest(&manifest)
+                .expect("output manifest digest")
+                .len(),
+            64
+        );
+    }
+
+    #[test]
+    fn file_artifact_records_hash_size_and_media_type() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "../../fixtures/legal_benchmark/harvey_compatibility_sample/tasks/corporate/sample-contract-review",
+        );
+        let path = root.join("documents/service-agreement.txt");
+        let artifact = artifact_from_file(
+            "artifact.source.service_agreement",
+            ArtifactKind::SourceDocument,
+            &root,
+            &path,
+            DataClassification::PublicReference,
+            Some(String::from("fixture")),
+        )
+        .expect("file artifact");
+
+        assert_eq!(artifact.relative_path, "documents/service-agreement.txt");
+        assert_eq!(artifact.media_type, "text/plain");
+        assert_eq!(artifact.byte_size, 128);
+        assert_eq!(artifact.sha256.len(), 64);
+    }
+
+    #[test]
+    fn manifest_comparison_detects_changed_inputs() {
+        let fixture = fixture_bundle();
+        let old_manifest = build_input_artifact_manifest(&fixture.task_spec);
+        let mut changed_task = fixture.task_spec;
+        changed_task.source_artifacts[0].sha256 =
+            String::from("0000000000000000000000000000000000000000000000000000000000000000");
+        let new_manifest = build_input_artifact_manifest(&changed_task);
+
+        let comparison =
+            compare_artifact_manifests(&old_manifest, &new_manifest).expect("comparison");
+
+        assert!(!comparison.is_unchanged());
+        assert_eq!(
+            comparison.changed_artifact_ids,
+            vec![String::from("artifact.source.service_agreement")]
+        );
+        assert!(comparison.added_artifact_ids.is_empty());
+        assert!(comparison.removed_artifact_ids.is_empty());
+        assert_eq!(comparison.old_manifest_hash.len(), 64);
+        assert_eq!(comparison.new_manifest_hash.len(), 64);
+        assert_ne!(comparison.old_manifest_hash, comparison.new_manifest_hash);
     }
 
     #[test]
