@@ -1,8 +1,8 @@
 //! Closed legal benchmark tool surface.
 //!
-//! These tools intentionally stay small and replayable: shell, read, write,
-//! edit, glob, and grep. Shell execution is modeled as sandbox-owned; callers
-//! must attach a sandbox runner before commands execute.
+//! These tools intentionally stay replayable: shell, read, write, edit, glob,
+//! grep, and deterministic document helpers. Shell execution is modeled as
+//! sandbox-owned; callers must attach a sandbox runner before commands execute.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -29,6 +29,12 @@ pub enum LegalBenchmarkToolName {
     Edit,
     Glob,
     Grep,
+    Inventory,
+    EmailSummary,
+    SpreadsheetSummary,
+    PdfSearch,
+    EvidenceTable,
+    ValidateDeliverables,
 }
 
 impl LegalBenchmarkToolName {
@@ -40,6 +46,12 @@ impl LegalBenchmarkToolName {
             Self::Edit => "edit",
             Self::Glob => "glob",
             Self::Grep => "grep",
+            Self::Inventory => "inventory",
+            Self::EmailSummary => "email_summary",
+            Self::SpreadsheetSummary => "spreadsheet_summary",
+            Self::PdfSearch => "pdf_search",
+            Self::EvidenceTable => "evidence_table",
+            Self::ValidateDeliverables => "validate_deliverables",
         }
     }
 }
@@ -90,6 +102,37 @@ pub enum LegalBenchmarkToolInput {
         max_results: usize,
         include_hidden: bool,
     },
+    Inventory {
+        root: LegalBenchmarkPathRoot,
+        max_results: usize,
+        include_hidden: bool,
+        include_hashes: bool,
+    },
+    EmailSummary {
+        root: LegalBenchmarkPathRoot,
+        relative_path: String,
+        max_body_chars: usize,
+    },
+    SpreadsheetSummary {
+        root: LegalBenchmarkPathRoot,
+        relative_path: String,
+        max_preview_rows: usize,
+    },
+    PdfSearch {
+        root: LegalBenchmarkPathRoot,
+        relative_path: String,
+        query: String,
+        page: Option<u32>,
+        max_matches: usize,
+    },
+    EvidenceTable {
+        entries: Vec<LegalBenchmarkEvidenceTableEntry>,
+    },
+    ValidateDeliverables {
+        root: LegalBenchmarkPathRoot,
+        required_paths: Vec<String>,
+        max_results: usize,
+    },
 }
 
 impl LegalBenchmarkToolInput {
@@ -101,6 +144,12 @@ impl LegalBenchmarkToolInput {
             Self::Edit { .. } => LegalBenchmarkToolName::Edit,
             Self::Glob { .. } => LegalBenchmarkToolName::Glob,
             Self::Grep { .. } => LegalBenchmarkToolName::Grep,
+            Self::Inventory { .. } => LegalBenchmarkToolName::Inventory,
+            Self::EmailSummary { .. } => LegalBenchmarkToolName::EmailSummary,
+            Self::SpreadsheetSummary { .. } => LegalBenchmarkToolName::SpreadsheetSummary,
+            Self::PdfSearch { .. } => LegalBenchmarkToolName::PdfSearch,
+            Self::EvidenceTable { .. } => LegalBenchmarkToolName::EvidenceTable,
+            Self::ValidateDeliverables { .. } => LegalBenchmarkToolName::ValidateDeliverables,
         }
     }
 }
@@ -143,6 +192,88 @@ pub struct LegalBenchmarkGrepMatch {
     pub line: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkInventoryArtifact {
+    pub root: LegalBenchmarkPathRoot,
+    pub relative_path: String,
+    pub byte_size: u64,
+    pub media_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    pub extracted_text_available: bool,
+    pub text_readable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sheet_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_count: Option<u32>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkEmailSummary {
+    pub relative_path: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub subject: Option<String>,
+    pub date: Option<String>,
+    pub body_preview: String,
+    pub attachment_count: u32,
+    pub warning_count: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkSpreadsheetSummary {
+    pub relative_path: String,
+    pub row_count: u64,
+    pub column_count: u64,
+    pub formula_count: u64,
+    pub preview_rows: Vec<Vec<String>>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkPdfSearchMatch {
+    pub relative_path: String,
+    pub page: u32,
+    pub snippet: String,
+    pub span_hash: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkEvidenceTableEntry {
+    pub source_ref: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locator: Option<String>,
+    pub quote: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkEvidenceTableRow {
+    pub evidence_id: String,
+    pub source_ref: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locator: Option<String>,
+    pub quote_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkDeliverableValidation {
+    pub relative_path: String,
+    pub exists: bool,
+    pub readable: bool,
+    pub byte_size: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    pub media_type: String,
+    pub warnings: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "tool", content = "output", rename_all = "snake_case")]
 pub enum LegalBenchmarkToolOutput {
@@ -177,6 +308,30 @@ pub enum LegalBenchmarkToolOutput {
         matches: Vec<LegalBenchmarkGrepMatch>,
         binary_files_skipped: u32,
         truncated: bool,
+    },
+    Inventory {
+        artifacts: Vec<LegalBenchmarkInventoryArtifact>,
+        truncated: bool,
+    },
+    EmailSummary {
+        summary: LegalBenchmarkEmailSummary,
+    },
+    SpreadsheetSummary {
+        summary: LegalBenchmarkSpreadsheetSummary,
+    },
+    PdfSearch {
+        matches: Vec<LegalBenchmarkPdfSearchMatch>,
+        truncated: bool,
+    },
+    EvidenceTable {
+        rows: Vec<LegalBenchmarkEvidenceTableRow>,
+        markdown: String,
+    },
+    ValidateDeliverables {
+        validations: Vec<LegalBenchmarkDeliverableValidation>,
+        all_present_and_readable: bool,
+        missing_count: u32,
+        unreadable_count: u32,
     },
 }
 
@@ -338,6 +493,75 @@ pub fn execute_legal_benchmark_tool(
             *case_sensitive,
             *max_results,
             *include_hidden,
+            started,
+        ),
+        LegalBenchmarkToolInput::Inventory {
+            root,
+            max_results,
+            include_hidden,
+            include_hashes,
+        } => execute_inventory(
+            workspace,
+            input.clone(),
+            *root,
+            *max_results,
+            *include_hidden,
+            *include_hashes,
+            started,
+        ),
+        LegalBenchmarkToolInput::EmailSummary {
+            root,
+            relative_path,
+            max_body_chars,
+        } => execute_email_summary(
+            workspace,
+            input.clone(),
+            *root,
+            relative_path,
+            *max_body_chars,
+            started,
+        ),
+        LegalBenchmarkToolInput::SpreadsheetSummary {
+            root,
+            relative_path,
+            max_preview_rows,
+        } => execute_spreadsheet_summary(
+            workspace,
+            input.clone(),
+            *root,
+            relative_path,
+            *max_preview_rows,
+            started,
+        ),
+        LegalBenchmarkToolInput::PdfSearch {
+            root,
+            relative_path,
+            query,
+            page,
+            max_matches,
+        } => execute_pdf_search(
+            workspace,
+            input.clone(),
+            *root,
+            relative_path,
+            query,
+            *page,
+            *max_matches,
+            started,
+        ),
+        LegalBenchmarkToolInput::EvidenceTable { entries } => {
+            execute_evidence_table(input.clone(), entries.as_slice(), started)
+        }
+        LegalBenchmarkToolInput::ValidateDeliverables {
+            root,
+            required_paths,
+            max_results,
+        } => execute_validate_deliverables(
+            workspace,
+            input.clone(),
+            *root,
+            required_paths.as_slice(),
+            *max_results,
             started,
         ),
     }
@@ -906,6 +1130,387 @@ fn execute_grep(
     )
 }
 
+fn execute_inventory(
+    workspace: &LegalBenchmarkToolWorkspace,
+    input: LegalBenchmarkToolInput,
+    root: LegalBenchmarkPathRoot,
+    max_results: usize,
+    include_hidden: bool,
+    include_hashes: bool,
+    started: Instant,
+) -> LegalBenchmarkToolExecution {
+    let root_path = root_path(workspace, root);
+    let files = match list_files(root_path, include_hidden) {
+        Ok(files) => files,
+        Err(error) => {
+            return failure_execution(
+                input,
+                started,
+                LegalBenchmarkToolFailureKind::IoError,
+                format!("failed to list files: {error}"),
+                Vec::new(),
+                0,
+                0,
+                None,
+                None,
+            );
+        }
+    };
+    let truncated = files.len() > max_results;
+    let mut artifacts = Vec::new();
+    let mut bytes_read = 0u64;
+    for relative_path in files.into_iter().take(max_results) {
+        let path = root_path.join(relative_path.as_str());
+        let bytes = match fs::read(path.as_path()) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                artifacts.push(LegalBenchmarkInventoryArtifact {
+                    root,
+                    relative_path,
+                    byte_size: 0,
+                    media_type: String::from("application/octet-stream"),
+                    sha256: None,
+                    extracted_text_available: false,
+                    text_readable: false,
+                    page_count: None,
+                    sheet_count: None,
+                    message_count: None,
+                    warnings: vec![format!("failed to read file: {error}")],
+                });
+                continue;
+            }
+        };
+        bytes_read = bytes_read.saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+        let content = String::from_utf8(bytes.clone()).ok();
+        let media_type = guess_media_type(relative_path.as_str());
+        let mut warnings = Vec::new();
+        if content.is_none()
+            && !workspace
+                .extracted_text_by_path
+                .contains_key(&relative_path)
+        {
+            warnings.push(String::from("binary_or_non_utf8_without_extracted_text"));
+        }
+        artifacts.push(LegalBenchmarkInventoryArtifact {
+            root,
+            relative_path: relative_path.clone(),
+            byte_size: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+            media_type,
+            sha256: include_hashes.then(|| sha256_hex(bytes.as_slice())),
+            extracted_text_available: workspace
+                .extracted_text_by_path
+                .contains_key(&relative_path),
+            text_readable: content.is_some(),
+            page_count: page_count_hint(
+                relative_path.as_str(),
+                content.as_deref(),
+                bytes.as_slice(),
+            ),
+            sheet_count: sheet_count_hint(
+                relative_path.as_str(),
+                content.as_deref(),
+                bytes.as_slice(),
+            ),
+            message_count: message_count_hint(relative_path.as_str(), content.as_deref()),
+            warnings,
+        });
+    }
+    success_execution(
+        input,
+        started,
+        LegalBenchmarkToolOutput::Inventory {
+            artifacts,
+            truncated,
+        },
+        Vec::new(),
+        bytes_read,
+        0,
+        None,
+        None,
+    )
+}
+
+fn execute_email_summary(
+    workspace: &LegalBenchmarkToolWorkspace,
+    input: LegalBenchmarkToolInput,
+    root: LegalBenchmarkPathRoot,
+    relative_path: &str,
+    max_body_chars: usize,
+    started: Instant,
+) -> LegalBenchmarkToolExecution {
+    let (content, source, bytes_read) =
+        match read_text_for_helper(workspace, root, relative_path, true) {
+            Ok(value) => value,
+            Err(error) => return path_or_read_failure(input, started, root, relative_path, error),
+        };
+    let headers = parse_email_headers(content.as_str());
+    let body = email_body(content.as_str());
+    let summary = LegalBenchmarkEmailSummary {
+        relative_path: relative_path.to_string(),
+        from: headers.get("from").cloned(),
+        to: headers.get("to").cloned(),
+        subject: headers.get("subject").cloned(),
+        date: headers.get("date").cloned(),
+        body_preview: truncate_chars(body.trim(), max_body_chars),
+        attachment_count: u32::try_from(
+            content
+                .to_ascii_lowercase()
+                .matches("content-disposition: attachment")
+                .count(),
+        )
+        .unwrap_or(u32::MAX),
+        warning_count: u32::from(source != "raw_file" && source != "extracted_text"),
+    };
+    success_execution(
+        input,
+        started,
+        LegalBenchmarkToolOutput::EmailSummary { summary },
+        vec![LegalBenchmarkPathTouch {
+            root,
+            relative_path: relative_path.to_string(),
+            access: "email_summary".to_string(),
+            before_hash: None,
+            after_hash: None,
+        }],
+        bytes_read,
+        0,
+        None,
+        None,
+    )
+}
+
+fn execute_spreadsheet_summary(
+    workspace: &LegalBenchmarkToolWorkspace,
+    input: LegalBenchmarkToolInput,
+    root: LegalBenchmarkPathRoot,
+    relative_path: &str,
+    max_preview_rows: usize,
+    started: Instant,
+) -> LegalBenchmarkToolExecution {
+    let (content, _source, bytes_read) =
+        match read_text_for_helper(workspace, root, relative_path, true) {
+            Ok(value) => value,
+            Err(error) => return path_or_read_failure(input, started, root, relative_path, error),
+        };
+    let delimiter = if relative_path.ends_with(".tsv") {
+        '\t'
+    } else {
+        ','
+    };
+    let rows = content
+        .lines()
+        .map(|line| split_delimited_row(line, delimiter))
+        .collect::<Vec<_>>();
+    let formula_count = rows
+        .iter()
+        .flat_map(|row| row.iter())
+        .filter(|cell| cell.trim_start().starts_with('='))
+        .count();
+    let column_count = rows.iter().map(Vec::len).max().unwrap_or(0);
+    let warnings = if relative_path.ends_with(".xlsx") {
+        vec![String::from(
+            "xlsx summary requires extracted text or a sandboxed office adapter for full fidelity",
+        )]
+    } else {
+        Vec::new()
+    };
+    let summary = LegalBenchmarkSpreadsheetSummary {
+        relative_path: relative_path.to_string(),
+        row_count: u64::try_from(rows.len()).unwrap_or(u64::MAX),
+        column_count: u64::try_from(column_count).unwrap_or(u64::MAX),
+        formula_count: u64::try_from(formula_count).unwrap_or(u64::MAX),
+        preview_rows: rows.into_iter().take(max_preview_rows).collect(),
+        warnings,
+    };
+    success_execution(
+        input,
+        started,
+        LegalBenchmarkToolOutput::SpreadsheetSummary { summary },
+        vec![LegalBenchmarkPathTouch {
+            root,
+            relative_path: relative_path.to_string(),
+            access: "spreadsheet_summary".to_string(),
+            before_hash: None,
+            after_hash: None,
+        }],
+        bytes_read,
+        0,
+        None,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_pdf_search(
+    workspace: &LegalBenchmarkToolWorkspace,
+    input: LegalBenchmarkToolInput,
+    root: LegalBenchmarkPathRoot,
+    relative_path: &str,
+    query: &str,
+    page: Option<u32>,
+    max_matches: usize,
+    started: Instant,
+) -> LegalBenchmarkToolExecution {
+    if query.trim().is_empty() {
+        return failure_execution(
+            input,
+            started,
+            LegalBenchmarkToolFailureKind::PatternInvalid,
+            "pdf search query cannot be empty",
+            Vec::new(),
+            0,
+            0,
+            None,
+            None,
+        );
+    }
+    let (content, _source, bytes_read) =
+        match read_text_for_helper(workspace, root, relative_path, true) {
+            Ok(value) => value,
+            Err(error) => return path_or_read_failure(input, started, root, relative_path, error),
+        };
+    let needle = query.to_ascii_lowercase();
+    let mut matches = Vec::new();
+    for (page_index, page_text) in content.split('\u{000c}').enumerate() {
+        let page_number = u32::try_from(page_index + 1).unwrap_or(u32::MAX);
+        if page.is_some_and(|target| target != page_number) {
+            continue;
+        }
+        let lowered = page_text.to_ascii_lowercase();
+        if let Some(index) = lowered.find(needle.as_str()) {
+            let snippet = snippet_around(page_text, index, query.len(), 120);
+            let span_hash =
+                sha256_hex(format!("{relative_path}|{page_number}|{snippet}").as_bytes());
+            matches.push(LegalBenchmarkPdfSearchMatch {
+                relative_path: relative_path.to_string(),
+                page: page_number,
+                snippet,
+                span_hash,
+            });
+            if matches.len() >= max_matches {
+                break;
+            }
+        }
+    }
+    let truncated = matches.len() >= max_matches;
+    success_execution(
+        input,
+        started,
+        LegalBenchmarkToolOutput::PdfSearch { matches, truncated },
+        vec![LegalBenchmarkPathTouch {
+            root,
+            relative_path: relative_path.to_string(),
+            access: "pdf_search".to_string(),
+            before_hash: None,
+            after_hash: None,
+        }],
+        bytes_read,
+        0,
+        None,
+        None,
+    )
+}
+
+fn execute_evidence_table(
+    input: LegalBenchmarkToolInput,
+    entries: &[LegalBenchmarkEvidenceTableEntry],
+    started: Instant,
+) -> LegalBenchmarkToolExecution {
+    let rows = entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let quote_hash = sha256_hex(entry.quote.as_bytes());
+            LegalBenchmarkEvidenceTableRow {
+                evidence_id: format!("evidence.table.{index}.{quote_hash}"),
+                source_ref: entry.source_ref.clone(),
+                locator: entry.locator.clone(),
+                quote_hash,
+                note: entry.note.clone(),
+            }
+        })
+        .collect::<Vec<_>>();
+    let markdown = render_evidence_markdown(entries, rows.as_slice());
+    success_execution(
+        input,
+        started,
+        LegalBenchmarkToolOutput::EvidenceTable { rows, markdown },
+        Vec::new(),
+        0,
+        0,
+        None,
+        None,
+    )
+}
+
+fn execute_validate_deliverables(
+    workspace: &LegalBenchmarkToolWorkspace,
+    input: LegalBenchmarkToolInput,
+    root: LegalBenchmarkPathRoot,
+    required_paths: &[String],
+    max_results: usize,
+    started: Instant,
+) -> LegalBenchmarkToolExecution {
+    if !matches!(
+        root,
+        LegalBenchmarkPathRoot::Output | LegalBenchmarkPathRoot::Workspace
+    ) {
+        return failure_execution(
+            input,
+            started,
+            LegalBenchmarkToolFailureKind::ReadForbidden,
+            "deliverable validation is allowed only in output or workspace roots",
+            Vec::new(),
+            0,
+            0,
+            None,
+            None,
+        );
+    }
+    let mut validations = Vec::new();
+    let mut bytes_read = 0u64;
+    for relative_path in required_paths.iter().take(max_results) {
+        match validate_one_deliverable(workspace, root, relative_path) {
+            Ok((validation, bytes)) => {
+                bytes_read = bytes_read.saturating_add(bytes);
+                validations.push(validation);
+            }
+            Err(detail) => validations.push(LegalBenchmarkDeliverableValidation {
+                relative_path: relative_path.clone(),
+                exists: false,
+                readable: false,
+                byte_size: 0,
+                sha256: None,
+                media_type: String::from("application/octet-stream"),
+                warnings: vec![detail],
+            }),
+        }
+    }
+    let missing_count = validations
+        .iter()
+        .filter(|validation| !validation.exists)
+        .count();
+    let unreadable_count = validations
+        .iter()
+        .filter(|validation| validation.exists && !validation.readable)
+        .count();
+    success_execution(
+        input,
+        started,
+        LegalBenchmarkToolOutput::ValidateDeliverables {
+            validations,
+            all_present_and_readable: missing_count == 0 && unreadable_count == 0,
+            missing_count: u32::try_from(missing_count).unwrap_or(u32::MAX),
+            unreadable_count: u32::try_from(unreadable_count).unwrap_or(u32::MAX),
+        },
+        Vec::new(),
+        bytes_read,
+        0,
+        None,
+        None,
+    )
+}
+
 fn success_execution(
     input: LegalBenchmarkToolInput,
     started: Instant,
@@ -1053,6 +1658,39 @@ fn transcript_events(
     ]
 }
 
+fn path_or_read_failure(
+    input: LegalBenchmarkToolInput,
+    started: Instant,
+    root: LegalBenchmarkPathRoot,
+    relative_path: &str,
+    detail: String,
+) -> LegalBenchmarkToolExecution {
+    let failure_kind = if detail.contains("binary") {
+        LegalBenchmarkToolFailureKind::BinaryFile
+    } else if detail.contains("path") || detail.contains("root") || detail.contains("exist") {
+        LegalBenchmarkToolFailureKind::InvalidPath
+    } else {
+        LegalBenchmarkToolFailureKind::IoError
+    };
+    failure_execution(
+        input,
+        started,
+        failure_kind,
+        detail,
+        vec![LegalBenchmarkPathTouch {
+            root,
+            relative_path: relative_path.to_string(),
+            access: "rejected".to_string(),
+            before_hash: None,
+            after_hash: None,
+        }],
+        0,
+        0,
+        None,
+        None,
+    )
+}
+
 fn path_failure(
     input: LegalBenchmarkToolInput,
     started: Instant,
@@ -1077,6 +1715,61 @@ fn path_failure(
         None,
         None,
     )
+}
+
+fn read_text_for_helper(
+    workspace: &LegalBenchmarkToolWorkspace,
+    root: LegalBenchmarkPathRoot,
+    relative_path: &str,
+    prefer_extracted: bool,
+) -> Result<(String, &'static str, u64), String> {
+    if prefer_extracted && let Some(text) = workspace.extracted_text_by_path.get(relative_path) {
+        return Ok((
+            text.clone(),
+            "extracted_text",
+            u64::try_from(text.len()).unwrap_or(u64::MAX),
+        ));
+    }
+    let path = resolve_existing_path(workspace, root, relative_path)?;
+    let bytes =
+        fs::read(path.as_path()).map_err(|error| format!("failed to read file: {error}"))?;
+    if bytes.len() > workspace.max_read_bytes {
+        return Err(String::from("read file exceeds workspace max_read_bytes"));
+    }
+    let content = String::from_utf8(bytes.clone())
+        .map_err(|_| String::from("binary or non-UTF-8 file requires extracted text"))?;
+    Ok((
+        content,
+        "raw_file",
+        u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+    ))
+}
+
+fn validate_one_deliverable(
+    workspace: &LegalBenchmarkToolWorkspace,
+    root: LegalBenchmarkPathRoot,
+    relative_path: &str,
+) -> Result<(LegalBenchmarkDeliverableValidation, u64), String> {
+    let path = resolve_existing_path(workspace, root, relative_path)?;
+    let bytes =
+        fs::read(path.as_path()).map_err(|error| format!("failed to read file: {error}"))?;
+    let readable = String::from_utf8(bytes.clone()).is_ok();
+    let mut warnings = Vec::new();
+    if !readable {
+        warnings.push(String::from("non_utf8_or_binary"));
+    }
+    Ok((
+        LegalBenchmarkDeliverableValidation {
+            relative_path: relative_path.to_string(),
+            exists: true,
+            readable,
+            byte_size: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+            sha256: Some(sha256_hex(bytes.as_slice())),
+            media_type: guess_media_type(relative_path),
+            warnings,
+        },
+        u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+    ))
 }
 
 fn resolve_existing_path(
@@ -1218,6 +1911,145 @@ fn wildcard_matches_inner(pattern: &[u8], value: &[u8]) -> bool {
     }
 }
 
+fn guess_media_type(relative_path: &str) -> String {
+    match Path::new(relative_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "txt" | "text" | "md" | "csv" | "tsv" | "json" | "xml" | "html" | "eml" => {
+            String::from("text/plain")
+        }
+        "pdf" => String::from("application/pdf"),
+        "docx" => {
+            String::from("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        }
+        "xlsx" => String::from("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        _ => String::from("application/octet-stream"),
+    }
+}
+
+fn page_count_hint(relative_path: &str, content: Option<&str>, bytes: &[u8]) -> Option<u32> {
+    if !relative_path.ends_with(".pdf") {
+        return content
+            .filter(|text| text.contains('\u{000c}'))
+            .map(|text| u32::try_from(text.split('\u{000c}').count()).unwrap_or(u32::MAX));
+    }
+    if let Some(text) = content {
+        return Some(
+            u32::try_from(text.split('\u{000c}').count())
+                .unwrap_or(u32::MAX)
+                .max(1),
+        );
+    }
+    let marker_count = bytes
+        .windows(b"/Type /Page".len())
+        .filter(|window| *window == b"/Type /Page")
+        .count();
+    Some(u32::try_from(marker_count.max(1)).unwrap_or(u32::MAX))
+}
+
+fn sheet_count_hint(relative_path: &str, content: Option<&str>, bytes: &[u8]) -> Option<u32> {
+    if relative_path.ends_with(".csv") || relative_path.ends_with(".tsv") {
+        return Some(1);
+    }
+    if !relative_path.ends_with(".xlsx") {
+        return None;
+    }
+    if let Some(text) = content {
+        let count = text.matches("sheet").count().max(1);
+        return Some(u32::try_from(count).unwrap_or(u32::MAX));
+    }
+    let count = bytes
+        .windows(b"xl/worksheets/sheet".len())
+        .filter(|window| *window == b"xl/worksheets/sheet")
+        .count()
+        .max(1);
+    Some(u32::try_from(count).unwrap_or(u32::MAX))
+}
+
+fn message_count_hint(relative_path: &str, content: Option<&str>) -> Option<u32> {
+    if !relative_path.ends_with(".eml") {
+        return None;
+    }
+    let text = content?;
+    let count = text
+        .lines()
+        .filter(|line| line.starts_with("From:") || line.starts_with("From "))
+        .count()
+        .max(1);
+    Some(u32::try_from(count).unwrap_or(u32::MAX))
+}
+
+fn parse_email_headers(content: &str) -> BTreeMap<String, String> {
+    let mut headers = BTreeMap::new();
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some((key, value)) = line.split_once(':') {
+            headers.insert(key.trim().to_ascii_lowercase(), value.trim().to_string());
+        }
+    }
+    headers
+}
+
+fn email_body(content: &str) -> &str {
+    content
+        .split_once("\r\n\r\n")
+        .or_else(|| content.split_once("\n\n"))
+        .map(|(_, body)| body)
+        .unwrap_or(content)
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
+}
+
+fn split_delimited_row(line: &str, delimiter: char) -> Vec<String> {
+    line.split(delimiter)
+        .map(|cell| cell.trim_matches('"').trim().to_string())
+        .collect()
+}
+
+fn snippet_around(content: &str, byte_index: usize, query_len: usize, radius: usize) -> String {
+    let start = content[..byte_index]
+        .char_indices()
+        .rev()
+        .nth(radius)
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    let end_target = byte_index.saturating_add(query_len);
+    let end = content[end_target.min(content.len())..]
+        .char_indices()
+        .nth(radius)
+        .map(|(index, _)| end_target.saturating_add(index).min(content.len()))
+        .unwrap_or(content.len());
+    content[start..end].replace('\n', " ")
+}
+
+fn render_evidence_markdown(
+    entries: &[LegalBenchmarkEvidenceTableEntry],
+    rows: &[LegalBenchmarkEvidenceTableRow],
+) -> String {
+    let mut markdown = String::from(
+        "| evidence_id | source_ref | locator | quote_hash | note |\n| --- | --- | --- | --- | --- |\n",
+    );
+    for (entry, row) in entries.iter().zip(rows.iter()) {
+        markdown.push_str(&format!(
+            "| {} | {} | {} | {} | {} |\n",
+            row.evidence_id,
+            row.source_ref.replace('|', "\\|"),
+            row.locator.clone().unwrap_or_default().replace('|', "\\|"),
+            row.quote_hash,
+            entry.note.clone().unwrap_or_default().replace('|', "\\|")
+        ));
+    }
+    markdown
+}
+
 fn deterministic_tool_call_id(tool_name: LegalBenchmarkToolName, input_hash: &str) -> String {
     let digest = sha256_hex(format!("{}|{input_hash}", tool_name.as_str()).as_bytes());
     format!("tool_call.{}.{}", tool_name.as_str(), digest)
@@ -1251,10 +2083,26 @@ mod tests {
         fs::create_dir_all(workspace.join("nested")).expect("workspace");
         fs::create_dir_all(output.as_path()).expect("output");
         fs::write(documents.join("case.txt"), "Alpha clause\nBeta clause\n").expect("case");
+        fs::write(
+            documents.join("thread.eml"),
+            "From: sender@example.com\nTo: lawyer@example.com\nSubject: Notice terms\nDate: Tue, 1 Jan 2026\n\nPlease review the termination notice.\nContent-Disposition: attachment\n",
+        )
+        .expect("eml");
+        fs::write(
+            documents.join("terms.csv"),
+            "Name,Amount,Formula\nBase,10,=SUM(B2:B2)\n",
+        )
+        .expect("csv");
+        fs::write(
+            documents.join("brief.pdf"),
+            "First page risk summary.\u{000c}Second page termination notice.",
+        )
+        .expect("pdf text");
         fs::write(workspace.join("notes.md"), "Alpha draft\nAlpha clause\n").expect("notes");
         fs::write(workspace.join("nested/summary.txt"), "Beta summary\n").expect("summary");
         fs::write(workspace.join(".hidden.txt"), "hidden Alpha\n").expect("hidden");
         fs::write(workspace.join("binary.bin"), [0, 159, 146, 150]).expect("binary");
+        fs::write(output.join("memo.md"), "# Memo\n\nDone.\n").expect("memo");
 
         let extracted = ExtractedArtifact {
             artifact: SourceArtifact {
@@ -1401,6 +2249,138 @@ mod tests {
             } => {
                 assert_eq!(matches.len(), 2);
                 assert_eq!(binary_files_skipped, 1);
+            }
+            _ => panic!("unexpected output"),
+        }
+    }
+
+    #[test]
+    fn inventory_records_hashes_and_document_hints() {
+        let workspace = workspace();
+        let execution = execute_legal_benchmark_tool(
+            &workspace,
+            LegalBenchmarkToolInput::Inventory {
+                root: LegalBenchmarkPathRoot::Documents,
+                max_results: 20,
+                include_hidden: false,
+                include_hashes: true,
+            },
+        );
+        match execution.output.expect("inventory output") {
+            LegalBenchmarkToolOutput::Inventory {
+                artifacts,
+                truncated,
+            } => {
+                assert!(!truncated);
+                assert!(artifacts.iter().any(|artifact| {
+                    artifact.relative_path == "thread.eml" && artifact.message_count == Some(1)
+                }));
+                assert!(artifacts.iter().any(|artifact| {
+                    artifact.relative_path == "terms.csv"
+                        && artifact.sheet_count == Some(1)
+                        && artifact.sha256.is_some()
+                }));
+                assert!(artifacts.iter().any(|artifact| {
+                    artifact.relative_path == "brief.pdf" && artifact.page_count == Some(2)
+                }));
+            }
+            _ => panic!("unexpected output"),
+        }
+    }
+
+    #[test]
+    fn document_helper_tools_extract_high_score_evidence() {
+        let workspace = workspace();
+        let email = execute_legal_benchmark_tool(
+            &workspace,
+            LegalBenchmarkToolInput::EmailSummary {
+                root: LegalBenchmarkPathRoot::Documents,
+                relative_path: "thread.eml".to_string(),
+                max_body_chars: 80,
+            },
+        );
+        match email.output.expect("email output") {
+            LegalBenchmarkToolOutput::EmailSummary { summary } => {
+                assert_eq!(summary.subject.as_deref(), Some("Notice terms"));
+                assert_eq!(summary.attachment_count, 1);
+            }
+            _ => panic!("unexpected output"),
+        }
+
+        let spreadsheet = execute_legal_benchmark_tool(
+            &workspace,
+            LegalBenchmarkToolInput::SpreadsheetSummary {
+                root: LegalBenchmarkPathRoot::Documents,
+                relative_path: "terms.csv".to_string(),
+                max_preview_rows: 2,
+            },
+        );
+        match spreadsheet.output.expect("spreadsheet output") {
+            LegalBenchmarkToolOutput::SpreadsheetSummary { summary } => {
+                assert_eq!(summary.row_count, 2);
+                assert_eq!(summary.column_count, 3);
+                assert_eq!(summary.formula_count, 1);
+            }
+            _ => panic!("unexpected output"),
+        }
+
+        let pdf = execute_legal_benchmark_tool(
+            &workspace,
+            LegalBenchmarkToolInput::PdfSearch {
+                root: LegalBenchmarkPathRoot::Documents,
+                relative_path: "brief.pdf".to_string(),
+                query: "termination".to_string(),
+                page: Some(2),
+                max_matches: 5,
+            },
+        );
+        let snippet = match pdf.output.expect("pdf output") {
+            LegalBenchmarkToolOutput::PdfSearch { matches, .. } => {
+                assert_eq!(matches.len(), 1);
+                assert_eq!(matches[0].page, 2);
+                matches[0].snippet.clone()
+            }
+            _ => panic!("unexpected output"),
+        };
+
+        let evidence = execute_legal_benchmark_tool(
+            &workspace,
+            LegalBenchmarkToolInput::EvidenceTable {
+                entries: vec![LegalBenchmarkEvidenceTableEntry {
+                    source_ref: "brief.pdf".to_string(),
+                    locator: Some("page:2".to_string()),
+                    quote: snippet,
+                    note: Some("termination notice".to_string()),
+                }],
+            },
+        );
+        match evidence.output.expect("evidence output") {
+            LegalBenchmarkToolOutput::EvidenceTable { rows, markdown } => {
+                assert_eq!(rows.len(), 1);
+                assert!(markdown.contains("termination notice"));
+            }
+            _ => panic!("unexpected output"),
+        }
+
+        let validation = execute_legal_benchmark_tool(
+            &workspace,
+            LegalBenchmarkToolInput::ValidateDeliverables {
+                root: LegalBenchmarkPathRoot::Output,
+                required_paths: vec!["memo.md".to_string(), "missing.docx".to_string()],
+                max_results: 10,
+            },
+        );
+        match validation.output.expect("validation output") {
+            LegalBenchmarkToolOutput::ValidateDeliverables {
+                validations,
+                all_present_and_readable,
+                missing_count,
+                ..
+            } => {
+                assert!(!all_present_and_readable);
+                assert_eq!(missing_count, 1);
+                assert_eq!(validations[0].relative_path, "memo.md");
+                assert!(validations[0].sha256.is_some());
             }
             _ => panic!("unexpected output"),
         }

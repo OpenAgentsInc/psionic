@@ -157,6 +157,12 @@ write and edit are restricted to workspace/output roots; shell remains
 sandbox-owned and routes through the Podman backend only when the full-feature
 caller attaches one.
 
+High-score document helpers now extend the same receipt-backed surface with
+inventory, EML summary, spreadsheet summary, page-targeted PDF search, evidence
+table construction, and deliverable validation. These tools improve source
+coverage, evidence traceability, and pre-judge output checks without exposing
+hidden criteria.
+
 ## Provider Adapter Layer
 
 The provider-neutral model contract is documented in
@@ -244,6 +250,6 @@ and exercises mock report and sweep fixtures without live provider credentials.
 
 ## Next Work
 
-The next implementation issue is high-score legal document tooling. It should
-improve document inventory, evidence coverage, and deliverable validation
-without exposing hidden rubric data.
+The next implementation issue is model and tool-policy sweep matrices for
+measuring which document-tool policies and provider routes produce better
+scores under explicit cost, latency, and reliability budgets.

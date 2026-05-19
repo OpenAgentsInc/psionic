@@ -68,6 +68,7 @@ pub fn build_coverage_snapshot(
     let mut evidence_refs = Vec::new();
     let mut deliverable_sections =
         output_deliverable_sections(task_spec, output_manifest.artifacts.as_slice());
+    let mut validations = build_deliverable_validations(task_spec, output_manifest);
 
     for call in tool_calls {
         apply_tool_call_coverage(
@@ -77,10 +78,10 @@ pub fn build_coverage_snapshot(
             &mut facts,
             &mut evidence_refs,
             &mut deliverable_sections,
+            &mut validations,
         )?;
     }
 
-    let validations = build_deliverable_validations(task_spec, output_manifest);
     let self_checks = transcript
         .iter()
         .filter_map(self_check_from_transcript_event)
@@ -312,8 +313,14 @@ fn apply_tool_call_coverage(
     facts: &mut Vec<FactCoverageEntry>,
     evidence_refs: &mut Vec<EvidenceCoverageEntry>,
     deliverable_sections: &mut Vec<DeliverableSectionCoverage>,
+    validations: &mut Vec<ValidationCoverageEntry>,
 ) -> Result<(), serde_json::Error> {
     match call.tool_name.as_str() {
+        "inventory" => apply_inventory_coverage(call, documents),
+        "email_summary" | "spreadsheet_summary" => apply_summary_coverage(call, documents, facts)?,
+        "pdf_search" => apply_pdf_search_coverage(call, documents, facts, evidence_refs)?,
+        "evidence_table" => apply_evidence_table_coverage(call, evidence_refs),
+        "validate_deliverables" => apply_validate_deliverables_coverage(call, validations),
         "glob" => apply_glob_coverage(call, documents),
         "grep" => apply_grep_coverage(call, documents, facts, evidence_refs)?,
         "read" => apply_read_coverage(call, documents, facts)?,
@@ -321,6 +328,172 @@ fn apply_tool_call_coverage(
         _ => {}
     }
     Ok(())
+}
+
+fn apply_inventory_coverage(
+    call: &ToolCallRecord,
+    documents: &mut BTreeMap<String, DocumentCoverageEntry>,
+) {
+    if !input_root_is_documents(call) {
+        return;
+    }
+    let Some(artifacts) = output_payload(call, "inventory")
+        .and_then(|inventory| inventory.get("artifacts"))
+        .and_then(Value::as_array)
+    else {
+        return;
+    };
+    for artifact in artifacts {
+        if let Some(relative_path) = artifact.get("relative_path").and_then(Value::as_str) {
+            document_entry(documents, relative_path).discovered = true;
+        }
+    }
+}
+
+fn apply_summary_coverage(
+    call: &ToolCallRecord,
+    documents: &mut BTreeMap<String, DocumentCoverageEntry>,
+    facts: &mut Vec<FactCoverageEntry>,
+) -> Result<(), serde_json::Error> {
+    if !input_root_is_documents(call) {
+        return Ok(());
+    }
+    let Some(relative_path) = input_payload(call)
+        .and_then(|input| input.get("relative_path"))
+        .and_then(Value::as_str)
+    else {
+        return Ok(());
+    };
+    let entry = document_entry(documents, relative_path);
+    entry.discovered = true;
+    entry.read = true;
+    if let Some(output) = &call.output {
+        facts.push(FactCoverageEntry {
+            fact_id: format!("fact.{}.{}", stable_path_id(relative_path), facts.len()),
+            source_ref: relative_path.to_owned(),
+            text_hash: stable_json_digest("psionic.legal_benchmark.coverage.summary.v1", output)?,
+            method: call.tool_name.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn apply_pdf_search_coverage(
+    call: &ToolCallRecord,
+    documents: &mut BTreeMap<String, DocumentCoverageEntry>,
+    facts: &mut Vec<FactCoverageEntry>,
+    evidence_refs: &mut Vec<EvidenceCoverageEntry>,
+) -> Result<(), serde_json::Error> {
+    if !input_root_is_documents(call) {
+        return Ok(());
+    }
+    let Some(matches) = output_payload(call, "pdf_search")
+        .and_then(|pdf| pdf.get("matches"))
+        .and_then(Value::as_array)
+    else {
+        return Ok(());
+    };
+    for matched in matches {
+        let Some(relative_path) = matched.get("relative_path").and_then(Value::as_str) else {
+            continue;
+        };
+        let entry = document_entry(documents, relative_path);
+        entry.discovered = true;
+        entry.read = true;
+        let snippet = matched
+            .get("snippet")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let span_hash = matched
+            .get("span_hash")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| {
+                stable_json_digest("psionic.legal_benchmark.coverage.pdf_search.v1", &snippet)
+                    .unwrap_or_default()
+            });
+        let page = matched.get("page").and_then(Value::as_u64).unwrap_or(0);
+        let evidence_id = format!("evidence.{}.page.{page}", stable_path_id(relative_path));
+        evidence_refs.push(EvidenceCoverageEntry {
+            evidence_id,
+            source_ref: relative_path.to_owned(),
+            locator: Some(format!("page:{page}")),
+            span_hash: span_hash.clone(),
+        });
+        facts.push(FactCoverageEntry {
+            fact_id: format!("fact.{}.{}", stable_path_id(relative_path), facts.len()),
+            source_ref: relative_path.to_owned(),
+            text_hash: span_hash,
+            method: String::from("pdf_search"),
+        });
+    }
+    Ok(())
+}
+
+fn apply_evidence_table_coverage(
+    call: &ToolCallRecord,
+    evidence_refs: &mut Vec<EvidenceCoverageEntry>,
+) {
+    let Some(rows) = output_payload(call, "evidence_table")
+        .and_then(|table| table.get("rows"))
+        .and_then(Value::as_array)
+    else {
+        return;
+    };
+    for row in rows {
+        let Some(evidence_id) = row.get("evidence_id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(source_ref) = row.get("source_ref").and_then(Value::as_str) else {
+            continue;
+        };
+        let span_hash = row
+            .get("quote_hash")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        evidence_refs.push(EvidenceCoverageEntry {
+            evidence_id: evidence_id.to_string(),
+            source_ref: source_ref.to_string(),
+            locator: row
+                .get("locator")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned),
+            span_hash,
+        });
+    }
+}
+
+fn apply_validate_deliverables_coverage(
+    call: &ToolCallRecord,
+    validations: &mut Vec<ValidationCoverageEntry>,
+) {
+    let Some(rows) = output_payload(call, "validate_deliverables")
+        .and_then(|output| output.get("validations"))
+        .and_then(Value::as_array)
+    else {
+        return;
+    };
+    for row in rows {
+        let Some(relative_path) = row.get("relative_path").and_then(Value::as_str) else {
+            continue;
+        };
+        let exists = row.get("exists").and_then(Value::as_bool).unwrap_or(false);
+        let readable = row
+            .get("readable")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        validations.push(ValidationCoverageEntry {
+            validation_id: format!("validation.tool.{}", stable_path_id(relative_path)),
+            target_ref: relative_path.to_string(),
+            passed: exists && readable,
+            detail: if exists && readable {
+                format!("deliverable {relative_path} exists and is readable")
+            } else {
+                format!("deliverable {relative_path} missing or unreadable")
+            },
+        });
+    }
 }
 
 fn apply_glob_coverage(
