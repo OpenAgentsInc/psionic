@@ -1,0 +1,30 @@
+{
+  "title": "Sample Contract Review",
+  "work_type": "review",
+  "tags": [
+    "Corporate",
+    "fixture"
+  ],
+  "instructions": "Review the attached documents and produce a risk memo. Output: `risk-memo.docx`",
+  "deliverables": {
+    "risk-memo.docx": "risk-memo.docx"
+  },
+  "criteria": [
+    {
+      "id": "C-001",
+      "title": "Identifies termination notice period",
+      "deliverables": [
+        "risk-memo.docx"
+      ],
+      "match_criteria": "PASS if the memo identifies that either party may terminate on thirty days written notice. FAIL otherwise."
+    },
+    {
+      "id": "C-002",
+      "title": "Identifies payment deadline",
+      "deliverables": [
+        "risk-memo.docx"
+      ],
+      "match_criteria": "PASS if the memo identifies that invoices are payable within fifteen days. FAIL otherwise."
+    }
+  ]
+}

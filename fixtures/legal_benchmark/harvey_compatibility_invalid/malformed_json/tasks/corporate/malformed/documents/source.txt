@@ -1,0 +1,1 @@
+This fixture has malformed task JSON.

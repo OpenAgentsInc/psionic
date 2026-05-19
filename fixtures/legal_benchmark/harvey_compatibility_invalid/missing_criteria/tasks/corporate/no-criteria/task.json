@@ -1,0 +1,12 @@
+{
+  "title": "Missing Criteria",
+  "work_type": "review",
+  "tags": [
+    "Corporate"
+  ],
+  "instructions": "Review the attached documents. Output: `memo.docx`",
+  "deliverables": {
+    "memo.docx": "memo.docx"
+  },
+  "criteria": []
+}
