@@ -14,6 +14,12 @@ It defines the closed Harvey-compatible tool set:
 - `edit`
 - `glob`
 - `grep`
+- `inventory`
+- `email_summary`
+- `spreadsheet_summary`
+- `pdf_search`
+- `evidence_table`
+- `validate_deliverables`
 
 Every call returns a `LegalBenchmarkToolExecution` with:
 
@@ -57,6 +63,29 @@ matcher, respects hidden-file policy, and truncates at the caller limit.
 `grep` performs deterministic substring matching, supports case-insensitive
 matching, skips binary files, and records how many binary files were skipped.
 
+`inventory` walks a root and returns file size, media type, optional SHA-256,
+extracted-text availability, text readability, and page/sheet/message-count
+hints. This is the first tool an agent should call on document-heavy tasks.
+
+`email_summary` parses EML-style headers and body previews from raw or
+extracted text. It records sender, recipient, subject, date, body preview, and
+attachment-count hints.
+
+`spreadsheet_summary` summarizes CSV/TSV or extracted spreadsheet text with
+row count, column count, formula count, and bounded preview rows. XLSX files
+without extracted text return a warning rather than pretending to have full
+workbook fidelity.
+
+`pdf_search` searches extracted or text-backed PDF content by page using form
+feed page boundaries and returns snippets with stable span hashes.
+
+`evidence_table` turns source refs, locators, quotes, and notes into
+receipt-backed evidence rows and a Markdown table for downstream deliverables.
+
+`validate_deliverables` checks required workspace/output paths for existence,
+readability, media type, byte size, and SHA-256. Missing or unreadable outputs
+are caught before judge scoring.
+
 `shell` is sandbox-owned. The generic dispatcher returns `sandbox_unavailable`
 unless a sandbox runner is attached. With the full feature set,
 `execute_shell_with_podman` routes shell commands through the `psionic-sandbox`
@@ -65,7 +94,8 @@ reference.
 
 ## Prompt Surface
 
-Agents should receive the six tools as a closed set. Prompts should state that:
+Agents should receive these receipt-backed tools as a closed set. Prompts
+should state that:
 
 - document inputs are read-only
 - outputs belong in the output root
@@ -73,3 +103,5 @@ Agents should receive the six tools as a closed set. Prompts should state that:
 - shell may be unavailable unless the run profile grants a sandbox
 - binary files and path traversal are structured tool errors
 - every tool call is transcripted and receipt-backed
+- use `inventory`, targeted summaries/search, `evidence_table`, and
+  `validate_deliverables` before final submission on document-heavy tasks

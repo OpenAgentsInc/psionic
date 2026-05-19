@@ -666,6 +666,104 @@ pub fn legal_benchmark_model_tool_specs() -> Vec<ModelToolSpec> {
                 "additionalProperties": false
             }),
         ),
+        tool_spec(
+            LegalBenchmarkToolName::Inventory,
+            "Inventory files with size, media type, hash, extraction availability, and document-count hints.",
+            json!({
+                "type": "object",
+                "required": ["root", "max_results", "include_hidden", "include_hashes"],
+                "properties": {
+                    "root": {"type": "string", "enum": ["documents", "workspace", "output"]},
+                    "max_results": {"type": "integer", "minimum": 1},
+                    "include_hidden": {"type": "boolean"},
+                    "include_hashes": {"type": "boolean"}
+                },
+                "additionalProperties": false
+            }),
+        ),
+        tool_spec(
+            LegalBenchmarkToolName::EmailSummary,
+            "Summarize an EML-style message with headers, body preview, and attachment count.",
+            json!({
+                "type": "object",
+                "required": ["root", "relative_path", "max_body_chars"],
+                "properties": {
+                    "root": {"type": "string", "enum": ["documents", "workspace", "output"]},
+                    "relative_path": {"type": "string"},
+                    "max_body_chars": {"type": "integer", "minimum": 1}
+                },
+                "additionalProperties": false
+            }),
+        ),
+        tool_spec(
+            LegalBenchmarkToolName::SpreadsheetSummary,
+            "Summarize CSV/TSV or extracted spreadsheet text with row, column, formula, and preview data.",
+            json!({
+                "type": "object",
+                "required": ["root", "relative_path", "max_preview_rows"],
+                "properties": {
+                    "root": {"type": "string", "enum": ["documents", "workspace", "output"]},
+                    "relative_path": {"type": "string"},
+                    "max_preview_rows": {"type": "integer", "minimum": 1}
+                },
+                "additionalProperties": false
+            }),
+        ),
+        tool_spec(
+            LegalBenchmarkToolName::PdfSearch,
+            "Search extracted PDF text by page and return page-scoped snippets with span hashes.",
+            json!({
+                "type": "object",
+                "required": ["root", "relative_path", "query", "max_matches"],
+                "properties": {
+                    "root": {"type": "string", "enum": ["documents", "workspace", "output"]},
+                    "relative_path": {"type": "string"},
+                    "query": {"type": "string"},
+                    "page": {"type": "integer", "minimum": 1},
+                    "max_matches": {"type": "integer", "minimum": 1}
+                },
+                "additionalProperties": false
+            }),
+        ),
+        tool_spec(
+            LegalBenchmarkToolName::EvidenceTable,
+            "Build a receipt-backed evidence table from source refs, locators, quotes, and notes.",
+            json!({
+                "type": "object",
+                "required": ["entries"],
+                "properties": {
+                    "entries": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["source_ref", "quote"],
+                            "properties": {
+                                "source_ref": {"type": "string"},
+                                "locator": {"type": "string"},
+                                "quote": {"type": "string"},
+                                "note": {"type": "string"}
+                            },
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }),
+        ),
+        tool_spec(
+            LegalBenchmarkToolName::ValidateDeliverables,
+            "Check required workspace/output deliverables for existence, readability, media type, and hash.",
+            json!({
+                "type": "object",
+                "required": ["root", "required_paths", "max_results"],
+                "properties": {
+                    "root": {"type": "string", "enum": ["workspace", "output"]},
+                    "required_paths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                    "max_results": {"type": "integer", "minimum": 1}
+                },
+                "additionalProperties": false
+            }),
+        ),
     ]
 }
 
@@ -1203,7 +1301,20 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(
             names,
-            vec!["shell", "read", "write", "edit", "glob", "grep"]
+            vec![
+                "shell",
+                "read",
+                "write",
+                "edit",
+                "glob",
+                "grep",
+                "inventory",
+                "email_summary",
+                "spreadsheet_summary",
+                "pdf_search",
+                "evidence_table",
+                "validate_deliverables"
+            ]
         );
         assert!(specs.iter().all(|spec| spec.input_schema.is_object()));
     }

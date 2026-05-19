@@ -41,6 +41,12 @@ credential route without leaking the credential value.
 - edit
 - glob
 - grep
+- inventory
+- email_summary
+- spreadsheet_summary
+- pdf_search
+- evidence_table
+- validate_deliverables
 
 OpenAI-compatible responses normalize `tool_calls[].function` payloads into
 `ModelToolCall`. Anthropic responses normalize `tool_use` content blocks into

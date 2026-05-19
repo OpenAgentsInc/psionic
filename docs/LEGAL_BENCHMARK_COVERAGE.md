@@ -24,9 +24,10 @@ used only by the evaluator and post-judge failure classifier.
 
 - discovered and read source documents
 - whether extracted text was used
-- facts and evidence spans captured by read/grep-style tools
+- facts and evidence spans captured by read/grep, PDF search, summary, and
+  evidence-table tools
 - drafted deliverable sections
-- deliverable validations
+- output-manifest and explicit deliverable validations
 - agent self-check declarations
 - policy-approved derived checklist items
 - whether hidden criteria appeared in model-visible transcript text
