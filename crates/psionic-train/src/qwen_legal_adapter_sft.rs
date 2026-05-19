@@ -49,6 +49,9 @@ pub const QWEN_LEGAL_RL_BENCHMARK_REPORT_SCHEMA_VERSION: &str =
 /// Stable schema version for the legal RL optimization window report.
 pub const QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_optimization_window.v1";
+/// Stable schema version for the legal RL perfect-score push report.
+pub const QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_perfect_score_push.v1";
 /// Stable plan id for the next Harvey legal hillclimb phase.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID: &str = "qwen_legal_rl_hillclimb_plan_v1";
 /// Stable report id for the next Harvey legal RL benchmark projection.
@@ -56,15 +59,22 @@ pub const QWEN_LEGAL_RL_BENCHMARK_REPORT_ID: &str = "qwen_legal_rl_benchmark_rep
 /// Stable report id for the phase-three Harvey legal RL optimization window.
 pub const QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_REPORT_ID: &str =
     "qwen_legal_rl_optimization_window_phase_003";
+/// Stable report id for the phase-four Harvey legal perfect-score push.
+pub const QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_REPORT_ID: &str =
+    "qwen_legal_rl_perfect_score_push_phase_004";
 /// Phase-two retained target aligned with Blueprint optimizer batch `phase_002`.
 pub const QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS: u16 = 7_000;
 /// Phase-three retained target aligned with Blueprint shadow-eval shortlist.
 pub const QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS: u16 = 7_800;
+/// Phase-four retained target aligned with Blueprint perfect-score push plan.
+pub const QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS: u16 = 8_500;
 /// Blueprint frontier consumed by the Psionic legal RL plan.
 pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
     "blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001";
 /// Blueprint shadow-eval shortlist consumed by the phase-three RL window.
 pub const QWEN_LEGAL_BLUEPRINT_SHADOW_EVAL_SHORTLIST_REF: &str = "blueprint://harvey_legal_qwen_phase_three_shadow_eval_shortlist/optimizer_shortlist.harvey_legal_qwen.phase_003.shadow_eval";
+/// Blueprint phase-four perfect-score push plan consumed by Psionic.
+pub const QWEN_LEGAL_BLUEPRINT_PERFECT_SCORE_PUSH_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_four_perfect_score_push_plan/optimizer_plan.harvey_legal_qwen.phase_004.perfect_score_push";
 /// Stable target-set id for the first narrow LM-head-only adapter.
 pub const QWEN_LEGAL_ADAPTER_TARGET_SET_ID: &str = "qwen3.5-4b.legal.lm_head_lora.v1";
 /// Stable adapter target id for the first smoke lane.
@@ -1114,6 +1124,72 @@ pub struct QwenLegalRlOptimizationWindowReport {
     pub report_digest: String,
 }
 
+/// One failure-family allocation inside the phase-four perfect-score push report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlPerfectScorePushTarget {
+    /// Failure family shared with Blueprint and Autopilot4.
+    pub failure_family: String,
+    /// Optimizer method assigned to this family.
+    pub optimizer_method: QwenLegalRlOptimizerMethod,
+    /// Blueprint module receiving the resulting candidate.
+    pub blueprint_module_slug: String,
+    /// Dataset or review request admitted into the window.
+    pub dataset_request_ref: String,
+    /// Planned accepted rollouts or reviewed traces for this family.
+    pub planned_accepted_rollouts: u16,
+    /// Conservative lift this target should support in shadow eval.
+    pub planned_shadow_lift_basis_points: u16,
+    /// Whether this family requires explicit judge-adjudication traces.
+    pub judge_adjudication_required: bool,
+    /// Per-family scorecard that must exist before promotion review.
+    pub scorecard_ref: String,
+}
+
+/// Phase-four offline RL/adjudication report for the Harvey perfect-score push.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlPerfectScorePushReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable report id.
+    pub report_id: String,
+    /// Source phase-three window report id.
+    pub source_window_report_id: String,
+    /// Stable digest of the phase-three report payload.
+    pub source_window_report_digest: String,
+    /// Plan id this push still executes.
+    pub plan_id: String,
+    /// Stable digest of the plan payload.
+    pub plan_digest: String,
+    /// Baseline retained score used for the push.
+    pub baseline_score_basis_points: u16,
+    /// Previous target carried forward from phase three.
+    pub previous_target_score_basis_points: u16,
+    /// New phase-four conservative target.
+    pub phase_four_target_score_basis_points: u16,
+    /// Sum of family-level planned shadow lifts.
+    pub total_planned_shadow_lift_basis_points: u16,
+    /// Target model family for retained scoring.
+    pub retained_target_model_id: String,
+    /// Rollout window id widened for phase four.
+    pub rollout_window_id: String,
+    /// Minimum accepted rollout count for the phase-four push.
+    pub accepted_rollout_minimum: u16,
+    /// Maximum quarantined rollout count for the phase-four push.
+    pub quarantined_rollout_budget: u16,
+    /// Maximum permitted holdout regression for promotion review.
+    pub holdout_max_regression_basis_points: u16,
+    /// Maximum unresolved judge-disagreement budget.
+    pub calibrated_judge_disagreement_budget_basis_points: u16,
+    /// Blueprint perfect-score push plan ref consumed by this report.
+    pub blueprint_perfect_score_push_plan_ref: String,
+    /// Per-family target allocations.
+    pub targets: Vec<QwenLegalRlPerfectScorePushTarget>,
+    /// Autopilot4 export/update target.
+    pub benchmark_export_ref: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
 impl QwenLegalRlBenchmarkReadinessReport {
     /// Returns the stable digest over the report payload.
     #[must_use]
@@ -1284,6 +1360,116 @@ impl QwenLegalRlOptimizationWindowReport {
     }
 }
 
+impl QwenLegalRlPerfectScorePushReport {
+    /// Returns the stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(b"psionic_qwen_legal_rl_perfect_score_push|", &clone)
+    }
+
+    fn validate(&self) -> Result<(), QwenLegalAdapterSftError> {
+        if self.schema_version != QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_SCHEMA_VERSION {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL perfect-score push schema version drifted"),
+            });
+        }
+        if self.report_id != QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_REPORT_ID {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL perfect-score push report id drifted"),
+            });
+        }
+        require_nonempty(
+            self.source_window_report_id.as_str(),
+            "source_window_report_id",
+        )?;
+        require_nonempty(
+            self.source_window_report_digest.as_str(),
+            "source_window_report_digest",
+        )?;
+        require_nonempty(self.plan_id.as_str(), "plan_id")?;
+        require_nonempty(self.plan_digest.as_str(), "plan_digest")?;
+        if self.previous_target_score_basis_points != QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS
+            || self.phase_four_target_score_basis_points != QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL perfect-score push target drifted"),
+            });
+        }
+        if self.baseline_score_basis_points >= self.previous_target_score_basis_points
+            || self.previous_target_score_basis_points >= self.phase_four_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL perfect-score push requires monotonic targets"),
+            });
+        }
+        if self
+            .baseline_score_basis_points
+            .saturating_add(self.total_planned_shadow_lift_basis_points)
+            < self.phase_four_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("planned perfect-score push lift does not support target"),
+            });
+        }
+        require_nonempty(
+            self.retained_target_model_id.as_str(),
+            "retained_target_model_id",
+        )?;
+        require_nonempty(self.rollout_window_id.as_str(), "rollout_window_id")?;
+        if self.accepted_rollout_minimum <= self.quarantined_rollout_budget {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("accepted legal rollouts must exceed quarantine budget"),
+            });
+        }
+        if self.holdout_max_regression_basis_points != 0 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("phase-four Harvey push allows no holdout regression"),
+            });
+        }
+        if self.calibrated_judge_disagreement_budget_basis_points > 75 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("judge disagreement budget is too loose"),
+            });
+        }
+        require_nonempty(
+            self.blueprint_perfect_score_push_plan_ref.as_str(),
+            "blueprint_perfect_score_push_plan_ref",
+        )?;
+        if self.targets.len() < 9 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("perfect-score push requires all frontier families"),
+            });
+        }
+        for target in &self.targets {
+            require_nonempty(target.failure_family.as_str(), "target.failure_family")?;
+            require_nonempty(
+                target.blueprint_module_slug.as_str(),
+                "target.blueprint_module_slug",
+            )?;
+            require_nonempty(
+                target.dataset_request_ref.as_str(),
+                "target.dataset_request_ref",
+            )?;
+            require_nonempty(target.scorecard_ref.as_str(), "target.scorecard_ref")?;
+            if target.planned_accepted_rollouts == 0 || target.planned_shadow_lift_basis_points == 0
+            {
+                return Err(QwenLegalAdapterSftError::InvalidConfig {
+                    detail: String::from("perfect-score push targets require rollout and lift"),
+                });
+            }
+        }
+        require_nonempty(self.benchmark_export_ref.as_str(), "benchmark_export_ref")?;
+        if self.report_digest != self.stable_digest() {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL perfect-score push digest drifted"),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Builds the offline benchmark projection for a legal RL plan.
 pub fn qwen_legal_rl_benchmark_readiness_report(
     plan: &QwenLegalRlHillclimbPlan,
@@ -1421,6 +1607,123 @@ pub fn qwen_legal_rl_phase_three_optimization_window_report(
     Ok(report)
 }
 
+/// Builds the phase-four perfect-score push report from the phase-three RL window.
+pub fn qwen_legal_rl_phase_four_perfect_score_push_report(
+    plan: &QwenLegalRlHillclimbPlan,
+    window_report: &QwenLegalRlOptimizationWindowReport,
+) -> Result<QwenLegalRlPerfectScorePushReport, QwenLegalAdapterSftError> {
+    plan.validate()?;
+    window_report.validate()?;
+    if window_report.plan_digest != plan.plan_digest
+        || window_report.plan_id != plan.plan_id
+        || window_report.phase_three_target_score_basis_points
+            != QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS
+    {
+        return Err(QwenLegalAdapterSftError::InvalidConfig {
+            detail: String::from("phase-four perfect-score push source report mismatch"),
+        });
+    }
+
+    let mut targets = window_report
+        .targets
+        .iter()
+        .map(|target| QwenLegalRlPerfectScorePushTarget {
+            failure_family: target.failure_family.clone(),
+            optimizer_method: target.optimizer_method,
+            blueprint_module_slug: target.blueprint_module_slug.clone(),
+            dataset_request_ref: target.dataset_request_ref.clone(),
+            planned_accepted_rollouts: target.planned_accepted_rollouts + 4,
+            planned_shadow_lift_basis_points: target.planned_shadow_lift_basis_points,
+            judge_adjudication_required: true,
+            scorecard_ref: target
+                .scorecard_ref
+                .replace("phase_003.shadow_eval", "phase_004.perfect_push"),
+        })
+        .collect::<Vec<_>>();
+
+    targets.extend([
+        QwenLegalRlPerfectScorePushTarget {
+            failure_family: String::from("deliverable_completeness"),
+            optimizer_method: QwenLegalRlOptimizerMethod::MiproPromptSearch,
+            blueprint_module_slug: String::from("harvey_legal.deliverable_outlining"),
+            dataset_request_ref: String::from(
+                "dataset_request.harvey_legal.deliverable_completeness.retained_001",
+            ),
+            planned_accepted_rollouts: 12,
+            planned_shadow_lift_basis_points: 384,
+            judge_adjudication_required: true,
+            scorecard_ref: String::from(
+                "scorecard.psionic.qwen_legal.deliverable_completeness.phase_004.perfect_push",
+            ),
+        },
+        QwenLegalRlPerfectScorePushTarget {
+            failure_family: String::from("fine_tune_data_selection"),
+            optimizer_method: QwenLegalRlOptimizerMethod::SupervisedFineTuneRefresh,
+            blueprint_module_slug: String::from("harvey_legal.candidate_improvement_planning"),
+            dataset_request_ref: String::from(
+                "dataset_request.harvey_legal.fine_tune_data_selection.retained_001",
+            ),
+            planned_accepted_rollouts: 12,
+            planned_shadow_lift_basis_points: 312,
+            judge_adjudication_required: true,
+            scorecard_ref: String::from(
+                "scorecard.psionic.qwen_legal.fine_tune_data_selection.phase_004.perfect_push",
+            ),
+        },
+        QwenLegalRlPerfectScorePushTarget {
+            failure_family: String::from("task_intake_routing"),
+            optimizer_method: QwenLegalRlOptimizerMethod::ManualReview,
+            blueprint_module_slug: String::from("harvey_legal.task_intake"),
+            dataset_request_ref: String::from(
+                "dataset_request.harvey_legal.task_intake_routing.retained_001",
+            ),
+            planned_accepted_rollouts: 8,
+            planned_shadow_lift_basis_points: 192,
+            judge_adjudication_required: true,
+            scorecard_ref: String::from(
+                "scorecard.psionic.qwen_legal.task_intake_routing.phase_004.perfect_push",
+            ),
+        },
+    ]);
+
+    let total_planned_shadow_lift_basis_points = targets
+        .iter()
+        .map(|target| target.planned_shadow_lift_basis_points)
+        .sum::<u16>();
+    let accepted_rollout_minimum = targets
+        .iter()
+        .map(|target| target.planned_accepted_rollouts)
+        .sum::<u16>();
+
+    let mut report = QwenLegalRlPerfectScorePushReport {
+        schema_version: String::from(QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_SCHEMA_VERSION),
+        report_id: String::from(QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_REPORT_ID),
+        source_window_report_id: window_report.report_id.clone(),
+        source_window_report_digest: window_report.report_digest.clone(),
+        plan_id: plan.plan_id.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        baseline_score_basis_points: window_report.baseline_score_basis_points,
+        previous_target_score_basis_points: window_report.phase_three_target_score_basis_points,
+        phase_four_target_score_basis_points: QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS,
+        total_planned_shadow_lift_basis_points,
+        retained_target_model_id: plan.retained_target_model_id.clone(),
+        rollout_window_id: String::from("harvey-legal-retained-20-task-window-004"),
+        accepted_rollout_minimum,
+        quarantined_rollout_budget: window_report.quarantined_rollout_budget + 4,
+        holdout_max_regression_basis_points: 0,
+        calibrated_judge_disagreement_budget_basis_points: 75,
+        blueprint_perfect_score_push_plan_ref: String::from(
+            QWEN_LEGAL_BLUEPRINT_PERFECT_SCORE_PUSH_PLAN_REF,
+        ),
+        targets,
+        benchmark_export_ref: String::from("autopilot4://benchmarks/harvey/progress/phase-004"),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    report.validate()?;
+    Ok(report)
+}
+
 /// Full higher-level Qwen legal adapter smoke outcome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QwenLegalAdapterSftRunOutcome {
@@ -1448,6 +1751,8 @@ pub struct QwenLegalAdapterSftRunOutcome {
     pub rl_benchmark_report: QwenLegalRlBenchmarkReadinessReport,
     /// Phase-three optimization window report for the RL hillclimb plan.
     pub rl_optimization_window_report: QwenLegalRlOptimizationWindowReport,
+    /// Phase-four perfect-score push report for the RL hillclimb plan.
+    pub rl_perfect_score_push_report: QwenLegalRlPerfectScorePushReport,
 }
 
 /// First honest Qwen legal adapter-SFT smoke trainer.
@@ -1753,6 +2058,10 @@ impl QwenLegalAdapterSftTrainer {
             &rl_hillclimb_plan,
             &rl_benchmark_report,
         )?;
+        let rl_perfect_score_push_report = qwen_legal_rl_phase_four_perfect_score_push_report(
+            &rl_hillclimb_plan,
+            &rl_optimization_window_report,
+        )?;
         let summary = QwenLegalAdapterSftSummary {
             run_summary,
             lane_id: String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID),
@@ -1790,6 +2099,7 @@ impl QwenLegalAdapterSftTrainer {
             rl_hillclimb_plan,
             rl_benchmark_report,
             rl_optimization_window_report,
+            rl_perfect_score_push_report,
         })
     }
 
@@ -2092,6 +2402,16 @@ mod tests {
             outcome.rl_optimization_window_report.report_digest,
             outcome.rl_optimization_window_report.stable_digest()
         );
+        assert_eq!(
+            outcome
+                .rl_perfect_score_push_report
+                .phase_four_target_score_basis_points,
+            QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            outcome.rl_perfect_score_push_report.report_digest,
+            outcome.rl_perfect_score_push_report.stable_digest()
+        );
         let loaded = outcome.exported_artifact.load_lm_head_lora_artifact()?;
         assert_eq!(loaded.hidden_size, 4);
         assert_eq!(loaded.rank, QWEN_LEGAL_ADAPTER_LORA_RANK);
@@ -2273,6 +2593,86 @@ mod tests {
         }));
         assert!(window.benchmark_export_ref.ends_with("phase-003"));
         assert_eq!(window.report_digest, window.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn qwen_legal_rl_phase_four_push_covers_all_frontier_families()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = canonical_qwen_legal_rl_hillclimb_plan(
+            sample_dataset_binding(),
+            sample_eval_pack_binding(),
+            "qwen35-4b-legal-smoke-r1-score-import",
+        )?;
+        let readiness_report = qwen_legal_rl_benchmark_readiness_report(&plan, 5_260)?;
+        let window =
+            qwen_legal_rl_phase_three_optimization_window_report(&plan, &readiness_report)?;
+        let push = qwen_legal_rl_phase_four_perfect_score_push_report(&plan, &window)?;
+        let methods = push
+            .targets
+            .iter()
+            .map(|target| target.optimizer_method)
+            .collect::<Vec<_>>();
+        let families = push
+            .targets
+            .iter()
+            .map(|target| target.failure_family.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            push.schema_version,
+            QWEN_LEGAL_RL_PERFECT_SCORE_PUSH_SCHEMA_VERSION
+        );
+        assert_eq!(push.plan_digest, plan.plan_digest);
+        assert_eq!(push.source_window_report_digest, window.report_digest);
+        assert_eq!(
+            push.previous_target_score_basis_points,
+            QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            push.phase_four_target_score_basis_points,
+            QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS
+        );
+        assert!(
+            push.baseline_score_basis_points
+                .saturating_add(push.total_planned_shadow_lift_basis_points)
+                >= push.phase_four_target_score_basis_points
+        );
+        assert_eq!(push.accepted_rollout_minimum, 140);
+        assert_eq!(push.quarantined_rollout_budget, 20);
+        assert_eq!(push.holdout_max_regression_basis_points, 0);
+        assert!(push.calibrated_judge_disagreement_budget_basis_points <= 75);
+        assert!(
+            push.blueprint_perfect_score_push_plan_ref
+                .contains("phase_four_perfect_score_push_plan")
+        );
+        assert_eq!(push.targets.len(), 9);
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::Grpo));
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::GepaTraceSelection));
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::MiproPromptSearch));
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::SupervisedFineTuneRefresh));
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::ManualReview));
+        for family in [
+            "document_coverage",
+            "citation_evidence",
+            "legal_reasoning",
+            "spreadsheet_reasoning",
+            "missing_fact",
+            "pre_submit_self_check",
+            "deliverable_completeness",
+            "fine_tune_data_selection",
+            "task_intake_routing",
+        ] {
+            assert!(families.contains(&family), "missing {family}");
+        }
+        assert!(push.targets.iter().all(|target| {
+            target.judge_adjudication_required
+                && target.planned_accepted_rollouts > 0
+                && target.planned_shadow_lift_basis_points > 0
+                && target.scorecard_ref.contains("phase_004.perfect_push")
+        }));
+        assert!(push.benchmark_export_ref.ends_with("phase-004"));
+        assert_eq!(push.report_digest, push.stable_digest());
         Ok(())
     }
 

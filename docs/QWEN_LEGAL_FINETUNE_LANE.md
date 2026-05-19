@@ -70,6 +70,7 @@ The run emits:
 - RL hillclimb plan digest
 - RL benchmark readiness report digest
 - RL optimization window report digest
+- RL perfect-score push report digest
 
 ## Artifact Gate
 
@@ -173,6 +174,29 @@ readiness report and the Blueprint shadow-eval shortlist:
 This is the next work packet for Pylon/Nexus. It is still not a live Harvey
 score claim; it is the bounded local benchmark target and evidence contract
 that the retained run must satisfy.
+
+## Phase-Four Perfect-Score Push
+
+The lane now also emits `QwenLegalRlPerfectScorePushReport` with schema
+`psionic.qwen_legal_rl_perfect_score_push.v1`. It consumes the phase-three
+optimization window and the Blueprint perfect-score push plan:
+
+- phase-three target carried forward: 7800 bps
+- phase-four conservative target: 8500 bps
+- accepted rollout minimum: 140
+- quarantine budget: 20
+- holdout regression allowance: 0 bps
+- calibrated judge disagreement budget: 75 bps
+- family coverage: all nine Blueprint optimizer frontier families
+- Blueprint plan ref:
+  `blueprint://harvey_legal_qwen_phase_four_perfect_score_push_plan/optimizer_plan.harvey_legal_qwen.phase_004.perfect_score_push`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-004`
+
+This is the next bounded work packet before any perfect-score campaign. It adds
+deliverable completeness, fine-tune data selection, and task-intake routing to
+the phase-three RL window while preserving judge-adjudication and scorecard
+requirements for every family.
 
 ## Runtime Admission
 
