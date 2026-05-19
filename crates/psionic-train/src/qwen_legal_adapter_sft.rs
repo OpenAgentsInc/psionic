@@ -46,15 +46,25 @@ pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_SCHEMA_VERSION: &str =
 /// Stable schema version for the legal RL benchmark readiness report.
 pub const QWEN_LEGAL_RL_BENCHMARK_REPORT_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_benchmark_report.v1";
+/// Stable schema version for the legal RL optimization window report.
+pub const QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_optimization_window.v1";
 /// Stable plan id for the next Harvey legal hillclimb phase.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID: &str = "qwen_legal_rl_hillclimb_plan_v1";
 /// Stable report id for the next Harvey legal RL benchmark projection.
 pub const QWEN_LEGAL_RL_BENCHMARK_REPORT_ID: &str = "qwen_legal_rl_benchmark_report_phase_002";
+/// Stable report id for the phase-three Harvey legal RL optimization window.
+pub const QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_REPORT_ID: &str =
+    "qwen_legal_rl_optimization_window_phase_003";
 /// Phase-two retained target aligned with Blueprint optimizer batch `phase_002`.
 pub const QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS: u16 = 7_000;
+/// Phase-three retained target aligned with Blueprint shadow-eval shortlist.
+pub const QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS: u16 = 7_800;
 /// Blueprint frontier consumed by the Psionic legal RL plan.
 pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
     "blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001";
+/// Blueprint shadow-eval shortlist consumed by the phase-three RL window.
+pub const QWEN_LEGAL_BLUEPRINT_SHADOW_EVAL_SHORTLIST_REF: &str = "blueprint://harvey_legal_qwen_phase_three_shadow_eval_shortlist/optimizer_shortlist.harvey_legal_qwen.phase_003.shadow_eval";
 /// Stable target-set id for the first narrow LM-head-only adapter.
 pub const QWEN_LEGAL_ADAPTER_TARGET_SET_ID: &str = "qwen3.5-4b.legal.lm_head_lora.v1";
 /// Stable adapter target id for the first smoke lane.
@@ -1042,6 +1052,68 @@ pub struct QwenLegalRlBenchmarkReadinessReport {
     pub report_digest: String,
 }
 
+/// One failure-family allocation inside a phase-three RL optimization window.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlOptimizationWindowTarget {
+    /// Failure family shared with Blueprint and Autopilot4.
+    pub failure_family: String,
+    /// Optimizer method assigned to this family.
+    pub optimizer_method: QwenLegalRlOptimizerMethod,
+    /// Blueprint module receiving the resulting candidate.
+    pub blueprint_module_slug: String,
+    /// Dataset request admitted into the window.
+    pub dataset_request_ref: String,
+    /// Planned accepted rollouts for this family.
+    pub planned_accepted_rollouts: u16,
+    /// Conservative lift this target should support in shadow eval.
+    pub planned_shadow_lift_basis_points: u16,
+    /// Per-family scorecard that must exist before promotion review.
+    pub scorecard_ref: String,
+}
+
+/// Phase-three offline RL optimization window report for the Harvey lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlOptimizationWindowReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable report id.
+    pub report_id: String,
+    /// Source readiness report id.
+    pub source_report_id: String,
+    /// Plan id this window executes.
+    pub plan_id: String,
+    /// Stable digest of the plan payload.
+    pub plan_digest: String,
+    /// Stable digest of the readiness report payload.
+    pub source_report_digest: String,
+    /// Baseline retained score used for the window.
+    pub baseline_score_basis_points: u16,
+    /// Previous conservative target carried forward from phase two.
+    pub previous_target_score_basis_points: u16,
+    /// New phase-three conservative target.
+    pub phase_three_target_score_basis_points: u16,
+    /// Sum of family-level planned shadow lifts.
+    pub total_planned_shadow_lift_basis_points: u16,
+    /// Target model family for retained scoring.
+    pub retained_target_model_id: String,
+    /// Rollout window id widened for phase three.
+    pub rollout_window_id: String,
+    /// Minimum accepted rollout count for the phase-three window.
+    pub accepted_rollout_minimum: u16,
+    /// Maximum quarantined rollout count for the phase-three window.
+    pub quarantined_rollout_budget: u16,
+    /// Maximum permitted holdout regression for promotion review.
+    pub holdout_max_regression_basis_points: u16,
+    /// Blueprint shadow-eval shortlist ref consumed by this report.
+    pub blueprint_shadow_eval_shortlist_ref: String,
+    /// Per-family target allocations.
+    pub targets: Vec<QwenLegalRlOptimizationWindowTarget>,
+    /// Autopilot4 export/update target.
+    pub benchmark_export_ref: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
 impl QwenLegalRlBenchmarkReadinessReport {
     /// Returns the stable digest over the report payload.
     #[must_use]
@@ -1111,6 +1183,107 @@ impl QwenLegalRlBenchmarkReadinessReport {
     }
 }
 
+impl QwenLegalRlOptimizationWindowReport {
+    /// Returns the stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(b"psionic_qwen_legal_rl_optimization_window|", &clone)
+    }
+
+    fn validate(&self) -> Result<(), QwenLegalAdapterSftError> {
+        if self.schema_version != QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_SCHEMA_VERSION {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL optimization window schema version drifted"),
+            });
+        }
+        if self.report_id != QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_REPORT_ID {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL optimization window report id drifted"),
+            });
+        }
+        require_nonempty(self.source_report_id.as_str(), "source_report_id")?;
+        require_nonempty(self.plan_id.as_str(), "plan_id")?;
+        require_nonempty(self.plan_digest.as_str(), "plan_digest")?;
+        require_nonempty(self.source_report_digest.as_str(), "source_report_digest")?;
+        if self.previous_target_score_basis_points != QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS
+            || self.phase_three_target_score_basis_points != QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL optimization window target drifted"),
+            });
+        }
+        if self.baseline_score_basis_points >= self.previous_target_score_basis_points
+            || self.previous_target_score_basis_points >= self.phase_three_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL optimization window requires monotonic targets"),
+            });
+        }
+        if self
+            .baseline_score_basis_points
+            .saturating_add(self.total_planned_shadow_lift_basis_points)
+            < self.phase_three_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("planned shadow lift does not support phase-three target"),
+            });
+        }
+        require_nonempty(
+            self.retained_target_model_id.as_str(),
+            "retained_target_model_id",
+        )?;
+        require_nonempty(self.rollout_window_id.as_str(), "rollout_window_id")?;
+        if self.accepted_rollout_minimum <= self.quarantined_rollout_budget {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("accepted legal rollouts must exceed quarantine budget"),
+            });
+        }
+        if self.holdout_max_regression_basis_points != 0 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("phase-three Harvey window allows no holdout regression"),
+            });
+        }
+        require_nonempty(
+            self.blueprint_shadow_eval_shortlist_ref.as_str(),
+            "blueprint_shadow_eval_shortlist_ref",
+        )?;
+        if self.targets.len() < 6 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from(
+                    "legal RL optimization window requires all phase-two families",
+                ),
+            });
+        }
+        for target in &self.targets {
+            require_nonempty(target.failure_family.as_str(), "target.failure_family")?;
+            require_nonempty(
+                target.blueprint_module_slug.as_str(),
+                "target.blueprint_module_slug",
+            )?;
+            require_nonempty(
+                target.dataset_request_ref.as_str(),
+                "target.dataset_request_ref",
+            )?;
+            require_nonempty(target.scorecard_ref.as_str(), "target.scorecard_ref")?;
+            if target.planned_accepted_rollouts == 0 || target.planned_shadow_lift_basis_points == 0
+            {
+                return Err(QwenLegalAdapterSftError::InvalidConfig {
+                    detail: String::from("legal RL optimization targets require rollout and lift"),
+                });
+            }
+        }
+        require_nonempty(self.benchmark_export_ref.as_str(), "benchmark_export_ref")?;
+        if self.report_digest != self.stable_digest() {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL optimization window digest drifted"),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Builds the offline benchmark projection for a legal RL plan.
 pub fn qwen_legal_rl_benchmark_readiness_report(
     plan: &QwenLegalRlHillclimbPlan,
@@ -1167,6 +1340,87 @@ pub fn qwen_legal_rl_benchmark_readiness_report(
     Ok(report)
 }
 
+/// Builds the phase-three optimization window report from the RL plan and phase-two report.
+pub fn qwen_legal_rl_phase_three_optimization_window_report(
+    plan: &QwenLegalRlHillclimbPlan,
+    readiness_report: &QwenLegalRlBenchmarkReadinessReport,
+) -> Result<QwenLegalRlOptimizationWindowReport, QwenLegalAdapterSftError> {
+    plan.validate()?;
+    readiness_report.validate()?;
+    if readiness_report.plan_digest != plan.plan_digest
+        || readiness_report.plan_id != plan.plan_id
+        || readiness_report.conservative_target_score_basis_points
+            != QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS
+    {
+        return Err(QwenLegalAdapterSftError::InvalidConfig {
+            detail: String::from("phase-three optimization window source report mismatch"),
+        });
+    }
+
+    let targets = plan
+        .targets
+        .iter()
+        .map(|target| {
+            let planned_accepted_rollouts = match target.optimizer_method {
+                QwenLegalRlOptimizerMethod::Grpo => 18,
+                QwenLegalRlOptimizerMethod::GepaTraceSelection => 12,
+                QwenLegalRlOptimizerMethod::MiproPromptSearch => 14,
+                QwenLegalRlOptimizerMethod::SupervisedFineTuneRefresh => 10,
+                QwenLegalRlOptimizerMethod::ManualReview => 6,
+            };
+            let planned_shadow_lift_basis_points = (target.target_lift_basis_points * 65) / 100;
+
+            QwenLegalRlOptimizationWindowTarget {
+                failure_family: target.failure_family.clone(),
+                optimizer_method: target.optimizer_method,
+                blueprint_module_slug: target.blueprint_module_slug.clone(),
+                dataset_request_ref: target.dataset_request_ref.clone(),
+                planned_accepted_rollouts,
+                planned_shadow_lift_basis_points,
+                scorecard_ref: format!(
+                    "scorecard.psionic.qwen_legal.{}.phase_003.shadow_eval",
+                    target.failure_family
+                ),
+            }
+        })
+        .collect::<Vec<_>>();
+    let total_planned_shadow_lift_basis_points = targets
+        .iter()
+        .map(|target| target.planned_shadow_lift_basis_points)
+        .sum::<u16>();
+    let accepted_rollout_minimum = targets
+        .iter()
+        .map(|target| target.planned_accepted_rollouts)
+        .sum::<u16>();
+
+    let mut report = QwenLegalRlOptimizationWindowReport {
+        schema_version: String::from(QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_SCHEMA_VERSION),
+        report_id: String::from(QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_REPORT_ID),
+        source_report_id: readiness_report.report_id.clone(),
+        plan_id: plan.plan_id.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        source_report_digest: readiness_report.report_digest.clone(),
+        baseline_score_basis_points: readiness_report.baseline_score_basis_points,
+        previous_target_score_basis_points: readiness_report.conservative_target_score_basis_points,
+        phase_three_target_score_basis_points: QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS,
+        total_planned_shadow_lift_basis_points,
+        retained_target_model_id: plan.retained_target_model_id.clone(),
+        rollout_window_id: String::from("harvey-legal-retained-20-task-window-003"),
+        accepted_rollout_minimum,
+        quarantined_rollout_budget: readiness_report.quarantined_rollout_budget + 4,
+        holdout_max_regression_basis_points: 0,
+        blueprint_shadow_eval_shortlist_ref: String::from(
+            QWEN_LEGAL_BLUEPRINT_SHADOW_EVAL_SHORTLIST_REF,
+        ),
+        targets,
+        benchmark_export_ref: String::from("autopilot4://benchmarks/harvey/progress/phase-003"),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    report.validate()?;
+    Ok(report)
+}
+
 /// Full higher-level Qwen legal adapter smoke outcome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QwenLegalAdapterSftRunOutcome {
@@ -1192,6 +1446,8 @@ pub struct QwenLegalAdapterSftRunOutcome {
     pub rl_hillclimb_plan: QwenLegalRlHillclimbPlan,
     /// Offline benchmark projection for the RL hillclimb plan.
     pub rl_benchmark_report: QwenLegalRlBenchmarkReadinessReport,
+    /// Phase-three optimization window report for the RL hillclimb plan.
+    pub rl_optimization_window_report: QwenLegalRlOptimizationWindowReport,
 }
 
 /// First honest Qwen legal adapter-SFT smoke trainer.
@@ -1493,6 +1749,10 @@ impl QwenLegalAdapterSftTrainer {
         )?;
         let rl_benchmark_report =
             qwen_legal_rl_benchmark_readiness_report(&rl_hillclimb_plan, 5_260)?;
+        let rl_optimization_window_report = qwen_legal_rl_phase_three_optimization_window_report(
+            &rl_hillclimb_plan,
+            &rl_benchmark_report,
+        )?;
         let summary = QwenLegalAdapterSftSummary {
             run_summary,
             lane_id: String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID),
@@ -1529,6 +1789,7 @@ impl QwenLegalAdapterSftTrainer {
             score_import_bundle,
             rl_hillclimb_plan,
             rl_benchmark_report,
+            rl_optimization_window_report,
         })
     }
 
@@ -1821,6 +2082,16 @@ mod tests {
             outcome.rl_benchmark_report.report_digest,
             outcome.rl_benchmark_report.stable_digest()
         );
+        assert_eq!(
+            outcome
+                .rl_optimization_window_report
+                .phase_three_target_score_basis_points,
+            QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            outcome.rl_optimization_window_report.report_digest,
+            outcome.rl_optimization_window_report.stable_digest()
+        );
         let loaded = outcome.exported_artifact.load_lm_head_lora_artifact()?;
         assert_eq!(loaded.hidden_size, 4);
         assert_eq!(loaded.rank, QWEN_LEGAL_ADAPTER_LORA_RANK);
@@ -1928,6 +2199,80 @@ mod tests {
         assert_eq!(report.dataset_request_count, plan.targets.len());
         assert!(report.benchmark_export_ref.contains("autopilot4"));
         assert_eq!(report.report_digest, report.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn qwen_legal_rl_phase_three_window_targets_shadow_eval_shortlist()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = canonical_qwen_legal_rl_hillclimb_plan(
+            sample_dataset_binding(),
+            sample_eval_pack_binding(),
+            "qwen35-4b-legal-smoke-r1-score-import",
+        )?;
+        let readiness_report = qwen_legal_rl_benchmark_readiness_report(&plan, 5_260)?;
+        let window =
+            qwen_legal_rl_phase_three_optimization_window_report(&plan, &readiness_report)?;
+        let methods = window
+            .targets
+            .iter()
+            .map(|target| target.optimizer_method)
+            .collect::<Vec<_>>();
+        let families = window
+            .targets
+            .iter()
+            .map(|target| target.failure_family.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            window.schema_version,
+            QWEN_LEGAL_RL_OPTIMIZATION_WINDOW_SCHEMA_VERSION
+        );
+        assert_eq!(window.plan_digest, plan.plan_digest);
+        assert_eq!(window.source_report_digest, readiness_report.report_digest);
+        assert_eq!(window.baseline_score_basis_points, 5_260);
+        assert_eq!(
+            window.previous_target_score_basis_points,
+            QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            window.phase_three_target_score_basis_points,
+            QWEN_LEGAL_PHASE_THREE_TARGET_SCORE_BPS
+        );
+        assert!(
+            window
+                .baseline_score_basis_points
+                .saturating_add(window.total_planned_shadow_lift_basis_points)
+                >= window.phase_three_target_score_basis_points
+        );
+        assert_eq!(window.accepted_rollout_minimum, 84);
+        assert_eq!(window.quarantined_rollout_budget, 16);
+        assert_eq!(window.holdout_max_regression_basis_points, 0);
+        assert!(
+            window
+                .blueprint_shadow_eval_shortlist_ref
+                .contains("phase_three_shadow_eval_shortlist")
+        );
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::Grpo));
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::GepaTraceSelection));
+        assert!(methods.contains(&QwenLegalRlOptimizerMethod::MiproPromptSearch));
+        for family in [
+            "document_coverage",
+            "citation_evidence",
+            "legal_reasoning",
+            "spreadsheet_reasoning",
+            "missing_fact",
+            "pre_submit_self_check",
+        ] {
+            assert!(families.contains(&family), "missing {family}");
+        }
+        assert!(window.targets.iter().all(|target| {
+            target.planned_accepted_rollouts > 0
+                && target.planned_shadow_lift_basis_points > 0
+                && target.scorecard_ref.contains("phase_003.shadow_eval")
+        }));
+        assert!(window.benchmark_export_ref.ends_with("phase-003"));
+        assert_eq!(window.report_digest, window.stable_digest());
         Ok(())
     }
 

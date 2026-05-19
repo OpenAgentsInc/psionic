@@ -181,9 +181,13 @@ pre-submit self-check failures across GRPO, GEPA trace selection, MIPRO prompt
 search, and supervised fine-tune refresh work. It now also emits an offline
 RL benchmark readiness report with the retained baseline at 5260 bps, the
 phase-two target at 7000 bps, accepted/quarantined rollout budgets, and an
-Autopilot4 export ref for the public progress page. That report is readiness
-evidence only; retained score claims still require the actual retained slice
-and Autopilot4 release-gate approval.
+Autopilot4 export ref for the public progress page. The same lane now emits a
+phase-three RL optimization window report that consumes the Blueprint
+shadow-eval shortlist, raises the next local benchmark target to 7800 bps,
+requires 84 accepted rollouts, caps quarantine at 16 rollouts, and allows zero
+holdout regression. Those reports are readiness evidence only; retained score
+claims still require the actual retained slice and Autopilot4 release-gate
+approval.
 The paired serving/eval metadata path is in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
 compare base and tuned Qwen candidates through one OpenAI-compatible route

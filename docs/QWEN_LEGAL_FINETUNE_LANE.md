@@ -69,6 +69,7 @@ The run emits:
 - score-import bundle digest
 - RL hillclimb plan digest
 - RL benchmark readiness report digest
+- RL optimization window report digest
 
 ## Artifact Gate
 
@@ -97,7 +98,7 @@ cargo test -p psionic-train qwen_legal_adapter
 The test fixture runs a four-step deterministic adapter update, exports a
 loadable LM-head LoRA artifact, saves a checkpoint, restores from a midpoint
 checkpoint, emits an Autopilot4 score-import bundle, and materializes the
-next-phase RL hillclimb plan.
+next-phase RL hillclimb plan plus local benchmark reports.
 
 ## RL Hillclimb Plan
 
@@ -152,6 +153,26 @@ benchmark numbers Autopilot4 can publish safely:
 This report is still local readiness evidence. A retained score claim requires
 the actual retained 20-task run, immutable score reports, and Autopilot4
 release-gate approval.
+
+## Phase-Three RL Optimization Window
+
+The lane also emits `QwenLegalRlOptimizationWindowReport` with schema
+`psionic.qwen_legal_rl_optimization_window.v1`. It consumes the phase-two
+readiness report and the Blueprint shadow-eval shortlist:
+
+- phase-two target carried forward: 7000 bps
+- phase-three conservative target: 7800 bps
+- accepted rollout minimum: 84
+- quarantine budget: 16
+- holdout regression allowance: 0 bps
+- Blueprint shortlist ref:
+  `blueprint://harvey_legal_qwen_phase_three_shadow_eval_shortlist/optimizer_shortlist.harvey_legal_qwen.phase_003.shadow_eval`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-003`
+
+This is the next work packet for Pylon/Nexus. It is still not a live Harvey
+score claim; it is the bounded local benchmark target and evidence contract
+that the retained run must satisfy.
 
 ## Runtime Admission
 
