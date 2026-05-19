@@ -233,10 +233,15 @@ without live provider credentials.
 Sweep planning and manifests are documented in `docs/LEGAL_BENCHMARK_SWEEPS.md`
 and implemented in `crates/psionic-eval/src/legal_benchmark_sweeps.rs`.
 
-The sweep layer plans task/config jobs, applies resume state, enforces cost,
+The sweep layer plans task/config jobs, expands provider/reasoning/context/
+extraction/tool-policy matrices, applies resume state, enforces cost,
 wall-time, token, and failure budgets, keeps going through individual
 task/model failures, and emits a manifest with skipped, resumed, succeeded,
 failed, blocked, and budget-exhausted job states for Autopilot4 import.
+
+Matrix exports summarize every recorded config hash by all-pass score,
+criterion pass rate, document coverage, reliability, cost, and latency, then
+mark Pareto-front configs for promotion-gate review.
 
 ## CI And Golden Fixtures
 
@@ -250,6 +255,5 @@ and exercises mock report and sweep fixtures without live provider credentials.
 
 ## Next Work
 
-The next implementation issue is model and tool-policy sweep matrices for
-measuring which document-tool policies and provider routes produce better
-scores under explicit cost, latency, and reliability budgets.
+The next implementation issue is production regression guardrails before
+benchmark-optimized modules can affect Autopilot agents.
