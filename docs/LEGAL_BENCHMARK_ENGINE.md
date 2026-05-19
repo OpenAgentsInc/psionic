@@ -144,8 +144,20 @@ Run records and score reports now retain `extraction_receipt_refs` so operator
 surfaces can distinguish extraction failure, missing content, and bad
 reasoning.
 
+## Tool Surface
+
+The closed Rust tool set is documented in `docs/LEGAL_BENCHMARK_TOOLS.md` and
+implemented in `crates/psionic-eval/src/legal_benchmark_tools.rs`.
+
+It covers shell, read, write, edit, glob, and grep with typed inputs, typed
+outputs, structured errors, byte metrics, touched paths, transcript events, and
+tool-call records. Read can prefer extracted text from the extraction layer;
+write and edit are restricted to workspace/output roots; shell remains
+sandbox-owned and routes through the Podman backend only when the full-feature
+caller attaches one.
+
 ## Next Work
 
-The next implementation issue is the benchmark tool bundle. It should consume
-the extraction receipts here and keep every search, quote, citation, draft,
-and validation call receipt-backed.
+The next implementation issue is provider abstraction. It should consume this
+tool surface from the agent loop without hard-coding one model vendor or one
+transport.

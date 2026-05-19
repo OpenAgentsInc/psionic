@@ -13,10 +13,12 @@
 mod legal_benchmark;
 mod legal_benchmark_extraction;
 mod legal_benchmark_harvey;
+mod legal_benchmark_tools;
 
 pub use legal_benchmark::*;
 pub use legal_benchmark_extraction::*;
 pub use legal_benchmark_harvey::*;
+pub use legal_benchmark_tools::*;
 
 #[cfg(feature = "full")]
 mod full;
