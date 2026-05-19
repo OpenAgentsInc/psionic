@@ -62,6 +62,8 @@ matcher, respects hidden-file policy, and truncates at the caller limit.
 
 `grep` performs deterministic substring matching, supports case-insensitive
 matching, skips binary files, and records how many binary files were skipped.
+Returned source-document matches count as read evidence spans in coverage
+snapshots.
 
 `inventory` walks a root and returns file size, media type, optional SHA-256,
 extracted-text availability, text readability, and page/sheet/message-count
@@ -105,3 +107,7 @@ should state that:
 - every tool call is transcripted and receipt-backed
 - use `inventory`, targeted summaries/search, `evidence_table`, and
   `validate_deliverables` before final submission on document-heavy tasks
+
+The Psionic agent prompt now renders that operating protocol only for tools
+enabled by the run's `ToolPolicy`, so a dry-run or restricted profile is not
+told to call unavailable tools.

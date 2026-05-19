@@ -372,6 +372,7 @@ pub fn legal_benchmark_system_prompt(request: &LegalBenchmarkAgentRunRequest) ->
     for tool in crate::legal_benchmark_model_tool_specs() {
         prompt.push_str(&format!("- {}: {}\n", tool.name, tool.description));
     }
+    append_benchmark_operating_protocol(&mut prompt, request);
     if !request.module_instructions.is_empty() {
         prompt.push_str("\nModule instructions:\n");
         for instruction in &request.module_instructions {
@@ -381,6 +382,61 @@ pub fn legal_benchmark_system_prompt(request: &LegalBenchmarkAgentRunRequest) ->
         }
     }
     prompt
+}
+
+fn append_benchmark_operating_protocol(
+    prompt: &mut String,
+    request: &LegalBenchmarkAgentRunRequest,
+) {
+    let allows = |tool: &str| {
+        request
+            .run_config
+            .tool_policy
+            .allowed_tools
+            .iter()
+            .any(|allowed| allowed == tool)
+    };
+    let mut lines = Vec::new();
+    if allows("inventory") {
+        lines.push(String::from(
+            "Start document-heavy tasks with inventory on the documents root.",
+        ));
+    }
+    let inspection_tools = [
+        "read",
+        "email_summary",
+        "spreadsheet_summary",
+        "pdf_search",
+        "grep",
+    ]
+    .into_iter()
+    .filter(|tool| allows(tool))
+    .collect::<Vec<_>>();
+    if !inspection_tools.is_empty() {
+        lines.push(format!(
+            "Inspect source content with {} before drafting; use targeted searches for quoted facts.",
+            inspection_tools.join(", ")
+        ));
+    }
+    if allows("evidence_table") {
+        lines.push(String::from(
+            "Capture cited support with evidence_table before relying on a source claim.",
+        ));
+    }
+    if allows("validate_deliverables") {
+        lines.push(String::from(
+            "Validate required output paths with validate_deliverables before submitting.",
+        ));
+    }
+    if lines.is_empty() {
+        return;
+    }
+    prompt.push_str("\nBenchmark operating protocol:\n");
+    for line in lines {
+        prompt.push_str("- ");
+        prompt.push_str(&line);
+        prompt.push('\n');
+    }
 }
 
 pub fn legal_benchmark_user_prompt(request: &LegalBenchmarkAgentRunRequest) -> String {
@@ -960,5 +1016,51 @@ mod tests {
         let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
         assert_eq!(result.terminal_state, RunTerminalState::NoToolCalls);
         assert_eq!(result.run_record.metrics.model_turns, 1);
+    }
+
+    #[test]
+    fn system_prompt_includes_allowed_coverage_protocol_without_hidden_criteria() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+
+        let mut task = task_spec();
+        task.tool_policy.allowed_tools = vec![
+            String::from("inventory"),
+            String::from("read"),
+            String::from("grep"),
+            String::from("evidence_table"),
+            String::from("validate_deliverables"),
+            String::from("write"),
+        ];
+        let input_manifest = build_input_artifact_manifest(&task);
+        let config = run_config(&task);
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("prompt.protocol")),
+        };
+        let prompt = legal_benchmark_system_prompt(&request);
+
+        assert!(prompt.contains("Benchmark operating protocol"));
+        assert!(prompt.contains("inventory on the documents root"));
+        assert!(prompt.contains("read, grep"));
+        assert!(prompt.contains("evidence_table"));
+        assert!(prompt.contains("validate_deliverables"));
+        assert!(!prompt.contains("The memo exists."));
     }
 }

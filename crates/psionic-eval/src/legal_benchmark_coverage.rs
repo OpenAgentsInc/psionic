@@ -568,7 +568,9 @@ fn apply_grep_coverage(
         let Some(relative_path) = matched.get("relative_path").and_then(Value::as_str) else {
             continue;
         };
-        document_entry(documents, relative_path).discovered = true;
+        let entry = document_entry(documents, relative_path);
+        entry.discovered = true;
+        entry.read = true;
         let line_number = matched.get("line_number").and_then(Value::as_u64);
         let line = matched
             .get("line")
@@ -995,6 +997,86 @@ mod tests {
             &task,
             &transcript
         ));
+    }
+
+    #[test]
+    fn grep_matches_count_as_read_evidence_for_document_coverage() {
+        let task = task_spec();
+        let run_config = run_config("integrity");
+        let output_manifest = ArtifactManifest {
+            schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
+            manifest_id: String::from("output"),
+            task_id: task.task_id.clone(),
+            task_version: task.task_version.clone(),
+            manifest_role: ArtifactManifestRole::Output,
+            artifacts: Vec::new(),
+            metadata: Metadata::new(),
+        };
+        let tool_calls = vec![ToolCallRecord {
+            tool_call_id: String::from("call.grep.contract"),
+            tool_name: String::from("grep"),
+            call_event_index: 1,
+            result_event_index: Some(2),
+            input: json!({
+                "root": "documents",
+                "pattern": "assignment",
+                "case_sensitive": false,
+                "max_results": 10,
+                "include_hidden": false
+            }),
+            output: Some(json!({
+                "tool": "grep",
+                "output": {
+                    "matches": [{
+                        "root": "documents",
+                        "relative_path": "contract.txt",
+                        "line_number": 7,
+                        "line": "Assignment requires written consent."
+                    }],
+                    "binary_files_skipped": 0,
+                    "truncated": false
+                }
+            })),
+            error_kind: None,
+            elapsed_ms: 3,
+        }];
+        let snapshot =
+            build_coverage_snapshot(&task, &run_config, &tool_calls, &[], &output_manifest)
+                .expect("coverage");
+
+        assert_eq!(
+            document_coverage_bps_from_snapshot(&task, &snapshot),
+            10_000
+        );
+        assert_eq!(snapshot.evidence_refs.len(), 1);
+        assert!(
+            snapshot
+                .documents
+                .iter()
+                .any(|entry| entry.relative_path == "contract.txt" && entry.read)
+        );
+
+        let failures = classify_criterion_failures(
+            &task,
+            &[CriterionResult {
+                criterion_id: String::from("criterion.source"),
+                passed: false,
+                verdict: CriterionVerdict::Fail,
+                reasoning: String::from("missed"),
+                evidence_refs: Vec::new(),
+                judge_model: String::from("mock"),
+                judge_prompt_hash: String::from("hash"),
+                raw_response_hash: String::from("raw"),
+                confidence_bps: None,
+                judge_latency_ms: None,
+                judge_cost_micro_usd: None,
+            }],
+            &snapshot,
+        );
+        assert_ne!(
+            failures[0].failure_class,
+            CriterionFailureClass::CoverageGap
+        );
     }
 
     #[allow(dead_code)]

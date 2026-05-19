@@ -50,6 +50,14 @@ After judging, missed criteria are compared to the snapshot and classified as:
 Reports export these comparisons for Autopilot4 failure clustering and
 improvement planning.
 
+## Document Coverage Semantics
+
+Returned `grep` matches now count the matched source document as read. The
+tool has inspected source bytes and returned a quoted line to the model, so a
+criterion tied to that source should not be classified as a coverage gap when
+the matching evidence span is present. Unmatched glob or inventory discovery
+still counts only as discovery, not reading.
+
 ## Validation
 
 Run:
