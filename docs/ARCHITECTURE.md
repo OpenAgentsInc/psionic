@@ -51,6 +51,10 @@ This doc should be read together with:
   transport surfaces
 - `docs/LLAMA_VLLM_SGLANG_INFERENCE_SPEC.md`
   - inference-completion plan and issue program
+- `docs/LEGAL_BENCHMARK_ENGINE.md`
+  - legal-agent benchmark schema contract for Harvey-compatible task specs,
+    artifact manifests, run records, transcripts, score reports, and
+    comparison reports
 
 The Psionic Train system builds on Psionic runtime, cluster, datastream,
 sandbox, and collective layers defined in this document.
@@ -96,6 +100,8 @@ Psionic owns reusable substrate for:
 - serving contracts
 - training-class recovery and collective planning
 - execution evidence and proof bundles
+- legal-agent benchmark task, artifact, run, transcript, and score schemas
+  where Psionic is the execution and evaluation substrate
 
 Psionic does not own:
 
