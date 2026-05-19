@@ -204,8 +204,18 @@ summaries. The example command
 writes `report.md`, `autopilot_report.json`, and `failure_clusters.json`
 without live provider credentials.
 
+## Sweep Runner
+
+Sweep planning and manifests are documented in `docs/LEGAL_BENCHMARK_SWEEPS.md`
+and implemented in `crates/psionic-eval/src/legal_benchmark_sweeps.rs`.
+
+The sweep layer plans task/config jobs, applies resume state, enforces cost,
+wall-time, token, and failure budgets, keeps going through individual
+task/model failures, and emits a manifest with skipped, resumed, succeeded,
+failed, blocked, and budget-exhausted job states for Autopilot4 import.
+
 ## Next Work
 
-The next implementation issue is resumable sweep orchestration. It should run
-task/model slices, call the runner/evaluator/report path, and emit sweep
-manifests for Autopilot4 import.
+The next implementation issue is Harvey parity CI and golden corpus checks. It
+should pin the audited corpus shape and run mock runner/evaluator/report/sweep
+fixtures without live provider credentials.
