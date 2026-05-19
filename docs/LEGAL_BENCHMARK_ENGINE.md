@@ -32,7 +32,7 @@ requires task identity, task version, input artifact manifest hash, run config
 hash, and output artifact manifest hash, so later runner work cannot produce a
 score without the immutable execution identity Autopilot needs.
 
-## Hashing
+## Artifact Manifests And Hashing
 
 The module exposes SHA-256 helpers over canonical serde JSON encodings:
 
@@ -47,6 +47,20 @@ The module exposes SHA-256 helpers over canonical serde JSON encodings:
 These helpers are namespaced by artifact family. Downstream code should store
 the digest and the JSON artifact together rather than recomputing identity from
 partial database rows.
+
+The module also provides reusable manifest helpers:
+
+- `artifact_from_file`
+- `build_input_artifact_manifest`
+- `build_output_artifact_manifest`
+- `build_derived_artifact_manifest`
+- `compare_artifact_manifests`
+
+Input manifests are built from normalized task source artifacts. Output and
+derived manifests take generated artifacts from the runner or extractor layer.
+All builders sort artifacts deterministically before hashing, so unchanged
+inputs produce stable manifest hashes and changed source bytes produce manifest
+drift that can be compared before a run is trusted.
 
 ## Fixture
 
@@ -94,7 +108,7 @@ For the audited Harvey checkout, the expected summary is:
 
 ## Next Work
 
-The next implementation issue is artifact manifest generation. It should turn
-the normalized source artifacts into reusable input manifests with stable
-manifest-level hashes, media typing, and output-manifest support for generated
-deliverables.
+The next implementation issue is document extraction receipts. It should attach
+versioned extractor identity, input hashes, output hashes, warnings, and
+coverage metadata to derived artifacts before runner and evaluator work depends
+on extracted text.
