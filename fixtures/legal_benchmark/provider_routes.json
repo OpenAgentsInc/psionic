@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "routes": [
+    {
+      "schema_version": 1,
+      "route_id": "openai.local.v1",
+      "family": "open_ai_compatible",
+      "base_url": "http://127.0.0.1:8000/v1",
+      "model_id": "psionic-local-legal",
+      "endpoint_path": "/chat/completions",
+      "secret_reference_id": "secret.openai.local",
+      "redacted_headers": {
+        "authorization": "Bearer <secret_ref:secret.openai.local>"
+      }
+    },
+    {
+      "schema_version": 1,
+      "route_id": "anthropic.harvey.parity",
+      "family": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "model_id": "claude-sonnet-legal",
+      "endpoint_path": "/messages",
+      "secret_reference_id": "secret.anthropic.harvey",
+      "redacted_headers": {
+        "anthropic-version": "2023-06-01",
+        "x-api-key": "<secret_ref:secret.anthropic.harvey>"
+      }
+    },
+    {
+      "schema_version": 1,
+      "route_id": "mock.legal.ci",
+      "family": "mock",
+      "base_url": "mock://legal-benchmark",
+      "model_id": "deterministic-legal-mock",
+      "redacted_headers": {}
+    }
+  ]
+}
