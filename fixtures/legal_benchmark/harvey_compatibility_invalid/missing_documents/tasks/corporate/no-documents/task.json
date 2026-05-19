@@ -1,0 +1,21 @@
+{
+  "title": "Missing Documents",
+  "work_type": "review",
+  "tags": [
+    "Corporate"
+  ],
+  "instructions": "Review the attached documents. Output: `memo.docx`",
+  "deliverables": {
+    "memo.docx": "memo.docx"
+  },
+  "criteria": [
+    {
+      "id": "C-001",
+      "title": "Identifies issue",
+      "deliverables": [
+        "memo.docx"
+      ],
+      "match_criteria": "PASS if the memo identifies the issue. FAIL otherwise."
+    }
+  ]
+}

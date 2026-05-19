@@ -1,0 +1,11 @@
+{
+  "title": "Malformed JSON",
+  "work_type": "review",
+  "tags": [
+    "Corporate"
+  ],
+  "instructions": "This fixture is intentionally malformed.",
+  "deliverables": {
+    "memo.docx": "memo.docx"
+  },
+  "criteria": [
