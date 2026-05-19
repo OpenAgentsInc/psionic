@@ -12,6 +12,9 @@ pub use jobs::*;
 mod pool;
 pub use pool::*;
 
+mod podman;
+pub use podman::*;
+
 mod tassadar_external_delegation;
 pub use tassadar_external_delegation::*;
 
