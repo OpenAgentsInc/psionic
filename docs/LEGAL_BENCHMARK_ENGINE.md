@@ -156,8 +156,21 @@ write and edit are restricted to workspace/output roots; shell remains
 sandbox-owned and routes through the Podman backend only when the full-feature
 caller attaches one.
 
+## Provider Adapter Layer
+
+The provider-neutral model contract is documented in
+`docs/LEGAL_BENCHMARK_PROVIDERS.md` and implemented in
+`crates/psionic-eval/src/legal_benchmark_provider.rs`.
+
+It defines model requests, messages, tool specs, tool calls, tool-result
+messages, usage accounting, structured provider failures, retry policy,
+OpenAI-compatible and Anthropic protocol adapters, and deterministic CI mocks.
+Routes record provider family, model id, model config hash, elapsed time,
+retry count, raw response hash, and secret reference id without writing raw
+credentials into run artifacts.
+
 ## Next Work
 
-The next implementation issue is provider abstraction. It should consume this
-tool surface from the agent loop without hard-coding one model vendor or one
-transport.
+The next implementation issue is the Rust agent loop. It should consume the
+provider adapter and closed tool surface to produce complete run records,
+transcripts, metrics, output manifests, and receipts.
