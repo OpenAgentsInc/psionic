@@ -58,6 +58,16 @@ criterion tied to that source should not be classified as a coverage gap when
 the matching evidence span is present. Unmatched glob or inventory discovery
 still counts only as discovery, not reading.
 
+## Pre-Submit Guard
+
+`run_legal_benchmark_agent` now checks the coverage-adjacent protocol before it
+accepts a source-backed final submission. The guard requires complete source
+inventory, per-source inspection through the best enabled document helper,
+evidence rows, required deliverable validation, and a final self-check. Early
+submissions are bounced back to the model with concrete missing steps while
+turns remain, which makes hill-climb runs spend remaining budget fixing
+coverage and citation gaps before judge scoring.
+
 ## Validation
 
 Run:

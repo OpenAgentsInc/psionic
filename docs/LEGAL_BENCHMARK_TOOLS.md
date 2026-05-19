@@ -111,3 +111,27 @@ should state that:
 The Psionic agent prompt now renders that operating protocol only for tools
 enabled by the run's `ToolPolicy`, so a dry-run or restricted profile is not
 told to call unavailable tools.
+
+## Pre-Submit Enforcement
+
+The agent loop now treats the protocol as an enforceable guard for source-backed
+tasks, not just prompt guidance. A submit response is accepted only after the
+run has:
+
+- submitted every required deliverable path
+- run `validate_deliverables` for required output paths when that tool is
+  enabled
+- run `inventory` on the documents root when that tool is enabled
+- inspected every source artifact with the strongest enabled helper:
+  `spreadsheet_summary` for tabular files, `email_summary` for EML files,
+  `pdf_search` for PDFs, then `read` or `grep` fallback for text
+- captured `evidence_table` rows for source-backed claims when that tool is
+  enabled
+- included a final self-check note covering evidence, deliverables, and uncited
+  or unsupported claims
+
+If the model submits early and there are turns remaining, the runner appends a
+`pre-submit protocol incomplete` transcript event and sends the missing steps
+back to the model. If no turns remain, the run ends as a policy failure. This
+keeps Harvey hill-climb attempts from reaching the judge with avoidable
+coverage, evidence, and validation gaps.

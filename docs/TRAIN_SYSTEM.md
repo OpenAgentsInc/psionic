@@ -184,6 +184,12 @@ doc `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`; it covers the required
 Qwen3.5/Qwen3.6 target set and records Qwen3.6 as a versioned
 `qwen36_alias_qwen35` decision until real artifact metadata requires a new
 runtime branch.
+The legal benchmark agent loop now also enforces the high-score source protocol
+before accepting source-backed submissions: inventory, per-source inspection,
+evidence-table rows, deliverable validation, and a final self-check must be
+present while tools and turns allow them. This closes the most avoidable
+document coverage, citation evidence, and validation gaps before Qwen or
+blueprint hill-climb runs reach the Harvey judge.
 
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in

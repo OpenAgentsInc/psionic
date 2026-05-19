@@ -2300,10 +2300,19 @@ mod tests {
             created_at_ms: 1,
             metadata: Metadata::new(),
         };
-        let mut adapter = MockModelAdapter::new(route, vec![Ok(response.clone())]);
+        let mut expected = response.clone();
+        expected.metadata.insert(
+            String::from("route_id"),
+            Value::String(route.route_id.clone()),
+        );
+        expected.metadata.insert(
+            String::from("route_model_id"),
+            Value::String(route.model_id.clone()),
+        );
+        let mut adapter = MockModelAdapter::new(route, vec![Ok(response)]);
         assert_eq!(
             adapter.complete(&request()).expect("mock response"),
-            response
+            expected
         );
     }
 }

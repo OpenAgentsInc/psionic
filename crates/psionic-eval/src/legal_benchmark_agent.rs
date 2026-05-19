@@ -15,14 +15,15 @@ use thiserror::Error;
 
 use crate::{
     ArtifactKind, ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, DataClassification,
-    LegalBenchmarkToolExecution, LegalBenchmarkToolFailureKind, LegalBenchmarkToolInput,
-    LegalBenchmarkToolReceipt, LegalBenchmarkToolWorkspace, Metadata, ModelAdapter,
-    ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole, ModelProviderRoute,
-    ModelRequest, ModelResponse, ModelStopReason, ModelToolCall, RunConfig, RunMetrics, RunRecord,
-    RunTerminalState, SourceArtifact, ToolCallRecord, ToolResultMessage, TranscriptEvent,
-    TranscriptEventKind, agent_visible_checklist, artifact_from_file, artifact_manifest_digest,
-    build_coverage_snapshot, build_output_artifact_manifest, execute_legal_benchmark_tool,
-    run_config_digest, run_record_digest, stable_json_digest, task_spec_digest, transcript_digest,
+    LegalBenchmarkPathRoot, LegalBenchmarkToolExecution, LegalBenchmarkToolFailureKind,
+    LegalBenchmarkToolInput, LegalBenchmarkToolReceipt, LegalBenchmarkToolWorkspace, Metadata,
+    ModelAdapter, ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole,
+    ModelProviderRoute, ModelRequest, ModelResponse, ModelStopReason, ModelToolCall, RunConfig,
+    RunMetrics, RunRecord, RunTerminalState, SourceArtifact, ToolCallRecord, ToolResultMessage,
+    TranscriptEvent, TranscriptEventKind, agent_visible_checklist, artifact_from_file,
+    artifact_manifest_digest, build_coverage_snapshot, build_output_artifact_manifest,
+    execute_legal_benchmark_tool, run_config_digest, run_record_digest, stable_json_digest,
+    task_spec_digest, transcript_digest,
 };
 
 pub const LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION: u16 = 1;
@@ -91,6 +92,12 @@ pub struct LegalBenchmarkSubmission {
     pub deliverables: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PreSubmitProtocolReport {
+    satisfied: bool,
+    missing_steps: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -212,9 +219,11 @@ where
         }
 
         if response.tool_calls.is_empty() {
-            terminal_state = Some(
-                match response.final_text.as_deref().and_then(parse_submission) {
-                    Some(submission) if is_submit_action(&submission.action) => {
+            match response.final_text.as_deref().and_then(parse_submission) {
+                Some(submission) if is_submit_action(&submission.action) => {
+                    let protocol =
+                        pre_submit_protocol_report(&request, &tool_calls, &transcript, &submission);
+                    if protocol.satisfied {
                         push_transcript_event(
                             &mut transcript,
                             TranscriptEventKind::Runner,
@@ -222,12 +231,35 @@ where
                             Some(String::from("submission accepted")),
                             Some(json!({"submission": submission})),
                         );
-                        RunTerminalState::Submitted
+                        terminal_state = Some(RunTerminalState::Submitted);
+                        break;
                     }
-                    _ => RunTerminalState::NoToolCalls,
-                },
-            );
-            break;
+                    push_transcript_event(
+                        &mut transcript,
+                        TranscriptEventKind::Runner,
+                        Some("runner"),
+                        Some(String::from("pre-submit protocol incomplete")),
+                        Some(json!({
+                            "submission": submission,
+                            "missing_steps": protocol.missing_steps.clone(),
+                        })),
+                    );
+                    if turn_index + 1 >= request.run_config.tool_policy.max_turns {
+                        terminal_state = Some(RunTerminalState::PolicyFailure);
+                        break;
+                    }
+                    let feedback = format!(
+                        "Pre-submit protocol incomplete. Complete these steps before submitting: {}",
+                        protocol.missing_steps.join("; ")
+                    );
+                    messages.push(ModelMessage::new(ModelMessageRole::User, feedback));
+                }
+                _ => {
+                    terminal_state = Some(RunTerminalState::NoToolCalls);
+                    break;
+                }
+            }
+            continue;
         }
 
         let mut terminal_from_tool = None;
@@ -438,11 +470,25 @@ fn append_benchmark_operating_protocol(
         prompt.push_str(&line);
         prompt.push('\n');
     }
+    prompt.push_str(
+        "- Final submission may be rejected until required inventory, source inspection, evidence rows, deliverable validation, and self-check notes are present.\n",
+    );
 }
 
 pub fn legal_benchmark_user_prompt(request: &LegalBenchmarkAgentRunRequest) -> String {
     let mut prompt = String::new();
     prompt.push_str(&request.task_spec.instructions);
+    if !request.task_spec.source_artifacts.is_empty() {
+        prompt.push_str("\n\nSource artifact tool paths:\n");
+        for artifact in &request.task_spec.source_artifacts {
+            prompt.push_str(&format!(
+                "- {}: {} ({})\n",
+                artifact.artifact_id,
+                source_tool_relative_path(artifact),
+                artifact.media_type
+            ));
+        }
+    }
     prompt.push_str("\n\nDeliverables:\n");
     for deliverable in &request.task_spec.deliverables {
         prompt.push_str(&format!(
@@ -466,6 +512,403 @@ pub fn parse_submission(text: &str) -> Option<LegalBenchmarkSubmission> {
 
 fn is_submit_action(action: &str) -> bool {
     matches!(action, "submit" | "finalize")
+}
+
+fn pre_submit_protocol_report(
+    request: &LegalBenchmarkAgentRunRequest,
+    tool_calls: &[ToolCallRecord],
+    transcript: &[TranscriptEvent],
+    submission: &LegalBenchmarkSubmission,
+) -> PreSubmitProtocolReport {
+    let mut missing_steps = Vec::new();
+    let source_artifacts = request.task_spec.source_artifacts.as_slice();
+    let required_deliverables = request
+        .task_spec
+        .deliverables
+        .iter()
+        .filter(|deliverable| deliverable.required)
+        .collect::<Vec<_>>();
+
+    let missing_submitted = required_deliverables
+        .iter()
+        .filter(|deliverable| {
+            !submission.deliverables.iter().any(|submitted| {
+                output_path_matches(deliverable.required_path.as_str(), submitted.as_str())
+            })
+        })
+        .map(|deliverable| deliverable.required_path.clone())
+        .collect::<Vec<_>>();
+    if !missing_submitted.is_empty() {
+        missing_steps.push(format!(
+            "submit every required deliverable path: {}",
+            missing_submitted.join(", ")
+        ));
+    }
+
+    if allowed_tool(request, "validate_deliverables") && !required_deliverables.is_empty() {
+        let missing_validations = required_deliverables
+            .iter()
+            .filter(|deliverable| {
+                !deliverable_validation_passed(tool_calls, deliverable.required_path.as_str())
+            })
+            .map(|deliverable| deliverable.required_path.clone())
+            .collect::<Vec<_>>();
+        if !missing_validations.is_empty() {
+            missing_steps.push(format!(
+                "validate required output paths with validate_deliverables: {}",
+                missing_validations.join(", ")
+            ));
+        }
+    }
+
+    if !source_artifacts.is_empty() {
+        if allowed_tool(request, "inventory")
+            && !inventory_discovers_all(tool_calls, source_artifacts)
+        {
+            missing_steps.push(String::from(
+                "run inventory on the documents root and discover every source artifact",
+            ));
+        }
+
+        if source_inspection_tools_available(request) {
+            let missing_inspections = source_artifacts
+                .iter()
+                .filter(|artifact| !source_artifact_inspected(request, tool_calls, artifact))
+                .map(|artifact| source_tool_relative_path(artifact))
+                .collect::<Vec<_>>();
+            if !missing_inspections.is_empty() {
+                missing_steps.push(format!(
+                    "inspect each source with the strongest available document tool: {}",
+                    missing_inspections.join(", ")
+                ));
+            }
+        }
+
+        if allowed_tool(request, "evidence_table") {
+            let missing_evidence = source_artifacts
+                .iter()
+                .filter(|artifact| !evidence_table_covers_source(tool_calls, artifact))
+                .map(|artifact| source_tool_relative_path(artifact))
+                .collect::<Vec<_>>();
+            if !missing_evidence.is_empty() {
+                missing_steps.push(format!(
+                    "capture evidence_table rows for source-backed claims: {}",
+                    missing_evidence.join(", ")
+                ));
+            }
+        }
+
+        if !submission_note_self_checks(submission.note.as_deref())
+            && !transcript_self_check_recorded(transcript)
+        {
+            missing_steps.push(String::from(
+                "include a final self-check note covering evidence, deliverables, and uncited or unsupported claims",
+            ));
+        }
+    }
+
+    PreSubmitProtocolReport {
+        satisfied: missing_steps.is_empty(),
+        missing_steps,
+    }
+}
+
+fn allowed_tool(request: &LegalBenchmarkAgentRunRequest, tool_name: &str) -> bool {
+    request
+        .run_config
+        .tool_policy
+        .allowed_tools
+        .iter()
+        .any(|allowed| allowed == tool_name)
+}
+
+fn source_inspection_tools_available(request: &LegalBenchmarkAgentRunRequest) -> bool {
+    [
+        "read",
+        "grep",
+        "pdf_search",
+        "email_summary",
+        "spreadsheet_summary",
+    ]
+    .iter()
+    .any(|tool| allowed_tool(request, tool))
+}
+
+fn inventory_discovers_all(
+    tool_calls: &[ToolCallRecord],
+    source_artifacts: &[SourceArtifact],
+) -> bool {
+    source_artifacts.iter().all(|artifact| {
+        tool_calls.iter().any(|call| {
+            if call.tool_name != "inventory" || call.error_kind.is_some() {
+                return false;
+            }
+            if input_root(call) != Some(LegalBenchmarkPathRoot::Documents) {
+                return false;
+            }
+            output_payload(call, "inventory")
+                .and_then(|output| output.get("artifacts"))
+                .and_then(Value::as_array)
+                .is_some_and(|artifacts| {
+                    artifacts.iter().any(|row| {
+                        row.get("relative_path")
+                            .and_then(Value::as_str)
+                            .is_some_and(|path| source_path_matches(artifact, path))
+                    })
+                })
+        })
+    })
+}
+
+fn source_artifact_inspected(
+    request: &LegalBenchmarkAgentRunRequest,
+    tool_calls: &[ToolCallRecord],
+    artifact: &SourceArtifact,
+) -> bool {
+    if is_spreadsheet_source(artifact) && allowed_tool(request, "spreadsheet_summary") {
+        return source_path_tool_called(tool_calls, "spreadsheet_summary", artifact);
+    }
+    if is_email_source(artifact) && allowed_tool(request, "email_summary") {
+        return source_path_tool_called(tool_calls, "email_summary", artifact);
+    }
+    if is_pdf_source(artifact) && allowed_tool(request, "pdf_search") {
+        return pdf_search_covers_source(tool_calls, artifact);
+    }
+    if allowed_tool(request, "read") && source_path_tool_called(tool_calls, "read", artifact) {
+        return true;
+    }
+    if allowed_tool(request, "grep") && grep_covers_source(tool_calls, artifact) {
+        return true;
+    }
+    if allowed_tool(request, "pdf_search") && pdf_search_covers_source(tool_calls, artifact) {
+        return true;
+    }
+    false
+}
+
+fn source_path_tool_called(
+    tool_calls: &[ToolCallRecord],
+    tool_name: &str,
+    artifact: &SourceArtifact,
+) -> bool {
+    tool_calls.iter().any(|call| {
+        call.tool_name == tool_name
+            && call.error_kind.is_none()
+            && input_root(call) == Some(LegalBenchmarkPathRoot::Documents)
+            && input_relative_path(call).is_some_and(|path| source_path_matches(artifact, path))
+            && output_payload(call, tool_name).is_some()
+    })
+}
+
+fn grep_covers_source(tool_calls: &[ToolCallRecord], artifact: &SourceArtifact) -> bool {
+    tool_calls.iter().any(|call| {
+        call.tool_name == "grep"
+            && call.error_kind.is_none()
+            && input_root(call) == Some(LegalBenchmarkPathRoot::Documents)
+            && output_payload(call, "grep")
+                .and_then(|output| output.get("matches"))
+                .and_then(Value::as_array)
+                .is_some_and(|matches| {
+                    matches.iter().any(|row| {
+                        row.get("relative_path")
+                            .and_then(Value::as_str)
+                            .is_some_and(|path| source_path_matches(artifact, path))
+                    })
+                })
+    })
+}
+
+fn pdf_search_covers_source(tool_calls: &[ToolCallRecord], artifact: &SourceArtifact) -> bool {
+    tool_calls.iter().any(|call| {
+        if call.tool_name != "pdf_search"
+            || call.error_kind.is_some()
+            || input_root(call) != Some(LegalBenchmarkPathRoot::Documents)
+        {
+            return false;
+        }
+        if input_relative_path(call).is_some_and(|path| source_path_matches(artifact, path))
+            && output_payload(call, "pdf_search").is_some()
+        {
+            return true;
+        }
+        output_payload(call, "pdf_search")
+            .and_then(|output| output.get("matches"))
+            .and_then(Value::as_array)
+            .is_some_and(|matches| {
+                matches.iter().any(|row| {
+                    row.get("relative_path")
+                        .and_then(Value::as_str)
+                        .is_some_and(|path| source_path_matches(artifact, path))
+                })
+            })
+    })
+}
+
+fn evidence_table_covers_source(tool_calls: &[ToolCallRecord], artifact: &SourceArtifact) -> bool {
+    tool_calls.iter().any(|call| {
+        call.tool_name == "evidence_table"
+            && call.error_kind.is_none()
+            && output_payload(call, "evidence_table")
+                .and_then(|output| output.get("rows"))
+                .and_then(Value::as_array)
+                .is_some_and(|rows| {
+                    rows.iter().any(|row| {
+                        row.get("source_ref")
+                            .and_then(Value::as_str)
+                            .is_some_and(|source_ref| source_ref_matches(artifact, source_ref))
+                    })
+                })
+    })
+}
+
+fn deliverable_validation_passed(tool_calls: &[ToolCallRecord], required_path: &str) -> bool {
+    tool_calls.iter().any(|call| {
+        call.tool_name == "validate_deliverables"
+            && call.error_kind.is_none()
+            && matches!(
+                input_root(call),
+                Some(LegalBenchmarkPathRoot::Output | LegalBenchmarkPathRoot::Workspace)
+            )
+            && output_payload(call, "validate_deliverables")
+                .and_then(|output| output.get("validations"))
+                .and_then(Value::as_array)
+                .is_some_and(|validations| {
+                    validations.iter().any(|validation| {
+                        let path_matches = validation
+                            .get("relative_path")
+                            .and_then(Value::as_str)
+                            .is_some_and(|path| output_path_matches(required_path, path));
+                        let exists = validation
+                            .get("exists")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false);
+                        let readable = validation
+                            .get("readable")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false);
+                        path_matches && exists && readable
+                    })
+                })
+    })
+}
+
+fn submission_note_self_checks(note: Option<&str>) -> bool {
+    let Some(note) = note else {
+        return false;
+    };
+    let normalized = note.to_ascii_lowercase();
+    (normalized.contains("self-check") || normalized.contains("self check"))
+        && (normalized.contains("evidence")
+            || normalized.contains("citation")
+            || normalized.contains("cited"))
+        && (normalized.contains("deliverable") || normalized.contains("output"))
+        && (normalized.contains("uncited")
+            || normalized.contains("unsupported")
+            || normalized.contains("unsubstantiated"))
+}
+
+fn transcript_self_check_recorded(transcript: &[TranscriptEvent]) -> bool {
+    transcript.iter().any(|event| {
+        event
+            .content
+            .as_deref()
+            .is_some_and(|content| submission_note_self_checks(Some(content)))
+    })
+}
+
+fn input_payload(call: &ToolCallRecord) -> Option<&Value> {
+    call.input.get("input")
+}
+
+fn output_payload<'a>(call: &'a ToolCallRecord, tool_name: &str) -> Option<&'a Value> {
+    let output = call.output.as_ref()?;
+    if output.get("tool").and_then(Value::as_str) != Some(tool_name) {
+        return None;
+    }
+    output.get("output")
+}
+
+fn input_root(call: &ToolCallRecord) -> Option<LegalBenchmarkPathRoot> {
+    match input_payload(call)?.get("root")?.as_str()? {
+        "documents" => Some(LegalBenchmarkPathRoot::Documents),
+        "workspace" => Some(LegalBenchmarkPathRoot::Workspace),
+        "output" => Some(LegalBenchmarkPathRoot::Output),
+        _ => None,
+    }
+}
+
+fn input_relative_path(call: &ToolCallRecord) -> Option<&str> {
+    input_payload(call)?.get("relative_path")?.as_str()
+}
+
+fn is_spreadsheet_source(artifact: &SourceArtifact) -> bool {
+    let media_type = artifact.media_type.to_ascii_lowercase();
+    let path = artifact.relative_path.to_ascii_lowercase();
+    media_type.contains("spreadsheet")
+        || media_type.contains("excel")
+        || media_type == "text/csv"
+        || path.ends_with(".xlsx")
+        || path.ends_with(".xls")
+        || path.ends_with(".csv")
+        || path.ends_with(".tsv")
+}
+
+fn is_email_source(artifact: &SourceArtifact) -> bool {
+    let media_type = artifact.media_type.to_ascii_lowercase();
+    let path = artifact.relative_path.to_ascii_lowercase();
+    media_type == "message/rfc822" || path.ends_with(".eml")
+}
+
+fn is_pdf_source(artifact: &SourceArtifact) -> bool {
+    artifact.media_type.eq_ignore_ascii_case("application/pdf")
+        || artifact
+            .relative_path
+            .to_ascii_lowercase()
+            .ends_with(".pdf")
+}
+
+fn source_ref_matches(artifact: &SourceArtifact, source_ref: &str) -> bool {
+    source_ref == artifact.artifact_id || source_path_matches(artifact, source_ref)
+}
+
+fn source_path_matches(artifact: &SourceArtifact, observed_path: &str) -> bool {
+    let observed = normalize_source_path(observed_path);
+    observed == normalize_source_path(&artifact.relative_path)
+        || observed == normalize_source_path(&source_tool_relative_path(artifact))
+}
+
+fn source_tool_relative_path(artifact: &SourceArtifact) -> String {
+    let normalized = strip_relative_prefixes(&artifact.relative_path);
+    if let Some((_, suffix)) = normalized.rsplit_once("/documents/") {
+        return suffix.to_string();
+    }
+    normalized
+        .strip_prefix("documents/")
+        .unwrap_or(normalized.as_str())
+        .to_string()
+}
+
+fn normalize_source_path(path: &str) -> String {
+    strip_relative_prefixes(path).to_ascii_lowercase()
+}
+
+fn output_path_matches(expected_path: &str, observed_path: &str) -> bool {
+    normalize_output_path(expected_path) == normalize_output_path(observed_path)
+}
+
+fn normalize_output_path(path: &str) -> String {
+    let stripped = strip_relative_prefixes(path).to_ascii_lowercase();
+    stripped
+        .strip_prefix("output/")
+        .or_else(|| stripped.strip_prefix("outputs/"))
+        .unwrap_or(stripped.as_str())
+        .to_string()
+}
+
+fn strip_relative_prefixes(path: &str) -> String {
+    path.trim_start_matches("./")
+        .trim_start_matches('/')
+        .replace('\\', "/")
 }
 
 fn execute_model_tool_call(
@@ -934,6 +1377,82 @@ mod tests {
         }
     }
 
+    fn response_submit_with_note(
+        route: &ModelProviderRoute,
+        deliverable_path: &str,
+        note: &str,
+    ) -> ModelResponse {
+        let mut response = response_submit(route);
+        response.response_id = String::from("mock.response.submit.note");
+        response.final_text = Some(
+            json!({
+                "action": "submit",
+                "deliverables": [deliverable_path],
+                "note": note
+            })
+            .to_string(),
+        );
+        response
+    }
+
+    fn response_with_protocol_tool_calls(route: &ModelProviderRoute) -> ModelResponse {
+        let mut response = response_with_tool_call(route);
+        response.response_id = String::from("mock.response.protocol.tools");
+        response.tool_calls = vec![
+            ModelToolCall {
+                tool_call_id: String::from("call.inventory.documents"),
+                tool_name: String::from("inventory"),
+                arguments: json!({
+                    "root": "documents",
+                    "max_results": 20,
+                    "include_hidden": false,
+                    "include_hashes": true
+                }),
+            },
+            ModelToolCall {
+                tool_call_id: String::from("call.read.case"),
+                tool_name: String::from("read"),
+                arguments: json!({
+                    "root": "documents",
+                    "relative_path": "case.txt",
+                    "prefer_extracted": false
+                }),
+            },
+            ModelToolCall {
+                tool_call_id: String::from("call.evidence.case"),
+                tool_name: String::from("evidence_table"),
+                arguments: json!({
+                    "entries": [{
+                        "source_ref": "artifact.case",
+                        "locator": "case.txt",
+                        "quote": "The contract requires notice within five days.",
+                        "note": "deadline support for memo"
+                    }]
+                }),
+            },
+            ModelToolCall {
+                tool_call_id: String::from("call.write.protocol.memo"),
+                tool_name: String::from("write"),
+                arguments: json!({
+                    "root": "output",
+                    "relative_path": "outputs/memo.md",
+                    "content": "# Memo\n\nThe notice deadline is five days, supported by the case file.\n",
+                    "overwrite": true
+                }),
+            },
+            ModelToolCall {
+                tool_call_id: String::from("call.validate.memo"),
+                tool_name: String::from("validate_deliverables"),
+                arguments: json!({
+                    "root": "output",
+                    "required_paths": ["outputs/memo.md"],
+                    "max_results": 10
+                }),
+            },
+        ];
+        response
+    }
+
     #[test]
     fn mock_agent_run_writes_outputs_and_run_artifacts() {
         let temp = tempfile::tempdir().expect("tempdir");
@@ -1056,6 +1575,109 @@ mod tests {
     }
 
     #[test]
+    fn source_backed_submit_waits_for_protocol_coverage() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+        let case_path = documents_root.join("case.txt");
+        fs::write(
+            &case_path,
+            "The contract requires notice within five days.\nThe counterparty waived no rights.\n",
+        )
+        .expect("case file");
+
+        let mut task = task_spec();
+        task.source_artifacts = vec![
+            artifact_from_file(
+                String::from("artifact.case"),
+                ArtifactKind::SourceDocument,
+                &documents_root,
+                &case_path,
+                DataClassification::BenchmarkConfidential,
+                Some(String::from("test fixture")),
+            )
+            .expect("source artifact"),
+        ];
+        task.deliverables[0].required_path = String::from("outputs/memo.md");
+        task.criteria[0].source_artifact_ids = vec![String::from("artifact.case")];
+        task.tool_policy.allowed_tools = vec![
+            String::from("inventory"),
+            String::from("read"),
+            String::from("write"),
+            String::from("evidence_table"),
+            String::from("validate_deliverables"),
+        ];
+        task.tool_policy.max_turns = 4;
+        let input_manifest = build_input_artifact_manifest(&task);
+        let config = run_config(&task);
+        let route = ModelProviderRoute::mock("mock.protocol", "deterministic-legal-mock");
+        let mut early_submit = response_submit(&route);
+        early_submit.final_text = Some(String::from(
+            "{\"action\":\"submit\",\"deliverables\":[\"outputs/memo.md\"]}",
+        ));
+        let mut adapter = MockModelAdapter::new(
+            route.clone(),
+            vec![
+                Ok(early_submit),
+                Ok(response_with_protocol_tool_calls(&route)),
+                Ok(response_submit_with_note(
+                    &route,
+                    "outputs/memo.md",
+                    "Final self-check: evidence rows support each claim, deliverables validated, and no uncited or unsupported claims remain.",
+                )),
+            ],
+        );
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("protocol.coverage")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+
+        assert_eq!(result.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(result.run_record.metrics.model_turns, 3);
+        assert_eq!(result.run_record.metrics.tool_call_count, 5);
+        assert!(
+            result.run_record.transcript.iter().any(|event| {
+                event.content.as_deref() == Some("pre-submit protocol incomplete")
+            })
+        );
+        assert!(
+            output_root.join("outputs/memo.md").exists(),
+            "memo should be written under the required output path"
+        );
+        let coverage = result
+            .run_record
+            .coverage_snapshot
+            .as_ref()
+            .expect("coverage snapshot");
+        assert!(coverage.documents.iter().any(|document| {
+            document.artifact_id == "artifact.case" && document.discovered && document.read
+        }));
+        assert!(!coverage.evidence_refs.is_empty());
+        assert!(
+            coverage.validations.iter().any(|validation| {
+                validation.target_ref == "outputs/memo.md" && validation.passed
+            })
+        );
+        assert!(!coverage.self_checks.is_empty());
+    }
+
+    #[test]
     fn system_prompt_includes_allowed_coverage_protocol_without_hidden_criteria() {
         let temp = tempfile::tempdir().expect("tempdir");
         let root = temp.keep();
@@ -1098,6 +1720,7 @@ mod tests {
         assert!(prompt.contains("read, grep"));
         assert!(prompt.contains("evidence_table"));
         assert!(prompt.contains("validate_deliverables"));
+        assert!(prompt.contains("Final submission may be rejected"));
         assert!(!prompt.contains("The memo exists."));
     }
 }
