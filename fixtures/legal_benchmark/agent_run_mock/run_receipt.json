@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "run_id": "run.legal.mock_agent.fixture.attempt.1",
+  "task_id": "legal.mock_agent",
+  "task_version": "v1",
+  "terminal_state": "submitted",
+  "task_spec_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "input_artifact_manifest_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "run_config_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "output_artifact_manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "transcript_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "metrics_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "tool_receipts_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+  "run_record_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+  "output_artifact_count": 1,
+  "tool_receipt_count": 1,
+  "created_at_ms": 1
+}

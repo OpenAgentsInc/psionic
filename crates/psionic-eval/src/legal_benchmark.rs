@@ -411,6 +411,8 @@ pub enum RunTerminalState {
     NoToolCalls,
     /// Maximum turn count reached.
     MaxTurns,
+    /// Maximum model token budget reached.
+    MaxTokens,
     /// Context limit reached.
     ContextOverflow,
     /// Provider failure ended the run.

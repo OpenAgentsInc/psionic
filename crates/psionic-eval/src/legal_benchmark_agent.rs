@@ -1,0 +1,946 @@
+//! Legal benchmark agent loop and run-record writer.
+//!
+//! This module drives provider turns against the closed legal benchmark tool
+//! surface, then writes replayable run artifacts for scoring and Autopilot
+//! import.
+
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use thiserror::Error;
+
+use crate::{
+    ArtifactKind, ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, DataClassification,
+    LegalBenchmarkToolExecution, LegalBenchmarkToolFailureKind, LegalBenchmarkToolInput,
+    LegalBenchmarkToolReceipt, LegalBenchmarkToolWorkspace, Metadata, ModelAdapter,
+    ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole, ModelRequest,
+    ModelResponse, ModelStopReason, ModelToolCall, RunConfig, RunMetrics, RunRecord,
+    RunTerminalState, SourceArtifact, ToolCallRecord, ToolResultMessage, TranscriptEvent,
+    TranscriptEventKind, artifact_from_file, artifact_manifest_digest,
+    build_output_artifact_manifest, execute_legal_benchmark_tool, run_config_digest,
+    run_record_digest, stable_json_digest, task_spec_digest, transcript_digest,
+};
+
+pub const LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION: u16 = 1;
+
+#[derive(Clone, Debug)]
+pub struct LegalBenchmarkAgentRunRequest {
+    pub task_spec: BenchmarkTaskSpec,
+    pub input_artifact_manifest: ArtifactManifest,
+    pub run_config: RunConfig,
+    pub tool_workspace: LegalBenchmarkToolWorkspace,
+    pub run_root: PathBuf,
+    pub module_instructions: Vec<String>,
+    pub extraction_receipt_refs: Vec<String>,
+    pub run_nonce: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkRunArtifactPaths {
+    pub run_root: PathBuf,
+    pub config_json: PathBuf,
+    pub transcript_jsonl: PathBuf,
+    pub metrics_json: PathBuf,
+    pub output_artifact_manifest_json: PathBuf,
+    pub extraction_receipts_json: PathBuf,
+    pub tool_receipts_json: PathBuf,
+    pub run_record_json: PathBuf,
+    pub run_receipt_json: PathBuf,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkRunReceipt {
+    pub schema_version: u16,
+    pub run_id: String,
+    pub task_id: String,
+    pub task_version: String,
+    pub terminal_state: RunTerminalState,
+    pub task_spec_hash: String,
+    pub input_artifact_manifest_hash: String,
+    pub run_config_hash: String,
+    pub output_artifact_manifest_hash: String,
+    pub transcript_hash: String,
+    pub metrics_hash: String,
+    pub tool_receipts_hash: String,
+    pub run_record_hash: String,
+    pub output_artifact_count: u64,
+    pub tool_receipt_count: u64,
+    pub created_at_ms: u64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkAgentRunResult {
+    pub run_id: String,
+    pub terminal_state: RunTerminalState,
+    pub run_record: RunRecord,
+    pub output_artifact_manifest: ArtifactManifest,
+    pub run_receipt: LegalBenchmarkRunReceipt,
+    pub tool_receipts: Vec<LegalBenchmarkToolReceipt>,
+    pub paths: LegalBenchmarkRunArtifactPaths,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkSubmission {
+    pub action: String,
+    pub deliverables: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Error)]
+pub enum LegalBenchmarkAgentRunError {
+    #[error("I/O error at {path}: {source}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("artifact manifest error: {0}")]
+    ArtifactManifest(#[from] ArtifactManifestError),
+    #[error("provider error: {0:?}")]
+    Provider(ModelAdapterError),
+    #[error("invalid model tool call {tool_call_id}: {detail}")]
+    ToolInput {
+        tool_call_id: String,
+        detail: String,
+    },
+}
+
+pub fn run_legal_benchmark_agent<A>(
+    request: LegalBenchmarkAgentRunRequest,
+    adapter: &mut A,
+) -> Result<LegalBenchmarkAgentRunResult, LegalBenchmarkAgentRunError>
+where
+    A: ModelAdapter,
+{
+    let started = Instant::now();
+    let run_config_hash = run_config_digest(&request.run_config)?;
+    let input_manifest_hash = artifact_manifest_digest(&request.input_artifact_manifest)?;
+    let task_spec_hash = task_spec_digest(&request.task_spec)?;
+    let run_id = legal_benchmark_run_id(
+        &request.task_spec,
+        &run_config_hash,
+        request.run_nonce.as_deref(),
+    );
+    let paths = run_artifact_paths(&request.run_root);
+
+    let mut transcript = Vec::new();
+    let mut tool_calls = Vec::new();
+    let mut tool_receipts = Vec::new();
+    let mut metrics = RunMetrics {
+        model_turns: 0,
+        tool_call_count: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        wall_time_ms: 0,
+        estimated_cost_micro_usd: 0,
+    };
+    let mut messages = vec![
+        ModelMessage::new(
+            ModelMessageRole::System,
+            legal_benchmark_system_prompt(&request),
+        ),
+        ModelMessage::new(
+            ModelMessageRole::User,
+            legal_benchmark_user_prompt(&request),
+        ),
+    ];
+    push_transcript_event(
+        &mut transcript,
+        TranscriptEventKind::System,
+        Some("system"),
+        messages[0].content.clone(),
+        Some(json!({"run_id": run_id, "run_config_hash": run_config_hash})),
+    );
+    push_transcript_event(
+        &mut transcript,
+        TranscriptEventKind::User,
+        Some("user"),
+        messages[1].content.clone(),
+        Some(json!({"task_id": request.task_spec.task_id})),
+    );
+
+    let mut terminal_state = None;
+    for turn_index in 0..request.run_config.tool_policy.max_turns {
+        let model_request = ModelRequest::new(
+            format!("model_request.{run_id}.{turn_index}"),
+            messages.clone(),
+        );
+        let response = match adapter.complete(&model_request) {
+            Ok(response) => response,
+            Err(error) => {
+                terminal_state = Some(provider_terminal_state(error.kind));
+                push_transcript_event(
+                    &mut transcript,
+                    TranscriptEventKind::Runner,
+                    Some("runner"),
+                    Some(String::from("provider failure")),
+                    Some(json!({"error": error})),
+                );
+                break;
+            }
+        };
+        apply_model_metrics(&mut metrics, &response);
+        push_model_response_event(&mut transcript, &response);
+        messages.push(ModelMessage::assistant_response(
+            response.final_text.clone(),
+            response.tool_calls.clone(),
+        ));
+
+        match response.stop_reason {
+            ModelStopReason::MaxTokens => {
+                terminal_state = Some(RunTerminalState::MaxTokens);
+                break;
+            }
+            ModelStopReason::SafetyRefusal => {
+                terminal_state = Some(RunTerminalState::PolicyFailure);
+                break;
+            }
+            ModelStopReason::ProviderError => {
+                terminal_state = Some(RunTerminalState::ProviderFailure);
+                break;
+            }
+            ModelStopReason::Stop | ModelStopReason::ToolCalls => {}
+        }
+
+        if response.tool_calls.is_empty() {
+            terminal_state = Some(
+                match response.final_text.as_deref().and_then(parse_submission) {
+                    Some(submission) if is_submit_action(&submission.action) => {
+                        push_transcript_event(
+                            &mut transcript,
+                            TranscriptEventKind::Runner,
+                            Some("runner"),
+                            Some(String::from("submission accepted")),
+                            Some(json!({"submission": submission})),
+                        );
+                        RunTerminalState::Submitted
+                    }
+                    _ => RunTerminalState::NoToolCalls,
+                },
+            );
+            break;
+        }
+
+        let mut terminal_from_tool = None;
+        for tool_call in &response.tool_calls {
+            let execution =
+                execute_model_tool_call(tool_call, &request.tool_workspace).map_err(|detail| {
+                    LegalBenchmarkAgentRunError::ToolInput {
+                        tool_call_id: tool_call.tool_call_id.clone(),
+                        detail,
+                    }
+                })?;
+            let tool_result_message = append_tool_execution(
+                &mut transcript,
+                &mut tool_calls,
+                &mut tool_receipts,
+                tool_call,
+                execution,
+            )?;
+            metrics.tool_call_count = metrics.tool_call_count.saturating_add(1);
+            messages.push(ModelMessage::tool_result(tool_result_message));
+
+            if let Some(receipt) = tool_receipts.last()
+                && matches!(
+                    receipt.failure_kind,
+                    Some(
+                        LegalBenchmarkToolFailureKind::SandboxUnavailable
+                            | LegalBenchmarkToolFailureKind::SandboxFailed
+                    )
+                )
+            {
+                terminal_from_tool = Some(RunTerminalState::SandboxFailure);
+                break;
+            }
+        }
+        if terminal_from_tool.is_some() {
+            terminal_state = terminal_from_tool;
+            break;
+        }
+    }
+
+    let terminal_state = terminal_state.unwrap_or(RunTerminalState::MaxTurns);
+    metrics.wall_time_ms = elapsed_ms(started);
+    let output_artifacts = collect_output_artifacts(&request.tool_workspace.output_root)?;
+    let output_manifest = build_output_artifact_manifest(
+        request.task_spec.task_id.clone(),
+        request.task_spec.task_version.clone(),
+        run_id.clone(),
+        output_artifacts,
+    );
+    let output_manifest_hash = artifact_manifest_digest(&output_manifest)?;
+    let run_record = RunRecord {
+        schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
+        run_id: run_id.clone(),
+        task_id: request.task_spec.task_id.clone(),
+        task_version: request.task_spec.task_version.clone(),
+        input_artifact_manifest_hash: input_manifest_hash.clone(),
+        run_config_hash: run_config_hash.clone(),
+        output_artifact_manifest_hash: output_manifest_hash.clone(),
+        terminal_state,
+        transcript,
+        tool_calls,
+        metrics,
+        extraction_receipt_refs: request.extraction_receipt_refs.clone(),
+        metadata: Metadata::new(),
+    };
+    let run_receipt = LegalBenchmarkRunReceipt {
+        schema_version: LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION,
+        run_id: run_id.clone(),
+        task_id: request.task_spec.task_id.clone(),
+        task_version: request.task_spec.task_version.clone(),
+        terminal_state,
+        task_spec_hash,
+        input_artifact_manifest_hash: input_manifest_hash,
+        run_config_hash,
+        output_artifact_manifest_hash: output_manifest_hash,
+        transcript_hash: transcript_digest(&run_record.transcript)?,
+        metrics_hash: stable_json_digest(
+            "psionic.legal_benchmark.run_metrics.v1",
+            &run_record.metrics,
+        )?,
+        tool_receipts_hash: stable_json_digest(
+            "psionic.legal_benchmark.tool_receipts.v1",
+            &tool_receipts,
+        )?,
+        run_record_hash: run_record_digest(&run_record)?,
+        output_artifact_count: u64::try_from(output_manifest.artifacts.len()).unwrap_or(u64::MAX),
+        tool_receipt_count: u64::try_from(tool_receipts.len()).unwrap_or(u64::MAX),
+        created_at_ms: now_ms(),
+        metadata: Metadata::new(),
+    };
+
+    write_run_artifacts(
+        &paths,
+        &request.run_config,
+        &run_record,
+        &output_manifest,
+        &request.extraction_receipt_refs,
+        &tool_receipts,
+        &run_receipt,
+    )?;
+
+    Ok(LegalBenchmarkAgentRunResult {
+        run_id,
+        terminal_state,
+        run_record,
+        output_artifact_manifest: output_manifest,
+        run_receipt,
+        tool_receipts,
+        paths,
+    })
+}
+
+pub fn legal_benchmark_system_prompt(request: &LegalBenchmarkAgentRunRequest) -> String {
+    let mut prompt = String::new();
+    prompt.push_str("You are running a legal benchmark task under Psionic control.\n");
+    prompt.push_str("Use only the listed tools and produce outputs intentionally.\n\n");
+    prompt.push_str("Tool policy:\n");
+    prompt.push_str(&format!(
+        "- allowed tools: {}\n",
+        request.run_config.tool_policy.allowed_tools.join(", ")
+    ));
+    prompt.push_str(&format!(
+        "- network allowed: {}\n",
+        request.run_config.tool_policy.network_allowed
+    ));
+    prompt.push_str(&format!(
+        "- source artifacts read-only: {}\n",
+        request.run_config.tool_policy.source_artifacts_read_only
+    ));
+    prompt.push_str(
+        "- submit by returning JSON: {\"action\":\"submit\",\"deliverables\":[\"path\"]}.\n\n",
+    );
+    prompt.push_str("Tool descriptions:\n");
+    for tool in crate::legal_benchmark_model_tool_specs() {
+        prompt.push_str(&format!("- {}: {}\n", tool.name, tool.description));
+    }
+    if !request.module_instructions.is_empty() {
+        prompt.push_str("\nModule instructions:\n");
+        for instruction in &request.module_instructions {
+            prompt.push_str("- ");
+            prompt.push_str(instruction);
+            prompt.push('\n');
+        }
+    }
+    prompt
+}
+
+pub fn legal_benchmark_user_prompt(request: &LegalBenchmarkAgentRunRequest) -> String {
+    let mut prompt = String::new();
+    prompt.push_str(&request.task_spec.instructions);
+    prompt.push_str("\n\nDeliverables:\n");
+    for deliverable in &request.task_spec.deliverables {
+        prompt.push_str(&format!(
+            "- {} at {}: {}\n",
+            deliverable.deliverable_id, deliverable.required_path, deliverable.description
+        ));
+    }
+    prompt.push_str("\nCriteria:\n");
+    for criterion in &request.task_spec.criteria {
+        prompt.push_str(&format!(
+            "- {}: {}\n",
+            criterion.criterion_id, criterion.description
+        ));
+    }
+    prompt
+}
+
+pub fn parse_submission(text: &str) -> Option<LegalBenchmarkSubmission> {
+    serde_json::from_str::<LegalBenchmarkSubmission>(text.trim()).ok()
+}
+
+fn is_submit_action(action: &str) -> bool {
+    matches!(action, "submit" | "finalize")
+}
+
+fn execute_model_tool_call(
+    tool_call: &ModelToolCall,
+    workspace: &LegalBenchmarkToolWorkspace,
+) -> Result<LegalBenchmarkToolExecution, String> {
+    let input: LegalBenchmarkToolInput = serde_json::from_value(json!({
+        "tool": tool_call.tool_name.clone(),
+        "input": tool_call.arguments.clone(),
+    }))
+    .map_err(|err| err.to_string())?;
+    Ok(execute_legal_benchmark_tool(workspace, input))
+}
+
+fn append_tool_execution(
+    transcript: &mut Vec<TranscriptEvent>,
+    tool_calls: &mut Vec<ToolCallRecord>,
+    tool_receipts: &mut Vec<LegalBenchmarkToolReceipt>,
+    provider_tool_call: &ModelToolCall,
+    mut execution: LegalBenchmarkToolExecution,
+) -> Result<ToolResultMessage, LegalBenchmarkAgentRunError> {
+    execution.receipt.tool_call_id = provider_tool_call.tool_call_id.clone();
+    execution.receipt.metadata.insert(
+        String::from("provider_tool_call_id"),
+        Value::String(provider_tool_call.tool_call_id.clone()),
+    );
+    execution.tool_call_record.tool_call_id = provider_tool_call.tool_call_id.clone();
+    execution.tool_call_record.call_event_index = next_event_index(transcript);
+    execution.tool_call_record.result_event_index = Some(next_event_index(transcript) + 1);
+    let output_value = execution
+        .output
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()?;
+    execution.tool_call_record.output = output_value.clone();
+    execution.tool_call_record.error_kind = execution
+        .receipt
+        .failure_kind
+        .map(|kind| format!("{kind:?}"));
+    push_transcript_event(
+        transcript,
+        TranscriptEventKind::ToolCall,
+        Some("assistant"),
+        None,
+        Some(json!({
+            "tool_call_id": provider_tool_call.tool_call_id.clone(),
+            "tool_name": provider_tool_call.tool_name.clone(),
+            "input": provider_tool_call.arguments.clone(),
+        })),
+    );
+    push_transcript_event(
+        transcript,
+        TranscriptEventKind::ToolResult,
+        Some("tool"),
+        None,
+        Some(json!({
+            "tool_call_id": provider_tool_call.tool_call_id.clone(),
+            "output": output_value,
+            "receipt": execution.receipt.clone(),
+        })),
+    );
+    let result_payload = json!({
+        "output": execution.output.clone(),
+        "failure_kind": execution.receipt.failure_kind,
+        "failure_detail": execution.receipt.failure_detail.clone(),
+        "receipt_ref": execution.receipt.tool_call_id,
+    });
+    let result_content = serde_json::to_string(&result_payload)?;
+    tool_calls.push(execution.tool_call_record);
+    tool_receipts.push(execution.receipt);
+    Ok(ToolResultMessage {
+        tool_call_id: provider_tool_call.tool_call_id.clone(),
+        tool_name: provider_tool_call.tool_name.clone(),
+        content: result_content,
+        is_error: tool_receipts
+            .last()
+            .and_then(|receipt| receipt.failure_kind)
+            .is_some(),
+        metadata: Metadata::new(),
+    })
+}
+
+fn push_model_response_event(transcript: &mut Vec<TranscriptEvent>, response: &ModelResponse) {
+    push_transcript_event(
+        transcript,
+        TranscriptEventKind::Assistant,
+        Some("assistant"),
+        response.final_text.clone(),
+        Some(json!({
+            "response_id": response.response_id.clone(),
+            "route_id": response.route_id.clone(),
+            "model_id": response.model_id.clone(),
+            "stop_reason": response.stop_reason,
+            "tool_calls": response.tool_calls.clone(),
+            "usage": response.usage.clone(),
+            "elapsed_ms": response.elapsed_ms,
+            "retry_count": response.retry_count,
+            "raw_response_hash": response.raw_response_hash.clone(),
+        })),
+    );
+}
+
+fn push_transcript_event(
+    transcript: &mut Vec<TranscriptEvent>,
+    kind: TranscriptEventKind,
+    role: Option<&str>,
+    content: Option<String>,
+    payload: Option<Value>,
+) {
+    transcript.push(TranscriptEvent {
+        event_index: next_event_index(transcript),
+        event_kind: kind,
+        role: role.map(ToOwned::to_owned),
+        content,
+        payload,
+        timestamp_ms: now_ms(),
+    });
+}
+
+fn next_event_index(transcript: &[TranscriptEvent]) -> u64 {
+    u64::try_from(transcript.len()).unwrap_or(u64::MAX)
+}
+
+fn apply_model_metrics(metrics: &mut RunMetrics, response: &ModelResponse) {
+    metrics.model_turns = metrics.model_turns.saturating_add(1);
+    metrics.input_tokens = metrics
+        .input_tokens
+        .saturating_add(response.usage.input_tokens);
+    metrics.output_tokens = metrics
+        .output_tokens
+        .saturating_add(response.usage.output_tokens);
+    metrics.estimated_cost_micro_usd = metrics
+        .estimated_cost_micro_usd
+        .saturating_add(response.usage.estimated_cost_micro_usd);
+}
+
+fn provider_terminal_state(kind: ModelAdapterFailureKind) -> RunTerminalState {
+    match kind {
+        ModelAdapterFailureKind::ContextOverflow => RunTerminalState::ContextOverflow,
+        ModelAdapterFailureKind::SafetyRefusal => RunTerminalState::PolicyFailure,
+        _ => RunTerminalState::ProviderFailure,
+    }
+}
+
+fn collect_output_artifacts(
+    root: &Path,
+) -> Result<Vec<SourceArtifact>, LegalBenchmarkAgentRunError> {
+    let mut files = Vec::new();
+    collect_files(root, root, &mut files)?;
+    files.sort();
+    let mut artifacts = Vec::new();
+    for (index, file) in files.iter().enumerate() {
+        artifacts.push(artifact_from_file(
+            format!("artifact.output.{index}"),
+            ArtifactKind::GeneratedDeliverable,
+            root,
+            file,
+            DataClassification::BenchmarkConfidential,
+            Some(String::from("legal_benchmark_agent_run")),
+        )?);
+    }
+    Ok(artifacts)
+}
+
+fn collect_files(
+    root: &Path,
+    path: &Path,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), LegalBenchmarkAgentRunError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(path).map_err(|source| LegalBenchmarkAgentRunError::Io {
+        path: path.to_path_buf(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| LegalBenchmarkAgentRunError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        let entry_path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|source| LegalBenchmarkAgentRunError::Io {
+                path: entry_path.clone(),
+                source,
+            })?;
+        if file_type.is_dir() {
+            collect_files(root, &entry_path, files)?;
+        } else if file_type.is_file() && entry_path.strip_prefix(root).is_ok() {
+            files.push(entry_path);
+        }
+    }
+    Ok(())
+}
+
+fn write_run_artifacts(
+    paths: &LegalBenchmarkRunArtifactPaths,
+    run_config: &RunConfig,
+    run_record: &RunRecord,
+    output_manifest: &ArtifactManifest,
+    extraction_receipt_refs: &[String],
+    tool_receipts: &[LegalBenchmarkToolReceipt],
+    run_receipt: &LegalBenchmarkRunReceipt,
+) -> Result<(), LegalBenchmarkAgentRunError> {
+    fs::create_dir_all(&paths.run_root).map_err(|source| LegalBenchmarkAgentRunError::Io {
+        path: paths.run_root.clone(),
+        source,
+    })?;
+    write_json(&paths.config_json, run_config)?;
+    write_transcript_jsonl(&paths.transcript_jsonl, &run_record.transcript)?;
+    write_json(&paths.metrics_json, &run_record.metrics)?;
+    write_json(&paths.output_artifact_manifest_json, output_manifest)?;
+    write_json(&paths.extraction_receipts_json, &extraction_receipt_refs)?;
+    write_json(&paths.tool_receipts_json, &tool_receipts)?;
+    write_json(&paths.run_record_json, run_record)?;
+    write_json(&paths.run_receipt_json, run_receipt)?;
+    Ok(())
+}
+
+fn write_json<T>(path: &Path, value: &T) -> Result<(), LegalBenchmarkAgentRunError>
+where
+    T: Serialize,
+{
+    let bytes = serde_json::to_vec_pretty(value)?;
+    fs::write(path, bytes).map_err(|source| LegalBenchmarkAgentRunError::Io {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn write_transcript_jsonl(
+    path: &Path,
+    transcript: &[TranscriptEvent],
+) -> Result<(), LegalBenchmarkAgentRunError> {
+    let mut file = fs::File::create(path).map_err(|source| LegalBenchmarkAgentRunError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    for event in transcript {
+        serde_json::to_writer(&mut file, event)?;
+        file.write_all(b"\n")
+            .map_err(|source| LegalBenchmarkAgentRunError::Io {
+                path: path.to_path_buf(),
+                source,
+            })?;
+    }
+    Ok(())
+}
+
+fn run_artifact_paths(run_root: &Path) -> LegalBenchmarkRunArtifactPaths {
+    LegalBenchmarkRunArtifactPaths {
+        run_root: run_root.to_path_buf(),
+        config_json: run_root.join("config.json"),
+        transcript_jsonl: run_root.join("transcript.jsonl"),
+        metrics_json: run_root.join("metrics.json"),
+        output_artifact_manifest_json: run_root.join("output_artifact_manifest.json"),
+        extraction_receipts_json: run_root.join("extraction_receipts.json"),
+        tool_receipts_json: run_root.join("tool_receipts.json"),
+        run_record_json: run_root.join("run_record.json"),
+        run_receipt_json: run_root.join("run_receipt.json"),
+    }
+}
+
+fn legal_benchmark_run_id(
+    task_spec: &BenchmarkTaskSpec,
+    run_config_hash: &str,
+    nonce: Option<&str>,
+) -> String {
+    let nonce = nonce
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| now_ms().to_string());
+    let hash_prefix = run_config_hash.get(..12).unwrap_or(run_config_hash);
+    format!(
+        "run.{}.{}.{}",
+        stable_id_part(&task_spec.task_id),
+        hash_prefix,
+        stable_id_part(&nonce)
+    )
+}
+
+fn stable_id_part(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '.'
+            }
+        })
+        .collect()
+}
+
+fn elapsed_ms(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn now_ms() -> u64 {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(duration) => u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
+        Err(_) => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        ArtifactManifestRole, CriterionKind, DeliverableKind, JudgeMode, JudgePolicy,
+        MockModelAdapter, ModelProviderRoute, ModelUsage, ToolPolicy,
+        build_input_artifact_manifest,
+    };
+
+    fn task_spec() -> BenchmarkTaskSpec {
+        BenchmarkTaskSpec {
+            schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
+            task_id: String::from("legal.mock_agent"),
+            task_version: String::from("v1"),
+            domain: String::from("legal"),
+            practice_area: String::from("contracts"),
+            workflow: String::from("draft"),
+            title: String::from("Draft memo"),
+            instructions: String::from("Read the case file and draft a short memo."),
+            work_type: String::from("drafting"),
+            tags: vec![String::from("mock")],
+            source_artifacts: Vec::new(),
+            deliverables: vec![crate::DeliverableSpec {
+                deliverable_id: String::from("memo"),
+                deliverable_kind: DeliverableKind::Markdown,
+                required_path: String::from("memo.md"),
+                description: String::from("Short legal memo"),
+                required: true,
+            }],
+            criteria: vec![crate::CriterionSpec {
+                criterion_id: String::from("criterion.memo.exists"),
+                criterion_kind: CriterionKind::DeliverableValidation,
+                description: String::from("The memo exists."),
+                weight_bps: Some(10_000),
+                deliverable_ids: vec![String::from("memo")],
+                source_artifact_ids: Vec::new(),
+            }],
+            judge_policy: JudgePolicy {
+                mode: JudgeMode::Deterministic,
+                provider: String::from("mock"),
+                model: String::from("mock-judge"),
+                prompt_template_id: String::from("judge.mock"),
+                prompt_template_hash: String::from("hash.judge.mock"),
+                all_pass_required: true,
+                sample_count: 1,
+            },
+            tool_policy: ToolPolicy {
+                allowed_tools: vec![String::from("write")],
+                network_allowed: false,
+                source_artifacts_read_only: true,
+                max_turns: 4,
+                max_wall_time_seconds: 60,
+            },
+            source_compatibility: None,
+            metadata: Metadata::new(),
+        }
+    }
+
+    fn run_config(task: &BenchmarkTaskSpec) -> RunConfig {
+        RunConfig {
+            schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
+            run_config_id: String::from("run_config.mock_agent"),
+            provider: String::from("mock"),
+            model: String::from("deterministic-legal-mock"),
+            agent_protocol_version: String::from("legal-agent-loop.v1"),
+            tool_policy: task.tool_policy.clone(),
+            judge_policy: task.judge_policy.clone(),
+            random_seed: Some(7),
+            metadata: Metadata::new(),
+        }
+    }
+
+    fn response_with_tool_call(route: &ModelProviderRoute) -> ModelResponse {
+        ModelResponse {
+            schema_version: crate::LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
+            response_id: String::from("mock.response.tool"),
+            request_id: String::from("model_request"),
+            route_id: route.route_id.clone(),
+            provider_family: route.family,
+            model_id: route.model_id.clone(),
+            model_config_hash: String::from("mock-config"),
+            secret_reference_id: None,
+            final_text: None,
+            tool_calls: vec![ModelToolCall {
+                tool_call_id: String::from("call.write.memo"),
+                tool_name: String::from("write"),
+                arguments: json!({
+                    "root": "output",
+                    "relative_path": "memo.md",
+                    "content": "# Memo\n\nContract risk is low.\n",
+                    "overwrite": true
+                }),
+            }],
+            stop_reason: ModelStopReason::ToolCalls,
+            usage: ModelUsage {
+                input_tokens: 12,
+                output_tokens: 8,
+                total_tokens: 20,
+                cached_input_tokens: 0,
+                estimated_cost_micro_usd: 0,
+            },
+            elapsed_ms: 5,
+            retry_count: 0,
+            raw_response_hash: String::from("mock-raw-tool"),
+            created_at_ms: 1,
+            metadata: Metadata::new(),
+        }
+    }
+
+    fn response_submit(route: &ModelProviderRoute) -> ModelResponse {
+        ModelResponse {
+            schema_version: crate::LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
+            response_id: String::from("mock.response.submit"),
+            request_id: String::from("model_request"),
+            route_id: route.route_id.clone(),
+            provider_family: route.family,
+            model_id: route.model_id.clone(),
+            model_config_hash: String::from("mock-config"),
+            secret_reference_id: None,
+            final_text: Some(String::from(
+                "{\"action\":\"submit\",\"deliverables\":[\"memo.md\"]}",
+            )),
+            tool_calls: Vec::new(),
+            stop_reason: ModelStopReason::Stop,
+            usage: ModelUsage {
+                input_tokens: 6,
+                output_tokens: 3,
+                total_tokens: 9,
+                cached_input_tokens: 0,
+                estimated_cost_micro_usd: 0,
+            },
+            elapsed_ms: 3,
+            retry_count: 0,
+            raw_response_hash: String::from("mock-raw-submit"),
+            created_at_ms: 2,
+            metadata: Metadata::new(),
+        }
+    }
+
+    #[test]
+    fn mock_agent_run_writes_outputs_and_run_artifacts() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+
+        let task = task_spec();
+        let input_manifest = build_input_artifact_manifest(&task);
+        assert_eq!(input_manifest.manifest_role, ArtifactManifestRole::Input);
+        let config = run_config(&task);
+        let route = ModelProviderRoute::mock("mock.agent", "deterministic-legal-mock");
+        let mut adapter = MockModelAdapter::new(
+            route.clone(),
+            vec![
+                Ok(response_with_tool_call(&route)),
+                Ok(response_submit(&route)),
+            ],
+        );
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: vec![String::from("Keep the memo short.")],
+            extraction_receipt_refs: vec![String::from("extract.mock.1")],
+            run_nonce: Some(String::from("attempt.1")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+
+        assert_eq!(result.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(result.run_record.metrics.model_turns, 2);
+        assert_eq!(result.run_record.metrics.tool_call_count, 1);
+        assert_eq!(result.output_artifact_manifest.artifacts.len(), 1);
+        assert_eq!(
+            fs::read_to_string(output_root.join("memo.md")).expect("memo"),
+            "# Memo\n\nContract risk is low.\n"
+        );
+        assert!(result.paths.config_json.exists());
+        assert!(result.paths.transcript_jsonl.exists());
+        assert!(result.paths.metrics_json.exists());
+        assert!(result.paths.output_artifact_manifest_json.exists());
+        assert!(result.paths.tool_receipts_json.exists());
+        assert!(result.paths.run_record_json.exists());
+        assert!(result.paths.run_receipt_json.exists());
+
+        let decoded: RunRecord = serde_json::from_slice(
+            &fs::read(&result.paths.run_record_json).expect("run record bytes"),
+        )
+        .expect("run record json");
+        assert_eq!(decoded.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(decoded.extraction_receipt_refs, vec!["extract.mock.1"]);
+    }
+
+    #[test]
+    fn no_tool_calls_without_submit_is_terminal() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+        let task = task_spec();
+        let input_manifest = build_input_artifact_manifest(&task);
+        let config = run_config(&task);
+        let route = ModelProviderRoute::mock("mock.no_tools", "deterministic-legal-mock");
+        let mut response = response_submit(&route);
+        response.final_text = Some(String::from("I am done."));
+        let mut adapter = MockModelAdapter::new(route, vec![Ok(response)]);
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("attempt.2")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+        assert_eq!(result.terminal_state, RunTerminalState::NoToolCalls);
+        assert_eq!(result.run_record.metrics.model_turns, 1);
+    }
+}
