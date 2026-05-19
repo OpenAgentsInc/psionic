@@ -489,6 +489,15 @@ pub fn legal_benchmark_user_prompt(request: &LegalBenchmarkAgentRunRequest) -> S
             ));
         }
     }
+    let issue_checklist = legal_issue_checklist(&request.task_spec);
+    if !issue_checklist.is_empty() {
+        prompt.push_str("\n\nPractice-area issue checklist:\n");
+        for item in issue_checklist {
+            prompt.push_str("- ");
+            prompt.push_str(&item);
+            prompt.push('\n');
+        }
+    }
     prompt.push_str("\n\nDeliverables:\n");
     for deliverable in &request.task_spec.deliverables {
         prompt.push_str(&format!(
@@ -512,6 +521,148 @@ pub fn parse_submission(text: &str) -> Option<LegalBenchmarkSubmission> {
 
 fn is_submit_action(action: &str) -> bool {
     matches!(action, "submit" | "finalize")
+}
+
+fn legal_issue_checklist(task_spec: &BenchmarkTaskSpec) -> Vec<String> {
+    let mut checklist = Vec::new();
+    push_unique(
+        &mut checklist,
+        "Identify parties, dates, governing documents, requested output, and assumptions.",
+    );
+    push_unique(
+        &mut checklist,
+        "Separate document-backed facts from legal conclusions and cite each material fact.",
+    );
+    push_unique(
+        &mut checklist,
+        "Track ambiguities, missing documents, and conflicts between source materials.",
+    );
+
+    let normalized = normalized_task_terms(task_spec);
+    if normalized.contains("review")
+        || normalized.contains("analyze")
+        || normalized.contains("compare")
+        || normalized.contains("issue")
+    {
+        push_unique(
+            &mut checklist,
+            "Compare draft terms against instructions, term sheets, prior versions, and controlling source documents.",
+        );
+    }
+    if normalized.contains("draft") {
+        push_unique(
+            &mut checklist,
+            "Mirror defined terms, party names, dates, cross-references, exhibits, and governing-law style from source documents.",
+        );
+    }
+
+    if normalized.contains("emerging")
+        || normalized.contains("venture")
+        || normalized.contains("startup")
+        || normalized.contains("stock")
+        || normalized.contains("financing")
+    {
+        push_unique(
+            &mut checklist,
+            "Check economics, conversion, liquidation, pro rata rights, voting/protective provisions, and approvals.",
+        );
+        push_unique(
+            &mut checklist,
+            "Check registration, information, transfer, ROFR/co-sale, board, stockholder, and securities-law issues.",
+        );
+    } else if normalized.contains("contract") || normalized.contains("commercial") {
+        push_unique(
+            &mut checklist,
+            "Check obligations, conditions, deadlines, termination, remedies, assignment, confidentiality, warranties, and indemnities.",
+        );
+        push_unique(
+            &mut checklist,
+            "Check governing law, dispute resolution, notice mechanics, attachments, and inconsistent defined terms.",
+        );
+    } else if normalized.contains("employment") || normalized.contains("labor") {
+        push_unique(
+            &mut checklist,
+            "Check classification, compensation, equity, termination, restrictive covenants, wage/hour, leave, and accommodations.",
+        );
+        push_unique(
+            &mut checklist,
+            "Check confidentiality, invention assignment, non-solicit, non-compete, and state-law enforceability limits.",
+        );
+    } else if normalized.contains("privacy")
+        || normalized.contains("cyber")
+        || normalized.contains("data")
+    {
+        push_unique(
+            &mut checklist,
+            "Check data categories, controller/processor roles, consent, retention, security, cross-border transfer, and breach notice.",
+        );
+        push_unique(
+            &mut checklist,
+            "Check vendor, subprocessor, regulator, consumer-rights, and data-processing-agreement obligations.",
+        );
+    } else if normalized.contains("intellectual")
+        || normalized.contains("ip")
+        || normalized.contains("patent")
+        || normalized.contains("copyright")
+        || normalized.contains("trademark")
+    {
+        push_unique(
+            &mut checklist,
+            "Check ownership, license scope, prosecution, infringement, open-source use, confidentiality, assignments, and royalties.",
+        );
+    } else if normalized.contains("litigation")
+        || normalized.contains("dispute")
+        || normalized.contains("court")
+    {
+        push_unique(
+            &mut checklist,
+            "Check procedural posture, jurisdiction, claims, elements, burdens, evidence, deadlines, defenses, and remedies.",
+        );
+    } else if normalized.contains("real estate") || normalized.contains("lease") {
+        push_unique(
+            &mut checklist,
+            "Check property description, title, diligence, covenants, closing, leases, zoning, environmental, and default remedies.",
+        );
+    } else if normalized.contains("finance")
+        || normalized.contains("banking")
+        || normalized.contains("credit")
+        || normalized.contains("loan")
+    {
+        push_unique(
+            &mut checklist,
+            "Check debt economics, collateral, guarantees, covenants, defaults, intercreditor terms, usury, and regulatory limits.",
+        );
+    } else if normalized.contains("tax") {
+        push_unique(
+            &mut checklist,
+            "Check taxpayer, transaction steps, characterization, timing, basis, withholding, reporting, and authority level.",
+        );
+    } else {
+        push_unique(
+            &mut checklist,
+            "Apply the practice-area standard issue-spotting checklist before drafting the final deliverable.",
+        );
+    }
+
+    checklist.truncate(8);
+    checklist
+}
+
+fn push_unique(checklist: &mut Vec<String>, item: &str) {
+    if !checklist.iter().any(|existing| existing == item) {
+        checklist.push(item.to_string());
+    }
+}
+
+fn normalized_task_terms(task_spec: &BenchmarkTaskSpec) -> String {
+    let mut terms = vec![
+        task_spec.practice_area.as_str(),
+        task_spec.workflow.as_str(),
+        task_spec.work_type.as_str(),
+        task_spec.title.as_str(),
+    ];
+    terms.extend(task_spec.tags.iter().map(String::as_str));
+    terms.join(" ").to_ascii_lowercase().replace('_', " ")
 }
 
 fn pre_submit_protocol_report(
@@ -1535,6 +1686,8 @@ mod tests {
             .find(|event| event.event_kind == TranscriptEventKind::User)
             .and_then(|event| event.content.as_deref())
             .expect("user prompt");
+        assert!(user_prompt.contains("Practice-area issue checklist"));
+        assert!(user_prompt.contains("obligations, conditions, deadlines"));
         assert!(!user_prompt.contains("The memo exists."));
     }
 

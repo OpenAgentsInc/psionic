@@ -112,6 +112,12 @@ The Psionic agent prompt now renders that operating protocol only for tools
 enabled by the run's `ToolPolicy`, so a dry-run or restricted profile is not
 told to call unavailable tools.
 
+The user prompt also renders a short practice-area issue checklist derived
+only from non-hidden task metadata: practice area, workflow, work type, title,
+and tags. It avoids Harvey `match_criteria` text while giving the model a
+stable checklist for common contracts, venture-financing, employment, privacy,
+IP, litigation, real estate, finance, and tax issue families.
+
 ## Pre-Submit Enforcement
 
 The agent loop now treats the protocol as an enforceable guard for source-backed

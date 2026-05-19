@@ -189,7 +189,10 @@ before accepting source-backed submissions: inventory, per-source inspection,
 evidence-table rows, deliverable validation, and a final self-check must be
 present while tools and turns allow them. This closes the most avoidable
 document coverage, citation evidence, and validation gaps before Qwen or
-blueprint hill-climb runs reach the Harvey judge.
+blueprint hill-climb runs reach the Harvey judge. The same prompt path now
+adds a compact practice-area issue checklist from public task metadata so
+adapter SFT traces and blueprint module selection can reinforce legal
+issue-spotting without leaking hidden Harvey criteria.
 
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in
