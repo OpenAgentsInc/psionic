@@ -172,7 +172,13 @@ in `docs/QWEN_LEGAL_FINETUNE_LANE.md`. The lane admits
 `qwen_legal_adapter_sft_v1` through the machine-runtime contract as a CUDA
 adapter-training smoke, binds #1018 legal training records, exports a typed
 LM-head LoRA artifact and exact checkpoint, and emits score-import metadata
-for Autopilot4 without claiming a retained Harvey score improvement.
+for Autopilot4 without claiming a retained Harvey score improvement. The same
+run now also emits a typed RL hillclimb plan that points Pylon/Nexus at
+`Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
+the Blueprint optimizer frontier, and assigns document coverage, citation
+evidence, legal reasoning, spreadsheet reasoning, missing facts, and
+pre-submit self-check failures across GRPO, GEPA trace selection, MIPRO prompt
+search, and supervised fine-tune refresh work.
 The paired serving/eval metadata path is in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
 compare base and tuned Qwen candidates through one OpenAI-compatible route

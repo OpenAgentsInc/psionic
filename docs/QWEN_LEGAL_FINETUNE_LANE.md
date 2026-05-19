@@ -67,6 +67,7 @@ The run emits:
 - adapter identity digest
 - final checkpoint id
 - score-import bundle digest
+- RL hillclimb plan digest
 
 ## Artifact Gate
 
@@ -94,7 +95,42 @@ cargo test -p psionic-train qwen_legal_adapter
 
 The test fixture runs a four-step deterministic adapter update, exports a
 loadable LM-head LoRA artifact, saves a checkpoint, restores from a midpoint
-checkpoint, and emits an Autopilot4 score-import bundle.
+checkpoint, emits an Autopilot4 score-import bundle, and materializes the
+next-phase RL hillclimb plan.
+
+## RL Hillclimb Plan
+
+The smoke lane now emits
+`QwenLegalRlHillclimbPlan` with schema
+`psionic.qwen_legal_rl_hillclimb_plan.v1`. This does not claim a retained
+Harvey score, but it gives Pylon/Nexus a concrete plan for the next phase:
+
+- retain `Qwen/Qwen3.5-4B` as the smallest smoke lane while targeting
+  `Qwen/Qwen3.6-35B-A3B` for retained scoring
+- require a retained 20-task Harvey slice before any public retained-score
+  claim
+- collect at least 60 accepted legal-agent rollouts with no more than 12
+  quarantined rollouts in the window
+- connect the run to
+  `blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001`
+- assign failure families to GRPO, GEPA trace selection, MIPRO prompt search,
+  and supervised fine-tune refresh work
+
+The current target families are:
+
+| Failure family | Method | Blueprint module |
+| --- | --- | --- |
+| `document_coverage` | MIPRO prompt search | `harvey_legal.document_inventory` |
+| `citation_evidence` | GEPA trace selection | `harvey_legal.evidence_mapping` |
+| `legal_reasoning` | GRPO | `harvey_legal.issue_fact_extraction` |
+| `spreadsheet_reasoning` | GRPO | `harvey_legal.evidence_mapping` |
+| `missing_fact` | supervised fine-tune refresh | `harvey_legal.issue_fact_extraction` |
+| `pre_submit_self_check` | GEPA trace selection | `harvey_legal.final_self_check` |
+
+Each target carries a reward signal, baseline miss value, target lift value,
+and dataset request ref. Operators should treat the plan as a routing and
+admission contract for Pylon work, not as proof that RL training has already
+improved the retained score.
 
 ## Runtime Admission
 
