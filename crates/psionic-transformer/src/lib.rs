@@ -3,6 +3,7 @@
 mod attention;
 mod blocks;
 mod encoder_decoder;
+mod qwen36_loss_masks;
 mod tassadar_post_article_canonical_computational_model_contract;
 mod tassadar_post_article_anti_drift_stability_closeout_contract;
 mod tassadar_post_article_canonical_machine_closure_bundle_contract;
@@ -21,6 +22,7 @@ use thiserror::Error;
 pub use attention::*;
 pub use blocks::*;
 pub use encoder_decoder::*;
+pub use qwen36_loss_masks::*;
 pub use psionic_nn::{ActivationKind, LayerError, LayerNorm, Linear};
 pub use tassadar_post_article_canonical_computational_model_contract::*;
 pub use tassadar_post_article_anti_drift_stability_closeout_contract::*;

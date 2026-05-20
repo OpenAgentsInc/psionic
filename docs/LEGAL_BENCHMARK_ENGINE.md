@@ -159,6 +159,27 @@ cargo run -p psionic-data --example legal_benchmark_build_sft_dataset -- \
   --manifest ./datasets/legal-sft-v1.manifest.json
 ```
 
+Qwen3.6 prompt handling is Rust-native. `crates/psionic-models/src/qwen36.rs`
+renders Qwen3.6 chat prompts in explicit `Thinking`, `DirectAnswer`, and
+`MixedExplicit` modes without using `/think` or `/nothink` soft-switch tokens.
+The renderer supports tokenizer JSON loading through the Rust `tokenizers`
+crate, tool-response transcript rendering, optional empty think-block emission
+for direct-answer generation prompts, deterministic prompt hashes, and a small
+`Qwen36PromptReceipt` that can be embedded in later run receipts.
+`crates/psionic-transformer/src/qwen36_loss_masks.rs` owns the matching loss
+mask contract: system, user, and tool spans are ignored under assistant-only
+loss, and empty think blocks can be ignored explicitly.
+The SFT dataset example schema now also carries `reasoning_mode`, so legal
+examples can declare `direct_answer` or a later thinking-mode value without
+using hidden prompt switches.
+
+Use:
+
+```bash
+cargo test -p psionic-models qwen36_template
+cargo test -p psionic-transformer qwen36_loss_masks
+```
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

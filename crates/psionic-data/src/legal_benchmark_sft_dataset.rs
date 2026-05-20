@@ -31,6 +31,7 @@ pub struct LegalSftDatasetExample {
     pub example_id: String,
     pub source_run_ids: Vec<String>,
     pub visibility: String,
+    pub reasoning_mode: String,
     pub base_task_id: String,
     pub messages: Vec<LegalSftMessage>,
     pub tool_trace: Vec<Value>,
@@ -218,6 +219,7 @@ fn process_good_run_receipt(
             example_id: format!("{run_id}.golden_workflow"),
             source_run_ids: vec![run_id.to_string()],
             visibility: training_visibility(visibility),
+            reasoning_mode: String::from("direct_answer"),
             base_task_id: task_id.to_string(),
             messages: vec![
                 system_message(),
@@ -245,6 +247,7 @@ fn process_good_run_receipt(
             example_id: format!("{run_id}.source_grounded_answer"),
             source_run_ids: vec![run_id.to_string()],
             visibility: training_visibility(visibility),
+            reasoning_mode: String::from("direct_answer"),
             base_task_id: task_id.to_string(),
             messages: vec![
                 system_message(),
@@ -272,6 +275,7 @@ fn process_good_run_receipt(
             example_id: format!("{run_id}.tool_discipline"),
             source_run_ids: vec![run_id.to_string()],
             visibility: training_visibility(visibility),
+            reasoning_mode: String::from("direct_answer"),
             base_task_id: task_id.to_string(),
             messages: vec![
                 system_message(),
@@ -302,6 +306,7 @@ fn process_good_run_receipt(
                 example_id: format!("{run_id}.minimal_answer"),
                 source_run_ids: vec![run_id.to_string()],
                 visibility: training_visibility(visibility),
+                reasoning_mode: String::from("direct_answer"),
                 base_task_id: task_id.to_string(),
                 messages: vec![
                     system_message(),
@@ -379,6 +384,7 @@ fn process_bad_run(
             example_id: format!("{run_id}.failure_correction"),
             source_run_ids: vec![run_id.to_string()],
             visibility: String::from("public_training"),
+            reasoning_mode: String::from("direct_answer"),
             base_task_id: string_at(value, "base_task_id")
                 .unwrap_or("unknown_task")
                 .to_string(),
