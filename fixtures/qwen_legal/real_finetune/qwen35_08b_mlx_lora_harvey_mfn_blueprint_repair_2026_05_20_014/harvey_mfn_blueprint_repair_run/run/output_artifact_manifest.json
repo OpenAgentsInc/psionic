@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest.output.harvey.funds-asset-management.analyze_mfn_waterfall.5aa41694.run.harvey.funds-asset-management.analyze_mfn_waterfall.7fba04f8472c.qwen35-08b-mlx-lora-harvey-mfn-blueprint-repair-2026-05-20",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "task_version": "5aa41694",
+  "manifest_role": "output",
+  "artifacts": []
+}

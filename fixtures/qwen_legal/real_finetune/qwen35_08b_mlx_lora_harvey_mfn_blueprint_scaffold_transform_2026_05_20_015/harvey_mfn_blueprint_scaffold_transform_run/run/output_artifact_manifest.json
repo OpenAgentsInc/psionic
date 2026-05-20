@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest.output.harvey.funds-asset-management.analyze_mfn_waterfall.5aa41694.run.harvey.funds-asset-management.analyze_mfn_waterfall.65f01a6e093b.qwen35-08b-mlx-lora-harvey-mfn-blueprint-scaffold-transform-2026-05-20",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "task_version": "5aa41694",
+  "manifest_role": "output",
+  "artifacts": [
+    {
+      "artifact_id": "artifact.output.0",
+      "artifact_kind": "generated_deliverable",
+      "relative_path": "output.md",
+      "original_filename": "output.md",
+      "media_type": "text/markdown",
+      "byte_size": 9868,
+      "sha256": "1251fefa77db9a9f65535b27301295e975b7fbf9c432f459829f15497208af12",
+      "data_classification": "benchmark_confidential",
+      "provenance": "legal_benchmark_agent_run"
+    }
+  ]
+}

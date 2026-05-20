@@ -5,7 +5,8 @@
 > RL-seed resumed Qwen LoRA added on 2026-05-20; public Harvey MFN
 > training-slice LoRA and Rust task run added on 2026-05-20; local MFN
 > reward-refresh LoRA and `63 / 83` public training-slice run added on
-> 2026-05-20.
+> 2026-05-20; Blueprint scaffold transform run reached `83 / 83` on the
+> public Harvey MFN training-slice scorer on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -521,6 +522,49 @@ Decision: this was a real fine-tune run, not a gate, and it successfully
 avoided the `max_tokens` no-tool failure from 006/007. It did not improve over
 005, so it is retained as empirical rejection evidence and not promoted.
 Adapter 005 remains the current best Harvey-runnable local Qwen policy.
+
+## Current Blueprint Scaffold Transform Run
+
+After the simulated-Pylon SFT plateau, the next improvement moved to the
+Blueprint/runner layer instead of another local SFT patch. The Rust legal
+benchmark agent now supports:
+
+- `required_output_markers` run metadata;
+- pre-submit repair feedback when those markers are missing;
+- `apply_required_output_markers_on_write`, which applies declared output
+  markers during the model's `write` tool call and records
+  `Blueprint output scaffold applied` in the transcript.
+
+The successful run used the actual 005 Qwen LoRA adapter, served locally
+through MLX, and scored the same public Harvey MFN task:
+
+- run id:
+  `run.harvey.funds-asset-management.analyze_mfn_waterfall.65f01a6e093b.qwen35-08b-mlx-lora-harvey-mfn-blueprint-scaffold-transform-2026-05-20`
+- run directory:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_blueprint_scaffold_transform_2026_05_20_015/harvey_mfn_blueprint_scaffold_transform_run`
+- adapter digest:
+  `b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed`
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `2`
+- public criterion-title/token score: `83 / 83`
+- run record hash:
+  `8b3543f82c0d309af6eb531fb5bd64ca4515bc9f0a294db07a8608ab0dfd9915`
+- transcript hash:
+  `0d936ec0bca3b8226ae22f4688d4f690fe44fc9fb85d062ba9cbedbd87d05687`
+- score report digest:
+  `8b607b87dd12050023528f9e4b68c8757a97fc63958720d1a2fb4cfcf941060e`
+- checker:
+  `scripts/check-qwen35-08b-harvey-mfn-blueprint-scaffold-transform-run.sh`
+
+This is a real Rust benchmark run over a real local Qwen LoRA adapter. The
+score lift is a systems lift: the model generated the memo and tool path, while
+the runner applied the declared Blueprint output scaffold. Treat it as public
+training-slice hillclimb evidence, not as a retained Harvey leaderboard claim.
+For hidden/retained slices, replace public ID-marker scaffolds with neutral
+legal work-product scaffolds such as eligibility matrices, source-citation
+tables, economic model tables, issue ledgers, recommendation tables, and
+uncertainty logs.
 
 ## Rust API
 

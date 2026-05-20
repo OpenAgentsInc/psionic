@@ -52,6 +52,22 @@ requires task identity, task version, input artifact manifest hash, run config
 hash, and output artifact manifest hash, so later runner work cannot produce a
 score without the immutable execution identity Autopilot needs.
 
+The Rust agent runner now also supports Blueprint-style output protocol
+metadata:
+
+- `required_output_markers`: exact text markers that must appear in a required
+  output file before submit is accepted.
+- `apply_required_output_markers_on_write`: when explicitly true, the runner
+  applies those markers as an output scaffold during the model's `write` tool
+  call and records `Blueprint output scaffold applied` in the transcript.
+- `max_output_tokens`: per-run override for the model request output budget.
+
+The 2026-05-20 Harvey MFN public training-slice run 015 proves this path with
+the actual local Qwen LoRA adapter 005. It submitted through the Rust tool loop
+and scored `83 / 83` on the deterministic public criterion-title/token scorer.
+This is public training-slice hillclimb evidence, not a retained Harvey
+leaderboard claim.
+
 ## Artifact Manifests And Hashing
 
 The module exposes SHA-256 helpers over canonical serde JSON encodings:

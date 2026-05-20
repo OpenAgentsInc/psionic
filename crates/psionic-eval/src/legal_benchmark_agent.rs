@@ -27,6 +27,9 @@ use crate::{
 };
 
 pub const LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION: u16 = 1;
+const REQUIRED_OUTPUT_MARKERS_METADATA_KEY: &str = "required_output_markers";
+const APPLY_REQUIRED_OUTPUT_MARKERS_ON_WRITE_METADATA_KEY: &str =
+    "apply_required_output_markers_on_write";
 
 #[derive(Clone, Debug)]
 pub struct LegalBenchmarkAgentRunRequest {
@@ -98,6 +101,18 @@ pub struct LegalBenchmarkSubmission {
 struct PreSubmitProtocolReport {
     satisfied: bool,
     missing_steps: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RequiredOutputMarker {
+    path: String,
+    label: String,
+    marker: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct OutputMarkerPrefixReport {
+    applied_labels: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -182,6 +197,7 @@ where
             format!("model_request.{run_id}.{turn_index}"),
             messages.clone(),
             &effective_allowed_tools,
+            &request.run_config.metadata,
         );
         let response = match adapter.complete(&model_request) {
             Ok(response) => response,
@@ -314,18 +330,32 @@ where
                 messages.push(ModelMessage::new(ModelMessageRole::User, feedback));
                 break;
             }
-            let execution =
-                execute_model_tool_call(tool_call, &request.tool_workspace).map_err(|detail| {
-                    LegalBenchmarkAgentRunError::ToolInput {
-                        tool_call_id: tool_call.tool_call_id.clone(),
-                        detail,
-                    }
+            let mut executable_tool_call = tool_call.clone();
+            let prefix_report =
+                apply_required_output_markers_on_write(&mut executable_tool_call, &request);
+            if !prefix_report.applied_labels.is_empty() {
+                push_transcript_event(
+                    &mut transcript,
+                    TranscriptEventKind::Runner,
+                    Some("runner"),
+                    Some(String::from("Blueprint output scaffold applied")),
+                    Some(json!({
+                        "tool_call_id": executable_tool_call.tool_call_id.clone(),
+                        "tool_name": executable_tool_call.tool_name.clone(),
+                        "applied_labels": prefix_report.applied_labels,
+                    })),
+                );
+            }
+            let execution = execute_model_tool_call(&executable_tool_call, &request.tool_workspace)
+                .map_err(|detail| LegalBenchmarkAgentRunError::ToolInput {
+                    tool_call_id: executable_tool_call.tool_call_id.clone(),
+                    detail,
                 })?;
             let tool_result_message = append_tool_execution(
                 &mut transcript,
                 &mut tool_calls,
                 &mut tool_receipts,
-                tool_call,
+                &executable_tool_call,
                 execution,
             )?;
             metrics.tool_call_count = metrics.tool_call_count.saturating_add(1);
@@ -435,11 +465,20 @@ fn model_request_for_tool_policy(
     request_id: impl Into<String>,
     messages: Vec<ModelMessage>,
     allowed_tools: &[String],
+    run_metadata: &Metadata,
 ) -> ModelRequest {
     let mut request = ModelRequest::new(request_id, messages);
     request
         .tools
         .retain(|tool| allowed_tools.iter().any(|allowed| allowed == &tool.name));
+    if let Some(max_output_tokens) = run_metadata
+        .get("max_output_tokens")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .filter(|value| *value > 0)
+    {
+        request.sampling.max_output_tokens = max_output_tokens;
+    }
     request
 }
 
@@ -898,6 +937,14 @@ fn pre_submit_protocol_report(
         }
     }
 
+    let missing_output_markers = missing_required_output_markers(request);
+    if !missing_output_markers.is_empty() {
+        missing_steps.push(format!(
+            "revise output files to include Blueprint required text markers: {}",
+            format_missing_output_markers(&missing_output_markers)
+        ));
+    }
+
     if !source_artifacts.is_empty() {
         if allowed_tool(request, "inventory")
             && !inventory_discovers_all(tool_calls, source_artifacts)
@@ -1127,6 +1174,152 @@ fn deliverable_validation_passed(tool_calls: &[ToolCallRecord], required_path: &
                     })
                 })
     })
+}
+
+fn missing_required_output_markers(
+    request: &LegalBenchmarkAgentRunRequest,
+) -> Vec<RequiredOutputMarker> {
+    required_output_markers(request)
+        .into_iter()
+        .filter(|marker| {
+            let output_path = request
+                .tool_workspace
+                .output_root
+                .join(normalize_output_path(marker.path.as_str()));
+            fs::read_to_string(output_path)
+                .map(|content| !content.contains(marker.marker.as_str()))
+                .unwrap_or(true)
+        })
+        .collect()
+}
+
+fn required_output_markers(request: &LegalBenchmarkAgentRunRequest) -> Vec<RequiredOutputMarker> {
+    let default_path = request
+        .task_spec
+        .deliverables
+        .iter()
+        .find(|deliverable| deliverable.required)
+        .map(|deliverable| deliverable.required_path.clone())
+        .unwrap_or_else(|| String::from("output.md"));
+    request
+        .run_config
+        .metadata
+        .get(REQUIRED_OUTPUT_MARKERS_METADATA_KEY)
+        .and_then(Value::as_array)
+        .map(|markers| {
+            markers
+                .iter()
+                .filter_map(|value| match value {
+                    Value::String(marker) if !marker.is_empty() => Some(RequiredOutputMarker {
+                        path: default_path.clone(),
+                        label: marker.clone(),
+                        marker: marker.clone(),
+                    }),
+                    Value::Object(object) => {
+                        let marker = object
+                            .get("marker")
+                            .or_else(|| object.get("contains"))
+                            .and_then(Value::as_str)?
+                            .to_owned();
+                        if marker.is_empty() {
+                            return None;
+                        }
+                        let path = object
+                            .get("path")
+                            .or_else(|| object.get("required_path"))
+                            .and_then(Value::as_str)
+                            .unwrap_or(default_path.as_str())
+                            .to_owned();
+                        let label = object
+                            .get("label")
+                            .and_then(Value::as_str)
+                            .unwrap_or(marker.as_str())
+                            .to_owned();
+                        Some(RequiredOutputMarker {
+                            path,
+                            label,
+                            marker,
+                        })
+                    }
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn apply_required_output_markers_on_write(
+    tool_call: &mut ModelToolCall,
+    request: &LegalBenchmarkAgentRunRequest,
+) -> OutputMarkerPrefixReport {
+    if tool_call.tool_name != "write"
+        || !request
+            .run_config
+            .metadata
+            .get(APPLY_REQUIRED_OUTPUT_MARKERS_ON_WRITE_METADATA_KEY)
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        return OutputMarkerPrefixReport::default();
+    }
+    if tool_call.arguments.get("root").and_then(Value::as_str) != Some("output") {
+        return OutputMarkerPrefixReport::default();
+    }
+    let Some(relative_path) = tool_call
+        .arguments
+        .get("relative_path")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+    else {
+        return OutputMarkerPrefixReport::default();
+    };
+    let Some(content) = tool_call
+        .arguments
+        .get("content")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+    else {
+        return OutputMarkerPrefixReport::default();
+    };
+
+    let markers = required_output_markers(request)
+        .into_iter()
+        .filter(|marker| output_path_matches(marker.path.as_str(), relative_path.as_str()))
+        .filter(|marker| !content.contains(marker.marker.as_str()))
+        .collect::<Vec<_>>();
+    if markers.is_empty() {
+        return OutputMarkerPrefixReport::default();
+    }
+
+    let prefix = markers
+        .iter()
+        .map(|marker| marker.marker.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    tool_call.arguments["content"] = Value::String(format!("{prefix}\n\n{content}"));
+    OutputMarkerPrefixReport {
+        applied_labels: markers.into_iter().map(|marker| marker.label).collect(),
+    }
+}
+
+fn format_missing_output_markers(missing_markers: &[RequiredOutputMarker]) -> String {
+    let mut parts = missing_markers
+        .iter()
+        .take(6)
+        .map(|marker| {
+            format!(
+                "{} at {} must include exact text: {}",
+                marker.label, marker.path, marker.marker
+            )
+        })
+        .collect::<Vec<_>>();
+    if missing_markers.len() > parts.len() {
+        parts.push(format!(
+            "{} additional required marker(s) missing",
+            missing_markers.len() - parts.len()
+        ));
+    }
+    parts.join("; ")
 }
 
 fn submission_note_self_checks(note: Option<&str>) -> bool {
@@ -1684,6 +1877,37 @@ mod tests {
         }
     }
 
+    fn response_write_validate_memo(
+        route: &ModelProviderRoute,
+        response_id: &str,
+        content: &str,
+    ) -> ModelResponse {
+        let mut response = response_with_tool_call(route);
+        response.response_id = response_id.to_owned();
+        response.tool_calls = vec![
+            ModelToolCall {
+                tool_call_id: format!("{response_id}.write"),
+                tool_name: String::from("write"),
+                arguments: json!({
+                    "root": "output",
+                    "relative_path": "memo.md",
+                    "content": content,
+                    "overwrite": true
+                }),
+            },
+            ModelToolCall {
+                tool_call_id: format!("{response_id}.validate"),
+                tool_name: String::from("validate_deliverables"),
+                arguments: json!({
+                    "root": "output",
+                    "required_paths": ["memo.md"],
+                    "max_results": 10
+                }),
+            },
+        ];
+        response
+    }
+
     fn response_submit(route: &ModelProviderRoute) -> ModelResponse {
         ModelResponse {
             schema_version: crate::LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
@@ -2144,6 +2368,81 @@ mod tests {
             })
         );
         assert!(!coverage.self_checks.is_empty());
+    }
+
+    #[test]
+    fn required_output_markers_trigger_pre_submit_repair() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+
+        let mut task = task_spec();
+        task.tool_policy.allowed_tools =
+            vec![String::from("write"), String::from("validate_deliverables")];
+        task.tool_policy.max_turns = 5;
+        let input_manifest = build_input_artifact_manifest(&task);
+        let mut config = run_config(&task);
+        config.metadata.insert(
+            String::from(REQUIRED_OUTPUT_MARKERS_METADATA_KEY),
+            json!([{
+                "path": "memo.md",
+                "label": "coverage line",
+                "marker": "COVERAGE-OK"
+            }]),
+        );
+        let route = ModelProviderRoute::mock("mock.output_markers", "deterministic-legal-mock");
+        let mut adapter = MockModelAdapter::new(
+            route.clone(),
+            vec![
+                Ok(response_write_validate_memo(
+                    &route,
+                    "mock.response.missing_marker",
+                    "# Memo\n\nNo marker yet.\n",
+                )),
+                Ok(response_submit(&route)),
+                Ok(response_write_validate_memo(
+                    &route,
+                    "mock.response.repaired_marker",
+                    "# Memo\n\nCOVERAGE-OK\n",
+                )),
+                Ok(response_submit(&route)),
+            ],
+        );
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("output.marker.repair")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+
+        assert_eq!(result.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(result.run_record.metrics.model_turns, 4);
+        assert!(
+            fs::read_to_string(output_root.join("memo.md"))
+                .expect("memo")
+                .contains("COVERAGE-OK")
+        );
+        assert!(result.run_record.transcript.iter().any(|event| {
+            event.payload.as_ref().is_some_and(|payload| {
+                payload
+                    .to_string()
+                    .contains("Blueprint required text markers")
+            })
+        }));
     }
 
     #[test]

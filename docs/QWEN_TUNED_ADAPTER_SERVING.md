@@ -280,6 +280,35 @@ Harvey MFN adapter. It is the current local serving target for public
 Harvey-slice hillclimb work. It is still not a retained Harvey judge score and
 not full distributed RL.
 
+The same 005 adapter now also has a Blueprint scaffold-transform run:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_blueprint_scaffold_transform_2026_05_20_015/harvey_mfn_blueprint_scaffold_transform_run
+```
+
+Run checker:
+
+```bash
+scripts/check-qwen35-08b-harvey-mfn-blueprint-scaffold-transform-run.sh
+```
+
+Recorded scaffold-transform result:
+
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `2`
+- public training-slice criterion-title/token pass count: `83 / 83`
+- transcript records `Blueprint output scaffold applied`
+- score report digest:
+  `8b607b87dd12050023528f9e4b68c8757a97fc63958720d1a2fb4cfcf941060e`
+- training record bundle digest:
+  `e8144347f2075efb0dbf26c44c78edf10b202e52bcc89690ce0537eba3fe2ac5`
+
+Claim boundary: this is still the same served model adapter. The lift is from
+the Rust/Blueprint output scaffold around the model, not from a new model-only
+fine-tune. Use this as public training-slice hillclimb evidence and as the
+current route for Autopilot-style output-protocol experiments.
+
 Two later local adapters exist but are not serving targets:
 
 - `qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006`

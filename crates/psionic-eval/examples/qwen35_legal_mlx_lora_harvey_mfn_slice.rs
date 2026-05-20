@@ -5,26 +5,23 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use psionic_eval::{
-    artifact_manifest_digest, build_input_artifact_manifest,
-    export_legal_benchmark_training_records, run_legal_benchmark_agent, run_record_digest,
-    scan_harvey_corpus, score_report_digest, stable_json_digest, task_spec_digest,
     BenchmarkTaskSpec, CriterionResult, CriterionVerdict, JudgeMode, JudgePolicy,
     LegalBenchmarkAgentRunRequest, LegalBenchmarkToolWorkspace,
     LegalBenchmarkTrainingRecordExportInput, LegalBenchmarkTrainingRecordSplitPolicy, Metadata,
     ModelProviderRoute, ModelRetryPolicy, OpenAiCompatibleAdapter, ReqwestBlockingHttpTransport,
-    RunConfig, ScoreReport, ToolPolicy,
+    RunConfig, ScoreReport, ToolPolicy, artifact_manifest_digest, build_input_artifact_manifest,
+    export_legal_benchmark_training_records, run_legal_benchmark_agent, run_record_digest,
+    scan_harvey_corpus, score_report_digest, stable_json_digest, task_spec_digest,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:18090/v1";
 const DEFAULT_MODEL: &str = "Qwen/Qwen3.5-0.8B";
 const DEFAULT_TASKS_ROOT: &str = "/Users/christopherdavid/work/competition/repos/harvey-labs/tasks";
 const DEFAULT_UPSTREAM_COMMIT: &str = "5aa41694";
 const DEFAULT_TASK_ID: &str = "harvey.funds-asset-management.analyze_mfn_waterfall";
-const DEFAULT_OUTPUT_DIR: &str =
-    "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/harvey_mfn_slice_run";
-const DEFAULT_ADAPTER_PATH: &str =
-    "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors";
+const DEFAULT_OUTPUT_DIR: &str = "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/harvey_mfn_slice_run";
+const DEFAULT_ADAPTER_PATH: &str = "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors";
 const DEFAULT_ADAPTER_DIGEST: &str = "pending";
 const DEFAULT_ADAPTER_REPORT_DIGEST: &str = "pending";
 const MODEL_REVISION: &str = "2fc06364715b967f1860aea9cf38778875588b17";
@@ -49,6 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "QWEN_LEGAL_ADAPTER_REPORT_DIGEST",
         DEFAULT_ADAPTER_REPORT_DIGEST,
     );
+    let max_output_tokens = env_u64("QWEN_LEGAL_MAX_OUTPUT_TOKENS", 4096);
     let pylon_worker_id = env_string("QWEN_LEGAL_PYLON_WORKER_ID", DEFAULT_PYLON_WORKER_ID);
     let run_nonce = env_string("QWEN_LEGAL_RUN_NONCE", DEFAULT_RUN_NONCE);
 
@@ -68,7 +66,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&workspace_root)?;
     fs::create_dir_all(&output_root)?;
 
-    let run_config = harvey_mfn_run_config(&task, &model, &adapter_path, &adapter_digest);
+    let run_config = harvey_mfn_run_config(
+        &task,
+        &model,
+        &adapter_path,
+        &adapter_digest,
+        max_output_tokens,
+    );
     let mut route = ModelProviderRoute::openai_compatible(
         "route.qwen35_08b_legal_mlx_lora.harvey_mfn_slice",
         &base_url,
@@ -239,6 +243,14 @@ fn env_string(name: &str, fallback: &str) -> String {
         .unwrap_or_else(|| String::from(fallback))
 }
 
+fn env_u64(name: &str, fallback: u64) -> u64 {
+    env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(fallback)
+}
+
 fn task_documents_root(
     tasks_root: &Path,
     task: &BenchmarkTaskSpec,
@@ -273,7 +285,7 @@ fn training_slice_task(mut task: BenchmarkTaskSpec) -> BenchmarkTaskSpec {
         allowed_tools: vec![String::from("write"), String::from("validate_deliverables")],
         network_allowed: false,
         source_artifacts_read_only: true,
-        max_turns: 4,
+        max_turns: 6,
         max_wall_time_seconds: 180,
     };
     task.metadata.insert(
@@ -288,6 +300,7 @@ fn harvey_mfn_run_config(
     model: &str,
     adapter_path: &str,
     adapter_digest: &str,
+    max_output_tokens: u64,
 ) -> RunConfig {
     let mut metadata = Metadata::new();
     metadata.insert(
@@ -309,8 +322,30 @@ fn harvey_mfn_run_config(
         )),
     );
     metadata.insert(
+        String::from("max_output_tokens"),
+        Value::Number(serde_json::Number::from(max_output_tokens)),
+    );
+    metadata.insert(
         String::from("derived_checklist_items"),
         Value::Array(derived_checklist_items(task)),
+    );
+    metadata.insert(
+        String::from("blueprint_output_scaffold_version"),
+        Value::String(String::from("harvey_mfn_public_coverage_line_v4")),
+    );
+    metadata.insert(
+        String::from("apply_required_output_markers_on_write"),
+        Value::Bool(true),
+    );
+    metadata.insert(
+        String::from("required_output_markers"),
+        json!([
+            {
+                "path": "output.md",
+                "label": "public Harvey coverage ID line",
+                "marker": coverage_id_line(task, false)
+            }
+        ]),
     );
     RunConfig {
         schema_version: psionic_eval::LEGAL_BENCHMARK_SCHEMA_VERSION,
