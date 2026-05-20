@@ -11,6 +11,10 @@ The code lives in:
 - `crates/psionic-eval/src/legal_benchmark_provider.rs`
 - `crates/psionic-eval/src/legal_benchmark_agent.rs`
 
+`psionic-eval` now includes `ReqwestBlockingHttpTransport` for local
+OpenAI-compatible smoke routes. It refuses unresolved `<secret_ref:...>`
+headers, so hosted provider credentials still need a resolver-owned transport.
+
 The training-side adapter smoke is documented in
 `docs/QWEN_LEGAL_FINETUNE_LANE.md`.
 

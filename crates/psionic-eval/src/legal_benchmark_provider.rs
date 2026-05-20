@@ -7,7 +7,7 @@
 //! into run artifacts.
 
 use std::collections::{BTreeMap, VecDeque};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -1221,6 +1221,99 @@ impl ProviderHttpTransport for MockHttpTransport {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ReqwestBlockingHttpTransport {
+    client: reqwest::blocking::Client,
+}
+
+impl ReqwestBlockingHttpTransport {
+    pub fn new() -> ModelAdapterResult<Self> {
+        let client = reqwest::blocking::Client::builder()
+            .build()
+            .map_err(|error| transport_error(format!("failed to build HTTP client: {error}")))?;
+        Ok(Self { client })
+    }
+}
+
+impl Default for ReqwestBlockingHttpTransport {
+    fn default() -> Self {
+        match Self::new() {
+            Ok(transport) => transport,
+            Err(_) => Self {
+                client: reqwest::blocking::Client::new(),
+            },
+        }
+    }
+}
+
+impl ProviderHttpTransport for ReqwestBlockingHttpTransport {
+    fn send(&mut self, request: ProviderHttpRequest) -> ModelAdapterResult<ProviderHttpResponse> {
+        if request
+            .headers
+            .values()
+            .any(|value| value.contains("<secret_ref:"))
+        {
+            return Err(transport_error(
+                "reqwest legal benchmark transport refuses unresolved secret references",
+            ));
+        }
+
+        let method = match request.method.as_str() {
+            "GET" => reqwest::Method::GET,
+            "POST" => reqwest::Method::POST,
+            other => {
+                return Err(transport_error(format!(
+                    "unsupported HTTP method for legal benchmark transport: {other}"
+                )));
+            }
+        };
+        let mut builder = self
+            .client
+            .request(method, request.url.clone())
+            .timeout(Duration::from_millis(request.timeout_ms.max(1)))
+            .header(reqwest::header::CONTENT_TYPE, "application/json");
+        for (name, value) in &request.headers {
+            if name.eq_ignore_ascii_case("content-type") {
+                continue;
+            }
+            builder = builder.header(name.as_str(), value.as_str());
+        }
+        if request.method == "POST" {
+            builder = builder.json(&request.body);
+        }
+
+        let started = SystemTime::now();
+        let response = builder
+            .send()
+            .map_err(|error| transport_error(format!("HTTP send failed: {error}")))?;
+        let elapsed_ms = started
+            .elapsed()
+            .map(|elapsed| elapsed.as_millis().min(u128::from(u64::MAX)) as u64)
+            .unwrap_or(0);
+        let status = response.status().as_u16();
+        let headers = response
+            .headers()
+            .iter()
+            .map(|(name, value)| {
+                (
+                    name.as_str().to_owned(),
+                    value.to_str().unwrap_or("<non_utf8_header>").to_owned(),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let body = response.json::<Value>().map_err(|error| {
+            transport_error(format!("HTTP response JSON parse failed: {error}"))
+        })?;
+
+        Ok(ProviderHttpResponse {
+            status,
+            headers,
+            body,
+            elapsed_ms,
+        })
+    }
+}
+
 pub fn legal_benchmark_model_tool_specs() -> Vec<ModelToolSpec> {
     vec![
         tool_spec(
@@ -2233,6 +2326,10 @@ fn candidate_error(detail: impl Into<String>) -> ModelAdapterError {
     ModelAdapterError::new(ModelAdapterFailureKind::InvalidRequest, detail)
 }
 
+fn transport_error(detail: impl Into<String>) -> ModelAdapterError {
+    ModelAdapterError::new(ModelAdapterFailureKind::TransportError, detail)
+}
+
 fn trim_url(url: String) -> String {
     url.trim_end_matches('/').to_owned()
 }
@@ -2321,6 +2418,32 @@ mod tests {
                 ModelMessage::new(ModelMessageRole::User, "Draft a short memo."),
             ],
         )
+    }
+
+    #[test]
+    fn reqwest_transport_refuses_unresolved_secret_headers() {
+        let mut transport = ReqwestBlockingHttpTransport::default();
+        let mut headers = BTreeMap::new();
+        headers.insert(
+            String::from("authorization"),
+            String::from("Bearer <secret_ref:legal-benchmark-local>"),
+        );
+        let error = transport
+            .send(ProviderHttpRequest {
+                method: String::from("POST"),
+                url: String::from("http://127.0.0.1:1/v1/chat/completions"),
+                headers,
+                body: json!({"model": "local"}),
+                timeout_ms: 1,
+            })
+            .expect_err("unresolved secret should fail before network");
+
+        assert_eq!(error.kind, ModelAdapterFailureKind::TransportError);
+        assert!(
+            error
+                .detail
+                .contains("refuses unresolved secret references")
+        );
     }
 
     #[test]

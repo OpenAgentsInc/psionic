@@ -53,6 +53,7 @@ psionic-router = { path = "../psionic-router", optional = true }
 psionic-runtime = { path = "../psionic-runtime", optional = true }
 psionic-sandbox = { path = "../psionic-sandbox", optional = true }
 psionic-transformer = { path = "../psionic-transformer", optional = true }
+reqwest = { workspace = true, features = ["blocking"] }
 safetensors = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
