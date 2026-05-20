@@ -22,6 +22,7 @@ mod legal_benchmark_integrity;
 mod legal_benchmark_provider;
 mod legal_benchmark_regression;
 mod legal_benchmark_reports;
+mod legal_benchmark_schema;
 mod legal_benchmark_sweeps;
 mod legal_benchmark_tools;
 #[cfg(feature = "full")]
@@ -37,6 +38,7 @@ pub use legal_benchmark_integrity::*;
 pub use legal_benchmark_provider::*;
 pub use legal_benchmark_regression::*;
 pub use legal_benchmark_reports::*;
+pub use legal_benchmark_schema::*;
 pub use legal_benchmark_sweeps::*;
 pub use legal_benchmark_tools::*;
 #[cfg(feature = "full")]

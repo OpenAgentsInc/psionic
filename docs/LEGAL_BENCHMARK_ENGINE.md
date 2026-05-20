@@ -86,6 +86,37 @@ answer file changes during scoring, the score report is forced invalid and the
 diagnostic is retained in `failure_diagnostics`. This keeps invalid runs
 auditable without allowing them into promotion metrics.
 
+`crates/psionic-eval/src/legal_benchmark_schema.rs` adds the canonical v1
+schema layer used for long-lived legal benchmark receipts and training data.
+It wraps today's `RunRecord`, output manifest, score report, and
+`answer_integrity` report into a `LegalRunReceipt` with:
+
+- benchmark id and visibility
+- base model, adapter, tokenizer, prompt template, thinking mode, and tools
+- source document or input-manifest hashes
+- transcript action hashes and tool-call hashes
+- answer file hashes and actor information
+- scorer version, score hash, wall-clock timings, git commit, dirty-tree flag,
+  worker id, hardware summary, replay command, and artifact refs
+
+The schema module also defines the first Rust shapes for legal training
+examples, bad-run examples, preference pairs, reward traces, dataset
+manifests, adapter manifests, model candidates, promotion decisions, Pylon
+training jobs, Pylon worker receipts, Psionic training configs, and Psionic
+training receipts. These are plain canonical JSON contracts for now; moving
+them into a shared crate is deferred until `psionic-train` needs to consume
+the same stable structs directly.
+
+Validation rejects receipts that omit benchmark visibility, answer file
+content hashes, scorer version, replay command, or required artifact hashes.
+Use:
+
+```bash
+cargo test -p psionic-eval legal_benchmark_schema
+cargo run -p psionic-eval --example legal_benchmark_validate_run_receipt -- <path>
+cargo run -p psionic-eval --example legal_benchmark_print_run_summary -- <path>
+```
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

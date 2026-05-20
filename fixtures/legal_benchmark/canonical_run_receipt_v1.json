@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "receipt_id": "legal.run_receipt.run.schema",
+  "created_at_rfc3339": "2026-05-20T00:00:00Z",
+  "run_spec": {
+    "schema_version": 1,
+    "run_id": "run.schema",
+    "task_id": "task.schema",
+    "task_version": "v1",
+    "benchmark_id": "harvey",
+    "benchmark_visibility": "public",
+    "base_model_id": "qwen3.5-4b",
+    "adapter_id": "adapter.legal.001",
+    "tokenizer_id": "qwen-tokenizer",
+    "tokenizer_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "prompt_template_id": "legal.autopilot.v1",
+    "prompt_template_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "thinking_mode": "disabled",
+    "tool_list": [
+      "write"
+    ],
+    "source_document_hashes": [
+      {
+        "algorithm": "sha256",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "git_commit": "abcdef1",
+    "git_dirty": false,
+    "deterministic_replay_command": [
+      "cargo",
+      "run",
+      "-p",
+      "psionic-eval"
+    ],
+    "worker_id": "worker.local"
+  },
+  "terminal_state": "submitted",
+  "model_output_transcript": [],
+  "tool_calls": [],
+  "answer_files": [
+    {
+      "schema_version": 1,
+      "relative_path": "memo.md",
+      "byte_size": 12,
+      "content_hash": {
+        "algorithm": "sha256",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "pre_score_hash": {
+        "algorithm": "sha256",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "post_score_hash": {
+        "algorithm": "sha256",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "creation_actor": "model",
+      "last_modifying_actor": "model",
+      "writer_tool_call_id": "call.write.memo",
+      "integrity_valid": true
+    }
+  ],
+  "score": {
+    "schema_version": 1,
+    "score_report_id": "score.run.schema",
+    "scorer_version": "psionic-eval.legal_benchmark_evaluator.v1",
+    "score_report_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "all_pass": true,
+    "criterion_pass_rate_bps": 10000,
+    "document_coverage_bps": 10000,
+    "criterion_count": 1,
+    "passed_criterion_count": 1,
+    "failure_diagnostics": []
+  },
+  "integrity": {
+    "schema_version": 1,
+    "valid": true,
+    "integrity_report_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "invalid_reasons": []
+  },
+  "run_record_hash": {
+    "algorithm": "sha256",
+    "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "output_artifact_manifest_hash": {
+    "algorithm": "sha256",
+    "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "artifact_paths_and_hashes": [
+    {
+      "relative_path": "memo.md",
+      "content_hash": {
+        "algorithm": "sha256",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    }
+  ],
+  "wall_clock_timings": {
+    "wall_time_ms": 100,
+    "model_turns": 1,
+    "tool_call_count": 1
+  }
+}
