@@ -367,6 +367,64 @@ served for Harvey legal benchmark runs, but it is still supervised
 reward-refresh over public criteria, not full GRPO/PPO, not Qwen3.6, and not a
 retained Harvey leaderboard score.
 
+## Failed Follow-On Hillclimb Attempts
+
+Two additional local fine-tunes were run after the 005 adapter. They are
+committed as evidence because they are actual Qwen LoRA training runs, but
+they are not promoted serving candidates.
+
+### 006 missed-criterion repair
+
+- run id:
+  `qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006`
+- parent adapter digest:
+  `b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed`
+- adapter:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006/adapters.safetensors`
+- adapter digest:
+  `06b9ac95ae10120240122bca4678b7424a071111495bf3cb1dd113a774c2a6da`
+- report digest:
+  `b7a7d41bf97c0bc7f256b7b317ca0f200b7804158e5160ab9deb31e891e93029`
+- training result:
+  first validation loss `2.085`, best validation loss `2.042` at iteration
+  `8`, final validation loss `3.399`, final train loss `0.561`
+- Harvey run:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006/harvey_mfn_miss_repair_run`
+- Harvey terminal state: `max_tokens`
+- public criterion-title/token score: `0 / 83`
+- failure: generated a long non-tool response, never called `write`, and
+  produced no output artifact.
+
+### 007 tool-discipline repair
+
+- run id:
+  `qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_tool_discipline_2026_05_20_007`
+- parent adapter digest:
+  `b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed`
+- adapter:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_tool_discipline_2026_05_20_007/adapters.safetensors`
+- adapter digest:
+  `2d71869052508a23e0cf3085fae64ebc580a8b5912ccca3293f4c31fc961b3a1`
+- report digest:
+  `50345ec682a4f4369a488a6d71f91729b83acefa773db4e024d98fe238d48eb8`
+- training result:
+  first validation loss `2.085`, best/final validation loss `2.013`, final
+  train loss `0.427`
+- Harvey run:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_tool_discipline_2026_05_20_007/harvey_mfn_tool_discipline_run`
+- Harvey terminal state: `max_tokens`
+- public criterion-title/token score: `0 / 83`
+- failure: generated a long non-tool response, never called `write`, and
+  produced no output artifact.
+
+These failures changed the operating recommendation. The next training step
+should not keep pushing tiny SFT patches against the same small model. The
+next useful work is to move the accepted 005 trajectory plus the failed
+006/007 traces into a proper preference/RL objective where non-tool
+generation is explicitly penalized, then run that objective on a reachable
+Pylon with enough GPU memory. Until then, 005 remains the current usable
+Harvey MFN local adapter.
+
 ## Rust API
 
 The implementation lives in:

@@ -1,0 +1,41 @@
+{
+    "adapter_path": "target/qwen_legal_real_finetune/run_2026_05_20_007_qwen35_08b_harvey_mfn_tool_discipline/mlx_adapter",
+    "batch_size": 1,
+    "clear_cache_threshold": 0,
+    "config": null,
+    "data": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_tool_discipline_2026_05_20_007",
+    "fine_tune_type": "lora",
+    "grad_accumulation_steps": 1,
+    "grad_checkpoint": true,
+    "iters": 8,
+    "learning_rate": 4e-06,
+    "lora_parameters": {
+        "rank": 8,
+        "dropout": 0.0,
+        "scale": 20.0
+    },
+    "lr_schedule": null,
+    "mask_prompt": false,
+    "max_seq_length": 2048,
+    "model": "Qwen/Qwen3.5-0.8B",
+    "num_layers": 8,
+    "optimizer": "adamw",
+    "optimizer_config": {
+        "adam": {},
+        "adamw": {},
+        "muon": {},
+        "sgd": {},
+        "adafactor": {}
+    },
+    "project_name": null,
+    "report_to": null,
+    "resume_adapter_file": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "save_every": 100,
+    "seed": 0,
+    "steps_per_eval": 4,
+    "steps_per_report": 1,
+    "test": false,
+    "test_batches": 500,
+    "train": true,
+    "val_batches": 1
+}

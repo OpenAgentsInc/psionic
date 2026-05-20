@@ -1,0 +1,42 @@
+Loading pretrained model
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 15650.39it/s]
+Loading datasets
+Training
+Loading fine-tuned weights from fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors
+Trainable parameters: 0.240% (1.804M/752.392M)
+Starting training..., iters: 16
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 34.43it/s]
+Iter 1: Val loss 2.085, Val took 0.036s
+Iter 1: Train loss 1.206, Learning Rate 3.000e-06, It/sec 0.040, Tokens/sec 77.204, Trained Tokens 1926, Peak mem 49.046 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 2: Train loss 0.981, Learning Rate 3.000e-06, It/sec 0.037, Tokens/sec 76.057, Trained Tokens 3973, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 3: Train loss 0.941, Learning Rate 3.000e-06, It/sec 0.186, Tokens/sec 381.381, Trained Tokens 6020, Peak mem 53.697 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 27.77it/s]
+Iter 4: Val loss 3.348, Val took 0.038s
+Iter 4: Train loss 1.095, Learning Rate 3.000e-06, It/sec 0.040, Tokens/sec 77.699, Trained Tokens 7946, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 5: Train loss 0.859, Learning Rate 3.000e-06, It/sec 0.186, Tokens/sec 380.502, Trained Tokens 9993, Peak mem 53.697 GB
+Iter 6: Train loss 1.024, Learning Rate 3.000e-06, It/sec 0.197, Tokens/sec 380.187, Trained Tokens 11919, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 7: Train loss 0.790, Learning Rate 3.000e-06, It/sec 0.185, Tokens/sec 379.561, Trained Tokens 13966, Peak mem 53.697 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 40.27it/s]
+Iter 8: Val loss 2.042, Val took 0.027s
+Iter 8: Train loss 0.962, Learning Rate 3.000e-06, It/sec 0.197, Tokens/sec 379.262, Trained Tokens 15892, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 9: Train loss 0.731, Learning Rate 3.000e-06, It/sec 0.184, Tokens/sec 376.802, Trained Tokens 17939, Peak mem 53.697 GB
+Iter 10: Train loss 0.903, Learning Rate 3.000e-06, It/sec 0.197, Tokens/sec 380.259, Trained Tokens 19865, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 11: Train loss 0.679, Learning Rate 3.000e-06, It/sec 0.184, Tokens/sec 377.131, Trained Tokens 21912, Peak mem 53.697 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 41.39it/s]
+Iter 12: Val loss 2.095, Val took 0.026s
+Iter 12: Train loss 0.846, Learning Rate 3.000e-06, It/sec 0.196, Tokens/sec 377.637, Trained Tokens 23838, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 13: Train loss 0.631, Learning Rate 3.000e-06, It/sec 0.185, Tokens/sec 377.885, Trained Tokens 25885, Peak mem 53.697 GB
+Iter 14: Train loss 0.792, Learning Rate 3.000e-06, It/sec 0.197, Tokens/sec 379.608, Trained Tokens 27811, Peak mem 53.697 GB
+Iter 15: Train loss 0.764, Learning Rate 3.000e-06, It/sec 0.196, Tokens/sec 378.354, Trained Tokens 29737, Peak mem 53.697 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3859 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 27.75it/s]
+Iter 16: Val loss 3.399, Val took 0.038s
+Iter 16: Train loss 0.561, Learning Rate 3.000e-06, It/sec 0.185, Tokens/sec 378.358, Trained Tokens 31784, Peak mem 53.705 GB
+Saved final weights to target/qwen_legal_real_finetune/run_2026_05_20_006_qwen35_08b_harvey_mfn_miss_repair/mlx_adapter/adapters.safetensors.

@@ -1,0 +1,59 @@
+{
+  "schema": "psionic.qwen_legal_mlx_lora_harvey_mfn_miss_repair.v1",
+  "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006",
+  "base_model": "Qwen/Qwen3.5-0.8B",
+  "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+  "backend": "mlx_lm.lora",
+  "logical_pylon_worker_id": "pylon.local.macos.mlx.01.harvey_mfn_miss_repair",
+  "parent_adapter": {
+    "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005",
+    "artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "report_digest": "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1",
+    "best_public_training_slice_score": {
+      "passed": 63,
+      "total": 83
+    }
+  },
+  "training_data": {
+    "path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_miss_repair_2026_05_20_006",
+    "digest": "6b72978b6da7788d4cabd3fd1573d3040e2bca5288fa70c429b216eb23ba67d2",
+    "train_records": 2,
+    "valid_records": 2,
+    "test_records": 2,
+    "source_score": {
+      "passed": 63,
+      "total": 83
+    },
+    "repair_target_missed_count": 20
+  },
+  "adapter": {
+    "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006/adapters.safetensors",
+    "sha256": "06b9ac95ae10120240122bca4678b7424a071111495bf3cb1dd113a774c2a6da",
+    "adapter_config_sha256": "abe6b0d8476ea67ba1841bd8441cf9680e36788d5229d6232eb3cc40cb4922da"
+  },
+  "training": {
+    "optimizer": "adamw",
+    "iterations": 16,
+    "learning_rate": 0.000003,
+    "max_seq_length": 2048,
+    "first_validation_loss": 2.085,
+    "best_validation_loss": 2.042,
+    "best_validation_iter": 8,
+    "final_validation_loss": 3.399,
+    "final_train_loss": 0.561,
+    "trained_tokens": 31784,
+    "peak_memory_gb": 53.705,
+    "train_log_sha256": "49fa0d54a42027fc24585191eba69e023700724b5a248e2dfe0a763af45210d3"
+  },
+  "tailnet_pylon_status": {
+    "local_mlx": "used_for_completed_training",
+    "archlinux": "online_but_tailscale_ssh_requires_reauth",
+    "imac_pro_bertha": "online_but_noninteractive_ssh_denied",
+    "macbook_pro_m2": "offline_at_check_time"
+  },
+  "claim_boundary": [
+    "This is an actual local MLX LoRA fine-tune resumed from the 005 Harvey MFN reward-refresh adapter.",
+    "It is a supervised missed-criterion repair step over public Harvey criteria, not full RL and not a retained Harvey judge score.",
+    "The remote Pylon nodes were visible on Tailnet but not available for unattended training because SSH authentication was blocked."
+  ]
+}

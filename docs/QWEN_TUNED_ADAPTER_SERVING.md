@@ -280,6 +280,22 @@ Harvey MFN adapter. It is the current local serving target for public
 Harvey-slice hillclimb work. It is still not a retained Harvey judge score and
 not full distributed RL.
 
+Two later local adapters exist but are not serving targets:
+
+- `qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006`
+  - adapter digest:
+    `06b9ac95ae10120240122bca4678b7424a071111495bf3cb1dd113a774c2a6da`
+  - Harvey run terminal state: `max_tokens`
+  - public training-slice score: `0 / 83`
+- `qwen35_08b_mlx_lora_harvey_mfn_tool_discipline_2026_05_20_007`
+  - adapter digest:
+    `2d71869052508a23e0cf3085fae64ebc580a8b5912ccca3293f4c31fc961b3a1`
+  - Harvey run terminal state: `max_tokens`
+  - public training-slice score: `0 / 83`
+
+Both failed by producing long non-tool responses and no output artifact. Keep
+serving 005 for local Harvey MFN work until a preference/RL run beats it.
+
 ## Candidate Identity
 
 Every Qwen legal candidate must bind:
