@@ -1,0 +1,63 @@
+<|im_start|>system
+You are a legal benchmark assistant. Follow the task record, use only provided source materials, cite evidence precisely, and do not invent facts.
+<|im_end|>
+<|im_start|>user
+Matter: acquisition-side diligence. Source bundle contains a purchase agreement, disclosure schedule excerpts, and an employment agreement. Draft the issue list for counsel review. Required behavior: inventory the documents first, separate known facts from assumptions, cite the controlling source for each issue, and identify missing documents.
+<|im_end|>
+<|im_start|>assistant
+Document inventory:
+1. Purchase agreement. Use this for closing conditions, representations, indemnity, covenants, termination, and defined terms.
+2. Disclosure schedule excerpts. Use this only for exceptions or facts explicitly disclosed in the excerpts.
+3. Employment agreement. Use this for restrictive covenants, assignment, compensation, and termination provisions tied to the named employee.
+
+Issue list:
+1. Closing-condition coverage. Confirm whether each required third-party consent and officer certificate is present in the purchase agreement and exceptions schedule. Evidence: purchase agreement closing-condition section; disclosure schedule consent exceptions.
+2. Disclosure exception scope. Identify each exception that narrows a representation and map it to the exact representation it modifies. Evidence: disclosure schedule excerpt headings and corresponding purchase agreement representation text.
+3. Employee covenant continuity. Confirm whether the employee's non-compete, non-solicit, confidentiality, and invention-assignment obligations survive the transaction. Evidence: employment agreement restrictive covenant and assignment provisions.
+4. Missing materials. The bundle does not include board approvals, full schedules, IP assignments, customer contracts, or benefits plan documents. Treat those as missing, not negative facts.
+
+Pre-submit self-check:
+- Every issue above names the source document.
+- No issue assumes a fact outside the supplied materials.
+- Missing documents are marked as missing rather than inferred.
+<|im_end|>
+
+<|im_start|>system
+You are a legal benchmark assistant. Produce benchmark-ready work product with explicit evidence mapping and a final coverage check.
+<|im_end|>
+<|im_start|>user
+Matter: litigation chronology. Source bundle contains a complaint, an answer, three email exhibits, and a deposition excerpt. Build a chronology for a motion memo. Required behavior: use neutral language, preserve dates, cite the exhibit or testimony source, and flag disputed facts.
+<|im_end|>
+<|im_start|>assistant
+Chronology:
+1. January 8, 2024. Plaintiff alleges the parties executed the services agreement. Source: complaint paragraph describing contract formation. Status: alleged and disputed unless admitted in the answer.
+2. February 2, 2024. Defendant sent an email asking for revised delivery dates. Source: email exhibit dated February 2, 2024. Status: document-supported.
+3. February 9, 2024. Plaintiff responded that the revised timeline would require written approval. Source: email exhibit dated February 9, 2024. Status: document-supported.
+4. March 1, 2024. Defendant denied that any approved change order existed. Source: answer paragraph responding to change-order allegation. Status: disputed pleading position.
+5. April 12, 2024. Witness testified that weekly status calls discussed schedule risk. Source: deposition excerpt page and line reference supplied in the bundle. Status: testimony-supported, subject to credibility and scope limits.
+
+Coverage check:
+- Pleading allegations are identified as allegations unless admitted.
+- Emails are treated as document evidence, not as proof of legal conclusion.
+- Deposition testimony is attributed to the witness and not stated as court-found fact.
+<|im_end|>
+
+<|im_start|>system
+You are a legal benchmark assistant. Do not expose hidden rubric assumptions. Use source-backed analysis, identify uncertainty, and produce a concise deliverable.
+<|im_end|>
+<|im_start|>user
+Matter: contract redline review. Source bundle contains a SaaS order form, master services agreement excerpts, and data processing addendum excerpts. Summarize customer-risk changes needed before signature.
+<|im_end|>
+<|im_start|>assistant
+Customer-risk changes before signature:
+1. Order-form precedence. Add language confirming that negotiated order-form terms prevail over conflicting boilerplate only where expressly stated. Evidence: order form precedence clause and master services agreement integration language.
+2. Data processing scope. Require the data processing addendum to identify processing purpose, categories of personal data, subprocessors, audit rights, and breach-notice timing. Evidence: data processing addendum excerpt.
+3. Liability alignment. Confirm that confidentiality, data security, and indemnity exclusions are carved out of any low general cap if the master services agreement currently caps all claims. Evidence: limitation-of-liability excerpt.
+4. Renewal and termination. Add clear non-renewal notice, termination for uncured material breach, and data-return or deletion obligations. Evidence: order form term and termination language; data processing addendum return/deletion provision.
+5. Missing-document flag. The bundle does not include full security exhibits, current subprocessors, or service-level terms. Request them before final approval.
+
+Final check:
+- Each requested change ties to a supplied document.
+- Missing materials are flagged without assuming their contents.
+- The deliverable is a signing-risk summary, not final legal advice.
+<|im_end|>

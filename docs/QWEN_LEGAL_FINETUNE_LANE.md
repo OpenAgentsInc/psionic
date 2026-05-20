@@ -19,6 +19,54 @@ update, and the Autopilot4 import loop are green.
 The Qwen replacement model set and the current `qwen36_alias_qwen35`
 conformance decision live in `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`.
 
+## Current Real-Weight Result
+
+On 2026-05-20, the lane gained a material local Qwen-family LoRA result in
+addition to the deterministic smoke trainer:
+
+- run id: `qwen_legal_real_qwen35_08b_mlx_lora_2026_05_20_002`
+- base model: `Qwen/Qwen3.5-0.8B`
+- Hugging Face revision:
+  `2fc06364715b967f1860aea9cf38778875588b17`
+- backend: `mlx_lm.lora`
+- logical Pylon worker: `pylon.local.macos.mlx.01`
+- data:
+  `fixtures/qwen_legal/real_finetune/mlx_lora_seed`
+- adapter:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors`
+- report:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/report.json`
+- report digest:
+  `b9c3c9dac55c469be1e946c9ea2e7be9255dfa2f02a097d31df97bf9d64592d5`
+- checker:
+  `scripts/check-qwen35-08b-legal-mlx-lora-fixture.sh`
+
+The run trained six LoRA iterations over the public-safe legal seed set.
+Validation loss moved from `3.595` to `3.223`, with `1.804M` trainable
+parameters and peak observed memory of `4.251 GB`. The adapter loaded through
+`mlx_lm.generate` and through the MLX HTTP server on
+`POST /v1/chat/completions`.
+
+This is the first real Qwen-family adapter artifact for the Harvey legal lane,
+but it is still not the retained model target. It is single local-worker SFT,
+not RL, not live Nexus settlement, and not a retained Harvey score claim.
+
+Serve it locally for Harvey smoke work with:
+
+```bash
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+Use this OpenAI-compatible route while the server is running:
+
+```text
+base_url: http://127.0.0.1:18088/v1
+model: Qwen/Qwen3.5-0.8B
+```
+
+The request model must be the real base model id. The current MLX server tries
+to resolve arbitrary aliases as Hugging Face repos.
+
 ## Rust API
 
 The implementation lives in:

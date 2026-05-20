@@ -1,0 +1,126 @@
+{
+  "schema_version": "psionic.qwen_legal_real_qwen_mlx_lora_report.v1",
+  "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_2026_05_20_002",
+  "created_at": "2026-05-20",
+  "training_backend": "mlx_lm.lora",
+  "trainer_version_observed": "mlx_lm 0.31.3 / mlx 0.31.2",
+  "base_model": {
+    "model_id": "Qwen/Qwen3.5-0.8B",
+    "model_family": "qwen3_5",
+    "huggingface_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "parameter_count_observed": 873438784,
+    "source": "huggingface"
+  },
+  "retained_target_model": {
+    "model_id": "Qwen/Qwen3.6-35B-A3B",
+    "status": "target_for_later_cuda_or_hosted_pylon_run"
+  },
+  "pylon_execution": {
+    "mode": "single_local_logical_pylon",
+    "worker_ids": [
+      "pylon.local.macos.mlx.01"
+    ],
+    "settlement": "not_live_nexus_settlement",
+    "notes": [
+      "This run used the local Mac MLX backend as one logical Pylon worker.",
+      "The prior qwen_legal_pylon_network_sft_v1 fixture remains the current multi-contributor Pylon-shaped aggregate, but it is still synthetic-hidden-state smoke.",
+      "This report is the first materialized real Qwen-family adapter trained locally for the Harvey legal lane."
+    ]
+  },
+  "dataset": {
+    "description": "public-safe synthetic legal benchmark seed examples for issue-list, chronology, and contract-risk behavior",
+    "corpus_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_harvey_legal_seed_corpus_2026_05_20.txt",
+    "corpus_sha256": "1e25f6718ddc7bf537c790bea183b98d99f2f18a2c1fb90cec835ce0977678ac",
+    "mlx_data_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_seed",
+    "splits": [
+      {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_seed/train.jsonl",
+        "sha256": "972949875f6df2df8494b85b9f436dfcc0d76b07695f21f86019815f3c80c3b3",
+        "examples": 2
+      },
+      {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_seed/valid.jsonl",
+        "sha256": "adceda2893687719e4b6ab5966acffe5d0b59fabb42237e6cd75de67f631b8ad",
+        "examples": 1
+      },
+      {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_seed/test.jsonl",
+        "sha256": "c4c38033d5623156a95d8eb41c9d7f95425c2e8f5498e7a75f148a02323e42cd",
+        "examples": 1
+      }
+    ],
+    "hidden_harvey_rubric_exposure": "none"
+  },
+  "training_command": "uvx --from mlx-lm mlx_lm.lora --model Qwen/Qwen3.5-0.8B --train --data fixtures/qwen_legal/real_finetune/mlx_lora_seed --fine-tune-type lora --optimizer adamw --num-layers 8 --batch-size 1 --iters 6 --val-batches 1 --learning-rate 1e-5 --steps-per-report 1 --steps-per-eval 3 --adapter-path target/qwen_legal_real_finetune/run_2026_05_20_002_qwen35_08b/mlx_adapter --max-seq-length 512 --grad-checkpoint",
+  "training_summary": {
+    "trainable_parameters": 1804000,
+    "trainable_parameter_fraction": 0.0024,
+    "iterations": 6,
+    "batch_size": 1,
+    "max_seq_length": 512,
+    "learning_rate": 0.00001,
+    "lora_rank": 8,
+    "lora_scale": 20.0,
+    "num_lora_layers": 8,
+    "gradient_checkpointing": true,
+    "first_validation_loss": 3.595,
+    "final_validation_loss": 3.223,
+    "final_train_loss": 2.038,
+    "trained_tokens": 2229,
+    "peak_memory_gb": 4.251
+  },
+  "artifacts": [
+    {
+      "kind": "adapter_weights",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors",
+      "sha256": "378e8b55e3320224c20c7c6c47d916dc590cb09c7eefbd1c7618e5adb71d27e4",
+      "bytes": 7230451
+    },
+    {
+      "kind": "adapter_config",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapter_config.json",
+      "sha256": "7e09e03c68578590628473d11cb5207d0bf7840aa911daf45b49c8fa957d7038",
+      "bytes": 1022
+    },
+    {
+      "kind": "training_log",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/mlx_lora_train.log",
+      "sha256": "e187ce9ce90c1022062f07bffb9e548ffcb8f49a93bbcc4b1fec9166cbcdbcc7"
+    },
+    {
+      "kind": "adapter_generate_smoke_log",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/mlx_adapter_generate.log",
+      "sha256": "db84498ce96db89a5a43886fca5eacc3a083a6f6dbfbf5297637996a533403e8"
+    },
+    {
+      "kind": "server_chat_completion_smoke",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/mlx_server_chat_completion.json",
+      "sha256": "19db52a88cbd50369f099fc184a6861d6f5ad27961ca27ab572783c4ef5be809"
+    }
+  ],
+  "serving": {
+    "server_command": "scripts/run-qwen35-08b-legal-mlx-lora-server.sh",
+    "direct_command": "uvx --from mlx-lm mlx_lm.server --model Qwen/Qwen3.5-0.8B --adapter-path fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002 --host 127.0.0.1 --port 18088 --max-tokens 512 --temp 0.0 --chat-template-args '{\"enable_thinking\": false}'",
+    "openai_compatible_base_url": "http://127.0.0.1:18088/v1",
+    "request_model_id": "Qwen/Qwen3.5-0.8B",
+    "verified_endpoint": "POST /v1/chat/completions",
+    "server_response_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/mlx_server_chat_completion.json"
+  },
+  "benchmark_readiness": {
+    "usable_for_harvey_smoke": true,
+    "usable_for_retained_score_claim": false,
+    "required_next_integration": [
+      "Add an admitted Psionic candidate identity row for Qwen/Qwen3.5-0.8B local MLX adapter smoke or promote the run to the existing Qwen/Qwen3.5-4B lane.",
+      "Run the Rust Harvey agent against the local OpenAI-compatible MLX server on a small public-safe smoke slice.",
+      "Export accepted trajectories into the Pylon/Nexus legal objective and repeat with two live workers.",
+      "Only after retained scoring succeeds, move the same adapter procedure to Qwen/Qwen3.6-35B-A3B on CUDA or hosted GPU Pylons."
+    ]
+  },
+  "claim_boundary": [
+    "This is an actual local LoRA fine-tune of a Qwen-family model, not just a deterministic gate.",
+    "It is not a full Qwen3.6 model fine-tune.",
+    "It is not RL training yet; it is supervised adapter fine-tuning on a tiny public-safe seed set.",
+    "It is not live distributed Pylon/Nexus settlement; it used one local logical Pylon worker.",
+    "It does not establish retained Harvey score lift."
+  ]
+}

@@ -1,0 +1,19 @@
+Loading pretrained model
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files:  10%|█         | 1/10 [00:00<00:06,  1.43it/s]Fetching 10 files:  30%|███       | 3/10 [00:00<00:01,  4.13it/s]Fetching 10 files:  40%|████      | 4/10 [00:38<01:19, 13.17s/it]Fetching 10 files: 100%|██████████| 10/10 [00:38<00:00,  3.85s/it]
+Loading datasets
+Training
+Trainable parameters: 0.240% (1.804M/752.392M)
+Starting training..., iters: 6
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:01<00:00,  1.46s/it]Calculating loss...: 100%|██████████| 1/1 [00:01<00:00,  1.47s/it]
+Iter 1: Val loss 3.595, Val took 1.473s
+Iter 1: Train loss 2.890, Learning Rate 1.000e-05, It/sec 0.146, Tokens/sec 53.086, Trained Tokens 363, Peak mem 4.199 GB
+Iter 2: Train loss 2.992, Learning Rate 1.000e-05, It/sec 0.368, Tokens/sec 139.718, Trained Tokens 743, Peak mem 4.203 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 30.65it/s]
+Iter 3: Val loss 3.443, Val took 0.034s
+Iter 3: Train loss 2.791, Learning Rate 1.000e-05, It/sec 1.411, Tokens/sec 536.076, Trained Tokens 1123, Peak mem 4.251 GB
+Iter 4: Train loss 2.383, Learning Rate 1.000e-05, It/sec 1.396, Tokens/sec 506.696, Trained Tokens 1486, Peak mem 4.251 GB
+Iter 5: Train loss 2.343, Learning Rate 1.000e-05, It/sec 1.415, Tokens/sec 537.566, Trained Tokens 1866, Peak mem 4.251 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 30.75it/s]
+Iter 6: Val loss 3.223, Val took 0.034s
+Iter 6: Train loss 2.038, Learning Rate 1.000e-05, It/sec 1.424, Tokens/sec 516.969, Trained Tokens 2229, Peak mem 4.251 GB
+Saved final weights to target/qwen_legal_real_finetune/run_2026_05_20_002_qwen35_08b/mlx_adapter/adapters.safetensors.

@@ -1,0 +1,10 @@
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 22721.04it/s]
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** Legal benchmark assistant.
+    *   **Task:** Generate a concise chronology of litigation chronology.
+    *   **Source Bundle:** Contains a complaint, answer, email exhibit, and deposition excerpt.
+    *   **Constraint:** Use source status labels.
+    *   **Missing Information:** The user has provided a prompt template but *did not actually provide the source bundle content* (the complaint, answer, email exhibit, and deposition excerpt).
+    *   **Goal:**

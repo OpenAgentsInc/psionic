@@ -14,6 +14,48 @@ The code lives in:
 The training-side adapter smoke is documented in
 `docs/QWEN_LEGAL_FINETUNE_LANE.md`.
 
+## Current Local Real-Weight Adapter
+
+The current material adapter that can be served locally is:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors
+```
+
+It was trained on 2026-05-20 with `mlx_lm.lora` against
+`Qwen/Qwen3.5-0.8B`. The machine-readable report is:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/report.json
+```
+
+Report digest:
+
+```text
+b9c3c9dac55c469be1e946c9ea2e7be9255dfa2f02a097d31df97bf9d64592d5
+```
+
+Start the local adapter server:
+
+```bash
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+Then point a Psionic/OpenAI-compatible Harvey smoke route at:
+
+```text
+base_url: http://127.0.0.1:18088/v1
+model: Qwen/Qwen3.5-0.8B
+```
+
+The MLX server verified `POST /v1/chat/completions` with that model id and the
+adapter path. Do not use a synthetic alias as the request model id unless an
+aliasing wrapper is added; MLX resolves unknown model ids through Hugging Face.
+
+Claim boundary: this is a locally trained Qwen-family LoRA adapter suitable for
+smoke benchmark routing. It is not the retained `Qwen/Qwen3.6-35B-A3B` target,
+not RL, and not a retained Harvey score claim.
+
 ## Candidate Identity
 
 Every Qwen legal candidate must bind:
