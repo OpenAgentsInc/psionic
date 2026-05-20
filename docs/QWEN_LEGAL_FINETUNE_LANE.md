@@ -2,7 +2,8 @@
 
 > Status: implemented smoke lane for `psionic-train` on 2026-05-19; real
 > local Qwen/MLX LoRA plus Rust legal-agent smoke added on 2026-05-20; local
-> RL-seed resumed Qwen LoRA added on 2026-05-20.
+> RL-seed resumed Qwen LoRA added on 2026-05-20; public Harvey MFN
+> training-slice LoRA and Rust task run added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -180,6 +181,93 @@ an accepted benchmark trajectory. It is useful as a local RL-seed/policy
 refresh candidate for the Harvey lane. It is not full GRPO/PPO, not a retained
 Harvey score claim, not a Qwen3.6 run, and not live distributed Pylon/Nexus
 settlement.
+
+## Current Harvey MFN Training-Slice Adapter Result
+
+The latest local candidate resumes from the RL-seed adapter and trains on a
+public Harvey MFN task slice:
+
+- run id: `qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004`
+- Harvey task id: `harvey.funds-asset-management.analyze_mfn_waterfall`
+- base model: `Qwen/Qwen3.5-0.8B`
+- parent adapter digest:
+  `06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623`
+- backend: `mlx_lm.lora`
+- logical Pylon worker: `pylon.local.macos.mlx.01.harvey_mfn_slice`
+- data:
+  `fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_slice_2026_05_20_004`
+- adapter:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors`
+- adapter digest:
+  `59c4dede1354cd9d7166e37acfc097090e8c398e729feef5deb77a94fb25b119`
+- report:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/report.json`
+- report SHA-256:
+  `138d73c329896906c5ce8dd9d2e2e71aa9a6cb7b107b262f5e44b289442ad363`
+- checker:
+  `scripts/check-qwen35-08b-legal-mlx-lora-harvey-mfn-slice-fixture.sh`
+
+Observed training facts:
+
+- iterations: `12`
+- first validation loss: `2.389`
+- best recorded validation loss: `2.134` at iteration `8`
+- final validation loss: `3.257`
+- final train loss: `1.248`
+- trained tokens: `8,973`
+- peak memory: `39.396 GB`
+
+Two larger local attempts were tried first (`8192` and `4096` max sequence
+length) and failed or became impractical on the local Metal backend. The
+retained artifact used a compact public-criteria slice at `2048` max sequence
+length.
+
+Serve it locally with:
+
+```bash
+MODEL_ID=Qwen/Qwen3.5-0.8B \
+ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004 \
+PORT=18090 \
+MAX_TOKENS=4096 \
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+Then run the Rust Harvey MFN training-slice example:
+
+```bash
+QWEN_LEGAL_MLX_BASE_URL=http://127.0.0.1:18090/v1 \
+QWEN_LEGAL_ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors \
+QWEN_LEGAL_ADAPTER_DIGEST=59c4dede1354cd9d7166e37acfc097090e8c398e729feef5deb77a94fb25b119 \
+QWEN_LEGAL_ADAPTER_REPORT_DIGEST=138d73c329896906c5ce8dd9d2e2e71aa9a6cb7b107b262f5e44b289442ad363 \
+QWEN_LEGAL_PYLON_WORKER_ID=pylon.local.macos.mlx.01.harvey_mfn_slice \
+QWEN_LEGAL_RUN_NONCE=qwen35-08b-mlx-lora-harvey-mfn-slice-2026-05-20-final \
+cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_mfn_slice -- \
+  fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/harvey_mfn_slice_run
+```
+
+Recorded MFN training-slice result:
+
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `2`
+- criterion-title/token pass count: `8 / 83`
+- pass rate: `963 bps`
+- run record hash:
+  `92de2ada169e5062c2c51af650a52916101f5ecddfb3783d615417641a1c144e`
+- transcript hash:
+  `4f8520896811f389ddf223d38f046308cc962aad2ac8469b151063b74e23fce4`
+- score report digest:
+  `7da1e7559aea3f45466cec8d6c085772ba988b0a10b60b216b5ad1d6000177ad`
+- training record bundle digest:
+  `842430aae1c7a4f675c5b27eadde9f28197833c0ebe22fd6528b28980fc14888`
+- run report digest:
+  `08e57a3cd33fa1bef953251b3e1abc275e66c37b6aac25d870913397ff25ba30`
+
+Tailnet status for this run: `archlinux` was online but required interactive
+Tailscale SSH reauthentication, and `imac-pro-bertha` denied SSH auth. The
+artifact therefore used one local logical Pylon. That is a real fine-tuned
+Qwen LoRA artifact and a real Harvey task run, but it is still not live
+multi-Pylon RL, not a retained Harvey score, and not Qwen3.6.
 
 ## Rust API
 

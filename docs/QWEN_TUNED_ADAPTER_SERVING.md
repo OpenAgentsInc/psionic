@@ -2,7 +2,8 @@
 
 > Status: implemented local smoke metadata path on 2026-05-19; real local
 > Qwen/MLX tool-backed Rust agent smoke added on 2026-05-20; local RL-seed
-> resumed adapter smoke added on 2026-05-20.
+> resumed adapter smoke added on 2026-05-20; public Harvey MFN training-slice
+> adapter and task run added on 2026-05-20.
 
 This document describes the first Psionic legal benchmark path for comparing a
 base Qwen candidate with a tuned Qwen adapter candidate through one
@@ -150,6 +151,70 @@ The recorded Rust agent smoke against this adapter has:
 This is now the strongest local Qwen candidate for the Harvey smoke route. It
 is a resumed LoRA policy refresh from accepted benchmark behavior, not a
 retained Harvey score claim or full RL run.
+
+## Harvey MFN Training-Slice Adapter
+
+The strongest local Harvey-task candidate is now:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors
+```
+
+Report:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/report.json
+```
+
+Adapter SHA-256:
+
+```text
+59c4dede1354cd9d7166e37acfc097090e8c398e729feef5deb77a94fb25b119
+```
+
+Report SHA-256:
+
+```text
+138d73c329896906c5ce8dd9d2e2e71aa9a6cb7b107b262f5e44b289442ad363
+```
+
+Serve it:
+
+```bash
+MODEL_ID=Qwen/Qwen3.5-0.8B \
+ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004 \
+PORT=18090 \
+MAX_TOKENS=4096 \
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+Run it against the public Harvey MFN training slice:
+
+```bash
+QWEN_LEGAL_MLX_BASE_URL=http://127.0.0.1:18090/v1 \
+QWEN_LEGAL_ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors \
+QWEN_LEGAL_ADAPTER_DIGEST=59c4dede1354cd9d7166e37acfc097090e8c398e729feef5deb77a94fb25b119 \
+QWEN_LEGAL_ADAPTER_REPORT_DIGEST=138d73c329896906c5ce8dd9d2e2e71aa9a6cb7b107b262f5e44b289442ad363 \
+QWEN_LEGAL_RUN_NONCE=qwen35-08b-mlx-lora-harvey-mfn-slice-2026-05-20-final \
+cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_mfn_slice -- \
+  fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/harvey_mfn_slice_run
+```
+
+Recorded result:
+
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `2`
+- public training-slice criterion-title/token pass count: `8 / 83`
+- score report digest:
+  `7da1e7559aea3f45466cec8d6c085772ba988b0a10b60b216b5ad1d6000177ad`
+- training record bundle digest:
+  `842430aae1c7a4f675c5b27eadde9f28197833c0ebe22fd6528b28980fc14888`
+
+This is the first local Qwen LoRA candidate that both trains from prior
+accepted benchmark behavior and runs a real Harvey task through the Rust agent
+loop. It is still a public training-slice score, not a retained Harvey
+leaderboard score.
 
 ## Candidate Identity
 

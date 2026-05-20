@@ -1,0 +1,37 @@
+[
+  {
+    "schema_version": 1,
+    "tool_call_id": "31f16637-c219-46dc-845c-58f794d37c0b",
+    "tool_name": "write",
+    "input_hash": "2c192bcb1f561995af2cb7b3009df74360865602f120cdbf312953000089dc47",
+    "output_hash": "515bb32a2c89ba0fb17c182a2cb77dc0c45a1410088f90de7fc3886ce3eec06f",
+    "elapsed_ms": 2,
+    "bytes_read": 0,
+    "bytes_written": 7419,
+    "touched_paths": [
+      {
+        "root": "output",
+        "relative_path": "output.md",
+        "access": "write",
+        "after_hash": "e0880717e75e6f8c6065fddea5413b95a49dc39b7da43359ab757e8957579bd1"
+      }
+    ],
+    "metadata": {
+      "provider_tool_call_id": "31f16637-c219-46dc-845c-58f794d37c0b"
+    }
+  },
+  {
+    "schema_version": 1,
+    "tool_call_id": "77c4c574-30f8-4eae-a201-ebaefbca7d4c",
+    "tool_name": "validate_deliverables",
+    "input_hash": "a08400beb4748b9e92c34d681b9d65fe28ebb1b8ee0b58339e21e87b4a81c5ad",
+    "output_hash": "e20618ad3f5cdbe90a6f079f2f26df7316e891bfd30da048d8b9bfd4310ca074",
+    "elapsed_ms": 0,
+    "bytes_read": 7419,
+    "bytes_written": 0,
+    "touched_paths": [],
+    "metadata": {
+      "provider_tool_call_id": "77c4c574-30f8-4eae-a201-ebaefbca7d4c"
+    }
+  }
+]

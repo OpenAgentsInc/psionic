@@ -266,6 +266,54 @@ where
 
         let mut terminal_from_tool = None;
         for tool_call in &response.tool_calls {
+            if let Some(submission) = submission_from_submit_tool_call(tool_call, &request) {
+                push_transcript_event(
+                    &mut transcript,
+                    TranscriptEventKind::ToolCall,
+                    Some("assistant"),
+                    None,
+                    Some(json!({
+                        "tool_call_id": tool_call.tool_call_id.clone(),
+                        "tool_name": tool_call.tool_name.clone(),
+                        "input": tool_call.arguments.clone(),
+                        "interpreted_as": "terminal_submission",
+                    })),
+                );
+                let protocol =
+                    pre_submit_protocol_report(&request, &tool_calls, &transcript, &submission);
+                if protocol.satisfied {
+                    push_transcript_event(
+                        &mut transcript,
+                        TranscriptEventKind::Runner,
+                        Some("runner"),
+                        Some(String::from("submission accepted")),
+                        Some(json!({"submission": submission, "source": "submit_tool_call"})),
+                    );
+                    terminal_from_tool = Some(RunTerminalState::Submitted);
+                    break;
+                }
+                push_transcript_event(
+                    &mut transcript,
+                    TranscriptEventKind::Runner,
+                    Some("runner"),
+                    Some(String::from("pre-submit protocol incomplete")),
+                    Some(json!({
+                        "submission": submission,
+                        "missing_steps": protocol.missing_steps.clone(),
+                        "source": "submit_tool_call",
+                    })),
+                );
+                if turn_index + 1 >= request.run_config.tool_policy.max_turns {
+                    terminal_from_tool = Some(RunTerminalState::PolicyFailure);
+                    break;
+                }
+                let feedback = format!(
+                    "Pre-submit protocol incomplete. Complete these steps before submitting: {}",
+                    protocol.missing_steps.join("; ")
+                );
+                messages.push(ModelMessage::new(ModelMessageRole::User, feedback));
+                break;
+            }
             let execution =
                 execute_model_tool_call(tool_call, &request.tool_workspace).map_err(|detail| {
                     LegalBenchmarkAgentRunError::ToolInput {
@@ -588,6 +636,77 @@ pub fn parse_submission(text: &str) -> Option<LegalBenchmarkSubmission> {
 
 fn is_submit_action(action: &str) -> bool {
     matches!(action, "submit" | "finalize")
+}
+
+fn submission_from_submit_tool_call(
+    tool_call: &ModelToolCall,
+    request: &LegalBenchmarkAgentRunRequest,
+) -> Option<LegalBenchmarkSubmission> {
+    if !is_submit_action(tool_call.tool_name.as_str()) {
+        return None;
+    }
+    let arguments = if tool_call
+        .arguments
+        .get("deliverables")
+        .and_then(Value::as_array)
+        .is_some()
+    {
+        &tool_call.arguments
+    } else {
+        tool_call
+            .arguments
+            .get("input")
+            .unwrap_or(&tool_call.arguments)
+    };
+    let deliverables = arguments
+        .get("deliverables")
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .filter(|deliverables| !deliverables.is_empty())
+        .unwrap_or_else(|| {
+            request
+                .task_spec
+                .deliverables
+                .iter()
+                .map(|deliverable| deliverable.required_path.clone())
+                .collect()
+        });
+    let action = tool_call
+        .arguments
+        .get("action")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            tool_call
+                .arguments
+                .get("input")
+                .and_then(|input| input.get("action"))
+                .and_then(Value::as_str)
+        })
+        .unwrap_or(tool_call.tool_name.as_str())
+        .to_owned();
+    let note = tool_call
+        .arguments
+        .get("note")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            tool_call
+                .arguments
+                .get("input")
+                .and_then(|input| input.get("note"))
+                .and_then(Value::as_str)
+        })
+        .map(str::to_owned);
+    Some(LegalBenchmarkSubmission {
+        action,
+        deliverables,
+        note,
+    })
 }
 
 fn legal_issue_checklist(task_spec: &BenchmarkTaskSpec) -> Vec<String> {

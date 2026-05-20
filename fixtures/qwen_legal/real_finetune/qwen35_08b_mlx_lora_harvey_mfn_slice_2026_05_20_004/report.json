@@ -1,0 +1,83 @@
+{
+  "schema": "psionic.qwen_legal_mlx_lora.training_report.v1",
+  "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004",
+  "created_at": "2026-05-20T06:09:31Z",
+  "base_model": "Qwen/Qwen3.5-0.8B",
+  "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+  "parent_adapter": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapters.safetensors",
+  "parent_adapter_digest": "06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623",
+  "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors",
+  "adapter_artifact_digest": "59c4dede1354cd9d7166e37acfc097090e8c398e729feef5deb77a94fb25b119",
+  "adapter_config_digest": "dbe9123ec64dbbab7f570a77394484eee57884680a21bdeacb7c199d4610c40a",
+  "train_log_digest": "6b35aa34f6219faede9026d4b3c601e274f7a4b432bb727e2494ffdff9b102fb",
+  "training_backend": "mlx_lm.lora",
+  "training_host": "local_macos_mlx",
+  "pylon_worker_id": "pylon.local.macos.mlx.01.harvey_mfn_slice",
+  "distributed_pylon_status": {
+    "used_nodes": [
+      "pylon.local.macos.mlx.01.harvey_mfn_slice"
+    ],
+    "attempted_tailnet_nodes": [
+      "archlinux",
+      "imac-pro-bertha"
+    ],
+    "blocker": "archlinux required interactive Tailscale SSH reauthentication and imac-pro-bertha denied SSH auth, so this retained artifact used one local logical Pylon."
+  },
+  "data": {
+    "data_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_slice_2026_05_20_004",
+    "source": "public_harvey_mfn_training_slice_plus_prior_rl_seed",
+    "harvey_task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+    "retained_score_claim": false,
+    "train_jsonl_digest": "774f830f37d52c8aa92e4d7b3e3fa26fef45afa07689592cbb1a4fb2fa90680a",
+    "valid_jsonl_digest": "a99924903cb4ae32cae78258f263ab305995f6ab2eae197c03202b5ab857cf4a",
+    "test_jsonl_digest": "bd7b69705b7467dd4cddcfdcb11192a5f610ab1ef50d248e1f4b9dc4fe761e7a",
+    "ideal_output_digest": "11ed489643e6270bb75bc27717407ee33c4c6ad6113ae8e81a1e37f1bf3c5119",
+    "train_records": 5,
+    "valid_records": 2,
+    "test_records": 2
+  },
+  "hyperparameters": {
+    "fine_tune_type": "lora",
+    "optimizer": "adamw",
+    "num_layers": 8,
+    "batch_size": 1,
+    "iterations": 12,
+    "val_batches": 1,
+    "learning_rate": 0.000006,
+    "max_seq_length": 2048,
+    "grad_checkpoint": true
+  },
+  "training_metrics": {
+    "initial_val_loss": 2.389,
+    "best_recorded_val_loss": 2.134,
+    "best_recorded_val_iter": 8,
+    "final_val_loss": 3.257,
+    "final_train_loss": 1.248,
+    "trained_tokens": 8973,
+    "peak_memory_gb": 39.396
+  },
+  "local_attempts": [
+    {
+      "max_seq_length": 8192,
+      "status": "failed_before_artifact",
+      "failure_kind": "metal_out_of_memory_or_too_slow_before_save"
+    },
+    {
+      "max_seq_length": 4096,
+      "status": "failed_before_artifact",
+      "failure_kind": "metal_out_of_memory"
+    },
+    {
+      "max_seq_length": 2048,
+      "status": "completed",
+      "saved_adapter": true
+    }
+  ],
+  "claim_boundary": [
+    "This is an actual local MLX LoRA fine-tune of Qwen/Qwen3.5-0.8B resumed from the prior RL-seed adapter.",
+    "It is trained on a public Harvey MFN training slice and prior legal/tool seed records.",
+    "It does not claim a retained Harvey benchmark score, a full RL/PPO/GRPO run, Qwen3.6 parity, or live multi-Pylon settlement."
+  ],
+  "usable_for_harvey_training_slice": true,
+  "usable_for_retained_score_claim": false
+}
