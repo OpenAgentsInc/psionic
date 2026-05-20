@@ -1,6 +1,7 @@
 # Qwen Legal Adapter Fine-Tune Lane
 
-> Status: implemented smoke lane for `psionic-train` on 2026-05-19.
+> Status: implemented smoke lane for `psionic-train` on 2026-05-19; real
+> local Qwen/MLX LoRA plus Rust legal-agent smoke added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -66,6 +67,39 @@ model: Qwen/Qwen3.5-0.8B
 
 The request model must be the real base model id. The current MLX server tries
 to resolve arbitrary aliases as Hugging Face repos.
+
+The current adapter has also passed the Rust legal benchmark agent smoke:
+
+```bash
+scripts/run-qwen35-08b-legal-mlx-lora-harvey-smoke.sh
+```
+
+Recorded result:
+
+- run id:
+  `run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-2026-05-20`
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `1`
+- generated deliverable:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/harvey_agent_smoke/output/outputs/memo.md`
+- run record hash:
+  `3463444d89f01b57a7d25304cce0a3033665fa01e8ed3c130613db456fd026db`
+- smoke report digest:
+  `13c28f8ff6f3e8fad7b81b537947dfa029295449aa913b8c0b57800be76d90c9`
+- deterministic score report digest:
+  `610eba2cc13ad7a16069d60eee9dbfa95f829ca1a4dfa20bb45108d5f004ac2d`
+- training record bundle digest:
+  `db28588382457abf216b31e00d6875c0525e026a706c3448e78e26c6497e74e3`
+
+This is now a real local Qwen LoRA plus a receipt-backed Rust benchmark-agent
+trajectory. The fixture shares the workspace and output roots only for this
+local smoke because the small Qwen adapter selects the `workspace` root even
+when instructed to use `output`. Production Harvey tasks should keep separate
+workspace and output roots and tune the tool-use policy on retained slices.
+The result exports one canonical legal benchmark training record and is usable
+as a seed trajectory for legal RL ingestion, but it is not itself an RL-trained
+model update or a retained Harvey score claim.
 
 ## Rust API
 

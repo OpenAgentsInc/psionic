@@ -177,9 +177,11 @@ where
 
     let mut terminal_state = None;
     for turn_index in 0..request.run_config.tool_policy.max_turns {
-        let model_request = ModelRequest::new(
+        let effective_allowed_tools = effective_allowed_tools_for_turn(&request, &tool_calls);
+        let model_request = model_request_for_tool_policy(
             format!("model_request.{run_id}.{turn_index}"),
             messages.clone(),
+            &effective_allowed_tools,
         );
         let response = match adapter.complete(&model_request) {
             Ok(response) => response,
@@ -381,15 +383,68 @@ where
     })
 }
 
+fn model_request_for_tool_policy(
+    request_id: impl Into<String>,
+    messages: Vec<ModelMessage>,
+    allowed_tools: &[String],
+) -> ModelRequest {
+    let mut request = ModelRequest::new(request_id, messages);
+    request
+        .tools
+        .retain(|tool| allowed_tools.iter().any(|allowed| allowed == &tool.name));
+    request
+}
+
+fn effective_allowed_tools_for_turn(
+    request: &LegalBenchmarkAgentRunRequest,
+    tool_calls: &[ToolCallRecord],
+) -> Vec<String> {
+    let mut allowed_tools = request.run_config.tool_policy.allowed_tools.clone();
+    if allowed_tools.is_empty()
+        || allowed_tools
+            .iter()
+            .any(|tool| tool == "validate_deliverables")
+        || !request.task_spec.source_artifacts.is_empty()
+    {
+        return allowed_tools;
+    }
+    if required_deliverables_written(request, tool_calls) {
+        allowed_tools.clear();
+    }
+    allowed_tools
+}
+
+fn required_deliverables_written(
+    request: &LegalBenchmarkAgentRunRequest,
+    tool_calls: &[ToolCallRecord],
+) -> bool {
+    request
+        .task_spec
+        .deliverables
+        .iter()
+        .filter(|deliverable| deliverable.required)
+        .all(|deliverable| {
+            tool_calls.iter().any(|call| {
+                call.tool_name == "write"
+                    && call.error_kind.is_none()
+                    && input_relative_path(call).is_some_and(|path| {
+                        output_path_matches(deliverable.required_path.as_str(), path)
+                    })
+            })
+        })
+}
+
 pub fn legal_benchmark_system_prompt(request: &LegalBenchmarkAgentRunRequest) -> String {
     let mut prompt = String::new();
     prompt.push_str("You are running a legal benchmark task under Psionic control.\n");
     prompt.push_str("Use only the listed tools and produce outputs intentionally.\n\n");
     prompt.push_str("Tool policy:\n");
-    prompt.push_str(&format!(
-        "- allowed tools: {}\n",
+    let allowed_tool_label = if request.run_config.tool_policy.allowed_tools.is_empty() {
+        String::from("none")
+    } else {
         request.run_config.tool_policy.allowed_tools.join(", ")
-    ));
+    };
+    prompt.push_str(&format!("- allowed tools: {}\n", allowed_tool_label));
     prompt.push_str(&format!(
         "- network allowed: {}\n",
         request.run_config.tool_policy.network_allowed
@@ -401,9 +456,21 @@ pub fn legal_benchmark_system_prompt(request: &LegalBenchmarkAgentRunRequest) ->
     prompt.push_str(
         "- submit by returning JSON: {\"action\":\"submit\",\"deliverables\":[\"path\"]}.\n\n",
     );
-    prompt.push_str("Tool descriptions:\n");
-    for tool in crate::legal_benchmark_model_tool_specs() {
-        prompt.push_str(&format!("- {}: {}\n", tool.name, tool.description));
+    if request.run_config.tool_policy.allowed_tools.is_empty() {
+        prompt.push_str("Tool descriptions:\n- No model tools are available for this task.\n");
+    } else {
+        prompt.push_str("Tool descriptions:\n");
+        for tool in crate::legal_benchmark_model_tool_specs() {
+            if request
+                .run_config
+                .tool_policy
+                .allowed_tools
+                .iter()
+                .any(|allowed| allowed == &tool.name)
+            {
+                prompt.push_str(&format!("- {}: {}\n", tool.name, tool.description));
+            }
+        }
     }
     append_benchmark_operating_protocol(&mut prompt, request);
     if !request.module_instructions.is_empty() {
@@ -1546,6 +1613,57 @@ mod tests {
         response
     }
 
+    #[derive(Clone, Debug)]
+    struct RecordingModelAdapter {
+        route: ModelProviderRoute,
+        responses: Vec<ModelResponse>,
+        request_tool_names_by_turn: Vec<Vec<String>>,
+    }
+
+    impl RecordingModelAdapter {
+        fn new(route: ModelProviderRoute, response: ModelResponse) -> Self {
+            Self::new_sequence(route, vec![response])
+        }
+
+        fn new_sequence(route: ModelProviderRoute, responses: Vec<ModelResponse>) -> Self {
+            Self {
+                route,
+                responses,
+                request_tool_names_by_turn: Vec::new(),
+            }
+        }
+    }
+
+    impl ModelAdapter for RecordingModelAdapter {
+        fn route(&self) -> &ModelProviderRoute {
+            &self.route
+        }
+
+        fn complete(&mut self, request: &ModelRequest) -> Result<ModelResponse, ModelAdapterError> {
+            self.request_tool_names_by_turn.push(
+                request
+                    .tools
+                    .iter()
+                    .map(|tool| tool.name.clone())
+                    .collect::<Vec<_>>(),
+            );
+            self.responses.drain(..1).next().ok_or_else(|| {
+                ModelAdapterError::new(
+                    ModelAdapterFailureKind::ProviderError,
+                    "recording adapter has no queued response",
+                )
+            })
+        }
+    }
+
+    fn request_tool_names(adapter: &RecordingModelAdapter, turn_index: usize) -> Vec<String> {
+        adapter
+            .request_tool_names_by_turn
+            .get(turn_index)
+            .cloned()
+            .unwrap_or_default()
+    }
+
     fn response_with_protocol_tool_calls(route: &ModelProviderRoute) -> ModelResponse {
         let mut response = response_with_tool_call(route);
         response.response_id = String::from("mock.response.protocol.tools");
@@ -1689,6 +1807,85 @@ mod tests {
         assert!(user_prompt.contains("Practice-area issue checklist"));
         assert!(user_prompt.contains("obligations, conditions, deadlines"));
         assert!(!user_prompt.contains("The memo exists."));
+    }
+
+    #[test]
+    fn agent_request_advertises_only_policy_allowed_tools() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+
+        let mut task = task_spec();
+        task.tool_policy.allowed_tools = vec![String::from("write")];
+        let input_manifest = build_input_artifact_manifest(&task);
+        let config = run_config(&task);
+        let route = ModelProviderRoute::mock("mock.agent.filtered", "deterministic-legal-mock");
+        let mut adapter = RecordingModelAdapter::new(route.clone(), response_submit(&route));
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("tool-filter")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+
+        assert_eq!(result.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(request_tool_names(&adapter, 0), vec![String::from("write")]);
+    }
+
+    #[test]
+    fn agent_suppresses_tools_after_required_write_without_sources() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+
+        let mut task = task_spec();
+        task.tool_policy.allowed_tools = vec![String::from("write")];
+        let input_manifest = build_input_artifact_manifest(&task);
+        let config = run_config(&task);
+        let route =
+            ModelProviderRoute::mock("mock.agent.write_then_submit", "deterministic-legal-mock");
+        let mut adapter = RecordingModelAdapter::new_sequence(
+            route.clone(),
+            vec![response_with_tool_call(&route), response_submit(&route)],
+        );
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("tool-suppression")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+
+        assert_eq!(result.terminal_state, RunTerminalState::Submitted);
+        assert_eq!(request_tool_names(&adapter, 0), vec![String::from("write")]);
+        assert!(request_tool_names(&adapter, 1).is_empty());
     }
 
     #[test]

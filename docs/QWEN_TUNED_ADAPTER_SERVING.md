@@ -1,6 +1,7 @@
 # Qwen Tuned Adapter Serving
 
-> Status: implemented local smoke metadata path on 2026-05-19.
+> Status: implemented local smoke metadata path on 2026-05-19; real local
+> Qwen/MLX tool-backed Rust agent smoke added on 2026-05-20.
 
 This document describes the first Psionic legal benchmark path for comparing a
 base Qwen candidate with a tuned Qwen adapter candidate through one
@@ -59,6 +60,45 @@ aliasing wrapper is added; MLX resolves unknown model ids through Hugging Face.
 Claim boundary: this is a locally trained Qwen-family LoRA adapter suitable for
 smoke benchmark routing. It is not the retained `Qwen/Qwen3.6-35B-A3B` target,
 not RL, and not a retained Harvey score claim.
+
+## Rust Harvey Agent Smoke
+
+With the adapter server running, run the Rust benchmark-agent smoke:
+
+```bash
+scripts/run-qwen35-08b-legal-mlx-lora-harvey-smoke.sh
+```
+
+The 2026-05-20 fixture result is:
+
+- run id:
+  `run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-2026-05-20`
+- terminal state: `submitted`
+- adapter: `Qwen/Qwen3.5-0.8B` plus the committed MLX LoRA adapter
+- output artifact count: `1`
+- tool receipt count: `1`
+- run record hash:
+  `3463444d89f01b57a7d25304cce0a3033665fa01e8ed3c130613db456fd026db`
+- transcript hash:
+  `0b1262fe073f221de39854311216107836d18287612deb8f772332b3beaeaf60`
+- smoke report digest:
+  `13c28f8ff6f3e8fad7b81b537947dfa029295449aa913b8c0b57800be76d90c9`
+- deterministic score report digest:
+  `610eba2cc13ad7a16069d60eee9dbfa95f829ca1a4dfa20bb45108d5f004ac2d`
+- training record bundle digest:
+  `db28588382457abf216b31e00d6875c0525e026a706c3448e78e26c6497e74e3`
+
+The smoke artifacts live at:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/harvey_agent_smoke
+```
+
+This run is useful as an RL trajectory seed because the adapter wrote a
+deliverable through the Rust `write` tool, produced a receipt-backed output
+artifact, submitted through the legal benchmark agent loop, and exported one
+canonical legal benchmark training record. It is still a no-source smoke task,
+not a retained Harvey benchmark score.
 
 ## Candidate Identity
 
@@ -148,5 +188,7 @@ The smoke proves:
 - response metadata records the same digests
 - wrong-template candidate pairs fail closed
 - mock/local smoke scores cannot become retained score claims
+- local MLX-served Qwen adapter can create and submit a tool-backed output
+  artifact through the Rust agent loop
 
 This is not a public Harvey score claim.

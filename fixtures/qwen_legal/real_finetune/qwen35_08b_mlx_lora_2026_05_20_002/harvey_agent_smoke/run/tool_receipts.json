@@ -1,0 +1,23 @@
+[
+  {
+    "schema_version": 1,
+    "tool_call_id": "e948fac9-76cd-469d-bcc0-11931144031a",
+    "tool_name": "write",
+    "input_hash": "559648351a28e76a622530685c09f91f993642f42086723da4f367f6ca8d3e3d",
+    "output_hash": "0a610ac7f9b86ffa02f55777502702c01793e1681182d7d16e5a6bbe24438509",
+    "elapsed_ms": 2,
+    "bytes_read": 0,
+    "bytes_written": 133,
+    "touched_paths": [
+      {
+        "root": "workspace",
+        "relative_path": "outputs/memo.md",
+        "access": "write",
+        "after_hash": "13ac4386636c30cd23d97c10065b45edfdbbac78808bc852caa28db065c69db2"
+      }
+    ],
+    "metadata": {
+      "provider_tool_call_id": "e948fac9-76cd-469d-bcc0-11931144031a"
+    }
+  }
+]
