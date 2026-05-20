@@ -1,0 +1,24 @@
+{
+  "schema_version": "psionic.legal_benchmark.dpo_dataset_manifest.v1",
+  "dataset_id": "legal-dpo-v1",
+  "output_jsonl": "fixtures/legal_benchmark/dpo_smoke/legal-dpo-v1.jsonl",
+  "included_count": 22,
+  "excluded_count": 0,
+  "pair_counts_by_failure_class": {
+    "DidNotWriteRequiredFile": 22
+  },
+  "pair_counts_by_family": {
+    "conciseness": 4,
+    "correct_path": 4,
+    "file_discipline": 4,
+    "integrity_safe": 2,
+    "source_grounding": 4,
+    "submission": 4
+  },
+  "source_receipts": [
+    "fixtures/legal_benchmark/sft_builder_runs/bad/bad_run.json",
+    "good/run_receipt.json"
+  ],
+  "excluded_inputs": [],
+  "dataset_hash": "a63797e5b303db47081e651e5e9468aec3362dd2976b2e24def9d2dd629b50cb"
+}

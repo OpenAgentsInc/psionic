@@ -576,6 +576,7 @@ sources without any runner-added answer text.
 
 The implementation lives in:
 
+- `crates/psionic-train/src/legal_dpo_cli.rs`
 - `crates/psionic-train/src/qwen_legal_adapter_sft.rs`
 - `crates/psionic-train/src/open_adapter.rs`
 - `crates/psionic-train/src/train_runtime.rs`
@@ -647,6 +648,7 @@ Run the focused tests from the repo root:
 
 ```bash
 cargo test -p psionic-train --lib qwen_legal
+cargo test -p psionic-train --lib legal_qwen36_dpo
 cargo test -p psionic-train --lib live_rl_update
 ```
 
@@ -654,13 +656,44 @@ The `qwen_legal` fixture runs a four-step deterministic adapter update,
 exports a loadable LM-head LoRA artifact, saves a checkpoint, restores from a
 midpoint checkpoint, emits an Autopilot4 score-import bundle, and materializes
 the next-phase RL hillclimb plan plus local benchmark reports. The
-`live_rl_update` fixture materializes rollout evidence and promotes a new
-revision only when teacher-logprob alignment is valid.
+`legal_qwen36_dpo` fixture loads a parent SFT adapter, renders legal DPO pairs
+through the Qwen3.6 direct-answer template, runs chosen/rejected weighted
+adapter updates, and checks that the final adapter improves the synthetic
+chosen-over-rejected margin. The `live_rl_update` fixture materializes rollout
+evidence and promotes a new revision only when teacher-logprob alignment is
+valid.
+
+Run the Rust-only command smoke from the repo root:
+
+```bash
+cargo run -p psionic-train -- dpo \
+  --config configs/legal/qwen36_dpo_smoke.json
+```
+
+The command bootstraps the parent SFT adapter from
+`configs/legal/qwen36_sft_smoke.json` when the local target artifact is
+missing, then writes `adapter.safetensors`, `loss_curve.json`,
+`checkpoint_summary.json`, and `training_receipt.json` under
+`target/legal/qwen36_dpo_smoke`.
+
+The 2026-05-20 local command run completed 6 Rust-only DPO steps over 22
+checked smoke pairs. Synthetic preference accuracy moved from `0.59090906` to
+`0.95454544`; average chosen-minus-rejected logprob margin moved from
+`0.3191057` to `4.2714095`. This proves the DPO smoke trainer can push the
+adapter toward file-writing answers over chat-only answers on the synthetic
+surface. It is not a retained Harvey score claim.
+
+The DPO adapter was also accepted by the deterministic replay harness:
+`harvey_public_three_deterministic_replay_v1` reported base `3333` bps,
+adapter `10000` bps, delta `6667` bps, and report hash
+`bd01ce5a8653414a2189d935c80c835c774f55f195ed6809021c135a352faa66`. Treat
+that as replay compatibility evidence only.
 
 The 2026-05-20 local run executed the broader filters with binary targets
 included:
 
 - `cargo test -p psionic-train qwen_legal`: 14 passed
+- `cargo test -p psionic-train legal_qwen36_dpo`: 1 passed
 - `cargo test -p psionic-train live_rl_update`: 2 passed
 
 Those are still local training/RL substrate tests. They are not retained Harvey
