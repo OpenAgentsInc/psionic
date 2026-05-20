@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "receipt_id": "legal.run_receipt.run.sft.good",
+  "run_spec": {
+    "schema_version": 1,
+    "run_id": "run.sft.good",
+    "task_id": "task.sft.good",
+    "task_version": "v1",
+    "benchmark_id": "harvey",
+    "benchmark_visibility": "public",
+    "base_model_id": "qwen",
+    "tokenizer_id": "qwen-tokenizer",
+    "tokenizer_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "prompt_template_id": "legal.autopilot.v1",
+    "prompt_template_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "thinking_mode": "disabled",
+    "tool_list": [
+      "write",
+      "validate_deliverables"
+    ],
+    "source_document_hashes": [
+      {
+        "algorithm": "sha256",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "git_commit": "abcdef1",
+    "git_dirty": false,
+    "deterministic_replay_command": [
+      "cargo",
+      "run"
+    ]
+  },
+  "answer_files": [
+    {
+      "schema_version": 1,
+      "relative_path": "memo.md",
+      "byte_size": 73,
+      "content_hash": {
+        "algorithm": "sha256",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "creation_actor": "model",
+      "last_modifying_actor": "model",
+      "writer_tool_call_id": "call.write.memo",
+      "integrity_valid": true
+    }
+  ],
+  "integrity": {
+    "schema_version": 1,
+    "valid": true,
+    "integrity_report_hash": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "invalid_reasons": []
+  },
+  "tool_calls": [
+    {
+      "tool_call_id": "call.write.memo",
+      "tool_name": "write"
+    }
+  ]
+}

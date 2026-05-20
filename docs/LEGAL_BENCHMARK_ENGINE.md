@@ -140,6 +140,25 @@ cargo test -p psionic-eval failed_trajectory_capture
 cargo run -p psionic-eval --example legal_benchmark_inspect_failures -- <run-dir>
 ```
 
+`crates/psionic-data/src/legal_benchmark_sft_dataset.rs` builds canonical
+`legal_sft_v1` JSONL from honest successful receipts and training-eligible
+bad-run examples. It refuses hidden/private-by-default receipts, unknown
+visibility, answer-integrity failures, non-model answer mutation, hidden
+scoring labels, scorer-only target labels, and known harness-injected marker
+runs. Successful runs become golden workflow, source-grounded answer,
+tool-discipline, and minimal-answer examples when answer file content is
+available. Failed runs stay excluded from raw SFT, but the builder may convert
+training-eligible failures into correction examples.
+
+Use:
+
+```bash
+cargo run -p psionic-data --example legal_benchmark_build_sft_dataset -- \
+  --runs ./runs \
+  --out ./datasets/legal-sft-v1.jsonl \
+  --manifest ./datasets/legal-sft-v1.manifest.json
+```
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

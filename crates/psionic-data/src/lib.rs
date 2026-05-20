@@ -9,6 +9,7 @@
 mod apple_adapter;
 mod apple_adapter_curation;
 mod cs336_a1_bpe;
+mod legal_benchmark_sft_dataset;
 mod legal_benchmark_training_record;
 mod parameter_golf;
 mod psion_benchmark_isolation;
@@ -57,6 +58,7 @@ use thiserror::Error;
 pub use apple_adapter::*;
 pub use apple_adapter_curation::*;
 pub use cs336_a1_bpe::*;
+pub use legal_benchmark_sft_dataset::*;
 pub use legal_benchmark_training_record::*;
 pub use parameter_golf::*;
 pub use psion_benchmark_isolation::*;

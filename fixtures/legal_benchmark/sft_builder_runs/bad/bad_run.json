@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "example_id": "bad_run.run.sft.bad",
+  "full_prompt": "Write memo.md.",
+  "full_model_response": "I stopped before writing the file.",
+  "tool_call_transcript": [],
+  "required_file_paths": [
+    "memo.md"
+  ],
+  "failure_class": "did_not_write_required_file",
+  "suggested_correction": "Write memo.md with a concise legal answer, validate it, then submit.",
+  "training_eligible": true,
+  "sft_eligible": false,
+  "training_eligibility_reasons": []
+}
