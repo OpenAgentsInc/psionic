@@ -73,6 +73,19 @@ Those controls affect request shape, turn order, and tool-call parsing. They
 do not add legal analysis, coverage markers, citations, headings, or scoring
 phrases to output files.
 
+The runner now emits an `answer_integrity` report in both run receipts and run
+metadata. The report records every required or declared answer file, its
+pre-score and post-score hash, size, mtime, writer tool-call id, and actor
+classification. A scored answer file is valid only when a model-authored
+`write` or `edit` tool call produced the final bytes. Files created by the
+harness, files changed during scoring, missing required files, and files whose
+hash no longer matches the model write receipt are marked invalid.
+
+The evaluator reads the same integrity report before and after scoring. If any
+answer file changes during scoring, the score report is forced invalid and the
+diagnostic is retained in `failure_diagnostics`. This keeps invalid runs
+auditable without allowing them into promotion metrics.
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

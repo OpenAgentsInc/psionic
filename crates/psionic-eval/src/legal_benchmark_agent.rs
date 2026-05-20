@@ -14,16 +14,17 @@ use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::{
-    ArtifactKind, ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, DataClassification,
+    ArtifactKind, ArtifactManifest, ArtifactManifestError, BenchmarkIntegrityError,
+    BenchmarkTaskSpec, DataClassification, LegalBenchmarkAnswerIntegrityReport,
     LegalBenchmarkPathRoot, LegalBenchmarkToolExecution, LegalBenchmarkToolFailureKind,
     LegalBenchmarkToolInput, LegalBenchmarkToolReceipt, LegalBenchmarkToolWorkspace, Metadata,
     ModelAdapter, ModelAdapterError, ModelAdapterFailureKind, ModelMessage, ModelMessageRole,
     ModelProviderRoute, ModelRequest, ModelResponse, ModelStopReason, ModelToolCall, RunConfig,
     RunMetrics, RunRecord, RunTerminalState, SourceArtifact, ToolCallRecord, ToolResultMessage,
     TranscriptEvent, TranscriptEventKind, agent_visible_checklist, artifact_from_file,
-    artifact_manifest_digest, build_coverage_snapshot, build_output_artifact_manifest,
-    execute_legal_benchmark_tool, run_config_digest, run_record_digest, stable_json_digest,
-    task_spec_digest, transcript_digest,
+    artifact_manifest_digest, build_answer_integrity_report, build_coverage_snapshot,
+    build_output_artifact_manifest, execute_legal_benchmark_tool, run_config_digest,
+    run_record_digest, stable_json_digest, task_spec_digest, transcript_digest,
 };
 
 pub const LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION: u16 = 1;
@@ -70,6 +71,8 @@ pub struct LegalBenchmarkRunReceipt {
     pub run_record_hash: String,
     pub output_artifact_count: u64,
     pub tool_receipt_count: u64,
+    #[serde(default)]
+    pub answer_integrity: LegalBenchmarkAnswerIntegrityReport,
     pub created_at_ms: u64,
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,
@@ -112,6 +115,8 @@ pub enum LegalBenchmarkAgentRunError {
     Json(#[from] serde_json::Error),
     #[error("artifact manifest error: {0}")]
     ArtifactManifest(#[from] ArtifactManifestError),
+    #[error("benchmark integrity error: {0}")]
+    Integrity(#[from] BenchmarkIntegrityError),
     #[error("provider error: {0:?}")]
     Provider(ModelAdapterError),
     #[error("invalid model tool call {tool_call_id}: {detail}")]
@@ -406,6 +411,12 @@ where
         run_id.clone(),
         output_artifacts,
     );
+    let answer_integrity = build_answer_integrity_report(
+        &request.task_spec,
+        &output_manifest,
+        &request.tool_workspace.output_root,
+        &tool_calls,
+    )?;
     let output_manifest_hash = artifact_manifest_digest(&output_manifest)?;
     let coverage_snapshot = build_coverage_snapshot(
         &request.task_spec,
@@ -414,7 +425,11 @@ where
         &transcript,
         &output_manifest,
     )?;
-    let provider_metadata = provider_route_run_metadata(adapter.route())?;
+    let mut provider_metadata = provider_route_run_metadata(adapter.route())?;
+    provider_metadata.insert(
+        String::from("answer_integrity"),
+        serde_json::to_value(&answer_integrity)?,
+    );
     let run_record = RunRecord {
         schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
         run_id: run_id.clone(),
@@ -453,6 +468,7 @@ where
         run_record_hash: run_record_digest(&run_record)?,
         output_artifact_count: u64::try_from(output_manifest.artifacts.len()).unwrap_or(u64::MAX),
         tool_receipt_count: u64::try_from(tool_receipts.len()).unwrap_or(u64::MAX),
+        answer_integrity,
         created_at_ms: now_ms(),
         metadata: provider_metadata,
     };
@@ -1801,7 +1817,7 @@ mod tests {
     use crate::{
         ArtifactManifestRole, CriterionKind, DeliverableKind, JudgeMode, JudgePolicy,
         MockModelAdapter, ModelProviderRoute, ModelUsage, ToolPolicy,
-        build_input_artifact_manifest,
+        RunActor, build_input_artifact_manifest,
     };
 
     fn task_spec() -> BenchmarkTaskSpec {
@@ -2469,6 +2485,11 @@ mod tests {
                     .as_ref()
                     .is_some_and(|payload| payload.to_string().contains("required text markers"))
         }));
+        assert!(result.run_receipt.answer_integrity.valid);
+        assert_eq!(
+            result.run_receipt.answer_integrity.answer_files[0].last_modifying_actor,
+            RunActor::Model
+        );
     }
 
     #[test]

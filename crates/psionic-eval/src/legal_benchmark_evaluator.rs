@@ -9,8 +9,9 @@ use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::{
-    ArtifactManifest, ArtifactManifestError, BenchmarkTaskSpec, CriterionResult, CriterionSpec,
-    CriterionVerdict, DeliverableKind, DeliverableSpec, JudgePolicy, Metadata, RunRecord,
+    ArtifactManifest, ArtifactManifestError, BenchmarkIntegrityError, BenchmarkIntegrityGuard,
+    BenchmarkTaskSpec, CriterionResult, CriterionSpec, CriterionVerdict, DeliverableKind,
+    DeliverableSpec, JudgePolicy, LegalBenchmarkAnswerIntegrityReport, Metadata, RunRecord,
     ScoreReport, SourceArtifact, artifact_from_file, artifact_manifest_digest,
     classify_criterion_failures, document_coverage_bps_from_snapshot, fallback_coverage_snapshot,
     run_record_digest, score_report_digest, stable_json_digest,
@@ -77,6 +78,8 @@ pub enum LegalBenchmarkEvaluationError {
     Json(#[from] serde_json::Error),
     #[error("artifact manifest error: {0}")]
     ArtifactManifest(#[from] ArtifactManifestError),
+    #[error("benchmark integrity error: {0}")]
+    Integrity(#[from] BenchmarkIntegrityError),
     #[error("judge error: {0}")]
     Judge(String),
 }
@@ -141,8 +144,16 @@ pub fn evaluate_legal_benchmark_run<J>(
 where
     J: LegalBenchmarkJudgeAdapter,
 {
-    let prechecks = run_prechecks(input)?;
-    let failure_diagnostics = prechecks
+    let integrity_guard = BenchmarkIntegrityGuard::before_scoring(
+        &input.task_spec,
+        &input.output_artifact_manifest,
+        &input.output_root,
+        &input.run_record.tool_calls,
+    )?;
+    let initial_answer_integrity = integrity_guard.finalize_after_scoring()?;
+    let mut prechecks = run_prechecks(input)?;
+    prechecks.push(answer_integrity_precheck(&initial_answer_integrity));
+    let mut failure_diagnostics = prechecks
         .iter()
         .filter(|precheck| !precheck.passed)
         .map(|precheck| format!("{}: {}", precheck.precheck_id, precheck.detail))
@@ -184,18 +195,32 @@ where
         )?);
     }
 
+    let answer_integrity = integrity_guard.finalize_after_scoring()?;
+    if !answer_integrity.valid {
+        failure_diagnostics.push(format!(
+            "answer_integrity: {}",
+            answer_integrity.invalid_reasons.join("; ")
+        ));
+    }
+
     let passed_count = criterion_results
         .iter()
         .filter(|result| result.passed)
         .count();
-    let criterion_pass_rate_bps = if criterion_results.is_empty() {
+    let raw_criterion_pass_rate_bps = if criterion_results.is_empty() {
         0
     } else {
         u32::try_from((passed_count * 10_000) / criterion_results.len()).unwrap_or(0)
     };
+    let criterion_pass_rate_bps = if answer_integrity.valid {
+        raw_criterion_pass_rate_bps
+    } else {
+        0
+    };
     let all_pass = criterion_results
         .iter()
-        .all(|result| result.verdict == CriterionVerdict::Pass);
+        .all(|result| result.verdict == CriterionVerdict::Pass)
+        && answer_integrity.valid;
     let mut metrics = input.run_record.metrics.clone();
     metrics.estimated_cost_micro_usd = metrics
         .estimated_cost_micro_usd
@@ -220,6 +245,10 @@ where
     metadata.insert(
         String::from("judge_prompt_template_hash"),
         Value::String(prompt_template_hash),
+    );
+    metadata.insert(
+        String::from("answer_integrity"),
+        serde_json::to_value(&answer_integrity)?,
     );
     let score_report = ScoreReport {
         schema_version: crate::LEGAL_BENCHMARK_SCHEMA_VERSION,
@@ -272,6 +301,28 @@ fn run_prechecks(
         prechecks.push(check_manifest_artifact(input, artifact)?);
     }
     Ok(prechecks)
+}
+
+fn answer_integrity_precheck(
+    report: &LegalBenchmarkAnswerIntegrityReport,
+) -> LegalBenchmarkPrecheck {
+    LegalBenchmarkPrecheck {
+        precheck_id: String::from("answer_integrity"),
+        passed: report.valid,
+        detail: if report.valid {
+            String::from("answer file integrity is valid")
+        } else {
+            format!(
+                "answer file integrity invalid: {}",
+                report.invalid_reasons.join("; ")
+            )
+        },
+        evidence_refs: report
+            .answer_files
+            .iter()
+            .map(|file| file.relative_path.clone())
+            .collect(),
+    }
 }
 
 fn check_deliverable(
@@ -484,9 +535,10 @@ mod tests {
     use super::*;
     use crate::{
         ArtifactKind, ArtifactManifestRole, CriterionKind, DataClassification, DeliverableKind,
-        JudgeMode, RunMetrics, RunTerminalState, ToolPolicy, TranscriptEvent, TranscriptEventKind,
-        build_output_artifact_manifest,
+        JudgeMode, RunMetrics, RunTerminalState, ToolCallRecord, ToolPolicy, TranscriptEvent,
+        TranscriptEventKind, build_output_artifact_manifest,
     };
+    use sha2::{Digest, Sha256};
 
     fn task_spec() -> BenchmarkTaskSpec {
         BenchmarkTaskSpec {
@@ -581,12 +633,44 @@ mod tests {
         }
     }
 
+    fn write_tool_call(relative_path: &str, content: &str) -> ToolCallRecord {
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        let after_hash = hex::encode(hasher.finalize());
+        ToolCallRecord {
+            tool_call_id: String::from("call.write.memo"),
+            tool_name: String::from("write"),
+            call_event_index: 1,
+            result_event_index: Some(2),
+            input: json!({
+                "tool": "write",
+                "input": {
+                    "root": "output",
+                    "relative_path": relative_path,
+                    "content": content,
+                    "overwrite": true
+                }
+            }),
+            output: Some(json!({
+                "tool": "write",
+                "output": {
+                    "relative_path": relative_path,
+                    "bytes_written": content.len(),
+                    "after_hash": after_hash
+                }
+            })),
+            error_kind: None,
+            elapsed_ms: 1,
+        }
+    }
+
     #[test]
     fn evaluator_scores_completed_run_with_mock_judge() {
         let temp = tempfile::tempdir().expect("tempdir");
         let output_root = temp.path().join("output");
         fs::create_dir_all(&output_root).expect("output dir");
-        fs::write(output_root.join("memo.md"), "# Memo\n\nLegal reasoning.\n").expect("memo");
+        let memo_content = "# Memo\n\nLegal reasoning.\n";
+        fs::write(output_root.join("memo.md"), memo_content).expect("memo");
         let task = task_spec();
         let artifact = artifact_from_file(
             "artifact.output.0",
@@ -604,7 +688,9 @@ mod tests {
             vec![artifact],
         );
         assert_eq!(output_manifest.manifest_role, ArtifactManifestRole::Output);
-        let run_record = run_record(&task, &output_manifest);
+        let mut run_record = run_record(&task, &output_manifest);
+        run_record.tool_calls = vec![write_tool_call("memo.md", memo_content)];
+        run_record.metrics.tool_call_count = 1;
         let input = LegalBenchmarkEvaluationInput {
             task_spec: task,
             run_record,
