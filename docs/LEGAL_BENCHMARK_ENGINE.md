@@ -117,6 +117,29 @@ cargo run -p psionic-eval --example legal_benchmark_validate_run_receipt -- <pat
 cargo run -p psionic-eval --example legal_benchmark_print_run_summary -- <path>
 ```
 
+`crates/psionic-eval/src/legal_benchmark_failed_trajectory.rs` captures failed
+legal runs as complete `LegalBadRunExample` artifacts. A bad-run example keeps
+the full prompt, full model response, tool-call transcript, attempted writes,
+required file status, answer content and hashes when present, action sequence,
+stop reason, score, scorer feedback, integrity status, failure class,
+suggested correction, and training eligibility. Bad examples are never marked
+SFT-eligible directly; a later dataset builder has to convert them into a
+positive example or preference pair.
+
+Failure capture currently classifies missing files, wrong output paths, empty
+or badly sized answers, missing source use, hallucinated citations, malformed
+or invalid JSON tool calls, harness integrity failures, scorer outages,
+timeouts, refusals, missing submissions, and uncategorized failures. Hidden and
+private benchmark failures stay audit-only unless an explicit private-training
+override is supplied and no hidden labels or scorer secrets are present.
+
+Use:
+
+```bash
+cargo test -p psionic-eval failed_trajectory_capture
+cargo run -p psionic-eval --example legal_benchmark_inspect_failures -- <run-dir>
+```
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

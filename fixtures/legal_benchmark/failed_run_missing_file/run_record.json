@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "run_id": "run.failed.fixture",
+  "task_id": "legal.failed.fixture",
+  "task_version": "v1",
+  "input_artifact_manifest_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_config_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "output_artifact_manifest_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "terminal_state": "no_tool_calls",
+  "transcript": [
+    {
+      "event_index": 0,
+      "event_kind": "system",
+      "role": "system",
+      "content": "Use the legal benchmark tools.",
+      "timestamp_ms": 1
+    },
+    {
+      "event_index": 1,
+      "event_kind": "user",
+      "role": "user",
+      "content": "Write memo.md.",
+      "timestamp_ms": 1
+    },
+    {
+      "event_index": 2,
+      "event_kind": "assistant",
+      "role": "assistant",
+      "content": "I cannot complete this.",
+      "payload": {
+        "stop_reason": "stop"
+      },
+      "timestamp_ms": 2
+    }
+  ],
+  "tool_calls": [],
+  "metrics": {
+    "model_turns": 1,
+    "tool_call_count": 0,
+    "input_tokens": 10,
+    "output_tokens": 5,
+    "wall_time_ms": 100,
+    "estimated_cost_micro_usd": 1
+  }
+}

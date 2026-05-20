@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "task_id": "legal.failed.fixture",
+  "task_version": "v1",
+  "domain": "legal",
+  "practice_area": "contracts",
+  "workflow": "review",
+  "title": "Failed fixture",
+  "instructions": "Write memo.md.",
+  "work_type": "review",
+  "tags": [
+    "failed_trajectory_capture"
+  ],
+  "source_artifacts": [],
+  "deliverables": [
+    {
+      "deliverable_id": "memo",
+      "deliverable_kind": "markdown",
+      "required_path": "memo.md",
+      "description": "Memo",
+      "required": true
+    }
+  ],
+  "criteria": [
+    {
+      "criterion_id": "criterion.memo",
+      "criterion_kind": "deliverable_validation",
+      "description": "The memo exists.",
+      "weight_bps": 10000,
+      "deliverable_ids": [
+        "memo"
+      ]
+    }
+  ],
+  "judge_policy": {
+    "mode": "deterministic",
+    "provider": "mock",
+    "model": "mock",
+    "prompt_template_id": "judge",
+    "prompt_template_hash": "hash",
+    "all_pass_required": true,
+    "sample_count": 1
+  },
+  "tool_policy": {
+    "allowed_tools": [
+      "write"
+    ],
+    "network_allowed": false,
+    "source_artifacts_read_only": true,
+    "max_turns": 2,
+    "max_wall_time_seconds": 60
+  }
+}

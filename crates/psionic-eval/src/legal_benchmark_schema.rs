@@ -59,6 +59,26 @@ pub enum LegalPromotionDecisionKind {
     Quarantine,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LegalFailureClass {
+    DidNotWriteRequiredFile,
+    WroteWrongPath,
+    WroteEmptyFile,
+    WroteTooLong,
+    WroteTooShort,
+    FailedToUseSources,
+    HallucinatedCitations,
+    DidNotSubmit,
+    ToolCallMalformed,
+    InvalidJson,
+    HarnessIntegrityFailure,
+    ScorerUnavailable,
+    Timeout,
+    ModelRefusal,
+    Other,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LegalContentDigest {
     pub algorithm: String,
@@ -666,8 +686,57 @@ pub struct LegalBadRunExample {
     pub schema_version: u16,
     pub example_id: String,
     pub run_receipt_hash: LegalContentDigest,
-    pub rejection_reason: String,
+    pub full_prompt: String,
+    pub full_model_response: String,
+    pub tool_call_transcript: Vec<LegalToolCall>,
+    pub attempted_file_writes: Vec<LegalAttemptedFileWrite>,
+    pub required_file_paths: Vec<String>,
+    pub required_files: Vec<LegalRequiredFileStatus>,
+    pub answer_files: Vec<LegalCapturedAnswerFile>,
+    pub action_sequence: Vec<String>,
+    pub stop_reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_bps: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scorer_feedback: Option<String>,
     pub integrity: LegalIntegrityReceipt,
+    pub failure_class: LegalFailureClass,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggested_correction: Option<String>,
+    pub training_eligible: bool,
+    pub sft_eligible: bool,
+    pub training_eligibility_reasons: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_malformed_text: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LegalAttemptedFileWrite {
+    pub relative_path: String,
+    pub tool_call_id: String,
+    pub tool_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<LegalContentDigest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub byte_len: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LegalRequiredFileStatus {
+    pub relative_path: String,
+    pub existed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<LegalContentDigest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub byte_len: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LegalCapturedAnswerFile {
+    pub relative_path: String,
+    pub content: String,
+    pub content_hash: LegalContentDigest,
+    pub byte_len: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
