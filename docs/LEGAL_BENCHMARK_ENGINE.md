@@ -159,6 +159,46 @@ cargo run -p psionic-data --example legal_benchmark_build_sft_dataset -- \
   --manifest ./datasets/legal-sft-v1.manifest.json
 ```
 
+`crates/psionic-data/src/legal_benchmark_dpo_dataset.rs` builds canonical
+`legal_dpo_v1` JSONL preference pairs from honest good runs and
+training-eligible bad-run examples. Each pair has the Rust/Psionic-native DPO
+shape:
+
+- `prompt`: system message plus the original task prompt and one explicit
+  training focus
+- `chosen`: the model-written legal answer or correct tool trajectory to
+  imitate
+- `rejected`: the bad model response or broken trajectory to avoid
+- `reason`: normalized failure class, such as `DidNotWriteRequiredFile`
+- `source_run_ids`, `visibility`, and `exclusion_flags`
+
+The builder emits file-discipline, correct-path, source-grounding,
+conciseness, submission, and integrity-safe pair families. Its manifest records
+total pair count, excluded input count, pair counts by failure class, pair
+counts by family, source receipt refs, excluded input reasons, and a dataset
+hash.
+
+The DPO builder uses the same safety boundary as the SFT builder: hidden and
+private benchmark labels are rejected, unknown visibility is rejected,
+integrity-invalid successful runs are rejected, harness-authored answer files
+are rejected, hidden/scorer-only markers are rejected, and integrity-invalid or
+harness-assisted bad runs are excluded instead of being used as negative
+examples. The checked local fixture currently yields 22 public-training pairs
+from one good run and one `DidNotWriteRequiredFile` bad run.
+
+Use:
+
+```bash
+cargo run -p psionic-data --example legal_benchmark_build_dpo_dataset -- \
+  --runs ./runs \
+  --out ./datasets/legal-dpo-v1.jsonl
+```
+
+The optional `--manifest ./datasets/legal-dpo-v1.manifest.json` flag overrides
+the default manifest path derived from the JSONL output path. The loader
+function `load_legal_dpo_dataset` is the handoff point for the Psionic DPO
+trainer.
+
 Qwen3.6 prompt handling is Rust-native. `crates/psionic-models/src/qwen36.rs`
 renders Qwen3.6 chat prompts in explicit `Thinking`, `DirectAnswer`, and
 `MixedExplicit` modes without using `/think` or `/nothink` soft-switch tokens.
