@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "run_config_id": "run_config.qwen35_08b_mlx_lora.harvey_mfn_training_slice",
+  "provider": "openai_compatible.local_mlx",
+  "model": "Qwen/Qwen3.5-0.8B",
+  "agent_protocol_version": "legal-agent-loop.v1",
+  "tool_policy": {
+    "allowed_tools": [
+      "write",
+      "validate_deliverables"
+    ],
+    "network_allowed": false,
+    "source_artifacts_read_only": true,
+    "max_turns": 6,
+    "max_wall_time_seconds": 180
+  },
+  "judge_policy": {
+    "mode": "deterministic",
+    "provider": "psionic",
+    "model": "deterministic-no-cheat-work-product",
+    "prompt_template_id": "judge.harvey_training_slice.no_cheat_mfn_work_product.v1",
+    "prompt_template_hash": "hash.harvey_training_slice.no_cheat_mfn_work_product.v1",
+    "all_pass_required": true,
+    "sample_count": 1
+  },
+  "random_seed": 11,
+  "metadata": {
+    "adapter_artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "coverage_mode": "hill_climb",
+    "derived_checklist_items": [
+      {
+        "item_id": "work_product.mfn.0",
+        "prompt": "Identify every relevant LP and separate first-close from final-close MFN treatment.",
+        "source": "psionic_mfn_work_product_requirements",
+        "agent_visible": true
+      },
+      {
+        "item_id": "work_product.mfn.1",
+        "prompt": "State the MFN threshold and explain which LPs fall above or below it.",
+        "source": "psionic_mfn_work_product_requirements",
+        "agent_visible": true
+      },
+      {
+        "item_id": "work_product.mfn.2",
+        "prompt": "Analyze exclusions instead of listing them mechanically.",
+        "source": "psionic_mfn_work_product_requirements",
+        "agent_visible": true
+      },
+      {
+        "item_id": "work_product.mfn.3",
+        "prompt": "Compare side-letter economics, including fee and carry terms.",
+        "source": "psionic_mfn_work_product_requirements",
+        "agent_visible": true
+      },
+      {
+        "item_id": "work_product.mfn.4",
+        "prompt": "Call out governance and challenge risks.",
+        "source": "psionic_mfn_work_product_requirements",
+        "agent_visible": true
+      },
+      {
+        "item_id": "work_product.mfn.5",
+        "prompt": "End with recommended elections, open assumptions, and source limits.",
+        "source": "psionic_mfn_work_product_requirements",
+        "agent_visible": true
+      }
+    ],
+    "max_output_tokens": 4096,
+    "runner_content_mutation_allowed": false,
+    "score_scope": "rubric_free_mfn_work_product_quality_proxy"
+  }
+}

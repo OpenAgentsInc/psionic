@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.002c4b06fcb9.qwen35-08b-mlx-lora-harvey-no-cheat-suite-model_only-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "terminal_state": "no_tool_calls",
+  "task_spec_hash": "2669395da397864da57edc6bd638b276130512aaa3b073be288afd04db23684e",
+  "input_artifact_manifest_hash": "f0b444b17f9dde36e1d72d8f68726d4c15e023da87f1dca2266a6d13a8345e87",
+  "run_config_hash": "002c4b06fcb9ad5f04a58181af466a4f9d3657a87fe5d39c57c83271388276e1",
+  "output_artifact_manifest_hash": "42d9f3a298278a676321c0e7fabc55dacc1196a3f403cc5ca0f265244bfc7b28",
+  "transcript_hash": "71af345fdae15236d7b02e82695c7e5b939826df1c66ffd2c8f597b7488b11e1",
+  "metrics_hash": "efb46d6c628889405a843b97c4f8441ba3077de30cb532854a15530d08f035a0",
+  "tool_receipts_hash": "47ac641a11daaeeb4508aa4728835c11d386f33b961288276b33fe6ba061cf07",
+  "run_record_hash": "dee427d0a3c24af6c3c05de80e45e35f5f4205a754f2e0b713b4d5653c8c1979",
+  "output_artifact_count": 0,
+  "tool_receipt_count": 1,
+  "created_at_ms": 1779286820073,
+  "metadata": {
+    "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "599594bde97c98c14251832ece541dcab180d067f9c2e735684f067e85ebda0b",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.model_only",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

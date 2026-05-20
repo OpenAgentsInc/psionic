@@ -890,6 +890,7 @@ impl ModelRequest {
             "route": route,
             "sampling": self.sampling,
             "tools": self.tools,
+            "metadata": self.metadata,
         });
         stable_json_digest("psionic.legal_benchmark.model_config.v1", &value).map_err(|err| {
             ModelAdapterError::new(
@@ -1545,10 +1546,24 @@ fn build_openai_request(
     let mut body = json!({
         "model": route.model_id,
         "messages": messages,
-        "tools": tools,
-        "tool_choice": "auto",
         "max_completion_tokens": request.sampling.max_output_tokens,
     });
+    if !tools.is_empty() {
+        body["tools"] = json!(tools);
+        body["tool_choice"] = Value::String(String::from("auto"));
+        if let Some(tool_choice) = request.metadata.get("tool_choice").and_then(Value::as_str) {
+            if tool_choice == "auto" {
+                body["tool_choice"] = Value::String(String::from("auto"));
+            } else {
+                body["tool_choice"] = json!({
+                    "type": "function",
+                    "function": {
+                        "name": tool_choice
+                    }
+                });
+            }
+        }
+    }
     if let Some(temperature) = request.sampling.temperature {
         body["temperature"] = json!(temperature);
     }

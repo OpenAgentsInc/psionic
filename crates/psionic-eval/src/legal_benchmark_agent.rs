@@ -27,9 +27,6 @@ use crate::{
 };
 
 pub const LEGAL_BENCHMARK_AGENT_SCHEMA_VERSION: u16 = 1;
-const REQUIRED_OUTPUT_MARKERS_METADATA_KEY: &str = "required_output_markers";
-const APPLY_REQUIRED_OUTPUT_MARKERS_ON_WRITE_METADATA_KEY: &str =
-    "apply_required_output_markers_on_write";
 
 #[derive(Clone, Debug)]
 pub struct LegalBenchmarkAgentRunRequest {
@@ -101,18 +98,6 @@ pub struct LegalBenchmarkSubmission {
 struct PreSubmitProtocolReport {
     satisfied: bool,
     missing_steps: Vec<String>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct RequiredOutputMarker {
-    path: String,
-    label: String,
-    marker: String,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct OutputMarkerPrefixReport {
-    applied_labels: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -193,11 +178,14 @@ where
     let mut terminal_state = None;
     for turn_index in 0..request.run_config.tool_policy.max_turns {
         let effective_allowed_tools = effective_allowed_tools_for_turn(&request, &tool_calls);
+        let forced_tool_choice =
+            forced_tool_choice_for_turn(&request, &tool_calls, &effective_allowed_tools);
         let model_request = model_request_for_tool_policy(
             format!("model_request.{run_id}.{turn_index}"),
             messages.clone(),
             &effective_allowed_tools,
             &request.run_config.metadata,
+            forced_tool_choice.as_deref(),
         );
         let response = match adapter.complete(&model_request) {
             Ok(response) => response,
@@ -219,9 +207,19 @@ where
             response.final_text.clone(),
             response.tool_calls.clone(),
         ));
+        let plain_text_tool_call = if response.tool_calls.is_empty()
+            && plain_text_tool_protocol_enabled(&request.run_config.metadata)
+        {
+            response
+                .final_text
+                .as_deref()
+                .and_then(parse_plain_text_tool_call)
+        } else {
+            None
+        };
 
         match response.stop_reason {
-            ModelStopReason::MaxTokens => {
+            ModelStopReason::MaxTokens if plain_text_tool_call.is_none() => {
                 terminal_state = Some(RunTerminalState::MaxTokens);
                 break;
             }
@@ -233,10 +231,43 @@ where
                 terminal_state = Some(RunTerminalState::ProviderFailure);
                 break;
             }
-            ModelStopReason::Stop | ModelStopReason::ToolCalls => {}
+            ModelStopReason::MaxTokens | ModelStopReason::Stop | ModelStopReason::ToolCalls => {}
         }
 
         if response.tool_calls.is_empty() {
+            if let Some(tool_call) = plain_text_tool_call {
+                push_transcript_event(
+                    &mut transcript,
+                    TranscriptEventKind::Runner,
+                    Some("runner"),
+                    Some(String::from("model-authored plain-text tool call accepted")),
+                    Some(json!({
+                        "tool_call_id": tool_call.tool_call_id.clone(),
+                        "tool_name": tool_call.tool_name.clone(),
+                    })),
+                );
+                let execution = execute_model_tool_call(&tool_call, &request.tool_workspace)
+                    .map_err(|detail| LegalBenchmarkAgentRunError::ToolInput {
+                        tool_call_id: tool_call.tool_call_id.clone(),
+                        detail,
+                    })?;
+                let tool_result_message = append_tool_execution(
+                    &mut transcript,
+                    &mut tool_calls,
+                    &mut tool_receipts,
+                    &tool_call,
+                    execution,
+                )?;
+                metrics.tool_call_count = metrics.tool_call_count.saturating_add(1);
+                messages.push(ModelMessage::new(
+                    ModelMessageRole::User,
+                    format!(
+                        "Tool result for {}: {}",
+                        tool_result_message.tool_name, tool_result_message.content
+                    ),
+                ));
+                continue;
+            }
             match response.final_text.as_deref().and_then(parse_submission) {
                 Some(submission) if is_submit_action(&submission.action) => {
                     let protocol =
@@ -330,32 +361,18 @@ where
                 messages.push(ModelMessage::new(ModelMessageRole::User, feedback));
                 break;
             }
-            let mut executable_tool_call = tool_call.clone();
-            let prefix_report =
-                apply_required_output_markers_on_write(&mut executable_tool_call, &request);
-            if !prefix_report.applied_labels.is_empty() {
-                push_transcript_event(
-                    &mut transcript,
-                    TranscriptEventKind::Runner,
-                    Some("runner"),
-                    Some(String::from("Blueprint output scaffold applied")),
-                    Some(json!({
-                        "tool_call_id": executable_tool_call.tool_call_id.clone(),
-                        "tool_name": executable_tool_call.tool_name.clone(),
-                        "applied_labels": prefix_report.applied_labels,
-                    })),
-                );
-            }
-            let execution = execute_model_tool_call(&executable_tool_call, &request.tool_workspace)
-                .map_err(|detail| LegalBenchmarkAgentRunError::ToolInput {
-                    tool_call_id: executable_tool_call.tool_call_id.clone(),
-                    detail,
+            let execution =
+                execute_model_tool_call(tool_call, &request.tool_workspace).map_err(|detail| {
+                    LegalBenchmarkAgentRunError::ToolInput {
+                        tool_call_id: tool_call.tool_call_id.clone(),
+                        detail,
+                    }
                 })?;
             let tool_result_message = append_tool_execution(
                 &mut transcript,
                 &mut tool_calls,
                 &mut tool_receipts,
-                &executable_tool_call,
+                tool_call,
                 execution,
             )?;
             metrics.tool_call_count = metrics.tool_call_count.saturating_add(1);
@@ -466,6 +483,7 @@ fn model_request_for_tool_policy(
     messages: Vec<ModelMessage>,
     allowed_tools: &[String],
     run_metadata: &Metadata,
+    forced_tool_choice: Option<&str>,
 ) -> ModelRequest {
     let mut request = ModelRequest::new(request_id, messages);
     request
@@ -479,7 +497,129 @@ fn model_request_for_tool_policy(
     {
         request.sampling.max_output_tokens = max_output_tokens;
     }
+    if let Some(tool_name) = forced_tool_choice {
+        request.metadata.insert(
+            String::from("tool_choice"),
+            Value::String(tool_name.to_owned()),
+        );
+    }
+    if plain_text_tool_protocol_enabled(run_metadata) {
+        request.tools.clear();
+        request
+            .metadata
+            .insert(String::from("plain_text_tool_protocol"), Value::Bool(true));
+    }
     request
+}
+
+fn plain_text_tool_protocol_enabled(metadata: &Metadata) -> bool {
+    metadata
+        .get("plain_text_tool_protocol")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn parse_plain_text_tool_call(text: &str) -> Option<ModelToolCall> {
+    let value = parse_json_value_from_text(text)?;
+    let tool_name = value
+        .get("tool")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("action").and_then(Value::as_str))?
+        .to_owned();
+    if is_submit_action(tool_name.as_str()) {
+        return None;
+    }
+    let arguments = normalize_plain_text_tool_arguments(
+        tool_name.as_str(),
+        value
+            .get("input")
+            .cloned()
+            .or_else(|| value.get("arguments").cloned())?,
+    )?;
+    let tool_call_hash =
+        stable_json_digest("psionic.legal_benchmark.plain_text_tool_call.v1", &value).ok()?;
+    Some(ModelToolCall {
+        tool_call_id: format!(
+            "plain_text_tool.{}",
+            tool_call_hash.chars().take(16).collect::<String>()
+        ),
+        tool_name,
+        arguments,
+    })
+}
+
+fn normalize_plain_text_tool_arguments(tool_name: &str, arguments: Value) -> Option<Value> {
+    match tool_name {
+        "write" => {
+            if arguments.get("root").is_some()
+                && arguments.get("relative_path").is_some()
+                && arguments.get("content").is_some()
+            {
+                return Some(arguments);
+            }
+            let path = arguments
+                .get("relative_path")
+                .or_else(|| arguments.get("path"))?
+                .as_str()?;
+            let content = arguments.get("content")?.as_str()?;
+            Some(json!({
+                "root": arguments
+                    .get("root")
+                    .and_then(Value::as_str)
+                    .unwrap_or("output"),
+                "relative_path": normalize_output_path(path),
+                "content": content,
+                "overwrite": arguments
+                    .get("overwrite")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true),
+            }))
+        }
+        "validate_deliverables" => {
+            if arguments.get("root").is_some() && arguments.get("required_paths").is_some() {
+                return Some(arguments);
+            }
+            let path = arguments
+                .get("path")
+                .or_else(|| arguments.get("relative_path"))?
+                .as_str()?;
+            Some(json!({
+                "root": arguments
+                    .get("root")
+                    .and_then(Value::as_str)
+                    .unwrap_or("output"),
+                "required_paths": [normalize_output_path(path)],
+                "max_results": arguments
+                    .get("max_results")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(5),
+            }))
+        }
+        _ => Some(arguments),
+    }
+}
+
+fn parse_json_value_from_text(text: &str) -> Option<Value> {
+    let trimmed = text.trim();
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        return Some(value);
+    }
+    let without_fence = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .and_then(|value| value.strip_suffix("```"))
+        .map(str::trim);
+    if let Some(candidate) = without_fence
+        && let Ok(value) = serde_json::from_str::<Value>(candidate)
+    {
+        return Some(value);
+    }
+    let start = trimmed.find('{')?;
+    let end = trimmed.rfind('}')?;
+    if end <= start {
+        return None;
+    }
+    serde_json::from_str::<Value>(&trimmed[start..=end]).ok()
 }
 
 fn effective_allowed_tools_for_turn(
@@ -519,6 +659,47 @@ fn required_deliverables_written(
                     })
             })
         })
+}
+
+fn required_deliverables_validated(
+    request: &LegalBenchmarkAgentRunRequest,
+    tool_calls: &[ToolCallRecord],
+) -> bool {
+    request
+        .task_spec
+        .deliverables
+        .iter()
+        .filter(|deliverable| deliverable.required)
+        .all(|deliverable| deliverable_validation_passed(tool_calls, &deliverable.required_path))
+}
+
+fn forced_tool_choice_for_turn(
+    request: &LegalBenchmarkAgentRunRequest,
+    tool_calls: &[ToolCallRecord],
+    allowed_tools: &[String],
+) -> Option<String> {
+    let metadata = &request.run_config.metadata;
+    let allowed = |tool_name: &str| allowed_tools.iter().any(|tool| tool == tool_name);
+    if metadata
+        .get("force_write_until_required_deliverables")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        && allowed("write")
+        && !required_deliverables_written(request, tool_calls)
+    {
+        return Some(String::from("write"));
+    }
+    if metadata
+        .get("force_validate_after_write")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        && allowed("validate_deliverables")
+        && required_deliverables_written(request, tool_calls)
+        && !required_deliverables_validated(request, tool_calls)
+    {
+        return Some(String::from("validate_deliverables"));
+    }
+    None
 }
 
 pub fn legal_benchmark_system_prompt(request: &LegalBenchmarkAgentRunRequest) -> String {
@@ -937,14 +1118,6 @@ fn pre_submit_protocol_report(
         }
     }
 
-    let missing_output_markers = missing_required_output_markers(request);
-    if !missing_output_markers.is_empty() {
-        missing_steps.push(format!(
-            "revise output files to include Blueprint required text markers: {}",
-            format_missing_output_markers(&missing_output_markers)
-        ));
-    }
-
     if !source_artifacts.is_empty() {
         if allowed_tool(request, "inventory")
             && !inventory_discovers_all(tool_calls, source_artifacts)
@@ -1174,152 +1347,6 @@ fn deliverable_validation_passed(tool_calls: &[ToolCallRecord], required_path: &
                     })
                 })
     })
-}
-
-fn missing_required_output_markers(
-    request: &LegalBenchmarkAgentRunRequest,
-) -> Vec<RequiredOutputMarker> {
-    required_output_markers(request)
-        .into_iter()
-        .filter(|marker| {
-            let output_path = request
-                .tool_workspace
-                .output_root
-                .join(normalize_output_path(marker.path.as_str()));
-            fs::read_to_string(output_path)
-                .map(|content| !content.contains(marker.marker.as_str()))
-                .unwrap_or(true)
-        })
-        .collect()
-}
-
-fn required_output_markers(request: &LegalBenchmarkAgentRunRequest) -> Vec<RequiredOutputMarker> {
-    let default_path = request
-        .task_spec
-        .deliverables
-        .iter()
-        .find(|deliverable| deliverable.required)
-        .map(|deliverable| deliverable.required_path.clone())
-        .unwrap_or_else(|| String::from("output.md"));
-    request
-        .run_config
-        .metadata
-        .get(REQUIRED_OUTPUT_MARKERS_METADATA_KEY)
-        .and_then(Value::as_array)
-        .map(|markers| {
-            markers
-                .iter()
-                .filter_map(|value| match value {
-                    Value::String(marker) if !marker.is_empty() => Some(RequiredOutputMarker {
-                        path: default_path.clone(),
-                        label: marker.clone(),
-                        marker: marker.clone(),
-                    }),
-                    Value::Object(object) => {
-                        let marker = object
-                            .get("marker")
-                            .or_else(|| object.get("contains"))
-                            .and_then(Value::as_str)?
-                            .to_owned();
-                        if marker.is_empty() {
-                            return None;
-                        }
-                        let path = object
-                            .get("path")
-                            .or_else(|| object.get("required_path"))
-                            .and_then(Value::as_str)
-                            .unwrap_or(default_path.as_str())
-                            .to_owned();
-                        let label = object
-                            .get("label")
-                            .and_then(Value::as_str)
-                            .unwrap_or(marker.as_str())
-                            .to_owned();
-                        Some(RequiredOutputMarker {
-                            path,
-                            label,
-                            marker,
-                        })
-                    }
-                    _ => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn apply_required_output_markers_on_write(
-    tool_call: &mut ModelToolCall,
-    request: &LegalBenchmarkAgentRunRequest,
-) -> OutputMarkerPrefixReport {
-    if tool_call.tool_name != "write"
-        || !request
-            .run_config
-            .metadata
-            .get(APPLY_REQUIRED_OUTPUT_MARKERS_ON_WRITE_METADATA_KEY)
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    {
-        return OutputMarkerPrefixReport::default();
-    }
-    if tool_call.arguments.get("root").and_then(Value::as_str) != Some("output") {
-        return OutputMarkerPrefixReport::default();
-    }
-    let Some(relative_path) = tool_call
-        .arguments
-        .get("relative_path")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-    else {
-        return OutputMarkerPrefixReport::default();
-    };
-    let Some(content) = tool_call
-        .arguments
-        .get("content")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-    else {
-        return OutputMarkerPrefixReport::default();
-    };
-
-    let markers = required_output_markers(request)
-        .into_iter()
-        .filter(|marker| output_path_matches(marker.path.as_str(), relative_path.as_str()))
-        .filter(|marker| !content.contains(marker.marker.as_str()))
-        .collect::<Vec<_>>();
-    if markers.is_empty() {
-        return OutputMarkerPrefixReport::default();
-    }
-
-    let prefix = markers
-        .iter()
-        .map(|marker| marker.marker.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
-    tool_call.arguments["content"] = Value::String(format!("{prefix}\n\n{content}"));
-    OutputMarkerPrefixReport {
-        applied_labels: markers.into_iter().map(|marker| marker.label).collect(),
-    }
-}
-
-fn format_missing_output_markers(missing_markers: &[RequiredOutputMarker]) -> String {
-    let mut parts = missing_markers
-        .iter()
-        .take(6)
-        .map(|marker| {
-            format!(
-                "{} at {} must include exact text: {}",
-                marker.label, marker.path, marker.marker
-            )
-        })
-        .collect::<Vec<_>>();
-    if missing_markers.len() > parts.len() {
-        parts.push(format!(
-            "{} additional required marker(s) missing",
-            missing_markers.len() - parts.len()
-        ));
-    }
-    parts.join("; ")
 }
 
 fn submission_note_self_checks(note: Option<&str>) -> bool {
@@ -2371,7 +2398,7 @@ mod tests {
     }
 
     #[test]
-    fn required_output_markers_trigger_pre_submit_repair() {
+    fn legacy_output_marker_metadata_does_not_mutate_model_write() {
         let temp = tempfile::tempdir().expect("tempdir");
         let root = temp.keep();
         let documents_root = root.join("documents");
@@ -2388,12 +2415,16 @@ mod tests {
         let input_manifest = build_input_artifact_manifest(&task);
         let mut config = run_config(&task);
         config.metadata.insert(
-            String::from(REQUIRED_OUTPUT_MARKERS_METADATA_KEY),
+            String::from("required_output_markers"),
             json!([{
                 "path": "memo.md",
                 "label": "coverage line",
                 "marker": "COVERAGE-OK"
             }]),
+        );
+        config.metadata.insert(
+            String::from("apply_required_output_markers_on_write"),
+            Value::Bool(true),
         );
         let route = ModelProviderRoute::mock("mock.output_markers", "deterministic-legal-mock");
         let mut adapter = MockModelAdapter::new(
@@ -2403,12 +2434,6 @@ mod tests {
                     &route,
                     "mock.response.missing_marker",
                     "# Memo\n\nNo marker yet.\n",
-                )),
-                Ok(response_submit(&route)),
-                Ok(response_write_validate_memo(
-                    &route,
-                    "mock.response.repaired_marker",
-                    "# Memo\n\nCOVERAGE-OK\n",
                 )),
                 Ok(response_submit(&route)),
             ],
@@ -2430,18 +2455,19 @@ mod tests {
         let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
 
         assert_eq!(result.terminal_state, RunTerminalState::Submitted);
-        assert_eq!(result.run_record.metrics.model_turns, 4);
+        assert_eq!(result.run_record.metrics.model_turns, 2);
         assert!(
-            fs::read_to_string(output_root.join("memo.md"))
+            !fs::read_to_string(output_root.join("memo.md"))
                 .expect("memo")
-                .contains("COVERAGE-OK")
+                .contains("COVERAGE-OK"),
+            "runner must not add text that the model did not write"
         );
-        assert!(result.run_record.transcript.iter().any(|event| {
-            event.payload.as_ref().is_some_and(|payload| {
-                payload
-                    .to_string()
-                    .contains("Blueprint required text markers")
-            })
+        assert!(!result.run_record.transcript.iter().any(|event| {
+            event.content.as_deref() == Some("Blueprint output scaffold applied")
+                || event
+                    .payload
+                    .as_ref()
+                    .is_some_and(|payload| payload.to_string().contains("required text markers"))
         }));
     }
 

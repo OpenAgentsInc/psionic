@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.corporate-ma.identify_earnout_issues.002c4b06fcb9.qwen35-08b-mlx-lora-harvey-no-cheat-suite-model_only-harvey_corporate_ma_identify_earnout_issues",
+  "task_id": "harvey.corporate-ma.identify_earnout_issues",
+  "task_version": "5aa41694",
+  "terminal_state": "max_tokens",
+  "task_spec_hash": "eb70b2e38464c825507c2da832c6855217567ae627b2c3fae3eef138b294c382",
+  "input_artifact_manifest_hash": "f31b2f593c878751d655eb3a29038188dfe768fcc185fcbe27cbee16021787de",
+  "run_config_hash": "002c4b06fcb9ad5f04a58181af466a4f9d3657a87fe5d39c57c83271388276e1",
+  "output_artifact_manifest_hash": "5572343b9cc3fb051a65d6b44fc3cfdaf8550016575ef4c27f1a54996284a19d",
+  "transcript_hash": "8a64e64688e7099c2577de2f1053a3b562ed5acd52e68943ac0d4cb267867e23",
+  "metrics_hash": "39eb643cd570890deaf223f2f3e0b12f023345d45736947407b0fae6bbe312c6",
+  "tool_receipts_hash": "a7df30dd6ea98914e89f8bb1648cf8b689afec0130c7392977ecc362c5511c24",
+  "run_record_hash": "650d4e9a986dc065bbe3f664e9422a7b059c6718a2c00578c58df959a73f100c",
+  "output_artifact_count": 0,
+  "tool_receipt_count": 0,
+  "created_at_ms": 1779287153094,
+  "metadata": {
+    "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "599594bde97c98c14251832ece541dcab180d067f9c2e735684f067e85ebda0b",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.model_only",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "score_report_id": "score.qwen35_08b_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold.2026_05_20",
+  "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.fcc66b99d230.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_funds_asset_management_analyze_mfn_waterfall",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "task_version": "5aa41694",
+  "run_record_hash": "200f38c9a448d496981a791003244e10c384709e4ed0bee7bd5d400d6e977424",
+  "output_artifact_manifest_hash": "2bfb5f7f1642cf4aae2ea7d0233891a91d695483484f359a91b62c86283d043a",
+  "all_pass": false,
+  "criterion_pass_rate_bps": 1111,
+  "criterion_results": [
+    {
+      "criterion_id": "protocol.submitted",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: run reached submitted terminal state.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "89a22266c9c5b786918be5424cf085e069706f6dbdeea95e1d37c9721218ee04",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.output_artifact",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: run produced an output artifact.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "f8df967ccf9c398ae09b3bcc0f310c627822b83aa496ab33cbe0f5979cd7e487",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.write_tool",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: model called write.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "88d1e003c62b8629b4d3358db0f5b47879a129514b959ff8cf5c242dc64d43f7",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.validate_tool",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: model called validate_deliverables.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "e212f781d9ae8d5e92e8f52303f6f8fe11fcbcf37dceee64071653f4620b07f0",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "integrity.no_public_criterion_ids",
+      "passed": true,
+      "verdict": "pass",
+      "reasoning": "Passed: output does not contain public Harvey criterion IDs.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "92e1a7150f8ee2a6ba090120dbb33a51350f80d2a9db060b4a98dab1b4361d4c",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.task_topic",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output mentions the task topic.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "e49dd5f1449f0edc6c347a3d530e44a8f5080616e1e77e7a2e6615d954135da8",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.source_limits",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output states source limits or assumptions.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "7a93c5355bd9d34c942eab803ec21eb9d789f2e0bfb8f44c88103ba87a9aa090",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.legal_action",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output contains legal analysis or action language.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "bd39011948a3a468a4744736536db4e320276690ff665009c7666003b40c4a1b",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.minimum_substance",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output has enough substance for a first-pass memo.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "ebe967212cf7a1c96fbec24d93e9458f5440f53766c0777db715f5c80ff6f5f2",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    }
+  ],
+  "metrics": {
+    "model_turns": 2,
+    "tool_call_count": 0,
+    "input_tokens": 1855,
+    "output_tokens": 61,
+    "wall_time_ms": 647,
+    "estimated_cost_micro_usd": 0
+  },
+  "document_coverage_bps": 0,
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.capital.commitment.schedule.and.fee.model.xlsx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/capital-commitment-schedule-and-fee-model.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.gp.side.letter.policy.memorandum.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/gp-side-letter-policy-memorandum.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.limited.partnership.agreement.excerpts.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/limited-partnership-agreement-excerpts.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.compendium.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/side-letter-compendium.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.terms.tracking.spreadsheet.xlsx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/side-letter-terms-tracking-spreadsheet.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable output.md missing"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "mode": "blueprint_scaffold",
+    "runner_content_mutation_allowed": false,
+    "score_scope": "rubric_free_protocol_and_work_product",
+    "task_spec_hash": "3680c2f9cc068cabc51cca3be037d7c788f7384a8720d6065f3819dc40c15b2e"
+  }
+}

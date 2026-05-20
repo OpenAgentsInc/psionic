@@ -1,0 +1,144 @@
+{
+  "schema": "psionic.harvey_no_cheat_suite.v1",
+  "suite_id": "harvey_no_cheat_suite_2026_05_20_019",
+  "tasks_root": "/Users/christopherdavid/work/competition/repos/harvey-labs/tasks",
+  "upstream_commit": "5aa41694",
+  "training_slice": true,
+  "retained_score_claim": false,
+  "runner_content_mutation_allowed": false,
+  "base_url": "http://127.0.0.1:18090/v1",
+  "model": "Qwen/Qwen3.5-0.8B",
+  "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+  "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+  "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+  "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+  "max_output_tokens": 1536,
+  "mode_average_pass_rate_bps": {
+    "model_only": 1851,
+    "blueprint_scaffold": 1481,
+    "delta_scaffold_minus_model_only": 0
+  },
+  "runs": [
+    {
+      "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+      "title": "MFN Waterfall Analysis and GP Recommendation Memo for Fund IV Side Letters",
+      "mode": "model_only",
+      "mode_label": "Model-only",
+      "terminal_state": "no_tool_calls",
+      "score": {
+        "pass_count": 2,
+        "check_count": 9,
+        "pass_rate_bps": 2222
+      },
+      "output_artifact_count": 0,
+      "tool_receipt_count": 1,
+      "output_md_sha256": null,
+      "score_report_digest": "b906ad4c70e825663082e17bbea4929d327f9046f06cb8d08bf71c3f12bdba3a",
+      "run_record_hash": "49f981d870d124f75e21e8acf745609a2415d2646766a4b5ae93cbacdc571d4f",
+      "transcript_hash": "0e2a00fbfa3fde0bccd3ef8e7cdb80c01ad6e99d8a47f13e4d4f05dcd85bbc38",
+      "run_dir": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_024/model_only/harvey_funds_asset_management_analyze_mfn_waterfall"
+    },
+    {
+      "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+      "title": "MFN Waterfall Analysis and GP Recommendation Memo for Fund IV Side Letters",
+      "mode": "blueprint_scaffold",
+      "mode_label": "Blueprint scaffold",
+      "terminal_state": "max_tokens",
+      "score": {
+        "pass_count": 2,
+        "check_count": 9,
+        "pass_rate_bps": 2222
+      },
+      "output_artifact_count": 0,
+      "tool_receipt_count": 1,
+      "output_md_sha256": null,
+      "score_report_digest": "7ba0b99611bf33b8983e8f64116c3fc3825577f7fc3ecf42db5245e4e634f2ef",
+      "run_record_hash": "d863a9ca74668556910971af96f668900d11ae305e14f09805d7b91f5eb58f67",
+      "transcript_hash": "2a0dd9f47b780a1cba9b04efd46ec1a5326fca0752d988d1cc7f12f2b46e9e7c",
+      "run_dir": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_024/blueprint_scaffold/harvey_funds_asset_management_analyze_mfn_waterfall"
+    },
+    {
+      "task_id": "harvey.corporate-ma.identify_earnout_issues",
+      "title": "Earnout Calculation Notice Review — Issue Identification Memorandum",
+      "mode": "model_only",
+      "mode_label": "Model-only",
+      "terminal_state": "max_tokens",
+      "score": {
+        "pass_count": 1,
+        "check_count": 9,
+        "pass_rate_bps": 1111
+      },
+      "output_artifact_count": 0,
+      "tool_receipt_count": 0,
+      "output_md_sha256": null,
+      "score_report_digest": "62d628b178186b2200f7ee0c00c84d62e4caba08f382a06679819dbbbd9cf963",
+      "run_record_hash": "7754f3869f38a56e1c1ce9ca3153ce9bb4f2db3e4fd0af95feaae62e38aecad8",
+      "transcript_hash": "10bdbbec0599a258d54ee3a6558f099a6444282dae802c652ab5d1b8dc685dcd",
+      "run_dir": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_024/model_only/harvey_corporate_ma_identify_earnout_issues"
+    },
+    {
+      "task_id": "harvey.corporate-ma.identify_earnout_issues",
+      "title": "Earnout Calculation Notice Review — Issue Identification Memorandum",
+      "mode": "blueprint_scaffold",
+      "mode_label": "Blueprint scaffold",
+      "terminal_state": "max_tokens",
+      "score": {
+        "pass_count": 1,
+        "check_count": 9,
+        "pass_rate_bps": 1111
+      },
+      "output_artifact_count": 0,
+      "tool_receipt_count": 0,
+      "output_md_sha256": null,
+      "score_report_digest": "77a1b9b67924051912df0ad648d26c72827a2c6fef4bfc1a204297c8be1b2205",
+      "run_record_hash": "b4601c60f6f181acbcf1818c6c936c0ce6399eccd856dd98ceb15296e299785d",
+      "transcript_hash": "f335ed3f0b008b213da20be4364eec3497890416d9f998536da1fe76bffd1256",
+      "run_dir": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_024/blueprint_scaffold/harvey_corporate_ma_identify_earnout_issues"
+    },
+    {
+      "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+      "title": "Assess Breach Notification Obligations Across Affected Jurisdictions — Incident Response Memorandum",
+      "mode": "model_only",
+      "mode_label": "Model-only",
+      "terminal_state": "max_tokens",
+      "score": {
+        "pass_count": 2,
+        "check_count": 9,
+        "pass_rate_bps": 2222
+      },
+      "output_artifact_count": 0,
+      "tool_receipt_count": 1,
+      "output_md_sha256": null,
+      "score_report_digest": "41f727751b89b8dc41e5f972a93cd87f7f472e82a2b34454f4a51f5ba137cf69",
+      "run_record_hash": "1ee49662c45c40db869658b07e9f7c73bae9fcdf33cd27bce1967c11d899a29f",
+      "transcript_hash": "d952ba7266bf96de6943cc8526a9d51511a4416dfad6bd2de61a3f58f0bc4018",
+      "run_dir": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_024/model_only/harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions"
+    },
+    {
+      "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+      "title": "Assess Breach Notification Obligations Across Affected Jurisdictions — Incident Response Memorandum",
+      "mode": "blueprint_scaffold",
+      "mode_label": "Blueprint scaffold",
+      "terminal_state": "max_tokens",
+      "score": {
+        "pass_count": 1,
+        "check_count": 9,
+        "pass_rate_bps": 1111
+      },
+      "output_artifact_count": 0,
+      "tool_receipt_count": 0,
+      "output_md_sha256": null,
+      "score_report_digest": "4b37f57fa33424c2994664fdde89e319cf740b15e2b7ff1c6c6f498a30343512",
+      "run_record_hash": "5446e528e5c8d828148a7e7400e9f78e9f30a92d8a3f4dd733e031118dae6d02",
+      "transcript_hash": "e5a43db6174b4fd30d9516e3468307b222793733847d13623ba1f82898de1404",
+      "run_dir": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_024/blueprint_scaffold/harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions"
+    }
+  ],
+  "claim_boundary": [
+    "These are local public Harvey training-slice runs through the Rust legal agent loop.",
+    "No runner path adds or rewrites model output.",
+    "Scaffold-assisted means prompt/module requirements only; it does not inject answer text.",
+    "Scores are local protocol and work-product checks, not official Harvey retained scores."
+  ],
+  "suite_report_digest": "03e630e3a2e58c8a6e04185ce56d58256b7639ad2e29ed4df5f81dfe3ac1526d"
+}

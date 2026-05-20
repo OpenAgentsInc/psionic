@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.corporate-ma.identify_earnout_issues.002c4b06fcb9.qwen35-08b-mlx-lora-harvey-no-cheat-suite-model_only-harvey_corporate_ma_identify_earnout_issues",
+  "task_id": "harvey.corporate-ma.identify_earnout_issues",
+  "task_version": "5aa41694",
+  "input_artifact_manifest_hash": "f31b2f593c878751d655eb3a29038188dfe768fcc185fcbe27cbee16021787de",
+  "run_config_hash": "002c4b06fcb9ad5f04a58181af466a4f9d3657a87fe5d39c57c83271388276e1",
+  "output_artifact_manifest_hash": "5572343b9cc3fb051a65d6b44fc3cfdaf8550016575ef4c27f1a54996284a19d",
+  "terminal_state": "max_tokens",
+  "transcript": [
+    {
+      "event_index": 0,
+      "event_kind": "system",
+      "role": "system",
+      "content": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: true\n- submit by returning JSON: {\"action\":\"submit\",\"deliverables\":[\"path\"]}.\n\nTool descriptions:\n- write: Write a UTF-8 output file under the workspace or output root.\n- validate_deliverables: Check required workspace/output deliverables for existence, readability, media type, and hash.\n\nBenchmark operating protocol:\n- Validate required output paths with validate_deliverables before submitting.\n- Final submission may be rejected until required inventory, source inspection, evidence rows, deliverable validation, and self-check notes are present.\n\nModule instructions:\n- This is a public Harvey training-slice run. It is not a retained benchmark score.\n- The runner must not and will not add text to your output. Any score comes only from what the model writes.\n- Write output.md under root output, validate output.md, then submit it.\n- Do not include Harvey criterion IDs, rubric labels, C-IDs, checklist IDs, or scoring tokens.\n- If you did not actually inspect a source document, say that plainly as a source limit instead of pretending.\n",
+      "payload": {
+        "run_id": "run.harvey.corporate-ma.identify_earnout_issues.002c4b06fcb9.qwen35-08b-mlx-lora-harvey-no-cheat-suite-model_only-harvey_corporate_ma_identify_earnout_issues",
+        "run_config_hash": "002c4b06fcb9ad5f04a58181af466a4f9d3657a87fe5d39c57c83271388276e1"
+      },
+      "timestamp_ms": 1779287050014
+    },
+    {
+      "event_index": 1,
+      "event_kind": "user",
+      "role": "user",
+      "content": "Review the earnout calculation notice for the first Earnout Period and prepare a comprehensive issues memo identifying errors, disputes, and risks.\n\nOutput: `earnout-issues-memorandum.docx`\n\nSource artifact tool paths:\n- artifact.source.corporate.ma.identify.earnout.issues.documents.company.earnout.notice.docx: company-earnout-notice.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.corporate.ma.identify.earnout.issues.documents.customer.revenue.schedule.xlsx: customer-revenue-schedule.xlsx (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)\n- artifact.source.corporate.ma.identify.earnout.issues.documents.earnout.calculation.notice.docx: earnout-calculation-notice.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.corporate.ma.identify.earnout.issues.documents.novabridge.acquisition.summary.docx: novabridge-acquisition-summary.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.corporate.ma.identify.earnout.issues.documents.purchase.agreement.earnout.excerpt.docx: purchase-agreement-earnout-excerpt.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.corporate.ma.identify.earnout.issues.documents.revenue.recognition.emails.eml: revenue-recognition-emails.eml (message/rfc822)\n\n\nPractice-area issue checklist:\n- Identify parties, dates, governing documents, requested output, and assumptions.\n- Separate document-backed facts from legal conclusions and cite each material fact.\n- Track ambiguities, missing documents, and conflicts between source materials.\n- Compare draft terms against instructions, term sheets, prior versions, and controlling source documents.\n- Check procedural posture, jurisdiction, claims, elements, burdens, evidence, deadlines, defenses, and remedies.\n\n\nDeliverables:\n- deliverable.output_md at output.md: Plain Markdown legal work product for local no-cheat scoring\n",
+      "payload": {
+        "task_id": "harvey.corporate-ma.identify_earnout_issues"
+      },
+      "timestamp_ms": 1779287050014
+    },
+    {
+      "event_index": 2,
+      "event_kind": "assistant",
+      "role": "assistant",
+      "payload": {
+        "response_id": "chatcmpl-f75b09b7-edbb-4d2d-b825-d312a9b41abe",
+        "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.model_only",
+        "model_id": "Qwen/Qwen3.5-0.8B",
+        "stop_reason": "max_tokens",
+        "tool_calls": [],
+        "usage": {
+          "input_tokens": 1174,
+          "output_tokens": 1536,
+          "total_tokens": 2710,
+          "cached_input_tokens": 730,
+          "estimated_cost_micro_usd": 0
+        },
+        "elapsed_ms": 8310,
+        "retry_count": 0,
+        "raw_response_hash": "31d63dd7b3f694b68be426601c1e087615704c1ee8a98c6c8ba2f4e3133ffae0",
+        "metadata": {
+          "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+          "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+          "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+          "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+          "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.model_only",
+          "route_model_id": "Qwen/Qwen3.5-0.8B",
+          "runner_content_mutation_allowed": false
+        }
+      },
+      "timestamp_ms": 1779287058324
+    }
+  ],
+  "tool_calls": [],
+  "metrics": {
+    "model_turns": 1,
+    "tool_call_count": 0,
+    "input_tokens": 1174,
+    "output_tokens": 1536,
+    "wall_time_ms": 8310,
+    "estimated_cost_micro_usd": 0
+  },
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.company.earnout.notice.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/company-earnout-notice.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.customer.revenue.schedule.xlsx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/customer-revenue-schedule.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.earnout.calculation.notice.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/earnout-calculation-notice.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.novabridge.acquisition.summary.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/novabridge-acquisition-summary.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.purchase.agreement.earnout.excerpt.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/purchase-agreement-earnout-excerpt.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.revenue.recognition.emails.eml",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/revenue-recognition-emails.eml",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable output.md missing"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "599594bde97c98c14251832ece541dcab180d067f9c2e735684f067e85ebda0b",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.model_only",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "schema_version": 1,
+    "tool_call_id": "fdbce84c-6461-4d12-b4ff-3d4f81e9b2c5",
+    "tool_name": "validate_deliverables",
+    "input_hash": "8a430506e9bff65eca637fc257e3bd3f7e50e826e2f2b27c4d8b898ede19f099",
+    "output_hash": "567f4872c30f6ec0384175d415ad38d7300249a3984b613466fb1309a7fd6163",
+    "elapsed_ms": 0,
+    "bytes_read": 0,
+    "bytes_written": 0,
+    "touched_paths": [],
+    "metadata": {
+      "provider_tool_call_id": "fdbce84c-6461-4d12-b4ff-3d4f81e9b2c5"
+    }
+  }
+]

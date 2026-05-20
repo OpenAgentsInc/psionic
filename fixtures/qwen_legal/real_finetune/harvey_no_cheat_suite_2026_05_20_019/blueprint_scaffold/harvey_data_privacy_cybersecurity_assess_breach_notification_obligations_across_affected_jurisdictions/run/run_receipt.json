@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.aa25e7328987.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "terminal_state": "max_tokens",
+  "task_spec_hash": "dfd718873d44340a1c6bb6eb00daace0af868cf15a5ec9e87784e2e6992505f2",
+  "input_artifact_manifest_hash": "f0b444b17f9dde36e1d72d8f68726d4c15e023da87f1dca2266a6d13a8345e87",
+  "run_config_hash": "aa25e7328987bb1b404e7e49fc33a84b18f68ea8d246889613c6686c8e6dda11",
+  "output_artifact_manifest_hash": "06b862a4e6ff9d8706400b1cf2490676ecfda3119d89a50f3bea6d65cc75f393",
+  "transcript_hash": "4f81d22944f9a17378a1b506d357448dfb6b311c3972bf146d6dd3b1f50344f0",
+  "metrics_hash": "315b2d6cb602e3d76dc6e5e79a651fc94408cf23877e905e6f8fa6edd9179f9d",
+  "tool_receipts_hash": "a7df30dd6ea98914e89f8bb1648cf8b689afec0130c7392977ecc362c5511c24",
+  "run_record_hash": "e04c6e320507e79cbc768f611d1dcf940103569892c0935f9fe1db9036247374",
+  "output_artifact_count": 0,
+  "tool_receipt_count": 0,
+  "created_at_ms": 1779286037090,
+  "metadata": {
+    "adapter_artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "adapter_report_digest": "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "299296ab17747d4c9c4ad776b4f6361369b619fa766134567abcb695a655f305",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

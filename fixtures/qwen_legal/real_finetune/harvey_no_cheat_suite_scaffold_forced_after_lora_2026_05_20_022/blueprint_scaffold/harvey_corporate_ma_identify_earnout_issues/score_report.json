@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "score_report_id": "score.qwen35_08b_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold.2026_05_20",
+  "run_id": "run.harvey.corporate-ma.identify_earnout_issues.6ea873bd4904.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_corporate_ma_identify_earnout_issues",
+  "task_id": "harvey.corporate-ma.identify_earnout_issues",
+  "task_version": "5aa41694",
+  "run_record_hash": "6c08519748c44a9206e9559fee4306c6855ed4dee09d6308886b0485bb5916b9",
+  "output_artifact_manifest_hash": "c88bcd4a6fa305f8fe2ea3289232e643a8b922dfe23881fded2afc9562c2b295",
+  "all_pass": false,
+  "criterion_pass_rate_bps": 1111,
+  "criterion_results": [
+    {
+      "criterion_id": "protocol.submitted",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: run reached submitted terminal state.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "aa370c68216e559816201bae11e6ab8e757d1c345b7d977aa05e608bd97655ab",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.output_artifact",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: run produced an output artifact.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "5dfc2ac0d749cb10855cce04f61d8efb4045e826ca7bd4940245b382dab10a36",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.write_tool",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: model called write.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "c8ed052ca2f60878719cf09f13ecfb911e044ac1a7ec4e01010346730481a045",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.validate_tool",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: model called validate_deliverables.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "cc207554024c32ce5d241e89b75e44d9781a9d412b133e2f416a133c8fe6c208",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "integrity.no_public_criterion_ids",
+      "passed": true,
+      "verdict": "pass",
+      "reasoning": "Passed: output does not contain public Harvey criterion IDs.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "4216ec8f4e57aec8cfb9c30fc166562e2f826c09e0323e5902c5f966ea1f506f",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.task_topic",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output mentions the task topic.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "173029678d8726c2931ece4199c3d8ead525b7500b2bf46c4188213986ba1d88",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.source_limits",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output states source limits or assumptions.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "decf3a6099c01e50f101de7ec62a65fcd164f434c12ca177c51f029412ea7e24",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.legal_action",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output contains legal analysis or action language.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "a69ff47f716a1fed2307abd5656e6ca4c7be675975bf9e13eef037136699ffea",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.minimum_substance",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output has enough substance for a first-pass memo.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "b84a06fd5dc91476fd2bd55fc8550560ee591eaea267ab76503d4a4bd0a110a7",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    }
+  ],
+  "metrics": {
+    "model_turns": 1,
+    "tool_call_count": 0,
+    "input_tokens": 1323,
+    "output_tokens": 1536,
+    "wall_time_ms": 7752,
+    "estimated_cost_micro_usd": 0
+  },
+  "document_coverage_bps": 0,
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.company.earnout.notice.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/company-earnout-notice.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.customer.revenue.schedule.xlsx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/customer-revenue-schedule.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.earnout.calculation.notice.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/earnout-calculation-notice.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.novabridge.acquisition.summary.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/novabridge-acquisition-summary.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.purchase.agreement.earnout.excerpt.docx",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/purchase-agreement-earnout-excerpt.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.corporate.ma.identify.earnout.issues.documents.revenue.recognition.emails.eml",
+        "relative_path": "corporate-ma/identify-earnout-issues/documents/revenue-recognition-emails.eml",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable output.md missing"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "mode": "blueprint_scaffold",
+    "runner_content_mutation_allowed": false,
+    "score_scope": "rubric_free_protocol_and_work_product",
+    "task_spec_hash": "0ccaeeb293a7f2faa23260a628cf0c1a5b70db6a56853234fc97ee4bd5dd80e3"
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.6ea873bd4904.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "input_artifact_manifest_hash": "f0b444b17f9dde36e1d72d8f68726d4c15e023da87f1dca2266a6d13a8345e87",
+  "run_config_hash": "6ea873bd4904fc92fdfbd692cdd1bbfc568159381d30710361be6195859e29b7",
+  "output_artifact_manifest_hash": "ff586c0cf8937cdbdf4a908e9a3480540ae6dc9389766594d107eed61aee6cff",
+  "terminal_state": "max_tokens",
+  "transcript": [
+    {
+      "event_index": 0,
+      "event_kind": "system",
+      "role": "system",
+      "content": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: true\n- submit by returning JSON: {\"action\":\"submit\",\"deliverables\":[\"path\"]}.\n\nTool descriptions:\n- write: Write a UTF-8 output file under the workspace or output root.\n- validate_deliverables: Check required workspace/output deliverables for existence, readability, media type, and hash.\n\nBenchmark operating protocol:\n- Validate required output paths with validate_deliverables before submitting.\n- Final submission may be rejected until required inventory, source inspection, evidence rows, deliverable validation, and self-check notes are present.\n\nModule instructions:\n- This is a public Harvey training-slice run. It is not a retained benchmark score.\n- The runner must not and will not add text to your output. Any score comes only from what the model writes.\n- Write output.md under root output, validate output.md, then submit it.\n- Do not include Harvey criterion IDs, rubric labels, C-IDs, checklist IDs, or scoring tokens.\n- If you did not actually inspect a source document, say that plainly as a source limit instead of pretending.\n- Blueprint work-product scaffold: task `Assess Breach Notification Obligations Across Affected Jurisdictions — Incident Response Memorandum` is analyze work in data-privacy-cybersecurity. Do not copy rubric text. Build the memo around product requirements: source map; material facts from visible source names; legal/business issues; analysis; recommendation; risks; assumptions; and source limits. Produce an issue map, explain the governing legal/business standard, compare source facts to that standard, and end with recommendations and open questions. Visible source names include: affected-individuals-summary.xlsx, bridgepoint-forensic-report.docx, client-notification-email-thread.eml, cyber-insurance-policy-summary.docx, evergreen-baa-template.docx, hipaa-breach-notification-policy.docx, hipaa-risk-assessment-summary.docx, incident-response-timeline.docx, telehealth-saas-agreement.docx.\n",
+      "payload": {
+        "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.6ea873bd4904.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+        "run_config_hash": "6ea873bd4904fc92fdfbd692cdd1bbfc568159381d30710361be6195859e29b7"
+      },
+      "timestamp_ms": 1779286507827
+    },
+    {
+      "event_index": 1,
+      "event_kind": "user",
+      "role": "user",
+      "content": "Review the attached incident documents and prepare a privileged breach notification obligations memo covering federal and multi-state requirements. Output: `breach-notification-memo.docx`.\n\nSource artifact tool paths:\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.affected.individuals.summary.xlsx: affected-individuals-summary.xlsx (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.bridgepoint.forensic.report.docx: bridgepoint-forensic-report.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.client.notification.email.thread.eml: client-notification-email-thread.eml (message/rfc822)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.cyber.insurance.policy.summary.docx: cyber-insurance-policy-summary.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.evergreen.baa.template.docx: evergreen-baa-template.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.hipaa.breach.notification.policy.docx: hipaa-breach-notification-policy.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.hipaa.risk.assessment.summary.docx: hipaa-risk-assessment-summary.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.incident.response.timeline.docx: incident-response-timeline.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.telehealth.saas.agreement.docx: telehealth-saas-agreement.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n\n\nPractice-area issue checklist:\n- Identify parties, dates, governing documents, requested output, and assumptions.\n- Separate document-backed facts from legal conclusions and cite each material fact.\n- Track ambiguities, missing documents, and conflicts between source materials.\n- Compare draft terms against instructions, term sheets, prior versions, and controlling source documents.\n- Check data categories, controller/processor roles, consent, retention, security, cross-border transfer, and breach notice.\n- Check vendor, subprocessor, regulator, consumer-rights, and data-processing-agreement obligations.\n\n\nDeliverables:\n- deliverable.output_md at output.md: Plain Markdown legal work product for local no-cheat scoring\n",
+      "payload": {
+        "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions"
+      },
+      "timestamp_ms": 1779286507827
+    },
+    {
+      "event_index": 2,
+      "event_kind": "assistant",
+      "role": "assistant",
+      "payload": {
+        "response_id": "chatcmpl-011ebcc4-fdc5-4fbf-b42e-9e6470fc06a1",
+        "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold",
+        "model_id": "Qwen/Qwen3.5-0.8B",
+        "stop_reason": "max_tokens",
+        "tool_calls": [],
+        "usage": {
+          "input_tokens": 1610,
+          "output_tokens": 1536,
+          "total_tokens": 3146,
+          "cached_input_tokens": 916,
+          "estimated_cost_micro_usd": 0
+        },
+        "elapsed_ms": 7888,
+        "retry_count": 0,
+        "raw_response_hash": "0ac078f630b18189ad039e88a3ffcca8358491e7e7e776dad7b7984b1cb34045",
+        "metadata": {
+          "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+          "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+          "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+          "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+          "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold",
+          "route_model_id": "Qwen/Qwen3.5-0.8B",
+          "runner_content_mutation_allowed": false
+        }
+      },
+      "timestamp_ms": 1779286515716
+    }
+  ],
+  "tool_calls": [],
+  "metrics": {
+    "model_turns": 1,
+    "tool_call_count": 0,
+    "input_tokens": 1610,
+    "output_tokens": 1536,
+    "wall_time_ms": 7889,
+    "estimated_cost_micro_usd": 0
+  },
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.affected.individuals.summary.xlsx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/affected-individuals-summary.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.bridgepoint.forensic.report.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/bridgepoint-forensic-report.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.client.notification.email.thread.eml",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/client-notification-email-thread.eml",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.cyber.insurance.policy.summary.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/cyber-insurance-policy-summary.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.evergreen.baa.template.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/evergreen-baa-template.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.hipaa.breach.notification.policy.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/hipaa-breach-notification-policy.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.hipaa.risk.assessment.summary.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/hipaa-risk-assessment-summary.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.incident.response.timeline.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/incident-response-timeline.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.telehealth.saas.agreement.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/telehealth-saas-agreement.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable output.md missing"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "c0e4bc217e49b8fc47b97d3460e0a283579eb7a0dde6f2a4ba4eeff019cb67ea",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

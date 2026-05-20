@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.6ea873bd4904.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_funds_asset_management_analyze_mfn_waterfall",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "task_version": "5aa41694",
+  "terminal_state": "max_tokens",
+  "task_spec_hash": "3680c2f9cc068cabc51cca3be037d7c788f7384a8720d6065f3819dc40c15b2e",
+  "input_artifact_manifest_hash": "7f8c666fb1421764514ab643cd1d467658233d6369257fd146712181ce3910f8",
+  "run_config_hash": "6ea873bd4904fc92fdfbd692cdd1bbfc568159381d30710361be6195859e29b7",
+  "output_artifact_manifest_hash": "8c97e326620f571e79a6e9b63f38323cb52e0a3b460ea32f774cc67521831905",
+  "transcript_hash": "9215281958fc94c495bb5fe8ce9359157aa9a5aa47bd3a31d283ed187e05818e",
+  "metrics_hash": "ddeb3f63f7915b626e7c6f1745e83e51d0db5866efb6a539f180d066716e4392",
+  "tool_receipts_hash": "6358473ecdac08ba0c316b5c325fc12d61424a043c6f9c919e4e8e98dc82337f",
+  "run_record_hash": "95f4ba3a32930d272d9dd3d83ea8b9a1219a21fb55feea8dfc9119a46053d49e",
+  "output_artifact_count": 0,
+  "tool_receipt_count": 1,
+  "created_at_ms": 1779286484142,
+  "metadata": {
+    "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "c0e4bc217e49b8fc47b97d3460e0a283579eb7a0dde6f2a4ba4eeff019cb67ea",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

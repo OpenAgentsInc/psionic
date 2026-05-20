@@ -52,21 +52,34 @@ requires task identity, task version, input artifact manifest hash, run config
 hash, and output artifact manifest hash, so later runner work cannot produce a
 score without the immutable execution identity Autopilot needs.
 
-The Rust agent runner now also supports Blueprint-style output protocol
-metadata:
+The Rust agent runner must not add answer text to model output. Run 015 did
+that through an output-scaffold path and therefore does not count as a
+benchmark score. Keep it only as a diagnostic example of a bad runner design:
+the scorer could be fooled when the runner inserted the words the scorer was
+looking for.
 
-- `required_output_markers`: exact text markers that must appear in a required
-  output file before submit is accepted.
-- `apply_required_output_markers_on_write`: when explicitly true, the runner
-  applies those markers as an output scaffold during the model's `write` tool
-  call and records `Blueprint output scaffold applied` in the transcript.
+The current supported no-cheat runner metadata is limited to controls that do
+not rewrite the deliverable:
+
 - `max_output_tokens`: per-run override for the model request output budget.
+- `force_write_until_required_deliverables`: keep prompting until the model
+  itself writes the required deliverable or the run budget is exhausted.
+- `force_validate_after_write`: require a model-authored validation step after
+  a model-authored write.
+- `plain_text_tool_protocol`: ask a weak local model to emit plain JSON tool
+  requests in text, then execute only the JSON tool call the model wrote.
 
-The 2026-05-20 Harvey MFN public training-slice run 015 proves this path with
-the actual local Qwen LoRA adapter 005. It submitted through the Rust tool loop
-and scored `83 / 83` on the deterministic public criterion-title/token scorer.
-This is public training-slice hillclimb evidence, not a retained Harvey
-leaderboard claim.
+Those controls affect request shape, turn order, and tool-call parsing. They
+do not add legal analysis, coverage markers, citations, headings, or scoring
+phrases to output files.
+
+The current honest Harvey MFN local result is run 016: the actual local Qwen
+LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
+and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite
+runs 019 and 025 compare model-only and scaffold-assisted prompts across three
+public Harvey tasks with runner output mutation disabled. Adapter 020 is a
+real local MLX LoRA fine-tune over clean no-cheat supervised trajectories, but
+it did not yet improve the broad suite score.
 
 ## Artifact Manifests And Hashing
 

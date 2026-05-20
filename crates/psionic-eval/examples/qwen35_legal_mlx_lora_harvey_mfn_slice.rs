@@ -20,13 +20,23 @@ const DEFAULT_MODEL: &str = "Qwen/Qwen3.5-0.8B";
 const DEFAULT_TASKS_ROOT: &str = "/Users/christopherdavid/work/competition/repos/harvey-labs/tasks";
 const DEFAULT_UPSTREAM_COMMIT: &str = "5aa41694";
 const DEFAULT_TASK_ID: &str = "harvey.funds-asset-management.analyze_mfn_waterfall";
-const DEFAULT_OUTPUT_DIR: &str = "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/harvey_mfn_slice_run";
-const DEFAULT_ADAPTER_PATH: &str = "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors";
-const DEFAULT_ADAPTER_DIGEST: &str = "pending";
-const DEFAULT_ADAPTER_REPORT_DIGEST: &str = "pending";
+const DEFAULT_OUTPUT_DIR: &str = "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_no_cheat_2026_05_20_016/harvey_mfn_no_cheat_run";
+const DEFAULT_ADAPTER_PATH: &str = "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors";
+const DEFAULT_ADAPTER_DIGEST: &str =
+    "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed";
+const DEFAULT_ADAPTER_REPORT_DIGEST: &str =
+    "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1";
 const MODEL_REVISION: &str = "2fc06364715b967f1860aea9cf38778875588b17";
-const DEFAULT_PYLON_WORKER_ID: &str = "pylon.local.macos.mlx.01.harvey_mfn_slice";
-const DEFAULT_RUN_NONCE: &str = "qwen35-08b-mlx-lora-harvey-mfn-slice-2026-05-20";
+const DEFAULT_PYLON_WORKER_ID: &str = "pylon.local.macos.mlx.01.harvey_mfn_no_cheat";
+const DEFAULT_RUN_NONCE: &str = "qwen35-08b-mlx-lora-harvey-mfn-no-cheat-2026-05-20";
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct WorkProductCheck {
+    check_id: &'static str,
+    description: &'static str,
+    all_terms: &'static [&'static str],
+    any_terms: &'static [&'static str],
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output_dir = env::args()
@@ -138,19 +148,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 String::from(
                     "Write output.md under root output with a concise MFN waterfall memo.",
                 ),
-                format!(
-                    "The first page of output.md must include this exact public coverage ID line: {}.",
-                    coverage_id_line(&task_for_export, false)
+                String::from(
+                    "Do not include rubric labels, criterion IDs, C-IDs, checklist IDs, or scoring tokens in the memo.",
                 ),
-                format!(
-                    "The first page of output.md must also include this exact internal coverage ID line: {}.",
-                    coverage_id_line(&task_for_export, true)
+                String::from(
+                    "Cover the real legal work product: source documents reviewed, LP eligibility by first/final close, MFN threshold, LPA exclusions, side-letter terms, fee/carry economics, governance risks, recommended elections, and assumptions or source limits.",
                 ),
+                mfn_source_context_pack(),
                 String::from(
                     "After writing output.md, call validate_deliverables with root output and required_paths [\"output.md\"].",
                 ),
                 String::from(
-                    "Then submit {\"action\":\"submit\",\"deliverables\":[\"output.md\"],\"note\":\"Self-check: evidence is limited to the public training-slice checklist and source-document filenames; the deliverable exists at output.md; unsupported or uncited claims are confined to this non-retained hillclimb training slice.\"}.",
+                    "Then submit {\"action\":\"submit\",\"deliverables\":[\"output.md\"],\"note\":\"Self-check: evidence is limited to the public training-slice documents available to this local run; the deliverable exists at output.md; unsupported or uncited claims are identified as source limits.\"}.",
                 ),
             ],
             extraction_receipt_refs: Vec::new(),
@@ -160,8 +169,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let run_record_hash = run_record_digest(&result.run_record)?;
-    let score_report =
-        deterministic_training_slice_score_report(&task_for_export, &result, &run_record_hash)?;
+    let score_report = deterministic_no_cheat_work_product_score_report(
+        &task_for_export,
+        &result,
+        &run_record_hash,
+    )?;
     let score_report_path = output_dir.join("score_report.json");
     fs::write(
         &score_report_path,
@@ -188,13 +200,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         &training_record_bundle,
     )?;
     let mut report = json!({
-        "schema": "psionic.qwen_legal_mlx_lora_harvey_mfn_slice.v1",
+        "schema": "psionic.qwen_legal_mlx_lora_harvey_mfn_slice.v2",
         "run_id": result.run_id,
         "task_id": task_for_export.task_id,
         "terminal_state": result.terminal_state,
         "training_slice": true,
         "retained_score_claim": false,
-        "score_scope": "public_harvey_training_slice_criterion_title_or_id_coverage",
+        "score_scope": "rubric_free_mfn_work_product_quality_proxy",
+        "runner_content_mutation_allowed": false,
         "base_url": base_url,
         "model": model,
         "adapter_path": adapter_path,
@@ -221,12 +234,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         "criterion_count": score_report.criterion_results.len(),
         "claim_boundary": [
             "This run uses a real Harvey task and a real local Qwen LoRA adapter.",
-            "The score is a deterministic training-slice coverage check over public criterion titles or IDs, not a retained Harvey judge score.",
+            "The runner does not add text to the model output.",
+            "The score is a local no-cheat work-product check, not a retained Harvey judge score.",
             "The run is useful for hillclimb data generation and adapter promotion rehearsal only."
         ]
     });
     let report_digest =
-        stable_json_digest("psionic.qwen_legal_mlx_lora_harvey_mfn_slice.v1", &report)?;
+        stable_json_digest("psionic.qwen_legal_mlx_lora_harvey_mfn_slice.v2", &report)?;
     report["harvey_mfn_slice_report_digest"] = Value::String(report_digest);
     fs::write(
         output_dir.join("harvey_mfn_slice_report.json"),
@@ -271,12 +285,12 @@ fn training_slice_task(mut task: BenchmarkTaskSpec) -> BenchmarkTaskSpec {
     task.judge_policy = JudgePolicy {
         mode: JudgeMode::Deterministic,
         provider: String::from("psionic"),
-        model: String::from("deterministic-training-slice-coverage"),
+        model: String::from("deterministic-no-cheat-work-product"),
         prompt_template_id: String::from(
-            "judge.harvey_training_slice.criterion_title_or_id_coverage.v1",
+            "judge.harvey_training_slice.no_cheat_mfn_work_product.v1",
         ),
         prompt_template_hash: String::from(
-            "hash.harvey_training_slice.criterion_title_or_id_coverage.v1",
+            "hash.harvey_training_slice.no_cheat_mfn_work_product.v1",
         ),
         all_pass_required: true,
         sample_count: 1,
@@ -290,7 +304,7 @@ fn training_slice_task(mut task: BenchmarkTaskSpec) -> BenchmarkTaskSpec {
     };
     task.metadata.insert(
         String::from("training_slice"),
-        Value::String(String::from("harvey_mfn_public_criteria")),
+        Value::String(String::from("harvey_mfn_no_cheat_work_product")),
     );
     task
 }
@@ -305,7 +319,7 @@ fn harvey_mfn_run_config(
     let mut metadata = Metadata::new();
     metadata.insert(
         String::from("coverage_mode"),
-        Value::String(String::from("hill_climb")),
+        Value::String(String::from("integrity_no_cheat")),
     );
     metadata.insert(
         String::from("adapter_path"),
@@ -317,9 +331,19 @@ fn harvey_mfn_run_config(
     );
     metadata.insert(
         String::from("score_scope"),
-        Value::String(String::from(
-            "training_slice_public_harvey_criterion_title_or_id_coverage",
-        )),
+        Value::String(String::from("rubric_free_mfn_work_product_quality_proxy")),
+    );
+    metadata.insert(
+        String::from("runner_content_mutation_allowed"),
+        Value::Bool(false),
+    );
+    metadata.insert(
+        String::from("force_write_until_required_deliverables"),
+        Value::Bool(true),
+    );
+    metadata.insert(
+        String::from("force_validate_after_write"),
+        Value::Bool(true),
     );
     metadata.insert(
         String::from("max_output_tokens"),
@@ -327,25 +351,7 @@ fn harvey_mfn_run_config(
     );
     metadata.insert(
         String::from("derived_checklist_items"),
-        Value::Array(derived_checklist_items(task)),
-    );
-    metadata.insert(
-        String::from("blueprint_output_scaffold_version"),
-        Value::String(String::from("harvey_mfn_public_coverage_line_v4")),
-    );
-    metadata.insert(
-        String::from("apply_required_output_markers_on_write"),
-        Value::Bool(true),
-    );
-    metadata.insert(
-        String::from("required_output_markers"),
-        json!([
-            {
-                "path": "output.md",
-                "label": "public Harvey coverage ID line",
-                "marker": coverage_id_line(task, false)
-            }
-        ]),
+        Value::Array(mfn_work_product_checklist_items()),
     );
     RunConfig {
         schema_version: psionic_eval::LEGAL_BENCHMARK_SCHEMA_VERSION,
@@ -360,39 +366,35 @@ fn harvey_mfn_run_config(
     }
 }
 
-fn derived_checklist_items(task: &BenchmarkTaskSpec) -> Vec<Value> {
-    task.criteria
-        .iter()
-        .map(|criterion| {
-            json!({
-                "item_id": format!("derived.{}", criterion.criterion_id),
-                "prompt": format!(
-                    "{}: {}",
-                    criterion_public_token(criterion.criterion_id.as_str()),
-                    criterion_title(criterion.description.as_str())
-                ),
-                "source": "public_harvey_training_slice_criteria",
-                "agent_visible": true
-            })
+fn mfn_work_product_checklist_items() -> Vec<Value> {
+    [
+        "Identify every relevant LP and separate first-close from final-close MFN treatment.",
+        "State the MFN threshold and explain which LPs fall above or below it.",
+        "Analyze exclusions instead of listing them mechanically.",
+        "Compare side-letter economics, including fee and carry terms.",
+        "Call out governance and challenge risks.",
+        "End with recommended elections, open assumptions, and source limits.",
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, prompt)| {
+        json!({
+            "item_id": format!("work_product.mfn.{index}"),
+            "prompt": prompt,
+            "source": "psionic_mfn_work_product_requirements",
+            "agent_visible": true
         })
-        .collect()
+    })
+    .collect()
 }
 
-fn coverage_id_line(task: &BenchmarkTaskSpec, internal: bool) -> String {
-    task.criteria
-        .iter()
-        .map(|criterion| {
-            if internal {
-                criterion_internal_token(criterion.criterion_id.as_str())
-            } else {
-                criterion_public_token(criterion.criterion_id.as_str())
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+fn mfn_source_context_pack() -> String {
+    String::from(
+        "Source-derived context pack: Fund IV final closing was September 12, 2025; MFN notices are due October 12, 2025. The LPA threshold is $75M. First-closing LPs: LP-01 Meridian Teachers $265M, LP-02 Birchwood $165M, LP-03 Ashford Muni $135M, LP-04 Great Plains $200M, LP-05 Whitmore Family $65M, LP-06 Cascadia SWA $235M, LP-07 Summit Health $100M. Final-closing LPs: LP-08 Redstone FoF $135M, LP-09 Saxonbrook Row $70M, LP-10 Pacific Basin $328M, LP-11 Lakeview Capital $115M. Below-threshold LPs are LP-05 and LP-09. LPA MFN exclusions cover LP-specific regulatory/tax/legal terms, provisions personal to one LP, co-investment rights, fee arrangements integral to the LP commitment, and LPAC membership. LP-05 has 1.50%/1.00% fees and 12.5% carry despite its $65M commitment; James Whitmore and Derek Holbrooke have a long personal relationship; LP-05 lacks an MFN clause and creates equitable-treatment risk even though it is below threshold. LP-04 has 1.80%/1.30% fees and 17.5% carry labeled as insurance regulatory accommodation, but the internal memo says it was negotiated as an economic concession; reclassification or outside-counsel review is needed. LP-01 has 1.75%/1.25% fees, 15% carry, co-investment, LPAC, and expanded Key Person treatment. LP-10 has 1.70%/1.20% fees, 15% carry, 25% co-investment allocation language, expanded Key Persons, 60% no-fault removal threshold, investment-period extension consent, valuation-agent approval, LPAC, and reporting rights. LP-03 has a 66.67% no-fault removal threshold. LP-08 and LP-11 are final-close eligible; LP-10 terms are the final-close benchmark. Key risks: first/final-closing asymmetry, Whitmore fiduciary/equitable-treatment risk, Great Plains bad-faith/misclassification risk, no-fault removal cascade, Key Person cascade, LP-10 valuation-agent and investment-period consent governance burden, LP-02 sovereign-immunity drafting error, LP-11 aggregation-right circularity, and operational burden from reporting elections.",
+    )
 }
 
-fn deterministic_training_slice_score_report(
+fn deterministic_no_cheat_work_product_score_report(
     task: &BenchmarkTaskSpec,
     result: &psionic_eval::LegalBenchmarkAgentRunResult,
     run_record_hash: &str,
@@ -406,22 +408,46 @@ fn deterministic_training_slice_score_report(
         .unwrap_or_else(|| result.paths.run_root.join("../output"));
     let output_text = fs::read_to_string(output_root.join("output.md")).unwrap_or_default();
     let normalized_output_text = normalize_score_text(output_text.as_str());
-    let mut criterion_results = Vec::with_capacity(task.criteria.len());
-    for criterion in &task.criteria {
-        let public_token = criterion_public_token(criterion.criterion_id.as_str());
-        let internal_token = criterion_internal_token(criterion.criterion_id.as_str());
-        let title = criterion_title(criterion.description.as_str());
-        let normalized_title_variants = criterion_title_variants(title)
-            .into_iter()
-            .map(|variant| normalize_score_text(&variant))
-            .collect::<Vec<_>>();
-        let passed = output_text.contains(public_token.as_str())
-            || output_text.contains(internal_token.as_str())
-            || normalized_title_variants
-                .iter()
-                .any(|variant| normalized_output_text.contains(variant));
+    let criterion_id_text_present = contains_criterion_id_text(output_text.as_str());
+    let checks = mfn_work_product_checks();
+    let mut criterion_results = Vec::with_capacity(checks.len() + 1);
+    criterion_results.push(CriterionResult {
+        criterion_id: String::from("work_product.no_public_criterion_ids"),
+        passed: !criterion_id_text_present,
+        verdict: if criterion_id_text_present {
+            CriterionVerdict::Fail
+        } else {
+            CriterionVerdict::Pass
+        },
+        reasoning: if criterion_id_text_present {
+            String::from("Output contains public criterion ID text. No-cheat scoring rejects that.")
+        } else {
+            String::from("Output does not contain public criterion ID text.")
+        },
+        evidence_refs: result
+            .output_artifact_manifest
+            .artifacts
+            .iter()
+            .map(|artifact| artifact.artifact_id.clone())
+            .collect(),
+        judge_model: String::from("psionic-deterministic-no-cheat-work-product"),
+        judge_prompt_hash: String::from("hash.psionic.harvey_mfn_no_cheat_work_product.v1"),
+        raw_response_hash: stable_json_digest(
+            "psionic.qwen_legal_mlx_lora.harvey_mfn_no_cheat.score_raw.v1",
+            &json!({
+                "run_id": result.run_id,
+                "criterion_id": "work_product.no_public_criterion_ids",
+                "criterion_id_text_present": criterion_id_text_present,
+            }),
+        )?,
+        confidence_bps: Some(9_000),
+        judge_latency_ms: Some(0),
+        judge_cost_micro_usd: Some(0),
+    });
+    for check in checks {
+        let passed = work_product_check_passed(&normalized_output_text, &check);
         criterion_results.push(CriterionResult {
-            criterion_id: criterion.criterion_id.clone(),
+            criterion_id: format!("work_product.mfn.{}", check.check_id),
             passed,
             verdict: if passed {
                 CriterionVerdict::Pass
@@ -430,11 +456,13 @@ fn deterministic_training_slice_score_report(
             },
             reasoning: if passed {
                 format!(
-                    "Training-slice deterministic scorer found marker `{public_token}`, internal marker `{internal_token}`, or a public criterion title variant for `{title}` in output.md."
+                    "No-cheat deterministic scorer found substantive content for: {}",
+                    check.description
                 )
             } else {
                 format!(
-                    "Training-slice deterministic scorer did not find marker `{public_token}`, internal marker `{internal_token}`, or a public criterion title variant for `{title}` in output.md."
+                    "No-cheat deterministic scorer did not find enough substantive content for: {}",
+                    check.description
                 )
             },
             evidence_refs: result
@@ -443,20 +471,18 @@ fn deterministic_training_slice_score_report(
                 .iter()
                 .map(|artifact| artifact.artifact_id.clone())
                 .collect(),
-            judge_model: String::from("psionic-deterministic-training-slice"),
-            judge_prompt_hash: String::from("hash.psionic.harvey_mfn_training_slice.v1"),
+            judge_model: String::from("psionic-deterministic-no-cheat-work-product"),
+            judge_prompt_hash: String::from("hash.psionic.harvey_mfn_no_cheat_work_product.v1"),
             raw_response_hash: stable_json_digest(
-                "psionic.qwen_legal_mlx_lora.harvey_mfn_slice.score_raw.v1",
+                "psionic.qwen_legal_mlx_lora.harvey_mfn_no_cheat.score_raw.v1",
                 &json!({
                     "run_id": result.run_id,
-                    "criterion_id": criterion.criterion_id,
-                    "public_token": public_token,
-                    "internal_token": internal_token,
-                    "title": title,
+                    "check_id": check.check_id,
+                    "description": check.description,
                     "passed": passed,
                 }),
             )?,
-            confidence_bps: Some(8_000),
+            confidence_bps: Some(7_000),
             judge_latency_ms: Some(0),
             judge_cost_micro_usd: Some(0),
         });
@@ -473,9 +499,15 @@ fn deterministic_training_slice_score_report(
     let mut metadata = Metadata::new();
     metadata.insert(
         String::from("score_scope"),
-        Value::String(String::from(
-            "training_slice_public_harvey_criterion_title_or_id_coverage",
-        )),
+        Value::String(String::from("rubric_free_mfn_work_product_quality_proxy")),
+    );
+    metadata.insert(
+        String::from("runner_content_mutation_allowed"),
+        Value::Bool(false),
+    );
+    metadata.insert(
+        String::from("criterion_id_text_present"),
+        Value::Bool(criterion_id_text_present),
     );
     metadata.insert(
         String::from("task_spec_hash"),
@@ -483,7 +515,9 @@ fn deterministic_training_slice_score_report(
     );
     Ok(ScoreReport {
         schema_version: psionic_eval::LEGAL_BENCHMARK_SCHEMA_VERSION,
-        score_report_id: String::from("score.qwen35_08b_mlx_lora.harvey_mfn_slice.2026_05_20"),
+        score_report_id: String::from(
+            "score.qwen35_08b_mlx_lora.harvey_mfn_no_cheat_work_product.2026_05_20",
+        ),
         run_id: result.run_id.clone(),
         task_id: result.run_record.task_id.clone(),
         task_version: result.run_record.task_version.clone(),
@@ -506,30 +540,144 @@ fn deterministic_training_slice_score_report(
     })
 }
 
-fn criterion_internal_token(criterion_id: &str) -> String {
-    criterion_id
-        .strip_prefix("criterion.")
-        .unwrap_or(criterion_id)
-        .to_ascii_uppercase()
+fn mfn_work_product_checks() -> Vec<WorkProductCheck> {
+    vec![
+        WorkProductCheck {
+            check_id: "source_documents",
+            description: "source documents are named",
+            all_terms: &["source documents"],
+            any_terms: &[
+                "capital commitment schedule",
+                "side letter compendium",
+                "limited partnership agreement",
+                "side letter terms tracking",
+            ],
+        },
+        WorkProductCheck {
+            check_id: "all_lps_covered",
+            description: "LP population is covered",
+            all_terms: &[
+                "lp 01", "lp 02", "lp 03", "lp 04", "lp 05", "lp 06", "lp 10", "lp 11",
+            ],
+            any_terms: &["meridian", "birchwood", "whitmore", "pacific basin"],
+        },
+        WorkProductCheck {
+            check_id: "first_close",
+            description: "first-close MFN treatment is analyzed",
+            all_terms: &["first close"],
+            any_terms: &["lp 01", "lp 02", "lp 03", "lp 04", "lp 06", "lp 07"],
+        },
+        WorkProductCheck {
+            check_id: "final_close",
+            description: "final-close MFN treatment is analyzed",
+            all_terms: &["final close"],
+            any_terms: &["lp 10", "lp 11", "pacific basin"],
+        },
+        WorkProductCheck {
+            check_id: "threshold",
+            description: "MFN threshold is stated",
+            all_terms: &["mfn", "threshold"],
+            any_terms: &["75m", "75 million", "75"],
+        },
+        WorkProductCheck {
+            check_id: "eligibility",
+            description: "eligibility and ineligibility are separated",
+            all_terms: &["eligible", "ineligible"],
+            any_terms: &["whitmore", "saxonbrook", "ashford", "cascadia"],
+        },
+        WorkProductCheck {
+            check_id: "fee_economics",
+            description: "fee economics are discussed",
+            all_terms: &["fee"],
+            any_terms: &["1 70", "1 75", "1 20", "1 25", "management fee"],
+        },
+        WorkProductCheck {
+            check_id: "carry_economics",
+            description: "carry economics are discussed",
+            all_terms: &["carry"],
+            any_terms: &["reduction", "strategic", "great plains"],
+        },
+        WorkProductCheck {
+            check_id: "exclusions",
+            description: "LPA exclusions are analyzed",
+            all_terms: &["exclusion"],
+            any_terms: &[
+                "lpac",
+                "advisory board",
+                "key person",
+                "valuation agent",
+                "strategic relationship",
+            ],
+        },
+        WorkProductCheck {
+            check_id: "notice_deadline",
+            description: "notice deadline is included",
+            all_terms: &["notice", "deadline"],
+            any_terms: &["october 12 2025", "october", "2025"],
+        },
+        WorkProductCheck {
+            check_id: "side_letters",
+            description: "side-letter treatment is included",
+            all_terms: &["side letter"],
+            any_terms: &["compendium", "mfn clause", "side letter terms"],
+        },
+        WorkProductCheck {
+            check_id: "governance_risks",
+            description: "governance risks are identified",
+            all_terms: &["governance", "risk"],
+            any_terms: &["valuation agent", "no fault", "lpac", "bad faith"],
+        },
+        WorkProductCheck {
+            check_id: "whitmore_issue",
+            description: "Whitmore issue is addressed",
+            all_terms: &["whitmore"],
+            any_terms: &["holbrooke", "personal relationship", "challenge risk"],
+        },
+        WorkProductCheck {
+            check_id: "great_plains_issue",
+            description: "Great Plains issue is addressed",
+            all_terms: &["great plains"],
+            any_terms: &["carry", "mislabel", "bad faith"],
+        },
+        WorkProductCheck {
+            check_id: "pacific_basin_issue",
+            description: "Pacific Basin issue is addressed",
+            all_terms: &["pacific basin"],
+            any_terms: &["lp 10", "final close", "benchmark"],
+        },
+        WorkProductCheck {
+            check_id: "recommendation",
+            description: "recommendation is included",
+            all_terms: &["recommend"],
+            any_terms: &["election", "elect", "remediate", "disclose"],
+        },
+        WorkProductCheck {
+            check_id: "source_limits",
+            description: "source limits or assumptions are stated",
+            all_terms: &[],
+            any_terms: &["assumption", "source limit", "based on", "provided source"],
+        },
+    ]
 }
 
-fn criterion_public_token(criterion_id: &str) -> String {
-    criterion_internal_token(criterion_id).replace('_', "-")
+fn work_product_check_passed(normalized_output_text: &str, check: &WorkProductCheck) -> bool {
+    check
+        .all_terms
+        .iter()
+        .all(|term| normalized_output_text.contains(normalize_score_text(term).as_str()))
+        && (check.any_terms.is_empty()
+            || check
+                .any_terms
+                .iter()
+                .any(|term| normalized_output_text.contains(normalize_score_text(term).as_str())))
 }
 
-fn criterion_title(description: &str) -> &str {
-    description.lines().next().unwrap_or(description)
-}
-
-fn criterion_title_variants(title: &str) -> Vec<String> {
-    let mut variants = vec![title.to_owned()];
-    if let Some((_, suffix)) = title.split_once(':') {
-        let suffix = suffix.trim();
-        if !suffix.is_empty() {
-            variants.push(suffix.to_owned());
-        }
-    }
-    variants
+fn contains_criterion_id_text(output_text: &str) -> bool {
+    (1..=999).any(|index| {
+        let hyphen = format!("C-{index:03}");
+        let underscore = format!("C_{index:03}");
+        output_text.contains(hyphen.as_str()) || output_text.contains(underscore.as_str())
+    })
 }
 
 fn normalize_score_text(value: &str) -> String {

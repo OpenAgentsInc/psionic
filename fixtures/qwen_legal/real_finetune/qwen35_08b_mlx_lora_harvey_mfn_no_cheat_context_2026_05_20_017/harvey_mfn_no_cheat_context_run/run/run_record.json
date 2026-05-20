@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.f8e7be4cce0d.qwen35-08b-mlx-lora-harvey-mfn-no-cheat-context-2026-05-20-017",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "task_version": "5aa41694",
+  "input_artifact_manifest_hash": "7f8c666fb1421764514ab643cd1d467658233d6369257fd146712181ce3910f8",
+  "run_config_hash": "f8e7be4cce0d8e5d061d40dfd81c4c1f075a9d0b6e702b719810ba26f7d048a0",
+  "output_artifact_manifest_hash": "0a206c83fd71e6314694417b4a8f4ed488b3ba0ae719c8712b785b84bcdadfd6",
+  "terminal_state": "no_tool_calls",
+  "transcript": [
+    {
+      "event_index": 0,
+      "event_kind": "system",
+      "role": "system",
+      "content": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: true\n- submit by returning JSON: {\"action\":\"submit\",\"deliverables\":[\"path\"]}.\n\nTool descriptions:\n- write: Write a UTF-8 output file under the workspace or output root.\n- validate_deliverables: Check required workspace/output deliverables for existence, readability, media type, and hash.\n\nBenchmark operating protocol:\n- Validate required output paths with validate_deliverables before submitting.\n- Final submission may be rejected until required inventory, source inspection, evidence rows, deliverable validation, and self-check notes are present.\n\nModule instructions:\n- This is a public Harvey training-slice run for the locally fine-tuned Qwen legal adapter; do not treat it as a retained score.\n- Write output.md under root output with a concise MFN waterfall memo.\n- Do not include rubric labels, criterion IDs, C-IDs, checklist IDs, or scoring tokens in the memo.\n- Cover the real legal work product: source documents reviewed, LP eligibility by first/final close, MFN threshold, LPA exclusions, side-letter terms, fee/carry economics, governance risks, recommended elections, and assumptions or source limits.\n- Source-derived context pack: Fund IV final closing was September 12, 2025; MFN notices are due October 12, 2025. The LPA threshold is $75M. First-closing LPs: LP-01 Meridian Teachers $265M, LP-02 Birchwood $165M, LP-03 Ashford Muni $135M, LP-04 Great Plains $200M, LP-05 Whitmore Family $65M, LP-06 Cascadia SWA $235M, LP-07 Summit Health $100M. Final-closing LPs: LP-08 Redstone FoF $135M, LP-09 Saxonbrook Row $70M, LP-10 Pacific Basin $328M, LP-11 Lakeview Capital $115M. Below-threshold LPs are LP-05 and LP-09. LPA MFN exclusions cover LP-specific regulatory/tax/legal terms, provisions personal to one LP, co-investment rights, fee arrangements integral to the LP commitment, and LPAC membership. LP-05 has 1.50%/1.00% fees and 12.5% carry despite its $65M commitment; James Whitmore and Derek Holbrooke have a long personal relationship; LP-05 lacks an MFN clause and creates equitable-treatment risk even though it is below threshold. LP-04 has 1.80%/1.30% fees and 17.5% carry labeled as insurance regulatory accommodation, but the internal memo says it was negotiated as an economic concession; reclassification or outside-counsel review is needed. LP-01 has 1.75%/1.25% fees, 15% carry, co-investment, LPAC, and expanded Key Person treatment. LP-10 has 1.70%/1.20% fees, 15% carry, 25% co-investment allocation language, expanded Key Persons, 60% no-fault removal threshold, investment-period extension consent, valuation-agent approval, LPAC, and reporting rights. LP-03 has a 66.67% no-fault removal threshold. LP-08 and LP-11 are final-close eligible; LP-10 terms are the final-close benchmark. Key risks: first/final-closing asymmetry, Whitmore fiduciary/equitable-treatment risk, Great Plains bad-faith/misclassification risk, no-fault removal cascade, Key Person cascade, LP-10 valuation-agent and investment-period consent governance burden, LP-02 sovereign-immunity drafting error, LP-11 aggregation-right circularity, and operational burden from reporting elections.\n- After writing output.md, call validate_deliverables with root output and required_paths [\"output.md\"].\n- Then submit {\"action\":\"submit\",\"deliverables\":[\"output.md\"],\"note\":\"Self-check: evidence is limited to the public training-slice documents available to this local run; the deliverable exists at output.md; unsupported or uncited claims are identified as source limits.\"}.\n",
+      "payload": {
+        "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.f8e7be4cce0d.qwen35-08b-mlx-lora-harvey-mfn-no-cheat-context-2026-05-20-017",
+        "run_config_hash": "f8e7be4cce0d8e5d061d40dfd81c4c1f075a9d0b6e702b719810ba26f7d048a0"
+      },
+      "timestamp_ms": 1779285337418
+    },
+    {
+      "event_index": 1,
+      "event_kind": "user",
+      "role": "user",
+      "content": "Review the attached fund documents and prepare an MFN election analysis and recommendation memo for the GP. Output: `output.md`.\n\nSource artifact tool paths:\n- artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.capital.commitment.schedule.and.fee.model.xlsx: capital-commitment-schedule-and-fee-model.xlsx (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)\n- artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.gp.side.letter.policy.memorandum.docx: gp-side-letter-policy-memorandum.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.limited.partnership.agreement.excerpts.docx: limited-partnership-agreement-excerpts.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.compendium.docx: side-letter-compendium.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)\n- artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.terms.tracking.spreadsheet.xlsx: side-letter-terms-tracking-spreadsheet.xlsx (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)\n\n\nPractice-area issue checklist:\n- Identify parties, dates, governing documents, requested output, and assumptions.\n- Separate document-backed facts from legal conclusions and cite each material fact.\n- Track ambiguities, missing documents, and conflicts between source materials.\n- Compare draft terms against instructions, term sheets, prior versions, and controlling source documents.\n- Apply the practice-area standard issue-spotting checklist before drafting the final deliverable.\n\n\nDeliverables:\n- deliverable.output_md at outputs/output.md: output.md\n",
+      "payload": {
+        "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall"
+      },
+      "timestamp_ms": 1779285337418
+    },
+    {
+      "event_index": 2,
+      "event_kind": "assistant",
+      "role": "assistant",
+      "payload": {
+        "response_id": "chatcmpl-66c3d35a-86a0-41fa-8b3c-d7bb9aa3703c",
+        "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_mfn_slice",
+        "model_id": "Qwen/Qwen3.5-0.8B",
+        "stop_reason": "stop",
+        "tool_calls": [],
+        "usage": {
+          "input_tokens": 1828,
+          "output_tokens": 2826,
+          "total_tokens": 4654,
+          "cached_input_tokens": 0,
+          "estimated_cost_micro_usd": 0
+        },
+        "elapsed_ms": 14971,
+        "retry_count": 0,
+        "raw_response_hash": "92e4db70dae5e2a535e362435fa1e69ffeabe5f33a92599db5d6dcddc569efd7",
+        "metadata": {
+          "adapter_artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+          "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+          "adapter_report_digest": "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1",
+          "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+          "pylon_worker_id": "pylon.local.macos.mlx.01.harvey_mfn_no_cheat",
+          "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_mfn_slice",
+          "route_model_id": "Qwen/Qwen3.5-0.8B",
+          "score_claim_kind": "training_slice_no_retained_claim",
+          "training_backend": "mlx_lm.lora"
+        }
+      },
+      "timestamp_ms": 1779285352390
+    }
+  ],
+  "tool_calls": [],
+  "metrics": {
+    "model_turns": 1,
+    "tool_call_count": 0,
+    "input_tokens": 1828,
+    "output_tokens": 2826,
+    "wall_time_ms": 14972,
+    "estimated_cost_micro_usd": 0
+  },
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.capital.commitment.schedule.and.fee.model.xlsx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/capital-commitment-schedule-and-fee-model.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.gp.side.letter.policy.memorandum.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/gp-side-letter-policy-memorandum.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.limited.partnership.agreement.excerpts.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/limited-partnership-agreement-excerpts.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.compendium.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/side-letter-compendium.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.terms.tracking.spreadsheet.xlsx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/side-letter-terms-tracking-spreadsheet.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable outputs/output.md missing"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "adapter_artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "adapter_report_digest": "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "pylon_worker_id": "pylon.local.macos.mlx.01.harvey_mfn_no_cheat",
+    "route_config_hash": "60f43f960f8aeec65c16ca06fd17de23830a1e28ee006c34381c9a447d028ae0",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_mfn_slice",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "score_claim_kind": "training_slice_no_retained_claim",
+    "training_backend": "mlx_lm.lora"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest.output.harvey.corporate-ma.identify_earnout_issues.5aa41694.run.harvey.corporate-ma.identify_earnout_issues.fcc66b99d230.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_corporate_ma_identify_earnout_issues",
+  "task_id": "harvey.corporate-ma.identify_earnout_issues",
+  "task_version": "5aa41694",
+  "manifest_role": "output",
+  "artifacts": []
+}

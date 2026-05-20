@@ -1,0 +1,16 @@
+[
+  {
+    "schema_version": 1,
+    "tool_call_id": "plain_text_tool.fc5ba4a9150509af",
+    "tool_name": "validate_deliverables",
+    "input_hash": "6684236773c0607fa82281fb1f0d7cbd31c43f18bcd22007733d99973f4b81b9",
+    "output_hash": "567f4872c30f6ec0384175d415ad38d7300249a3984b613466fb1309a7fd6163",
+    "elapsed_ms": 0,
+    "bytes_read": 0,
+    "bytes_written": 0,
+    "touched_paths": [],
+    "metadata": {
+      "provider_tool_call_id": "plain_text_tool.fc5ba4a9150509af"
+    }
+  }
+]

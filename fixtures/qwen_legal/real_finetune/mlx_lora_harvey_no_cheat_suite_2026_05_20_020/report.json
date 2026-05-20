@@ -1,0 +1,50 @@
+{
+  "schema": "psionic.qwen_legal_mlx_lora_harvey_no_cheat_suite.v1",
+  "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_no_cheat_suite_2026_05_20_020",
+  "base_model": "Qwen/Qwen3.5-0.8B",
+  "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+  "backend": "mlx_lm.lora",
+  "logical_pylon_worker_id": "pylon.local.macos.mlx.01.harvey_no_cheat_suite",
+  "parent_adapter": {
+    "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005",
+    "artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "report_digest": "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1"
+  },
+  "training_data": {
+    "schema": "psionic.harvey_no_cheat_suite.mlx_lora_data.v1",
+    "dataset_id": "mlx_lora_harvey_no_cheat_suite_2026_05_20_020",
+    "output_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020",
+    "source_suite_run": "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_2026_05_20_019",
+    "source_policy": "chosen labels are human/script-authored clean tool trajectories over actual no-cheat runner prompts; runner output was not mutated",
+    "forbidden_marker_check": "C-###, C_###, Criterion Coverage Map, Public coverage IDs, Internal coverage IDs",
+    "train_records": 12,
+    "valid_records": 2,
+    "test_records": 2,
+    "train_sha256": "9f6dc968203ac9965352a1ac30e29d70b97e52560c9d5d409b43d9b44abb16d8",
+    "valid_sha256": "338b3adf53a0738ece34b04d74dfe16a587ca9a9e1c278821f20862285c4f7c2",
+    "test_sha256": "3f6addf96763749a3762e48bc4c6584adea2dbb3348f8d889067b0eda38909ea"
+  },
+  "adapter": {
+    "path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "sha256": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1"
+  },
+  "training": {
+    "optimizer": "adamw",
+    "iterations": 10,
+    "learning_rate": 0.000006,
+    "max_seq_length": 2048,
+    "first_validation_loss": 3.083,
+    "best_validation_loss": 2.232,
+    "best_validation_iter": 10,
+    "final_validation_loss": 2.232,
+    "final_train_loss": 2.064,
+    "trained_tokens": 14305,
+    "peak_memory_gb": 43.362,
+    "train_log_sha256": "2c4b59f72b6803d41cb8e7d6f6bc95d858891a8cf78cc5c868a5a117db2b43a7"
+  },
+  "claim_boundary": [
+    "This is an actual local MLX LoRA fine-tune resumed from adapter 005.",
+    "The dataset uses actual no-cheat Rust runner prompts plus clean supervised tool trajectories.",
+    "It does not use public Harvey criterion IDs or runner-added output text."
+  ]
+}

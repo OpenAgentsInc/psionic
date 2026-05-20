@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "run_config_id": "run_config.qwen35_08b_mlx_lora.harvey_no_cheat_suite.model_only",
+  "provider": "openai_compatible.local_mlx",
+  "model": "Qwen/Qwen3.5-0.8B",
+  "agent_protocol_version": "legal-agent-loop.v1.no-cheat-suite",
+  "tool_policy": {
+    "allowed_tools": [
+      "write",
+      "validate_deliverables"
+    ],
+    "network_allowed": false,
+    "source_artifacts_read_only": true,
+    "max_turns": 6,
+    "max_wall_time_seconds": 180
+  },
+  "judge_policy": {
+    "mode": "deterministic",
+    "provider": "psionic",
+    "model": "deterministic-no-cheat-suite",
+    "prompt_template_id": "judge.harvey.no_cheat_suite.v1",
+    "prompt_template_hash": "hash.harvey.no_cheat_suite.v1",
+    "all_pass_required": false,
+    "sample_count": 1
+  },
+  "random_seed": 19,
+  "metadata": {
+    "adapter_artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "coverage_mode": "integrity_no_public_rubric",
+    "max_output_tokens": 1536,
+    "mode": "model_only",
+    "runner_content_mutation_allowed": false,
+    "score_scope": "rubric_free_protocol_and_work_product"
+  }
+}

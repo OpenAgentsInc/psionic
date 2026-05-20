@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "score_report_id": "score.qwen35_08b_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold.2026_05_20",
+  "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.fcc66b99d230.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "run_record_hash": "48bd5bc5f9859cb8f277e842c0866f4d6da445665ea9041b4857a4d840b5b6c3",
+  "output_artifact_manifest_hash": "3304c46a87170067cd6288689fe60071b4040fb0af0dd6fc66c7ee87b3d4f970",
+  "all_pass": false,
+  "criterion_pass_rate_bps": 1111,
+  "criterion_results": [
+    {
+      "criterion_id": "protocol.submitted",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: run reached submitted terminal state.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "7fecd4fadf902618326c1fd3798b9d962fd0b52fc0b4d8e6cb6299dbe475d30d",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.output_artifact",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: run produced an output artifact.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "0458163d59daa314d04b53845f71d0cabef04ae0be38c211dac80235b2f0428b",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.write_tool",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: model called write.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "feb83305db4f6b78705b72aeff24e900d14d7086258d18d0d29e03ae6363b4dc",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "protocol.validate_tool",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: model called validate_deliverables.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "92933db8dce233e37850c9dbb9e37ffbdc2dfceae94f2b7445b00694db2d9884",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "integrity.no_public_criterion_ids",
+      "passed": true,
+      "verdict": "pass",
+      "reasoning": "Passed: output does not contain public Harvey criterion IDs.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "3f92b00233b3fd5c97d9356fc8178bd80ba9876dced5dbf9f6e4208af83c0a89",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.task_topic",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output mentions the task topic.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "e7a73c8fd30a2703d7bc93546d3cbb07b8978c5ef99d90f3c46d6104bee187e5",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.source_limits",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output states source limits or assumptions.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "59487a0f344edff13e23b0ca99c1585c0e62c6103c5d2b5143afad541a417b12",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.legal_action",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output contains legal analysis or action language.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "c1bf16bea58e729659039856a989f1daf7abff2047d640472f9fcb54c309ef2d",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "work_product.minimum_substance",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Missing or failed: output has enough substance for a first-pass memo.",
+      "evidence_refs": [],
+      "judge_model": "psionic-deterministic-no-cheat-suite",
+      "judge_prompt_hash": "hash.psionic.harvey.no_cheat_suite.v1",
+      "raw_response_hash": "a277cfac544afefd5c500f6de06493f32ac1a7ecc30201f5922f390986521e87",
+      "confidence_bps": 7500,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    }
+  ],
+  "metrics": {
+    "model_turns": 1,
+    "tool_call_count": 0,
+    "input_tokens": 1207,
+    "output_tokens": 1536,
+    "wall_time_ms": 7751,
+    "estimated_cost_micro_usd": 0
+  },
+  "document_coverage_bps": 0,
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.affected.individuals.summary.xlsx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/affected-individuals-summary.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.bridgepoint.forensic.report.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/bridgepoint-forensic-report.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.client.notification.email.thread.eml",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/client-notification-email-thread.eml",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.cyber.insurance.policy.summary.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/cyber-insurance-policy-summary.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.evergreen.baa.template.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/evergreen-baa-template.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.hipaa.breach.notification.policy.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/hipaa-breach-notification-policy.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.hipaa.risk.assessment.summary.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/hipaa-risk-assessment-summary.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.incident.response.timeline.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/incident-response-timeline.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.data.privacy.cybersecurity.assess.breach.notification.obligations.across.affected.jurisdictions.documents.telehealth.saas.agreement.docx",
+        "relative_path": "data-privacy-cybersecurity/assess-breach-notification-obligations-across-affected-jurisdictions/documents/telehealth-saas-agreement.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable output.md missing"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "mode": "blueprint_scaffold",
+    "runner_content_mutation_allowed": false,
+    "score_scope": "rubric_free_protocol_and_work_product",
+    "task_spec_hash": "dfd718873d44340a1c6bb6eb00daace0af868cf15a5ec9e87784e2e6992505f2"
+  }
+}

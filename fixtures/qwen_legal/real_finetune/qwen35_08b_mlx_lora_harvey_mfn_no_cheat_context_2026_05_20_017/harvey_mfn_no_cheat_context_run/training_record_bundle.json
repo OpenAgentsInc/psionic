@@ -1,0 +1,91 @@
+{
+  "schema_version": "psionic.legal_benchmark.training_record_bundle.v1",
+  "bundle_id": "qwen35_08b_mlx_lora_harvey_mfn_slice_training_2026_05_20",
+  "suite_id": "harvey_legal_qwen_local_training_slice",
+  "source_report_id": "score.qwen35_08b_mlx_lora.harvey_mfn_no_cheat_work_product.2026_05_20",
+  "source_report_digest": "f03c8ab7149f5f7c0db563579f6f3ae15a91a3cc3689c9aacf88fa57048f7a26",
+  "split_counts": [
+    {
+      "split": "train",
+      "record_count": 1
+    }
+  ],
+  "records": [
+    {
+      "schema_version": "psionic.legal_benchmark.training_record.v1",
+      "record_id": "legal.training.harvey.funds-asset-management.analyze_mfn_waterfall.run.harvey.funds-asset-management.analyze_mfn_waterfall.f8e7be4cce0d.qwen35-08b-mlx-lora-harvey-mfn-no-cheat-context-2026-05-20-017",
+      "suite_id": "harvey_legal_qwen_local_training_slice",
+      "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+      "task_version": "5aa41694",
+      "practice_area": "funds-asset-management",
+      "work_type": "analyze",
+      "source_artifact_manifest_digest": "7f8c666fb1421764514ab643cd1d467658233d6369257fd146712181ce3910f8",
+      "tool_policy_hash": "e448097bf6c057337b50a5f04d26a4b031bf2889dcd702ade5cf402b6de7b600",
+      "deliverable_refs": [
+        {
+          "deliverable_id": "deliverable.output_md",
+          "relative_path": "outputs/output.md",
+          "required": true
+        }
+      ],
+      "coverage_snapshot_ref": "eb12e3aba25bf2fa0207ea750dcd8061b21207ddf08fa51e247bf6258ceb0c56",
+      "score_report_ref": "score.qwen35_08b_mlx_lora.harvey_mfn_no_cheat_work_product.2026_05_20",
+      "score_report_digest": "4502b972e5d0a2c0f26f7688605546ddafdc170eac533b77eb4bbad1504984d3",
+      "failure_family_labels": [
+        "unclassified"
+      ],
+      "judge_provenance": [
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:036992ae27e6bb4a90050335b3538333714ac7aaf97606d97f269971591d3564",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:1f0c0029b2bb13149db38142ece6e667f7c80a218a7f1f38ac1eca61e7273938",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:24a128505f9a80db90c07aab6f59d010b09dcc6eec5498db49658909e0af594c",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:4ea8cbccb6d3c8fb3ba810548d594663108d20dd09d94862d77c43f7a0b17826",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:69dfa52a4f6052474e319a439797b7a04acb059c85258dc5284144787fde82ae",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:7219bf65c0a90b6b86c5944069c8d7e6700bf723003c5f171ae2048110675416",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:735b9548a3e5a308636750e196b3815cf3f9755efccc070c34af7f44eecda373",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:84dfd32a8285ffc725f253909fe29e103cae813d1def0a19ac1933409af4458e",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:88744cbbc7d69687011dd554c30a4313ad0c2a94ad0806b8ab7aa95153a8f303",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:93999993cf2c7107380156e8c5e9a5633807b1f26d8ee5c90dab3999054cc5f1",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:aa06937f7181e24218e0cf3e536f6a13e27eff8b11245e92fd6b35de4aed385c",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:c88f816554e48ba9fab877a1bb52aba7ead28844260a4d37e4876603cc0f3436",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:d0da6d34dd0b56792334a9d88b46e2cc0e2044bddb8debccec64a20c72af845f",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:d8cd71f8cc5e8c17edf75070bf248588fb6d0ba938c3453fe5c969fba3bbaf24",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:de12369fab90903dafbf6f3be98de9e9d8284c4be20d5f8f64eb395d8de246e8",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:e4a0a0c01ede73f8fba3379fcdcfcf48c25d24ca3be162bf4534d21c860cf2fa",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:ec17037b28926449286a1a13731883f19e010989b49670a1d9786c0a879a6934",
+        "psionic-deterministic-no-cheat-work-product@hash.psionic.harvey_mfn_no_cheat_work_product.v1:fcff0c68ab3b57e01d35990949faab108e1bd35431cfbda5972e92def9e38e58"
+      ],
+      "hidden_criterion_policy": "judge_only_excluded",
+      "split": "train",
+      "examples": [
+        {
+          "example_id": "harvey.funds-asset-management.analyze_mfn_waterfall.directive",
+          "example_kind": "task_directive",
+          "visibility": "model_visible",
+          "input_text": "Review the attached fund documents and prepare an MFN election analysis and recommendation memo for the GP. Output: `output.md`.",
+          "source_refs": [
+            "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.capital.commitment.schedule.and.fee.model.xlsx",
+            "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.gp.side.letter.policy.memorandum.docx",
+            "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.limited.partnership.agreement.excerpts.docx",
+            "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.compendium.docx",
+            "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.terms.tracking.spreadsheet.xlsx"
+          ]
+        },
+        {
+          "example_id": "score.qwen35_08b_mlx_lora.harvey_mfn_no_cheat_work_product.2026_05_20.judge",
+          "example_kind": "judge_rationale",
+          "visibility": "judge_only",
+          "input_text": "work_product.no_public_criterion_ids:pass:Output does not contain public criterion ID text.\nwork_product.mfn.source_documents:fail:No-cheat deterministic scorer did not find enough substantive content for: source documents are named\nwork_product.mfn.all_lps_covered:fail:No-cheat deterministic scorer did not find enough substantive content for: LP population is covered\nwork_product.mfn.first_close:fail:No-cheat deterministic scorer did not find enough substantive content for: first-close MFN treatment is analyzed\nwork_product.mfn.final_close:fail:No-cheat deterministic scorer did not find enough substantive content for: final-close MFN treatment is analyzed\nwork_product.mfn.threshold:fail:No-cheat deterministic scorer did not find enough substantive content for: MFN threshold is stated\nwork_product.mfn.eligibility:fail:No-cheat deterministic scorer did not find enough substantive content for: eligibility and ineligibility are separated\nwork_product.mfn.fee_economics:fail:No-cheat deterministic scorer did not find enough substantive content for: fee economics are discussed\nwork_product.mfn.carry_economics:fail:No-cheat deterministic scorer did not find enough substantive content for: carry economics are discussed\nwork_product.mfn.exclusions:fail:No-cheat deterministic scorer did not find enough substantive content for: LPA exclusions are analyzed\nwork_product.mfn.notice_deadline:fail:No-cheat deterministic scorer did not find enough substantive content for: notice deadline is included\nwork_product.mfn.side_letters:fail:No-cheat deterministic scorer did not find enough substantive content for: side-letter treatment is included\nwork_product.mfn.governance_risks:fail:No-cheat deterministic scorer did not find enough substantive content for: governance risks are identified\nwork_product.mfn.whitmore_issue:fail:No-cheat deterministic scorer did not find enough substantive content for: Whitmore issue is addressed\nwork_product.mfn.great_plains_issue:fail:No-cheat deterministic scorer did not find enough substantive content for: Great Plains issue is addressed\nwork_product.mfn.pacific_basin_issue:fail:No-cheat deterministic scorer did not find enough substantive content for: Pacific Basin issue is addressed\nwork_product.mfn.recommendation:fail:No-cheat deterministic scorer did not find enough substantive content for: recommendation is included\nwork_product.mfn.source_limits:fail:No-cheat deterministic scorer did not find enough substantive content for: source limits or assumptions are stated"
+        }
+      ],
+      "metadata": {
+        "criterion_pass_rate_bps": 555,
+        "run_record_digest": "f8a38958ada5cab9209df31e41c69e0795b53eb37402a62d042b4d890cb68898",
+        "terminal_state": "no_tool_calls",
+        "transcript_digest": "eb6559430d5031beef25127a2b8f29b8cc14d2e7d10422e063f7ff4c16d1838f"
+      },
+      "record_digest": "d08a1a8d1b0f12fbcd8bcff8238211ae2015a11ea16c6f34f35920492df021da"
+    }
+  ],
+  "claim_boundary": "legal benchmark training records preserve source evidence and judge-only scoring provenance; they are dataset artifacts, not score-lift claims",
+  "bundle_digest": "be1c839833976829bd070dc5b65dbd0c9c9a50d48b986f0644d760e680d225a4"
+}

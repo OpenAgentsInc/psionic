@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.fcc66b99d230.qwen35-08b-mlx-lora-harvey-no-cheat-suite-blueprint_scaffold-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "terminal_state": "max_tokens",
+  "task_spec_hash": "dfd718873d44340a1c6bb6eb00daace0af868cf15a5ec9e87784e2e6992505f2",
+  "input_artifact_manifest_hash": "f0b444b17f9dde36e1d72d8f68726d4c15e023da87f1dca2266a6d13a8345e87",
+  "run_config_hash": "fcc66b99d230abf0cfbea57cea7e4023f5045410bba5f67f4b0139f0162f243e",
+  "output_artifact_manifest_hash": "3304c46a87170067cd6288689fe60071b4040fb0af0dd6fc66c7ee87b3d4f970",
+  "transcript_hash": "e5a43db6174b4fd30d9516e3468307b222793733847d13623ba1f82898de1404",
+  "metrics_hash": "4a61ce4e5f63e3f552a6f19dcea05fa4ebd1466c4cfa0fe5eecc6e3b1fed64ad",
+  "tool_receipts_hash": "a7df30dd6ea98914e89f8bb1648cf8b689afec0130c7392977ecc362c5511c24",
+  "run_record_hash": "5446e528e5c8d828148a7e7400e9f78e9f30a92d8a3f4dd733e031118dae6d02",
+  "output_artifact_count": 0,
+  "tool_receipt_count": 0,
+  "created_at_ms": 1779287083862,
+  "metadata": {
+    "adapter_artifact_digest": "30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_no_cheat_suite_2026_05_20_020/adapters.safetensors",
+    "adapter_report_digest": "506d14d74d319b3182cdc9ef59ce67dc4df9082b85c322457851fe022cd2ae29",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "c0e4bc217e49b8fc47b97d3460e0a283579eb7a0dde6f2a4ba4eeff019cb67ea",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.blueprint_scaffold",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}

@@ -5,8 +5,8 @@
 > RL-seed resumed Qwen LoRA added on 2026-05-20; public Harvey MFN
 > training-slice LoRA and Rust task run added on 2026-05-20; local MFN
 > reward-refresh LoRA and `63 / 83` public training-slice run added on
-> 2026-05-20; Blueprint scaffold transform run reached `83 / 83` on the
-> public Harvey MFN training-slice scorer on 2026-05-20.
+> 2026-05-20; no-cheat runner correction, single-task run 016, broad suite
+> runs 019/025, and adapter 020 added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -523,48 +523,54 @@ avoided the `max_tokens` no-tool failure from 006/007. It did not improve over
 005, so it is retained as empirical rejection evidence and not promoted.
 Adapter 005 remains the current best Harvey-runnable local Qwen policy.
 
-## Current Blueprint Scaffold Transform Run
+## Current No-Cheat Harvey Runner Result
 
-After the simulated-Pylon SFT plateau, the next improvement moved to the
-Blueprint/runner layer instead of another local SFT patch. The Rust legal
-benchmark agent now supports:
+Run 015 is retired as an invalid score. The runner added words to the model's
+output file, so the `83 / 83` result only proves that inserted text can satisfy
+the public scorer. It does not prove model quality and must not be used as a
+benchmark improvement.
 
-- `required_output_markers` run metadata;
-- pre-submit repair feedback when those markers are missing;
-- `apply_required_output_markers_on_write`, which applies declared output
-  markers during the model's `write` tool call and records
-  `Blueprint output scaffold applied` in the transcript.
+The Rust legal benchmark agent now rejects that design. Legacy marker metadata
+is ignored for output mutation, and the old scaffold-transform checker was
+deleted. The allowed no-cheat controls are:
 
-The successful run used the actual 005 Qwen LoRA adapter, served locally
-through MLX, and scored the same public Harvey MFN task:
+- `max_output_tokens`, which changes only the provider request budget;
+- `force_write_until_required_deliverables`, which keeps asking the model to
+  write its own deliverable;
+- `force_validate_after_write`, which requires model-authored validation
+  before submission;
+- `plain_text_tool_protocol`, which lets weak local models write JSON tool
+  requests as text while the runner only executes the JSON the model wrote.
 
-- run id:
-  `run.harvey.funds-asset-management.analyze_mfn_waterfall.65f01a6e093b.qwen35-08b-mlx-lora-harvey-mfn-blueprint-scaffold-transform-2026-05-20`
-- run directory:
-  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_blueprint_scaffold_transform_2026_05_20_015/harvey_mfn_blueprint_scaffold_transform_run`
-- adapter digest:
-  `b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed`
-- terminal state: `submitted`
-- output artifact count: `1`
-- tool receipt count: `2`
-- public criterion-title/token score: `83 / 83`
-- run record hash:
-  `8b3543f82c0d309af6eb531fb5bd64ca4515bc9f0a294db07a8608ab0dfd9915`
-- transcript hash:
-  `0d936ec0bca3b8226ae22f4688d4f690fe44fc9fb85d062ba9cbedbd87d05687`
-- score report digest:
-  `8b607b87dd12050023528f9e4b68c8757a97fc63958720d1a2fb4cfcf941060e`
-- checker:
-  `scripts/check-qwen35-08b-harvey-mfn-blueprint-scaffold-transform-run.sh`
+Current no-cheat evidence:
 
-This is a real Rust benchmark run over a real local Qwen LoRA adapter. The
-score lift is a systems lift: the model generated the memo and tool path, while
-the runner applied the declared Blueprint output scaffold. Treat it as public
-training-slice hillclimb evidence, not as a retained Harvey leaderboard claim.
-For hidden/retained slices, replace public ID-marker scaffolds with neutral
-legal work-product scaffolds such as eligibility matrices, source-citation
-tables, economic model tables, issue ledgers, recommendation tables, and
-uncertainty logs.
+- 016: adapter 005, same Harvey MFN task, runner output mutation disabled,
+  terminal state `submitted`, one model-written output artifact, two tool
+  receipts, score `4 / 18` on a rubric-free MFN work-product proxy.
+- 019: three public Harvey tasks, model-only and scaffold-assisted prompts
+  side by side, runner output mutation disabled, no output artifacts produced,
+  model-only average `1851` bps, scaffold-assisted average `1481` bps.
+- 020: real local MLX LoRA fine-tune resumed from adapter 005 over clean
+  no-cheat supervised tool trajectories, adapter digest
+  `30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1`,
+  validation loss `3.083` to `2.232`.
+- 025: the broad no-cheat suite rerun against adapter 020, no output artifacts
+  produced, model-only average `1851` bps, scaffold-assisted average `1481`
+  bps, signed delta `-370` bps.
+
+Run checker:
+
+```bash
+scripts/check-qwen35-08b-harvey-no-cheat-suite-runs.sh
+```
+
+Current operating conclusion: adapter 020 learned the clean supervised data
+distribution, but the broad suite did not improve. More prompt-only variants
+are not the next useful move. The next useful move is preference/RL data over
+model-written traces: use 016 and clean supervised trajectories as chosen
+examples, use 010-014 plus 017-019 and 021-025 failures as rejected protocol
+evidence, and train a policy that writes, validates, submits, and cites
+sources without any runner-added answer text.
 
 ## Rust API
 

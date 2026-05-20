@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest.output.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.5aa41694.run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.002c4b06fcb9.qwen35-08b-mlx-lora-harvey-no-cheat-suite-model_only-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "manifest_role": "output",
+  "artifacts": []
+}

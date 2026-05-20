@@ -3,7 +3,8 @@
 > Status: implemented local smoke metadata path on 2026-05-19; real local
 > Qwen/MLX tool-backed Rust agent smoke added on 2026-05-20; local RL-seed
 > resumed adapter smoke added on 2026-05-20; public Harvey MFN training-slice
-> adapter and task run added on 2026-05-20.
+> adapter and task run added on 2026-05-20; no-cheat Harvey suite adapter and
+> runner correction added on 2026-05-20.
 
 This document describes the first Psionic legal benchmark path for comparing a
 base Qwen candidate with a tuned Qwen adapter candidate through one
@@ -280,34 +281,39 @@ Harvey MFN adapter. It is the current local serving target for public
 Harvey-slice hillclimb work. It is still not a retained Harvey judge score and
 not full distributed RL.
 
-The same 005 adapter now also has a Blueprint scaffold-transform run:
+Run 015 is retired as an invalid score. It used the same 005 adapter, but the
+runner added output text during the write call. That proves the scorer could
+be fooled by inserted text. It does not prove the model solved the task, and
+it should not be used as a benchmark improvement.
 
-```text
-fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_blueprint_scaffold_transform_2026_05_20_015/harvey_mfn_blueprint_scaffold_transform_run
-```
+The current no-cheat Harvey path is:
+
+- 005 remains the best local Qwen adapter on the old public
+  criterion-title/token scorer with `63 / 83`. That scorer exposed public
+  criterion IDs and is useful only for public training-slice hillclimbing.
+- 016 is the current honest single-task MFN run. The runner did not mutate the
+  output. The model wrote one deliverable, submitted, and scored `4 / 18` on a
+  rubric-free MFN work-product proxy.
+- 019 ran a three-task no-cheat suite with model-only and scaffold-assisted
+  prompts side by side. Both modes failed to write output artifacts on the
+  broad slice.
+- 020 is a real local MLX LoRA fine-tune resumed from 005 over clean
+  no-cheat supervised tool trajectories. Adapter digest:
+  `30ba107fe59d81a8871edc02aa25a56b7eb7bc126d2705bc6f515e601f6c27a1`.
+- 025 reran the broad no-cheat suite against adapter 020. The score did not
+  improve: model-only average `1851` bps, scaffold-assisted average `1481`
+  bps, signed delta `-370` bps.
 
 Run checker:
 
 ```bash
-scripts/check-qwen35-08b-harvey-mfn-blueprint-scaffold-transform-run.sh
+scripts/check-qwen35-08b-harvey-no-cheat-suite-runs.sh
 ```
 
-Recorded scaffold-transform result:
-
-- terminal state: `submitted`
-- output artifact count: `1`
-- tool receipt count: `2`
-- public training-slice criterion-title/token pass count: `83 / 83`
-- transcript records `Blueprint output scaffold applied`
-- score report digest:
-  `8b607b87dd12050023528f9e4b68c8757a97fc63958720d1a2fb4cfcf941060e`
-- training record bundle digest:
-  `e8144347f2075efb0dbf26c44c78edf10b202e52bcc89690ce0537eba3fe2ac5`
-
-Claim boundary: this is still the same served model adapter. The lift is from
-the Rust/Blueprint output scaffold around the model, not from a new model-only
-fine-tune. Use this as public training-slice hillclimb evidence and as the
-current route for Autopilot-style output-protocol experiments.
+Claim boundary: no current route may add answer text to model output. Blueprint
+can supply product requirements, output schemas, validators, and tool protocol
+constraints. It cannot inject legal analysis, coverage labels, citations, or
+scoring phrases into the deliverable.
 
 Two later local adapters exist but are not serving targets:
 

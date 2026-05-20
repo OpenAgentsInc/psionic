@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "run.harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions.390ad3532478.qwen35-08b-mlx-lora-harvey-no-cheat-suite-model_only-harvey_data_privacy_cybersecurity_assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_id": "harvey.data-privacy-cybersecurity.assess_breach_notification_obligations_across_affected_jurisdictions",
+  "task_version": "5aa41694",
+  "terminal_state": "max_tokens",
+  "task_spec_hash": "2669395da397864da57edc6bd638b276130512aaa3b073be288afd04db23684e",
+  "input_artifact_manifest_hash": "f0b444b17f9dde36e1d72d8f68726d4c15e023da87f1dca2266a6d13a8345e87",
+  "run_config_hash": "390ad3532478edb23e9fdd0e3e8aff9e33a7aa186762bfcf4a0485a182901d3c",
+  "output_artifact_manifest_hash": "46be33801424ecaf1b7d6648656668d5b0c170ddf93551a3f47fb6779d91014d",
+  "transcript_hash": "196067b295a38fd1ddd9edceedb8ff7778957444a5b515873190f3f4f525c5a0",
+  "metrics_hash": "0217e93798fbb42e48295c7c20e3f696e8e9aee254e297c89fc545565f098177",
+  "tool_receipts_hash": "5cbd53a48074890f73cce79067ed1507ff6a257f583dad14f9c4f3d7b172807c",
+  "run_record_hash": "f7f9f677609056c0d393159f275c3488d7e936301b9e8e91f7613dbf2e1a255b",
+  "output_artifact_count": 0,
+  "tool_receipt_count": 1,
+  "created_at_ms": 1779286028895,
+  "metadata": {
+    "adapter_artifact_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "adapter_report_digest": "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "route_config_hash": "e44eb5b86badafb9b35bd61bfc51b12ea3df4d28d80b73309141782a80cb44d5",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.harvey_no_cheat_suite.model_only",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "runner_content_mutation_allowed": false
+  }
+}
