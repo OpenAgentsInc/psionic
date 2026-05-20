@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "suite_id": "harvey_public_003_workflow",
+  "mode": "public_harvey_three_task",
+  "fixed_task_order": [
+    "harvey.public.lease_notice",
+    "harvey.public.purchase_indemnity",
+    "harvey.public.privilege_log"
+  ],
+  "prompt_template_id": "autopilot.legal.direct_answer.v1",
+  "prompt_template_hash": "419ccc8b3507fb02f376004d6046809966e124dbe3caed77d326d561d4bb724a",
+  "scorer_version": "psionic-rust-legal-scorer-v1",
+  "inference_settings": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_output_tokens": 2048,
+    "seed": 20260520
+  },
+  "source_documents": [
+    {
+      "document_id": "lease_notice",
+      "relative_path": "fixtures/legal_benchmark/eval_suite_public_three/lease_notice.txt",
+      "media_type": "text/plain",
+      "byte_size": 200,
+      "sha256": "e42e52b5f48a499c3948c2452fe01b6f1aa0a515974b9850b7380e12f2416de8"
+    },
+    {
+      "document_id": "purchase_indemnity",
+      "relative_path": "fixtures/legal_benchmark/eval_suite_public_three/purchase_indemnity.txt",
+      "media_type": "text/plain",
+      "byte_size": 207,
+      "sha256": "939cd0cb216da9c1e50897413ece81096dd992ec6dd41f1f1ad3e4351a9c4b8b"
+    },
+    {
+      "document_id": "privilege_log",
+      "relative_path": "fixtures/legal_benchmark/eval_suite_public_three/privilege_log.txt",
+      "media_type": "text/plain",
+      "byte_size": 203,
+      "sha256": "0aa9f5bbdbfb72ad299ebd934f79baa554f580cb2e225340db1c00627b441cdc"
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "harvey.public.lease_notice",
+      "task_version": "v1",
+      "title": "Lease notice memo",
+      "practice_area": "real_estate",
+      "workflow": "review",
+      "instructions": "Write a short memo stating whether notice is required and how it may be sent.",
+      "source_document_ids": [
+        "lease_notice"
+      ],
+      "required_answer_path": "answer.md",
+      "base_outcome": "missing_answer",
+      "adapter_outcome": "pass",
+      "replay_answer_markdown": "# Lease notice memo\n\nThe tenant should send written notice within ten calendar days after learning of the material service interruption. Email can satisfy the notice requirement if the landlord acknowledges receipt."
+    },
+    {
+      "task_id": "harvey.public.purchase_indemnity",
+      "task_version": "v1",
+      "title": "Purchase agreement indemnity memo",
+      "practice_area": "ma",
+      "workflow": "analyze",
+      "instructions": "Write a short answer identifying the indemnity trigger and claim-notice deadline.",
+      "source_document_ids": [
+        "purchase_indemnity"
+      ],
+      "required_answer_path": "answer.md",
+      "base_outcome": "tool_failure",
+      "adapter_outcome": "pass",
+      "replay_answer_markdown": "# Purchase indemnity answer\n\nThe seller indemnifies the buyer for pre-closing tax liabilities. The buyer must send a claim notice within thirty days after discovering the liability."
+    },
+    {
+      "task_id": "harvey.public.privilege_log",
+      "task_version": "v1",
+      "title": "Privilege log classification",
+      "practice_area": "litigation",
+      "workflow": "classify",
+      "instructions": "Classify the two privilege-log entries and explain the likely privilege result.",
+      "source_document_ids": [
+        "privilege_log"
+      ],
+      "required_answer_path": "answer.md",
+      "base_outcome": "pass",
+      "adapter_outcome": "pass",
+      "replay_answer_markdown": "# Privilege log classification\n\nEntry 14 is likely privileged because outside counsel sent litigation strategy to the general counsel. Entry 17 is likely not privileged on these facts because it is an ordinary business report copied to counsel."
+    }
+  ],
+  "training_allowed": true,
+  "metadata": {
+    "boundary": "Deterministic three-task public replay fixture for Rust harness validation. It is not hidden Harvey performance.",
+    "suite_level": "harvey_public_003_workflow",
+    "source": "Psionic local fixture built from public-style legal task patterns."
+  }
+}

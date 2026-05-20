@@ -1,0 +1,1 @@
+The incident log says an attacker accessed customer names, emails, and account tokens for 4,200 California residents on March 1. The security team contained the issue on March 3. No Social Security numbers or payment card numbers were exposed.
