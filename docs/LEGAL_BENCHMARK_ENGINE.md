@@ -237,6 +237,49 @@ This is a local protocol proof. It does not train a live Qwen model by itself;
 it gives Nexus/Pylon the signed job and receipt shape needed before those
 workers run real SFT, DPO, or GRPO shards.
 
+## Distributed Dataset Sharding
+
+`crates/psionic-data/src/legal_benchmark_dataset_sharding.rs` owns the first
+legal fine-tuning dataset sharding and artifact transport contract for Pylon.
+
+It reads `legal_sft_v1` JSONL, requires every row to have a stable
+`example_id`, sorts rows by `example_id`, computes a canonical global dataset
+hash over the sorted rows, and assigns rows to shards with:
+
+```text
+shard = sha256(example_id) mod shard_count
+```
+
+The sharder writes:
+
+- one `dataset_shard_manifest.json`
+- one `shard-00000.jsonl` style file per shard
+- one uploaded artifact copy per shard under `artifacts/`
+
+The manifest records the global dataset hash, source file hash, immutable
+dataset lock, shard hashes, local artifact refs, uploaded artifact refs, and
+its own manifest hash. The worker receipt path refuses a shard when the
+expected manifest hash does not match, verifies the shard artifact before
+credit, and records a stable credit key so retries do not double-count a shard.
+
+Run the CLI with:
+
+```bash
+cargo run -p psionic-data --example legal_benchmark_shard_dataset -- \
+  --dataset fixtures/legal_benchmark/sharding/legal-sft-v1.jsonl \
+  --shards 4 \
+  --out target/legal/dataset_shards
+```
+
+The same command shape works for the normal generated dataset path:
+
+```bash
+cargo run -p psionic-data --example legal_benchmark_shard_dataset -- \
+  --dataset datasets/legal-sft-v1.jsonl \
+  --shards 8 \
+  --out datasets/shards/
+```
+
 `crates/psionic-data/src/legal_benchmark_sft_dataset.rs` builds canonical
 `legal_sft_v1` JSONL from honest successful receipts and training-eligible
 bad-run examples. It refuses hidden/private-by-default receipts, unknown
