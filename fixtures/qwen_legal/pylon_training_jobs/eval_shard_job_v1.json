@@ -41,8 +41,11 @@
   },
   "payment_budget": {
     "budget_id": "budget.qwen-legal.pylon.protocol.000001",
-    "max_cost_microusd": 0,
-    "payment_account_ref": "ledger://local-smoke/no-payment"
+    "agreed_price_microusd": 2500,
+    "max_cost_microusd": 2500,
+    "currency": "USD",
+    "payment_account_ref": "ledger://local-smoke/qwen-legal-pylon",
+    "pay_failed_but_valid_eval_attempts": false
   },
   "receipt_requirements": {
     "require_signature": true,

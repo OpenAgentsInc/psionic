@@ -9,7 +9,7 @@
 > runs 019/025, adapter 020, Rust-only Qwen3.6 GRPO smoke, and the
 > Qwen3.6-27B target-path smoke added on 2026-05-20; Qwen3.6-35B-A3B
 > MoE-safe target-path smoke added on 2026-05-20; unified legal fine-tuning
-> command surface added on 2026-05-20.
+> command surface and Pylon payment settlement receipts added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -437,12 +437,14 @@ Each job carries a stable job id, parent run id, model id/hash, optional
 adapter id/hash, dataset manifest hash, shard assignment, training config
 hash, expected input artifact hashes, expected output artifact declarations,
 runtime cap, hardware requirements, payment/budget metadata, and receipt
-requirements.
+requirements. The payment budget records the agreed price, max budget,
+currency, payment account reference, and whether a valid failed eval attempt is
+payable.
 
 Each worker receipt carries the worker id, worker Ed25519 public key, job id,
 input and output hashes, start/end timestamps, hardware summary, Psionic
-version, git commit, logs hash, metrics, failure reason when needed, signature,
-and receipt digest.
+version, git commit, logs hash, metrics, failure reason when needed, the agreed
+price, initial payment status, signature, and receipt digest.
 
 Canonical local fixtures live under
 `fixtures/qwen_legal/pylon_training_jobs/`:
@@ -464,10 +466,51 @@ cargo run -p psionic-train --example qwen_legal_verify_worker_receipt -- \
   target/legal/pylon_jobs/job.qwen-legal.dataset-shard.000001.receipt.json
 ```
 
+Settle the job payment decision with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_settle_training_job -- \
+  job.qwen-legal.dataset-shard.000001
+```
+
+Recorded local payment-settlement smoke:
+
+- worker receipt digest:
+  `bb884e79ab1bdaeddf7fe56a5c27b14d0d14dd31ae552d2301e3c9713863a97c`
+- settlement receipt path:
+  `target/legal/pylon_jobs/settlements/job.qwen-legal.dataset-shard.000001.payment_decision.json`
+- decision digest:
+  `e7e265bc8379ce9044095440ee5a01e549771c3cf5dfd88df1bb7e41cafacfd8`
+- validation status: `valid`
+- payment status: `payable`
+- agreed price: `2500` micro-USD
+- payment proof:
+  `pending_payment_proof:ledger://local-smoke/qwen-legal-pylon:budget.qwen-legal.pylon.protocol.000001:job.qwen-legal.dataset-shard.000001`
+
+The report command now includes a worker contribution/payment table:
+
+```bash
+cargo run -p psionic-train -- legal ft report --run qwen-legal-ft-payment-smoke
+```
+
+Recorded payment-table smoke:
+
+- report digest:
+  `be96e2150abc9a3fda80afe2bf8ab52f953b103cb4be260a3322d591e5f77aaa`
+- `job.qwen-legal.dataset-shard.000001`: `valid` and `payable`
+- `job.qwen-legal.eval-shard.000001`: `missing_receipt` and `withheld`
+
+The settlement logic withholds payment when the worker uses the wrong input
+hash, misses a required output, submits an invalid receipt, corrupts an
+artifact, duplicates a shard that already has a valid successful receipt, or
+has no receipt. Failed eval attempts are only payable if that job budget says
+so explicitly.
+
 The current worker is a protocol smoke, not a live distributed trainer. It
 does prove local Pylon intake, input hash enforcement, required output
-enforcement, deterministic output materialization, signed receipts, and
-receipt verification for dataset-shard and eval-shard jobs.
+enforcement, deterministic output materialization, signed receipts, receipt
+verification, settlement decisions, and contribution/payment reporting for
+dataset-shard and eval-shard jobs.
 
 ## Distributed Dataset Shards
 

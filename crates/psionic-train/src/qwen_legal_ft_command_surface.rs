@@ -7,6 +7,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+use crate::{
+    qwen_legal_pylon_worker_contribution_payment_table, PylonTrainingWorkerContributionPaymentRow,
+};
+
 pub const QWEN_LEGAL_FT_REPORT_SCHEMA_VERSION: &str = "psionic.qwen_legal_ft_report.v1";
 pub const QWEN_LEGAL_FT_COMMAND_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_ft_command_receipt.v1";
@@ -66,6 +70,7 @@ pub struct QwenLegalFtRunReport {
     pub integrity_valid: bool,
     pub deterministic_replay_command: Vec<String>,
     pub command_rows: Vec<QwenLegalFtCommandRow>,
+    pub worker_contribution_payment_table: Vec<PylonTrainingWorkerContributionPaymentRow>,
     pub artifact_index: BTreeMap<String, QwenLegalFtArtifactRef>,
     pub claim_boundary: String,
     pub report_digest: String,
@@ -250,6 +255,12 @@ pub fn build_qwen_legal_ft_report(
         .count();
     let planned_command_count = command_rows.len() - ready_command_count;
     let integrity_valid = command_rows.iter().all(|row| row.integrity_valid);
+    let worker_contribution_payment_table = qwen_legal_pylon_worker_contribution_payment_table()
+        .map_err(|error| {
+            QwenLegalFtCommandSurfaceError::InvalidIntegrity(format!(
+                "failed to build Pylon worker contribution payment table: {error}"
+            ))
+        })?;
     let mut artifact_index = BTreeMap::new();
     for row in &command_rows {
         for artifact in &row.required_artifacts {
@@ -279,6 +290,7 @@ pub fn build_qwen_legal_ft_report(
             run_id.to_string(),
         ],
         command_rows,
+        worker_contribution_payment_table,
         artifact_index,
         claim_boundary: String::from(
             "The legal ft command surface reports local command readiness and receipt integrity. It does not claim hidden Harvey benchmark performance.",
@@ -288,11 +300,27 @@ pub fn build_qwen_legal_ft_report(
 }
 
 pub fn qwen_legal_ft_human_summary(report: &QwenLegalFtRunReport, report_path: &Path) -> String {
+    let payable_workers = report
+        .worker_contribution_payment_table
+        .iter()
+        .filter(|row| row.payment_status == crate::PylonTrainingPaymentStatus::Payable)
+        .count();
+    let withheld_workers = report
+        .worker_contribution_payment_table
+        .iter()
+        .filter(|row| row.payment_status == crate::PylonTrainingPaymentStatus::Withheld)
+        .count();
     let mut lines = vec![
         format!("legal ft report for run {}", report.run_id),
         format!(
             "commands: {} ready, {} planned, {} total",
             report.ready_command_count, report.planned_command_count, report.command_count
+        ),
+        format!(
+            "pylon payments: {} payable, {} withheld, {} rows",
+            payable_workers,
+            withheld_workers,
+            report.worker_contribution_payment_table.len()
         ),
         format!("integrity: {}", integrity_label(report.integrity_valid)),
         format!("report: {}", report_path.display()),
