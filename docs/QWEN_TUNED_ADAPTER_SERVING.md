@@ -154,7 +154,7 @@ retained Harvey score claim or full RL run.
 
 ## Harvey MFN Training-Slice Adapter
 
-The strongest local Harvey-task candidate is now:
+The older Harvey-task candidate is:
 
 ```text
 fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors
@@ -215,6 +215,70 @@ This is the first local Qwen LoRA candidate that both trains from prior
 accepted benchmark behavior and runs a real Harvey task through the Rust agent
 loop. It is still a public training-slice score, not a retained Harvey
 leaderboard score.
+
+## Harvey MFN Reward-Refresh Adapter
+
+The strongest local Harvey-task candidate is now:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors
+```
+
+Report:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/report.json
+```
+
+Adapter SHA-256:
+
+```text
+b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed
+```
+
+Report SHA-256:
+
+```text
+550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1
+```
+
+Serve it:
+
+```bash
+MODEL_ID=Qwen/Qwen3.5-0.8B \
+ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005 \
+PORT=18091 \
+MAX_TOKENS=4096 \
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+Run it against the public Harvey MFN training slice:
+
+```bash
+QWEN_LEGAL_MLX_BASE_URL=http://127.0.0.1:18091/v1 \
+QWEN_LEGAL_ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors \
+QWEN_LEGAL_ADAPTER_DIGEST=b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed \
+QWEN_LEGAL_ADAPTER_REPORT_DIGEST=550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1 \
+QWEN_LEGAL_RUN_NONCE=qwen35-08b-mlx-lora-harvey-mfn-reward-refresh-score-v2-2026-05-20 \
+cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_mfn_slice -- \
+  fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/harvey_mfn_reward_score_v2_run
+```
+
+Recorded result:
+
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `2`
+- public training-slice criterion-title/token pass count: `63 / 83`
+- score report digest:
+  `2d77bbd77017f8d3e629b8209d93487b750a3baf8c9a5dffc59e38d18fc866cf`
+- training record bundle digest:
+  `6e01bd7339fcca570ef39c533c05be7f43782561141a0fb3a1ef6395534f2b50`
+
+This candidate is an actual local MLX LoRA fine-tune resumed from the 004
+Harvey MFN adapter. It is the current local serving target for public
+Harvey-slice hillclimb work. It is still not a retained Harvey judge score and
+not full distributed RL.
 
 ## Candidate Identity
 

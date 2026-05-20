@@ -1,0 +1,30 @@
+Loading pretrained model
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 11391.37it/s]
+Loading datasets
+Training
+Loading fine-tuned weights from fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_slice_2026_05_20_004/adapters.safetensors
+Trainable parameters: 0.240% (1.804M/752.392M)
+Starting training..., iters: 12
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 26.01it/s]
+Iter 1: Val loss 2.092, Val took 0.048s
+Iter 1: Train loss 1.190, Learning Rate 5.000e-06, It/sec 0.080, Tokens/sec 94.776, Trained Tokens 1192, Peak mem 21.153 GB
+Iter 2: Train loss 0.527, Learning Rate 5.000e-06, It/sec 0.387, Tokens/sec 140.576, Trained Tokens 1555, Peak mem 21.153 GB
+Iter 3: Train loss 0.603, Learning Rate 5.000e-06, It/sec 1.554, Tokens/sec 590.536, Trained Tokens 1935, Peak mem 21.153 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 33.03it/s]
+Iter 4: Val loss 3.261, Val took 0.032s
+Iter 4: Train loss 1.202, Learning Rate 5.000e-06, It/sec 0.050, Tokens/sec 86.175, Trained Tokens 3660, Peak mem 39.396 GB
+Iter 5: Train loss 1.246, Learning Rate 5.000e-06, It/sec 0.515, Tokens/sec 139.438, Trained Tokens 3931, Peak mem 39.396 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 2705 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 6: Train loss 0.778, Learning Rate 5.000e-06, It/sec 0.037, Tokens/sec 75.169, Trained Tokens 5978, Peak mem 53.705 GB
+Iter 7: Train loss 1.143, Learning Rate 5.000e-06, It/sec 0.168, Tokens/sec 116.989, Trained Tokens 6673, Peak mem 53.705 GB
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 32.07it/s]
+Iter 8: Val loss 3.319, Val took 0.033s
+Iter 8: Train loss 1.105, Learning Rate 5.000e-06, It/sec 0.239, Tokens/sec 412.301, Trained Tokens 8398, Peak mem 53.705 GB
+Iter 9: Train loss 0.414, Learning Rate 5.000e-06, It/sec 1.505, Tokens/sec 571.884, Trained Tokens 8778, Peak mem 53.705 GB
+Iter 10: Train loss 0.316, Learning Rate 5.000e-06, It/sec 1.530, Tokens/sec 555.506, Trained Tokens 9141, Peak mem 53.705 GB
+Iter 11: Train loss 0.945, Learning Rate 5.000e-06, It/sec 0.082, Tokens/sec 98.256, Trained Tokens 10333, Peak mem 53.705 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 2705 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 48.61it/s]
+Iter 12: Val loss 2.054, Val took 0.022s
+Iter 12: Train loss 0.668, Learning Rate 5.000e-06, It/sec 0.185, Tokens/sec 379.196, Trained Tokens 12380, Peak mem 53.705 GB
+Saved final weights to target/qwen_legal_real_finetune/run_2026_05_20_005_qwen35_08b_harvey_mfn_reward_refresh/mlx_adapter/adapters.safetensors.

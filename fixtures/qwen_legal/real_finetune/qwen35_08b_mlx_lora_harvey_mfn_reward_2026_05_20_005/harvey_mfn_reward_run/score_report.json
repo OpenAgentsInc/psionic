@@ -1,0 +1,1490 @@
+{
+  "schema_version": 1,
+  "score_report_id": "score.qwen35_08b_mlx_lora.harvey_mfn_slice.2026_05_20",
+  "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.d6dbfce21fb1.qwen35-08b-mlx-lora-harvey-mfn-reward-refresh-2026-05-20",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "task_version": "5aa41694",
+  "run_record_hash": "0d8beaefaae52d3e7e61a48531bead549c8637236f44b0a616765e73b287eca0",
+  "output_artifact_manifest_hash": "3185dd6fcc56ff5505ccc0b31b76b565e5c21bd80f477486238113171de067c4",
+  "all_pass": false,
+  "criterion_pass_rate_bps": 120,
+  "criterion_results": [
+    {
+      "criterion_id": "criterion.c_001",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-001`, internal marker `C_001`, or a public criterion title variant for `MFN Eligibility: LP-01 Meridian Teachers correctly identified as eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "f187f3547e4f01a66af8f29b485042d9c067ee87f2363360b5c7a2d7a0ddb1ba",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_002",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-002`, internal marker `C_002`, or a public criterion title variant for `MFN Eligibility: LP-02 Birchwood correctly identified as eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "2ea1376bbf1075431e63209a5746e3ca0aac76b532e1bacfa4ff0c3b420c8c4d",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_003",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-003`, internal marker `C_003`, or a public criterion title variant for `MFN Eligibility: LP-03 Ashford Muni correctly identified as eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "33d67ec2669b505a1ea17f07ca1492958e01e2277d12dcfdc9624c672b64f5ea",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_004",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-004`, internal marker `C_004`, or a public criterion title variant for `MFN Eligibility: LP-04 Great Plains correctly identified as eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "addc75b9cdd7b2d40e556c2a6e89426b57de525b6799f206d6a00790d39adca0",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_005",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-005`, internal marker `C_005`, or a public criterion title variant for `MFN Eligibility: LP-05 Whitmore Family correctly identified as ineligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "46432ff964944040b768da26edd4087573f2546f8080a4e49eefc992541cdc00",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_006",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-006`, internal marker `C_006`, or a public criterion title variant for `MFN Eligibility: LP-06 Cascadia SWA correctly identified as eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a8c8b1e1695d6de82ac9fa152c759ddb13be635f581f98a7ab5a287d42896dd0",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_007",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-007`, internal marker `C_007`, or a public criterion title variant for `MFN Eligibility: LP-07 Summit Health correctly identified as eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "bad089640b9f46f912b751c1cf826b4f0c6f2ea96172e3daca6bb817b7bf0d86",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_008",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-008`, internal marker `C_008`, or a public criterion title variant for `MFN Eligibility: LP-08 Redstone FoF correctly identified as eligible (final close only)` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "cce0171e6efb9005cfc81c0491107e5ef7ff8ed07ccdb0e742585c170229fd6c",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_009",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-009`, internal marker `C_009`, or a public criterion title variant for `MFN Eligibility: LP-09 Saxonbrook Row correctly identified as ineligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "b2efd505275076f50011dbbedf95fdf4e22c8a9524d17110589e562688b5d447",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_010",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-010`, internal marker `C_010`, or a public criterion title variant for `MFN Eligibility: LP-10 Pacific Basin correctly identified as eligible (final close only)` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "ecea07e99a86f4a997379efcb4c825a0e2df758bdc19bebf96385df46d0abed2",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_011",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-011`, internal marker `C_011`, or a public criterion title variant for `MFN Eligibility: LP-11 Lakeview Capital correctly identified as eligible (final close only)` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "aa25dc8bdea5d1afbff5971631a3d4ca27ecdc94859e868c135924b43620b52f",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_012",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-012`, internal marker `C_012`, or a public criterion title variant for `MFN threshold correctly stated as $75M` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "4445447acbe0888dd8f36a91887542e405a4f4cee3871893cba3e98aaaade741",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_013",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-013`, internal marker `C_013`, or a public criterion title variant for `Five LPA MFN exclusion categories correctly enumerated` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "f48cb3a7ed011e8694df0775eabdd195e3d936131d58119c96859bc59e8e1dc4",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_014",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-014`, internal marker `C_014`, or a public criterion title variant for `MFN notice deadline correctly identified as October 12, 2025` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "e970268eaf1cab27b50ec033fcb4f56238a9d7974611f7be8748294988745016",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_015",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-015`, internal marker `C_015`, or a public criterion title variant for `Whitmore management fee correctly identified as 1.50%/1.00%` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "4ecf788402bd8f3ce042eaa6ece0c5a0b0d9222747609be053b8eb012e81875b",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_016",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-016`, internal marker `C_016`, or a public criterion title variant for `Whitmore carried interest correctly identified as 12.5%` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "76316899e25ed77d723ab3b752f3f1d8c497a766c1927c186e1e627fefacf9dd",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_017",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-017`, internal marker `C_017`, or a public criterion title variant for `Whitmore preferential economics flagged as a concern` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "35c18d792d4f919a28ba7665e06b1a8e5fd96ed7734d5ef2f7e920d3ba1450c7",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_018",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-018`, internal marker `C_018`, or a public criterion title variant for `ISSUE_001: Whitmore-Holbrooke personal relationship flagged` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "205538848d733828545ad1977ac3da33c98e52a069f252e16de33a40fd4a5d53",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_019",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-019`, internal marker `C_019`, or a public criterion title variant for `ISSUE_001: 'Integral to commitment' exclusion defense analyzed` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "2bc2c46461affc380da8b0897f95ecb486cc8f0fc33c1cd0e26ab14193b932bf",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_020",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-020`, internal marker `C_020`, or a public criterion title variant for `ISSUE_001: Whitmore side letter omits MFN clause noted` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "28652b372f96f102472e92292331d4f480bf0cc838c5415e6d739062efe9d2ba",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_021",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-021`, internal marker `C_021`, or a public criterion title variant for `ISSUE_001: LP challenge risk despite Whitmore being below MFN threshold` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "c29613a8cc2db798537337aadc49731f9d7c0ed8dc51c9effde7de44054b3e91",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_022",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-022`, internal marker `C_022`, or a public criterion title variant for `ISSUE_002: Great Plains carry reduction mislabeling identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "4bec93c6b8f4bf05365f464d0f7740bbd0a9f9859fd899a01b7beee74f98f58f",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_023",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-023`, internal marker `C_023`, or a public criterion title variant for `ISSUE_002: Risk of bad faith claim if mislabeling discovered` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "c9f2a1eecf1642aa89788337f438f5c6e7b9df0322c15a2c1fad0022892c0a69",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_024",
+      "passed": true,
+      "verdict": "pass",
+      "reasoning": "Training-slice deterministic scorer found marker `C-024`, internal marker `C_024`, or a public criterion title variant for `ISSUE_002: Recommendation to reclassify Great Plains carry as MFN-eligible` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a3621450d0f9b09a79e13472489edb035bb179ccf896855b3c99922171d2222b",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_025",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-025`, internal marker `C_025`, or a public criterion title variant for `ISSUE_003: First/final closing MFN asymmetry identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "d11e011b8a6e55452175b5ef5753f8e6ba492fb3e1732a5948e15a0af7f03a98",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_026",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-026`, internal marker `C_026`, or a public criterion title variant for `ISSUE_003: Pacific Basin cannot elect into first closing LP-01 terms` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "ecbeb669995c9d117ef38047f0f498fb1d4146d1ce05238f6d4a80681f30bb35",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_027",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-027`, internal marker `C_027`, or a public criterion title variant for `ISSUE_003: LP-10 terms become benchmark for final closing MFN` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "09d666651e4836d49a5788b90f0dcb5aced931938e11349e274bb3b402ebe009",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_028",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-028`, internal marker `C_028`, or a public criterion title variant for `ISSUE_004: No-fault removal threshold cascade risk identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "721daeeacc1b24bcf8b75553a450b0a5f3826b931c677d07d6b572189066b08a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_029",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-029`, internal marker `C_029`, or a public criterion title variant for `ISSUE_004: Analysis of which LPs can elect which threshold` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a66e7dec8e417873e2c8b8125f358bbed37f5b6ec9b5e0a1f4ce23164c0f1121",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_030",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-030`, internal marker `C_030`, or a public criterion title variant for `ISSUE_004: Governance provisions not clearly excluded from MFN noted` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "76ea2de7983bee6f7c89979ad4dc7aa89d231625c234dc2c7a595dec9b7536f7",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_031",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-031`, internal marker `C_031`, or a public criterion title variant for `ISSUE_005: Withholding tax gross-up economic exposure identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "92af342d4c860bf8ba412e94c6f8a5699b6c87d099de61df4b9dd20d87a62d3f",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_032",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-032`, internal marker `C_032`, or a public criterion title variant for `ISSUE_005: Analysis of whether gross-up is excludable as tax-specific` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a8511e0d03622e08e38ae632af380f1e0b2b09293c532c214a322203ca789061",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_033",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-033`, internal marker `C_033`, or a public criterion title variant for `ISSUE_005: Practical assessment of domestic LP election likelihood` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "552b0897e3c2e12896105b3e8b60a9b68a16be44554e811cd86785c4390904f9",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_034",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-034`, internal marker `C_034`, or a public criterion title variant for `ISSUE_006: Birchwood sovereign immunity drafting error identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "9ef8fae7b79722b87f91c1b9def816eb55b6013c442fa1f840ade1802a68d917",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_035",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-035`, internal marker `C_035`, or a public criterion title variant for `ISSUE_006: Risk of LP confusion during MFN disclosure noted` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "56a20a06be29398996d17ccd72169eeec8ea771a4019958ec3e8b0908cd0867b",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_036",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-036`, internal marker `C_036`, or a public criterion title variant for `ISSUE_006: Recommendation to address with Birchwood before MFN notice` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "64e04a3adcb44502fca208e8cd12bb0cedacb8b2fe30b4ff6fabc5cd0d4cad16",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_037",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-037`, internal marker `C_037`, or a public criterion title variant for `ISSUE_007: Lakeview aggregation right and MFN threshold gaming` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "697748ebafb4e7898859770e90dd4858ea6b69b3621e7fde9eeff9126c3d0946",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_038",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-038`, internal marker `C_038`, or a public criterion title variant for `ISSUE_007: Circular logic problem analyzed` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "734ca622b2a6638e89b61a4d0d9db4b904a0da91d7edd0674762112e0a39cbd4",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_039",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-039`, internal marker `C_039`, or a public criterion title variant for `ISSUE_008: Co-investment 'guarantee' language conflict identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a352e0c0d9cb6d939eff1c25d91e437e348cfb53b4d1b3edca58aedf3d697aee",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_040",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-040`, internal marker `C_040`, or a public criterion title variant for `ISSUE_008: Co-investment exclusion scope analyzed` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "4a9448107f5f1a3ece243904d572ca15f4f1d2ad42d6323812d829fd62f32283",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_041",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-041`, internal marker `C_041`, or a public criterion title variant for `ISSUE_009: Current aggregate management fee revenue calculated` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a51af639667b692bc654ca36db90d5b703fc6ac71adb75afee34074d4d516022",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_042",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-042`, internal marker `C_042`, or a public criterion title variant for `ISSUE_009: Worst-case MFN management fee scenario modeled` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "9186cbe440a59109f87cdc36d98d8e16cb7f006b27f5f03e73650cf879dd0e2f",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_043",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-043`, internal marker `C_043`, or a public criterion title variant for `ISSUE_009: Dollar impact of MFN fee elections quantified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "626f1d50f07a11c83fa3e8e4419c7ce87ca54c762a504eecff59a6f3602459a1",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_044",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-044`, internal marker `C_044`, or a public criterion title variant for `ISSUE_009: Carried interest impact of MFN elections modeled` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "c4872b4637e086b14769d386c3820dce4952fb8806ee08758edce2864e6bc33a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_045",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-045`, internal marker `C_045`, or a public criterion title variant for `ISSUE_009: Realistic/expected scenario provided in addition to worst case` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "14cc6f546ad2a85a343591e70d3fa54516dc0017bd2835fae4c9b8d7fb971f00",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_046",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-046`, internal marker `C_046`, or a public criterion title variant for `ISSUE_010: Key Person expansion MFN risk identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "546d9b26e158838fcf7ef298b85db72c517cd837580e678242cd861597f60646",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_047",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-047`, internal marker `C_047`, or a public criterion title variant for `ISSUE_010: Key Person expansion not clearly excludable from MFN noted` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a686185dd03eb030b77e55e27b0373cbcb7738874bb8a809e0570ca3070d4eeb",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_048",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-048`, internal marker `C_048`, or a public criterion title variant for `ISSUE_011: Valuation agent approval right identified as governance risk` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "f35219181f4109e747ee70a2e0ac2bcbad976deba365a8862cfb1f063d24c347",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_049",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-049`, internal marker `C_049`, or a public criterion title variant for `ISSUE_011: Valuation agent right not fitting MFN exclusions noted` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a8d47653a9389dbe2eba8ae830446d5350c96d090318eda08237a297848c973a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_050",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-050`, internal marker `C_050`, or a public criterion title variant for `ISSUE_012: Combined carry + fee reduction impact modeled` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "ee172b3aedb4e631880653f5cc3a5dc85e21f80d5a19e669b7a1851b8940fa8f",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_051",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-051`, internal marker `C_051`, or a public criterion title variant for `ISSUE_012: First closing LPs can elect LP-01's 15% carry via MFN` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "7815c93adfb135232a6f64439f5f03c85812972217779a8d8e62bc79dc80db9a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_052",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-052`, internal marker `C_052`, or a public criterion title variant for `ISSUE_012: Final closing LPs can elect LP-10's 15% carry via MFN` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "ff2233e55dbe23153f71fadff23cc2dbea3d261f327036527125255f339f900c",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_053",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-053`, internal marker `C_053`, or a public criterion title variant for `Exclusion analysis: LP-01's carry reduction labeled 'strategic relationship'` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "fc1882154a1a1e939547855b2bb6f5dada66d43463fb0d83c137f257113a7ff8",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_054",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-054`, internal marker `C_054`, or a public criterion title variant for `Exclusion analysis: LPAC membership provisions correctly excluded` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a2ebfac4d76fa0b8a1aea3abfde51f72f23652bf6a75fa7d48aa6d022df99ea9",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_055",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-055`, internal marker `C_055`, or a public criterion title variant for `LP-05 advisory board seat flagged as inconsistent with policy` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a970f2e45e3398b53ae4616324bc2cd6f30dfc2d0247e08cfba911703f66cd31",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_056",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-056`, internal marker `C_056`, or a public criterion title variant for `Recommendation: Amend side letters before MFN notice distribution` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "f5bc69a672cdb90eb55834152b1020b069646c93d11449a1fbdee111a6436cc2",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_057",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-057`, internal marker `C_057`, or a public criterion title variant for `Recommendation: MFN notice structuring advice provided` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "96cab4654540c202aa9304449a6072c4e98c6b69763a67e220d7e61500cd6ff4",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_058",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-058`, internal marker `C_058`, or a public criterion title variant for `Recommendation: Items requiring outside counsel input identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "ec60f7d03d9295e47f5f4f75934f0ee1f4437ecab4b08f607516b5f2beb87478",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_059",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-059`, internal marker `C_059`, or a public criterion title variant for `Memo includes MFN eligibility matrix or equivalent table` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a75228ad0cada0018b0bed89e19ff7e8a620f054233b096a4112213b03eec935",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_060",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-060`, internal marker `C_060`, or a public criterion title variant for `Memo covers all five requested sections` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "2c3a6be19c9bfaab4fd1a7caad0def11f7a4a4716c08749f9ec2bfddc4053f8a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_061",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-061`, internal marker `C_061`, or a public criterion title variant for `Fund size correctly stated as $1.85B` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "925d86e0f60e343a7a23bef3a7a7a44696dace4315b0f982818ba993465d7d10",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_062",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-062`, internal marker `C_062`, or a public criterion title variant for `GP commitment correctly stated as $37M (2%)` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "bdabc113544fbda98cf05b56e8df8c48a2a0ef2566c0863ad5a813d7c5d7a15a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_063",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-063`, internal marker `C_063`, or a public criterion title variant for `Standard management fee correctly stated as 2.0%/1.5%` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "2f3995dd0590b6c8c44c2f846bc4ebc575f134e9e9b7450cefb6b7649db46eb0",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_064",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-064`, internal marker `C_064`, or a public criterion title variant for `Standard carried interest correctly stated as 20% over 8% preferred` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "f0e94f05b6364c25301a0248fbbf88e953cb6f6c1b169c54901f4d2c4bf6de5e",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_065",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-065`, internal marker `C_065`, or a public criterion title variant for `LP-10 consent right for investment period extensions identified` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "35d244599ec1ad4ba2d171e684bb928a433975e1e28a352f52588e8f2033f62a",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_066",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-066`, internal marker `C_066`, or a public criterion title variant for `Excuse rights variations noted but not over-elevated` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a202990dd7f57aef16c14b80ec8a29704ee9e33bdabe8202ebb5169945ad864f",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_067",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-067`, internal marker `C_067`, or a public criterion title variant for `Standard fee revenue baseline: approximately $36.26M/year at 2.0% on $1.813B` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "b1384e3fdb5cfb1c9fb93aa06fdf715a46e9bb54c47af2cb40ddba6fd30fce98",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_068",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-068`, internal marker `C_068`, or a public criterion title variant for `Reporting enhancement provisions analyzed for MFN eligibility` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "73f3c4aece8e9c090406827a1c48679f16fcd28f9465d4a9a8be9dad5823b217",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_069",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-069`, internal marker `C_069`, or a public criterion title variant for `LP-06 sovereign immunity correctly distinguished from LP-02 error` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "75734d964f8340315fb71937dc6ac31e1b78065a83029e0282b275dc9c16a224",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_070",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-070`, internal marker `C_070`, or a public criterion title variant for `Whitmore placement agent fee disclosure waiver noted` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "25dac621e3987a143732e3b25021236bff5a4db79e3d8d5d3337825be0e80e34",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_071",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-071`, internal marker `C_071`, or a public criterion title variant for `Post-investment period fee modeling included` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "3cae04184b7e1e234a1b083251a0d98e338abb5e648cd3f96a11df6b8e275ac2",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_072",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-072`, internal marker `C_072`, or a public criterion title variant for `No-fault removal: LPA standard threshold correctly stated as 75%` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "3ede77c0204185beba13aa14573722ed60cb9baa4d800b73fe684a6e9d97dc30",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_073",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-073`, internal marker `C_073`, or a public criterion title variant for `Key Persons correctly identified as Holbrooke and Iversen under LPA` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "144c64845d1beab4b5f27c5d24ad7ca31603fc8bd0542f29777bde8129208733",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_074",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-074`, internal marker `C_074`, or a public criterion title variant for `Delgado and Chen correctly identified as non-Key Persons under LPA` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "0da4e1b2f766c16eaa925b026e62e41889630cb2815de897ceb7d1c9a0366080",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_075",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-075`, internal marker `C_075`, or a public criterion title variant for `LP commitment amounts correctly referenced throughout` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "02eb8ff0e4c6639d8a6751fc4a9b132a5ddaf4f5731b5fd870ac370bc4d9edae",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_076",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-076`, internal marker `C_076`, or a public criterion title variant for `Transaction/monitoring fee offset noted in fee calculations` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "337b8d968924421bc3ded234690668def1ef73285432aad10d2c16ebe8cab3c9",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_077",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-077`, internal marker `C_077`, or a public criterion title variant for `ISSUE_004: Aggregate commitment impact of removal threshold spread assessed` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "5ad28b53f8b9cb5b5c7b9aff63377b773c490870b2477fd11ff585614d520fdb",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_078",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-078`, internal marker `C_078`, or a public criterion title variant for `Correct identification of first closing LPs` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "ce3f3df78f3a6f42ee930c7d0f1d49548d0491b763db860a23697d738b352b9e",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_079",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-079`, internal marker `C_079`, or a public criterion title variant for `Correct identification of final closing LPs` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "88d145bb7030462c4bcc8be544d60eb43ea82c65d6144fe0e7475ec01de4097d",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_080",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-080`, internal marker `C_080`, or a public criterion title variant for `Total MFN-eligible first closing LP count correctly stated as 6` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "8a91b3771540dbdd3da3b6b7f46c570795e559f9b8ea24667c2c459a96ea7472",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_081",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-081`, internal marker `C_081`, or a public criterion title variant for `Total MFN-eligible final closing LP count correctly stated as 3` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "a73bebbf0f0ec290ebf08f6adfe37addad81a35178c059997fa1a1c969c14775",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_082",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-082`, internal marker `C_082`, or a public criterion title variant for `LP-10's best management fee among final closing LPs noted as 1.70%/1.20%` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "c2ba24b8b29ac14f66de86c2a5742f005594d86276d69667d68744cb2d7610d3",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    },
+    {
+      "criterion_id": "criterion.c_083",
+      "passed": false,
+      "verdict": "fail",
+      "reasoning": "Training-slice deterministic scorer did not find marker `C-083`, internal marker `C_083`, or a public criterion title variant for `LP-01's best management fee among first closing LPs noted as 1.75%/1.25%` in output.md.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-training-slice",
+      "judge_prompt_hash": "hash.psionic.harvey_mfn_training_slice.v1",
+      "raw_response_hash": "8f7cab3a9a234edf41542f70b3b2c3b4148ba12dcd13fd736d62fda8ba1c7e70",
+      "confidence_bps": 8000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    }
+  ],
+  "metrics": {
+    "model_turns": 3,
+    "tool_call_count": 2,
+    "input_tokens": 10818,
+    "output_tokens": 2344,
+    "wall_time_ms": 12276,
+    "estimated_cost_micro_usd": 0
+  },
+  "document_coverage_bps": 0,
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "hill_climb",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [
+      {
+        "item_id": "derived.criterion.c_001",
+        "prompt": "C-001: MFN Eligibility: LP-01 Meridian Teachers correctly identified as eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_002",
+        "prompt": "C-002: MFN Eligibility: LP-02 Birchwood correctly identified as eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_003",
+        "prompt": "C-003: MFN Eligibility: LP-03 Ashford Muni correctly identified as eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_004",
+        "prompt": "C-004: MFN Eligibility: LP-04 Great Plains correctly identified as eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_005",
+        "prompt": "C-005: MFN Eligibility: LP-05 Whitmore Family correctly identified as ineligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_006",
+        "prompt": "C-006: MFN Eligibility: LP-06 Cascadia SWA correctly identified as eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_007",
+        "prompt": "C-007: MFN Eligibility: LP-07 Summit Health correctly identified as eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_008",
+        "prompt": "C-008: MFN Eligibility: LP-08 Redstone FoF correctly identified as eligible (final close only)",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_009",
+        "prompt": "C-009: MFN Eligibility: LP-09 Saxonbrook Row correctly identified as ineligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_010",
+        "prompt": "C-010: MFN Eligibility: LP-10 Pacific Basin correctly identified as eligible (final close only)",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_011",
+        "prompt": "C-011: MFN Eligibility: LP-11 Lakeview Capital correctly identified as eligible (final close only)",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_012",
+        "prompt": "C-012: MFN threshold correctly stated as $75M",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_013",
+        "prompt": "C-013: Five LPA MFN exclusion categories correctly enumerated",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_014",
+        "prompt": "C-014: MFN notice deadline correctly identified as October 12, 2025",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_015",
+        "prompt": "C-015: Whitmore management fee correctly identified as 1.50%/1.00%",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_016",
+        "prompt": "C-016: Whitmore carried interest correctly identified as 12.5%",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_017",
+        "prompt": "C-017: Whitmore preferential economics flagged as a concern",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_018",
+        "prompt": "C-018: ISSUE_001: Whitmore-Holbrooke personal relationship flagged",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_019",
+        "prompt": "C-019: ISSUE_001: 'Integral to commitment' exclusion defense analyzed",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_020",
+        "prompt": "C-020: ISSUE_001: Whitmore side letter omits MFN clause noted",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_021",
+        "prompt": "C-021: ISSUE_001: LP challenge risk despite Whitmore being below MFN threshold",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_022",
+        "prompt": "C-022: ISSUE_002: Great Plains carry reduction mislabeling identified",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_023",
+        "prompt": "C-023: ISSUE_002: Risk of bad faith claim if mislabeling discovered",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      },
+      {
+        "item_id": "derived.criterion.c_024",
+        "prompt": "C-024: ISSUE_002: Recommendation to reclassify Great Plains carry as MFN-eligible",
+        "source": "public_harvey_training_slice_criteria",
+        "agent_visible": true
+      }
+    ],
+    "documents": [
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.capital.commitment.schedule.and.fee.model.xlsx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/capital-commitment-schedule-and-fee-model.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.gp.side.letter.policy.memorandum.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/gp-side-letter-policy-memorandum.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.limited.partnership.agreement.excerpts.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/limited-partnership-agreement-excerpts.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.compendium.docx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/side-letter-compendium.docx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      },
+      {
+        "artifact_id": "artifact.source.funds.asset.management.analyze.mfn.waterfall.documents.side.letter.terms.tracking.spreadsheet.xlsx",
+        "relative_path": "funds-asset-management/analyze-mfn-waterfall/documents/side-letter-terms-tracking-spreadsheet.xlsx",
+        "discovered": false,
+        "read": false,
+        "used_extracted_text": false
+      }
+    ],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [
+      {
+        "deliverable_id": "unmatched.output.md",
+        "relative_path": "output.md",
+        "section_id": "tool.write.output.md",
+        "drafted": true
+      }
+    ],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.deliverable.output_md",
+        "target_ref": "deliverable.output_md",
+        "passed": false,
+        "detail": "deliverable outputs/output.md missing"
+      },
+      {
+        "validation_id": "validation.tool.output.md",
+        "target_ref": "output.md",
+        "passed": true,
+        "detail": "deliverable output.md exists and is readable"
+      }
+    ],
+    "self_checks": [
+      {
+        "self_check_id": "self_check.0",
+        "area": "agent_declared",
+        "outcome": "You are running a legal benchmark task under Psionic control.\nUse only the listed tools and produce outputs intentionally.\n\nTool policy:\n- allowed tools: write, validate_deliverables\n- network allowed: false\n- source artifacts read-only: tr"
+      }
+    ]
+  },
+  "metadata": {
+    "score_scope": "training_slice_public_harvey_criterion_title_or_id_coverage",
+    "task_spec_hash": "e2c162e90a91747dbe6cfa8029f4a83047ec1a95dca87473bb74454492b2f813"
+  }
+}
