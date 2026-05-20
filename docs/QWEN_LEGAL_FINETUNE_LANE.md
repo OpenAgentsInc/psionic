@@ -8,7 +8,8 @@
 > 2026-05-20; no-cheat runner correction, single-task run 016, broad suite
 > runs 019/025, adapter 020, Rust-only Qwen3.6 GRPO smoke, and the
 > Qwen3.6-27B target-path smoke added on 2026-05-20; Qwen3.6-35B-A3B
-> MoE-safe target-path smoke added on 2026-05-20.
+> MoE-safe target-path smoke added on 2026-05-20; unified legal fine-tuning
+> command surface added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -26,6 +27,72 @@ update, and the Autopilot4 import loop are green.
 
 The Qwen replacement model set and the current `qwen36_alias_qwen35`
 conformance decision live in `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`.
+
+## Legal Fine-Tuning Command Surface
+
+The legal lane now has one `psionic-train legal ft` command surface for the
+operator loop. It is intentionally a command catalog and receipt layer: every
+subcommand emits a plain summary, a JSON receipt or report, the deterministic
+replay command, required input artifact hashes, expected output paths, and an
+integrity flag. If a required static artifact is missing, the command exits
+nonzero instead of producing a trusted receipt.
+
+Generate the complete report with either entry point:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_ft_report -- \
+  --run qwen-legal-ft-smoke
+
+cargo run -p psionic-train -- legal ft report --run qwen-legal-ft-smoke
+```
+
+Recorded local result:
+
+- report path:
+  `target/legal/ft_runs/qwen-legal-ft-smoke/qwen_legal_ft_report.json`
+- command readiness: `17 / 17`
+- integrity: `valid`
+- report digest:
+  `066baa9148e319742053ac847b9782992d715307f5458f1291136f078d5fd7be`
+
+The first receipt smoke was:
+
+```bash
+cargo run -p psionic-train -- legal ft build-sft --run qwen-legal-ft-smoke
+```
+
+Recorded receipt:
+
+- receipt path:
+  `target/legal/ft_runs/qwen-legal-ft-smoke/build-sft/receipt.json`
+- receipt digest:
+  `172a264e005190e03a38204dbd341b8a3d36c6b16511b17e4cb16ac9d0661cab`
+- integrity: `valid`
+
+The command catalog is:
+
+- `init-run`
+- `run-task`
+- `eval`
+- `build-sft`
+- `build-dpo`
+- `build-rewards`
+- `train-sft`
+- `train-dpo`
+- `train-grpo`
+- `submit-pylon-job`
+- `collect-pylon-receipts`
+- `merge-adapters`
+- `register-adapter`
+- `promote`
+- `report`
+- `replay`
+- `verify-integrity`
+
+This surface does not replace the actual training and eval commands. It makes
+them discoverable, replayable, and auditable from one place so a three-task
+local loop, data build, local SFT smoke, Pylon job, adapter merge, promotion,
+and final report can all point at the same run id and receipt folder.
 
 ## Qwen3.6-27B Target Path
 
