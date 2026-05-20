@@ -21,6 +21,7 @@ The adapter layer defines:
 - `ModelUsage`
 - `ModelAdapter`
 - `ProviderHttpTransport`
+- `GoogleVertexGeminiAdapter`
 - `OpenAiCompatibleAdapter`
 - `AnthropicAdapter`
 - `MockModelAdapter`
@@ -28,8 +29,13 @@ The adapter layer defines:
 Routes record provider family, base URL, model id, endpoint path, route id,
 model config hash, and secret reference id. They do not carry raw API keys.
 HTTP request builders use redacted credential placeholders such as
-`<secret_ref:secret.openai.local>` so serialized run artifacts can identify the
+`<secret_ref:secret.google.vertex.adc>` so serialized run artifacts can identify the
 credential route without leaking the credential value.
+
+The active hosted benchmark route is `google_vertex_gemini` with
+`gemini-3-flash-preview` on Vertex AI `generateContent`. The OpenAI-compatible
+route is retained for local/self-hosted fallback models and historical baselines
+only; it is not the product-aligned Harvey benchmark default.
 
 ## Tool Calling
 
@@ -48,8 +54,9 @@ credential route without leaking the credential value.
 - evidence_table
 - validate_deliverables
 
-OpenAI-compatible responses normalize `tool_calls[].function` payloads into
-`ModelToolCall`. Anthropic responses normalize `tool_use` content blocks into
+Gemini responses normalize `functionCall` parts into `ModelToolCall`.
+OpenAI-compatible responses normalize `tool_calls[].function` payloads into the
+same structure. Anthropic responses normalize `tool_use` content blocks into
 the same structure. Tool results flow back through `ToolResultMessage`, which
 can be rendered as provider-specific tool-result messages by the adapters.
 

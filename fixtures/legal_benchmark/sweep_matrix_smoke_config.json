@@ -10,10 +10,10 @@
   "task_ids": [],
   "providers": [
     {
-      "provider_id": "hosted",
-      "provider_family": "openai_compatible",
-      "model": "hosted-large",
-      "route_id": "route.hosted"
+      "provider_id": "gemini3_flash",
+      "provider_family": "google_vertex_gemini",
+      "model": "gemini-3-flash-preview",
+      "route_id": "google.gemini3.flash.primary"
     },
     {
       "provider_id": "local",

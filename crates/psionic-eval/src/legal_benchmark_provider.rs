@@ -1,9 +1,10 @@
 //! Provider-neutral model adapter contracts for legal benchmark agents.
 //!
-//! The adapter layer normalizes hosted providers, OpenAI-compatible local
-//! serving endpoints, and deterministic CI mocks into one benchmark model
-//! surface. It deliberately records route and secret reference identity without
-//! carrying raw credentials into run artifacts.
+//! The adapter layer normalizes hosted Google Vertex Gemini providers,
+//! OpenAI-compatible local serving endpoints, Anthropic parity routes, and
+//! deterministic CI mocks into one benchmark model surface. It deliberately
+//! records route and secret reference identity without carrying raw credentials
+//! into run artifacts.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -24,6 +25,7 @@ pub const QWEN_LEGAL_MODEL_FAMILY_ACCEPTANCE_LABEL: &str = "qwen35";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelProviderFamily {
+    GoogleVertexGemini,
     OpenAiCompatible,
     Anthropic,
     PsionicCompatible,
@@ -589,6 +591,57 @@ pub struct ModelProviderRoute {
 }
 
 impl ModelProviderRoute {
+    pub fn google_vertex_gemini(
+        route_id: impl Into<String>,
+        project_id: impl Into<String>,
+        location: impl Into<String>,
+        model_id: impl Into<String>,
+        secret_reference_id: Option<String>,
+    ) -> Self {
+        let project_id = project_id.into();
+        let location = location.into();
+        let model_id = model_id.into();
+        let api_endpoint = if location == "global" {
+            String::from("https://aiplatform.googleapis.com")
+        } else {
+            format!("https://{location}-aiplatform.googleapis.com")
+        };
+        let base_url = format!(
+            "{api_endpoint}/v1/projects/{project_id}/locations/{location}/publishers/google/models/{model_id}:generateContent"
+        );
+        let secret_reference_id = secret_reference_id.filter(|value| !value.trim().is_empty());
+        let mut redacted_headers = BTreeMap::new();
+        redacted_headers.insert(
+            String::from("content-type"),
+            String::from("application/json"),
+        );
+        redacted_headers.insert(String::from("x-goog-user-project"), project_id.clone());
+        if let Some(secret_ref) = &secret_reference_id {
+            redacted_headers.insert(
+                String::from("authorization"),
+                format!("Bearer <secret_ref:{secret_ref}>"),
+            );
+        }
+        let mut metadata = Metadata::new();
+        metadata.insert(String::from("project_id"), Value::String(project_id));
+        metadata.insert(String::from("location"), Value::String(location));
+        metadata.insert(
+            String::from("endpoint_kind"),
+            Value::String(String::from("generateContent")),
+        );
+        Self {
+            schema_version: LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
+            route_id: route_id.into(),
+            family: ModelProviderFamily::GoogleVertexGemini,
+            base_url: trim_url(base_url),
+            model_id,
+            endpoint_path: None,
+            secret_reference_id,
+            redacted_headers,
+            metadata,
+        }
+    }
+
     pub fn openai_compatible(
         route_id: impl Into<String>,
         base_url: impl Into<String>,
@@ -1060,6 +1113,48 @@ where
 }
 
 #[derive(Clone, Debug)]
+pub struct GoogleVertexGeminiAdapter<T> {
+    route: ModelProviderRoute,
+    retry_policy: ModelRetryPolicy,
+    transport: T,
+}
+
+impl<T> GoogleVertexGeminiAdapter<T> {
+    pub fn new(route: ModelProviderRoute, transport: T, retry_policy: ModelRetryPolicy) -> Self {
+        Self {
+            route,
+            retry_policy,
+            transport,
+        }
+    }
+
+    pub fn into_transport(self) -> T {
+        self.transport
+    }
+}
+
+impl<T> ModelAdapter for GoogleVertexGeminiAdapter<T>
+where
+    T: ProviderHttpTransport,
+{
+    fn route(&self) -> &ModelProviderRoute {
+        &self.route
+    }
+
+    fn complete(&mut self, request: &ModelRequest) -> ModelAdapterResult<ModelResponse> {
+        let http_request =
+            build_google_vertex_gemini_request(&self.route, &self.retry_policy, request);
+        let (http_response, retry_count) = send_with_retries(
+            &mut self.transport,
+            http_request,
+            &self.route,
+            &self.retry_policy,
+        )?;
+        parse_google_vertex_gemini_response(&self.route, request, &http_response, retry_count)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct MockModelAdapter {
     route: ModelProviderRoute,
     responses: VecDeque<ModelAdapterResult<ModelResponse>>,
@@ -1501,6 +1596,133 @@ fn anthropic_tool_use_message_json(tool_call: &ModelToolCall) -> Value {
     })
 }
 
+fn build_google_vertex_gemini_request(
+    route: &ModelProviderRoute,
+    retry_policy: &ModelRetryPolicy,
+    request: &ModelRequest,
+) -> ProviderHttpRequest {
+    let system = request
+        .messages
+        .iter()
+        .filter(|message| message.role == ModelMessageRole::System)
+        .filter_map(|message| message.content.clone())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let contents = request
+        .messages
+        .iter()
+        .filter(|message| message.role != ModelMessageRole::System)
+        .map(google_vertex_gemini_content_json)
+        .collect::<Vec<_>>();
+    let function_declarations = request
+        .tools
+        .iter()
+        .map(|tool| {
+            json!({
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.input_schema,
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut generation_config = json!({
+        "maxOutputTokens": request.sampling.max_output_tokens,
+    });
+    if let Some(temperature) = request.sampling.temperature {
+        generation_config["temperature"] = json!(temperature);
+    }
+    if let Some(top_p) = request.sampling.top_p {
+        generation_config["topP"] = json!(top_p);
+    }
+    if let Some(thinking_level) = route
+        .metadata
+        .get("thinking_level")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+    {
+        generation_config["thinkingConfig"] = json!({
+            "thinkingLevel": thinking_level.to_ascii_uppercase(),
+        });
+    }
+
+    let mut body = json!({
+        "contents": contents,
+        "generationConfig": generation_config,
+    });
+    if !system.is_empty() {
+        body["systemInstruction"] = json!({
+            "parts": [{"text": system}],
+        });
+    }
+    if !function_declarations.is_empty() {
+        body["tools"] = json!([{
+            "functionDeclarations": function_declarations,
+        }]);
+        body["toolConfig"] = json!({
+            "functionCallingConfig": {"mode": "AUTO"},
+        });
+    }
+    ProviderHttpRequest {
+        method: String::from("POST"),
+        url: route.endpoint_url(),
+        headers: route.redacted_headers.clone(),
+        body,
+        timeout_ms: retry_policy.timeout_ms,
+    }
+}
+
+fn google_vertex_gemini_content_json(message: &ModelMessage) -> Value {
+    let role = match message.role {
+        ModelMessageRole::Assistant => "model",
+        ModelMessageRole::System | ModelMessageRole::User | ModelMessageRole::Tool => "user",
+    };
+    let mut parts = Vec::new();
+    if let Some(content) = message
+        .content
+        .as_ref()
+        .filter(|content| !content.trim().is_empty())
+    {
+        if message.role == ModelMessageRole::Tool {
+            parts.push(json!({
+                "functionResponse": {
+                    "name": message.tool_name.as_deref().unwrap_or_else(|| {
+                        message.tool_call_id.as_deref().unwrap_or("tool")
+                    }),
+                    "response": {
+                        "result": content,
+                        "is_error": message
+                            .metadata
+                            .get("is_error")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false)
+                    }
+                }
+            }));
+        } else {
+            parts.push(json!({"text": content}));
+        }
+    }
+    for tool_call in &message.tool_calls {
+        parts.push(google_vertex_gemini_function_call_json(tool_call));
+    }
+    if parts.is_empty() {
+        parts.push(json!({"text": ""}));
+    }
+    json!({
+        "role": role,
+        "parts": parts,
+    })
+}
+
+fn google_vertex_gemini_function_call_json(tool_call: &ModelToolCall) -> Value {
+    json!({
+        "functionCall": {
+            "name": tool_call.tool_name.clone(),
+            "args": tool_call.arguments.clone(),
+        }
+    })
+}
+
 fn send_with_retries<T>(
     transport: &mut T,
     request: ProviderHttpRequest,
@@ -1789,6 +2011,131 @@ fn parse_anthropic_usage(response: &ProviderHttpResponse) -> ModelUsage {
     }
 }
 
+fn parse_google_vertex_gemini_response(
+    route: &ModelProviderRoute,
+    request: &ModelRequest,
+    response: &ProviderHttpResponse,
+    retry_count: u32,
+) -> ModelAdapterResult<ModelResponse> {
+    let candidate = response
+        .body
+        .get("candidates")
+        .and_then(Value::as_array)
+        .and_then(|candidates| candidates.first())
+        .ok_or_else(|| parse_error(route, "Gemini response missing first candidate"))?;
+    let parts = candidate
+        .get("content")
+        .and_then(|content| content.get("parts"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| parse_error(route, "Gemini response missing content parts"))?;
+    let mut text_blocks = Vec::new();
+    let mut tool_calls = Vec::new();
+    for (index, part) in parts.iter().enumerate() {
+        if let Some(text) = part.get("text").and_then(Value::as_str) {
+            if !text.is_empty() {
+                text_blocks.push(text.to_owned());
+            }
+        }
+        if let Some(function_call) = part
+            .get("functionCall")
+            .or_else(|| part.get("function_call"))
+        {
+            if let Some(tool_call) = google_vertex_gemini_tool_call(function_call, index) {
+                tool_calls.push(tool_call);
+            }
+        }
+    }
+    let finish_reason = candidate
+        .get("finishReason")
+        .or_else(|| candidate.get("finish_reason"))
+        .and_then(Value::as_str)
+        .unwrap_or("STOP");
+    let stop_reason = match finish_reason {
+        "MAX_TOKENS" => ModelStopReason::MaxTokens,
+        "SAFETY" | "RECITATION" | "SPII" => ModelStopReason::SafetyRefusal,
+        "STOP" if !tool_calls.is_empty() => ModelStopReason::ToolCalls,
+        "STOP" => ModelStopReason::Stop,
+        "MALFORMED_FUNCTION_CALL" => ModelStopReason::ProviderError,
+        _ if !tool_calls.is_empty() => ModelStopReason::ToolCalls,
+        _ => ModelStopReason::ProviderError,
+    };
+    Ok(ModelResponse {
+        schema_version: LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
+        response_id: response
+            .body
+            .get("responseId")
+            .or_else(|| response.body.get("response_id"))
+            .and_then(Value::as_str)
+            .unwrap_or("gemini-response")
+            .to_owned(),
+        request_id: request.request_id.clone(),
+        route_id: route.route_id.clone(),
+        provider_family: route.family,
+        model_id: route.model_id.clone(),
+        model_config_hash: request.config_hash(route)?,
+        secret_reference_id: route.secret_reference_id.clone(),
+        final_text: (!text_blocks.is_empty()).then(|| text_blocks.join("\n")),
+        tool_calls,
+        stop_reason,
+        usage: parse_google_vertex_gemini_usage(response),
+        elapsed_ms: response.elapsed_ms,
+        retry_count,
+        raw_response_hash: raw_response_hash(&response.body)?,
+        created_at_ms: now_ms(),
+        metadata: response_metadata_for_route(route),
+    })
+}
+
+fn google_vertex_gemini_tool_call(value: &Value, index: usize) -> Option<ModelToolCall> {
+    let tool_name = value.get("name")?.as_str()?.to_owned();
+    Some(ModelToolCall {
+        tool_call_id: value
+            .get("id")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| {
+                if index == 0 {
+                    tool_name.clone()
+                } else {
+                    format!("{}_{}", tool_name, index)
+                }
+            }),
+        tool_name,
+        arguments: value
+            .get("args")
+            .or_else(|| value.get("arguments"))
+            .cloned()
+            .unwrap_or_else(|| json!({})),
+    })
+}
+
+fn parse_google_vertex_gemini_usage(response: &ProviderHttpResponse) -> ModelUsage {
+    let usage = response.body.get("usageMetadata").unwrap_or(&Value::Null);
+    let input_tokens = usage
+        .get("promptTokenCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let output_tokens = usage
+        .get("candidatesTokenCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let total_tokens = usage
+        .get("totalTokenCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(input_tokens + output_tokens);
+    let cached_input_tokens = usage
+        .get("cachedContentTokenCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    ModelUsage {
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        cached_input_tokens,
+        estimated_cost_micro_usd: 0,
+    }
+}
+
 fn parse_tool_arguments(value: Option<&Value>) -> Value {
     match value {
         Some(Value::String(arguments)) if arguments.trim().is_empty() => json!({}),
@@ -2055,6 +2402,96 @@ mod tests {
         assert_eq!(
             sent.headers.get("authorization").map(String::as_str),
             Some("Bearer <secret_ref:secret.openai.local>")
+        );
+        assert!(!sent.body.to_string().contains("sk-"));
+    }
+
+    #[test]
+    fn google_vertex_gemini_adapter_uses_generate_content_shape() {
+        let mut route = ModelProviderRoute::google_vertex_gemini(
+            "google.gemini3.flash",
+            "openagentsgemini",
+            "global",
+            "gemini-3-flash-preview",
+            Some(String::from("secret.google.vertex.adc")),
+        );
+        route.metadata.insert(
+            String::from("thinking_level"),
+            Value::String(String::from("HIGH")),
+        );
+        let transport = MockHttpTransport::new(vec![Ok(ProviderHttpResponse {
+            status: 200,
+            headers: BTreeMap::new(),
+            body: json!({
+                "responseId": "gemini-response-1",
+                "candidates": [{
+                    "finishReason": "STOP",
+                    "content": {
+                        "role": "model",
+                        "parts": [{
+                            "functionCall": {
+                                "name": "read",
+                                "args": {
+                                    "root": "documents",
+                                    "relative_path": "case.txt",
+                                    "prefer_extracted": true
+                                }
+                            }
+                        }]
+                    }
+                }],
+                "usageMetadata": {
+                    "promptTokenCount": 31,
+                    "candidatesTokenCount": 9,
+                    "totalTokenCount": 40,
+                    "cachedContentTokenCount": 5
+                }
+            }),
+            elapsed_ms: 64,
+        })]);
+        let mut adapter =
+            GoogleVertexGeminiAdapter::new(route, transport, ModelRetryPolicy::default());
+        let response = adapter.complete(&request()).expect("gemini response");
+        assert_eq!(
+            response.provider_family,
+            ModelProviderFamily::GoogleVertexGemini
+        );
+        assert_eq!(response.stop_reason, ModelStopReason::ToolCalls);
+        assert_eq!(response.tool_calls.len(), 1);
+        assert_eq!(response.tool_calls[0].tool_name, "read");
+        assert_eq!(
+            response.tool_calls[0].arguments["relative_path"],
+            Value::String(String::from("case.txt"))
+        );
+        assert_eq!(response.usage.input_tokens, 31);
+        assert_eq!(response.usage.cached_input_tokens, 5);
+
+        let transport = adapter.into_transport();
+        let sent = &transport.requests[0];
+        assert_eq!(
+            sent.url,
+            "https://aiplatform.googleapis.com/v1/projects/openagentsgemini/locations/global/publishers/google/models/gemini-3-flash-preview:generateContent"
+        );
+        assert_eq!(
+            sent.headers.get("authorization").map(String::as_str),
+            Some("Bearer <secret_ref:secret.google.vertex.adc>")
+        );
+        assert_eq!(
+            sent.headers.get("x-goog-user-project").map(String::as_str),
+            Some("openagentsgemini")
+        );
+        assert_eq!(
+            sent.body["systemInstruction"]["parts"][0]["text"],
+            Value::String(String::from("Use only allowed tools."))
+        );
+        assert!(sent.body["tools"][0]["functionDeclarations"].is_array());
+        assert_eq!(
+            sent.body["toolConfig"]["functionCallingConfig"]["mode"],
+            Value::String(String::from("AUTO"))
+        );
+        assert_eq!(
+            sent.body["generationConfig"]["thinkingConfig"]["thinkingLevel"],
+            Value::String(String::from("HIGH"))
         );
         assert!(!sent.body.to_string().contains("sk-"));
     }

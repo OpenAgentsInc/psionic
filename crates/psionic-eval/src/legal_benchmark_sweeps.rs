@@ -741,10 +741,10 @@ mod tests {
             task_ids: Vec::new(),
             providers: vec![
                 LegalBenchmarkSweepProviderAxis {
-                    provider_id: String::from("hosted"),
-                    provider_family: String::from("openai_compatible"),
-                    model: String::from("hosted-large"),
-                    route_id: String::from("route.hosted"),
+                    provider_id: String::from("gemini3_flash"),
+                    provider_family: String::from("google_vertex_gemini"),
+                    model: String::from("gemini-3-flash-preview"),
+                    route_id: String::from("google.gemini3.flash.primary"),
                 },
                 LegalBenchmarkSweepProviderAxis {
                     provider_id: String::from("local"),

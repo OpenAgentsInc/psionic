@@ -3,6 +3,26 @@
   "routes": [
     {
       "schema_version": 1,
+      "route_id": "google.gemini3.flash.primary",
+      "family": "google_vertex_gemini",
+      "base_url": "https://aiplatform.googleapis.com/v1/projects/openagentsgemini/locations/global/publishers/google/models/gemini-3-flash-preview:generateContent",
+      "model_id": "gemini-3-flash-preview",
+      "secret_reference_id": "secret.google.vertex.adc",
+      "redacted_headers": {
+        "authorization": "Bearer <secret_ref:secret.google.vertex.adc>",
+        "content-type": "application/json",
+        "x-goog-user-project": "openagentsgemini"
+      },
+      "metadata": {
+        "endpoint_kind": "generateContent",
+        "location": "global",
+        "primary_benchmark_route": true,
+        "project_id": "openagentsgemini",
+        "thinking_level": "HIGH"
+      }
+    },
+    {
+      "schema_version": 1,
       "route_id": "openai.local.v1",
       "family": "open_ai_compatible",
       "base_url": "http://127.0.0.1:8000/v1",
@@ -11,6 +31,10 @@
       "secret_reference_id": "secret.openai.local",
       "redacted_headers": {
         "authorization": "Bearer <secret_ref:secret.openai.local>"
+      },
+      "metadata": {
+        "fallback_only": true,
+        "status": "retired_backup_only"
       }
     },
     {

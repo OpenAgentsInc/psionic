@@ -205,11 +205,13 @@ The provider-neutral model contract is documented in
 `crates/psionic-eval/src/legal_benchmark_provider.rs`.
 
 It defines model requests, messages, tool specs, tool calls, tool-result
-messages, usage accounting, structured provider failures, retry policy,
-OpenAI-compatible and Anthropic protocol adapters, and deterministic CI mocks.
-Routes record provider family, model id, model config hash, elapsed time,
-retry count, raw response hash, and secret reference id without writing raw
-credentials into run artifacts.
+messages, usage accounting, structured provider failures, retry policy, a
+Google Vertex Gemini `generateContent` adapter for the active
+`gemini-3-flash-preview` benchmark lane, OpenAI-compatible and Anthropic
+protocol adapters for fallback/parity lanes, and deterministic CI mocks. Routes
+record provider family, model id, model config hash, elapsed time, retry count,
+raw response hash, and secret reference id without writing raw credentials into
+run artifacts.
 
 ## Agent Runner
 
