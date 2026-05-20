@@ -274,6 +274,33 @@ This dry run is the first local matrix contract over the full Harvey corpus. It
 is still readiness evidence only; public score claims require imported score
 reports and release-gate approval.
 
+## Phase-Eight Residual Burn-Down Dry Run
+
+The lane now also emits `QwenLegalRlResidualBurnDownReport` with schema
+`psionic.qwen_legal_rl_residual_burn_down.v1`. It consumes the phase-seven
+full-corpus matrix report and the Blueprint residual burn-down plan:
+
+- phase-seven target carried forward: 9800 bps
+- phase-eight conservative target: 9900 bps
+- full corpus: 1251 Harvey tasks
+- practice-area coverage: all 24 audited practice areas
+- Qwen/Blueprint/RL matrix cells: 96
+- residual miss cluster budget: 24
+- accepted rollout minimum: 626
+- quarantine budget: 48
+- adversarial holdout task-runs: 288
+- holdout regression allowance: 0 bps
+- calibrated judge disagreement budget: 15 bps
+- family coverage: all nine Blueprint optimizer frontier families
+- Blueprint plan ref:
+  `blueprint://harvey_legal_qwen_phase_eight_residual_burn_down_plan/optimizer_plan.harvey_legal_qwen.phase_008.residual_burn_down`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-008`
+
+This dry run narrows the final residual error budget before any perfect-score
+push. It is still readiness evidence only; public score claims require imported
+score reports and release-gate approval.
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:

@@ -209,6 +209,13 @@ to all 1251 Harvey tasks, requires 48 Qwen/Blueprint/RL matrix cells, keeps all
 24 audited practice areas represented, requires 410 accepted rollouts, caps
 quarantine at 38 rollouts, adds 144 adversarial holdout task-runs, allows zero
 holdout regression, and lowers the judge-disagreement budget to 25 bps.
+The lane now also emits a phase-eight residual burn-down report that consumes
+the Blueprint residual burn-down plan, carries the 9800 bps target forward,
+raises the next local benchmark target to 9900 bps, keeps all 1251 Harvey
+tasks in scope, requires 96 Qwen/Blueprint/RL matrix cells, caps residual miss
+clusters at 24, requires 626 accepted rollouts, caps quarantine at 48 rollouts,
+adds 288 adversarial holdout task-runs, allows zero holdout regression, and
+lowers the judge-disagreement budget to 15 bps.
 Those reports are readiness evidence only; retained score claims still require
 the actual retained slice and Autopilot4 release-gate approval.
 The paired serving/eval metadata path is in
