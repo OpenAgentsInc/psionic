@@ -17,7 +17,7 @@ benchmark lane. It distinguishes real corpus execution from planning gates.
 
 The upstream Harvey Python harness was invoked for a live model smoke against
 `trusts-estates-private-client/compare-trust-documents-against-client-instructions`.
-It failed before model execution because this host does not have `podman` on
+It failed before model execution because this host did not have `podman` on
 `PATH`.
 
 Failure class:
@@ -28,6 +28,17 @@ FileNotFoundError: [Errno 2] No such file or directory: 'podman'
 
 This is a local runtime dependency blocker, not a model failure and not a
 Harvey score.
+
+A follow-up `scripts/setup.sh` run installed `pandoc` and `podman`, initialized
+the Podman machine, and then failed while starting the VM:
+
+```text
+Error: vfkit exited unexpectedly with exit code 1
+```
+
+The manual `podman machine start` retry then hung while the Podman SSH socket
+refused connections. The current blocker is therefore a non-working local
+Podman Machine VM, not a missing binary.
 
 ## Corpus Scan
 
@@ -147,8 +158,8 @@ Focused validation:
 
 ## Next Actual Run
 
-Install or route around the local Podman blocker, then run a retained live
-agent slice that uses the now-extracted document text:
+Repair or route around the local Podman Machine blocker, then run a retained
+live agent slice that uses the now-extracted document text:
 
 - start with the pinned 20-task slice in Autopilot4;
 - require extraction receipts for every source document;
@@ -156,4 +167,3 @@ agent slice that uses the now-extracted document text:
 - import immutable Psionic score reports into Autopilot4;
 - compare failures by document coverage, citation evidence, legal reasoning,
   spreadsheet reasoning, missing facts, and pre-submit self-check.
-
