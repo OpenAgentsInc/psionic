@@ -6,14 +6,16 @@
 //! attach real command execution without changing downstream receipt schemas.
 
 use std::collections::BTreeMap;
+use std::io::{Cursor, Read};
 use std::path::Path;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use zip::ZipArchive;
 
-use crate::{ArtifactKind, Metadata, SourceArtifact, stable_json_digest};
+use crate::{stable_json_digest, ArtifactKind, Metadata, SourceArtifact};
 
 pub const LEGAL_BENCHMARK_EXTRACTION_SCHEMA_VERSION: u16 = 1;
 
@@ -280,6 +282,188 @@ pub struct ExternalExtractorSpec {
     pub supported_extensions: Vec<String>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NativeOfficeXmlArtifactExtractor;
+
+impl ArtifactExtractor for NativeOfficeXmlArtifactExtractor {
+    fn extractor_name(&self) -> &'static str {
+        "psionic.native_office_xml"
+    }
+
+    fn extractor_version(&self) -> &'static str {
+        "1.0.0"
+    }
+
+    fn command_or_crate_version(&self) -> &'static str {
+        "zip+xml_text"
+    }
+
+    fn supports(&self, artifact: &SourceArtifact) -> bool {
+        file_extension(artifact.relative_path.as_str())
+            .as_deref()
+            .is_some_and(|extension| matches!(extension, "docx" | "pptx" | "xlsx"))
+    }
+
+    fn extract(
+        &self,
+        artifact: &SourceArtifact,
+        bytes: &[u8],
+        policy: &ArtifactExtractionPolicy,
+    ) -> ArtifactExtractionResult {
+        let started = Instant::now();
+        if !extractor_allowed(self.extractor_name(), policy) {
+            return failure_result(
+                artifact,
+                self.extractor_name(),
+                self.extractor_version(),
+                self.command_or_crate_version(),
+                policy.output_format,
+                bytes.len(),
+                started,
+                ExtractionFailureKind::PolicyDenied,
+                "extractor is not allowed by extraction policy",
+                Vec::new(),
+            );
+        }
+        if bytes.len() > usize::try_from(policy.max_input_bytes).unwrap_or(usize::MAX) {
+            return failure_result(
+                artifact,
+                self.extractor_name(),
+                self.extractor_version(),
+                self.command_or_crate_version(),
+                policy.output_format,
+                bytes.len(),
+                started,
+                ExtractionFailureKind::InputTooLarge,
+                "input exceeds extraction policy byte limit",
+                Vec::new(),
+            );
+        }
+
+        let extension = file_extension(artifact.relative_path.as_str());
+        let extracted = match extension.as_deref() {
+            Some("docx") => extract_docx_text(bytes),
+            Some("pptx") => extract_pptx_text(bytes),
+            Some("xlsx") => extract_xlsx_text(bytes),
+            _ => Err(String::from("unsupported Office XML extension")),
+        };
+
+        match extracted {
+            Ok(text) => success_result(
+                artifact,
+                self.extractor_name(),
+                self.extractor_version(),
+                self.command_or_crate_version(),
+                policy.output_format,
+                bytes.len(),
+                started,
+                text,
+                vec![ExtractionWarning {
+                    warning_code: String::from("native_office_xml_lossy"),
+                    message: String::from(
+                        "native Office XML extraction preserves text only; layout, comments, formulas, and tracked-change semantics are not authoritative",
+                    ),
+                    metadata: Metadata::new(),
+                }],
+                None,
+            ),
+            Err(detail) => failure_result(
+                artifact,
+                self.extractor_name(),
+                self.extractor_version(),
+                self.command_or_crate_version(),
+                policy.output_format,
+                bytes.len(),
+                started,
+                ExtractionFailureKind::DecodeError,
+                detail,
+                Vec::new(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NativeEmailArtifactExtractor;
+
+impl ArtifactExtractor for NativeEmailArtifactExtractor {
+    fn extractor_name(&self) -> &'static str {
+        "psionic.native_email"
+    }
+
+    fn extractor_version(&self) -> &'static str {
+        "1.0.0"
+    }
+
+    fn command_or_crate_version(&self) -> &'static str {
+        "std::str+lossy_mime"
+    }
+
+    fn supports(&self, artifact: &SourceArtifact) -> bool {
+        file_extension(artifact.relative_path.as_str())
+            .as_deref()
+            .is_some_and(|extension| extension == "eml")
+            || artifact.media_type == "message/rfc822"
+    }
+
+    fn extract(
+        &self,
+        artifact: &SourceArtifact,
+        bytes: &[u8],
+        policy: &ArtifactExtractionPolicy,
+    ) -> ArtifactExtractionResult {
+        let started = Instant::now();
+        if !extractor_allowed(self.extractor_name(), policy) {
+            return failure_result(
+                artifact,
+                self.extractor_name(),
+                self.extractor_version(),
+                self.command_or_crate_version(),
+                policy.output_format,
+                bytes.len(),
+                started,
+                ExtractionFailureKind::PolicyDenied,
+                "extractor is not allowed by extraction policy",
+                Vec::new(),
+            );
+        }
+        if bytes.len() > usize::try_from(policy.max_input_bytes).unwrap_or(usize::MAX) {
+            return failure_result(
+                artifact,
+                self.extractor_name(),
+                self.extractor_version(),
+                self.command_or_crate_version(),
+                policy.output_format,
+                bytes.len(),
+                started,
+                ExtractionFailureKind::InputTooLarge,
+                "input exceeds extraction policy byte limit",
+                Vec::new(),
+            );
+        }
+
+        let text = extract_eml_text(bytes);
+        success_result(
+            artifact,
+            self.extractor_name(),
+            self.extractor_version(),
+            self.command_or_crate_version(),
+            policy.output_format,
+            bytes.len(),
+            started,
+            text,
+            vec![ExtractionWarning {
+                warning_code: String::from("native_email_lossy"),
+                message: String::from(
+                    "native EML extraction preserves readable headers and body text only; attachments and MIME encodings require the sandboxed extractor",
+                ),
+                metadata: Metadata::new(),
+            }],
+            None,
+        )
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExternalCommandArtifactExtractor {
     pub spec: ExternalExtractorSpec,
@@ -403,6 +587,14 @@ impl ArtifactExtractorRegistry {
         let native = NativeTextArtifactExtractor;
         if native.supports(artifact) {
             return native.extract(artifact, bytes, policy);
+        }
+        let office = NativeOfficeXmlArtifactExtractor;
+        if office.supports(artifact) {
+            return office.extract(artifact, bytes, policy);
+        }
+        let email = NativeEmailArtifactExtractor;
+        if email.supports(artifact) {
+            return email.extract(artifact, bytes, policy);
         }
         for extractor in &self.external_extractors {
             if extractor.supports(artifact) {
@@ -664,6 +856,144 @@ fn normalize_newlines(value: &str) -> String {
     value.replace("\r\n", "\n").replace('\r', "\n")
 }
 
+fn extract_docx_text(bytes: &[u8]) -> Result<String, String> {
+    let parts = extract_zip_xml_text(bytes, |name| {
+        name == "word/document.xml"
+            || name.starts_with("word/header")
+            || name.starts_with("word/footer")
+    })?;
+    let mut output = Vec::new();
+    for part in parts {
+        output.push(collect_tag_text(&part, "w:t").join(" "));
+    }
+    nonempty_text(output.join("\n"))
+}
+
+fn extract_pptx_text(bytes: &[u8]) -> Result<String, String> {
+    let mut parts = extract_zip_xml_text(bytes, |name| {
+        name.starts_with("ppt/slides/slide") && name.ends_with(".xml")
+    })?;
+    parts.sort();
+    let output = parts
+        .into_iter()
+        .map(|part| collect_tag_text(&part, "a:t").join(" "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    nonempty_text(output)
+}
+
+fn extract_xlsx_text(bytes: &[u8]) -> Result<String, String> {
+    let mut parts = extract_zip_xml_text(bytes, |name| {
+        name == "xl/sharedStrings.xml"
+            || (name.starts_with("xl/worksheets/sheet") && name.ends_with(".xml"))
+    })?;
+    parts.sort();
+    let output = parts
+        .into_iter()
+        .flat_map(|part| {
+            let mut values = collect_tag_text(&part, "t");
+            values.extend(collect_tag_text(&part, "v"));
+            values
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    nonempty_text(output)
+}
+
+fn extract_zip_xml_text(
+    bytes: &[u8],
+    mut include_name: impl FnMut(&str) -> bool,
+) -> Result<Vec<String>, String> {
+    let cursor = Cursor::new(bytes);
+    let mut archive =
+        ZipArchive::new(cursor).map_err(|error| format!("failed to open zip archive: {error}"))?;
+    let mut parts = Vec::new();
+    for index in 0..archive.len() {
+        let mut file = archive
+            .by_index(index)
+            .map_err(|error| format!("failed to read zip entry {index}: {error}"))?;
+        let name = file.name().to_string();
+        if !include_name(&name) {
+            continue;
+        }
+        let mut raw = Vec::new();
+        file.read_to_end(&mut raw)
+            .map_err(|error| format!("failed to read zip entry `{name}`: {error}"))?;
+        parts.push(String::from_utf8_lossy(&raw).into_owned());
+    }
+    if parts.is_empty() {
+        return Err(String::from(
+            "Office XML archive did not contain supported text parts",
+        ));
+    }
+    Ok(parts)
+}
+
+fn collect_tag_text(xml: &str, tag_name: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let open_prefix = format!("<{tag_name}");
+    let close = format!("</{tag_name}>");
+    let mut offset = 0;
+    while let Some(open_start) = xml[offset..].find(&open_prefix) {
+        let open_start = offset + open_start;
+        let Some(open_end) = xml[open_start..].find('>') else {
+            break;
+        };
+        let value_start = open_start + open_end + 1;
+        let Some(close_start) = xml[value_start..].find(&close) else {
+            break;
+        };
+        let close_start = value_start + close_start;
+        let value = decode_xml_entities(&xml[value_start..close_start]);
+        let value = value.trim();
+        if !value.is_empty() {
+            values.push(value.to_string());
+        }
+        offset = close_start + close.len();
+    }
+    values
+}
+
+fn decode_xml_entities(value: &str) -> String {
+    value
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+}
+
+fn extract_eml_text(bytes: &[u8]) -> String {
+    let raw = String::from_utf8_lossy(bytes);
+    let normalized = normalize_newlines(&raw);
+    let (headers, body) = normalized
+        .split_once("\n\n")
+        .unwrap_or((normalized.as_str(), ""));
+    let mut output = Vec::new();
+    for header in ["From:", "To:", "Cc:", "Date:", "Subject:"] {
+        if let Some(line) = headers.lines().find(|line| {
+            line.to_ascii_lowercase()
+                .starts_with(&header.to_ascii_lowercase())
+        }) {
+            output.push(line.trim().to_string());
+        }
+    }
+    let body = body.trim();
+    if !body.is_empty() {
+        output.push(body.to_string());
+    }
+    output.join("\n")
+}
+
+fn nonempty_text(text: String) -> Result<String, String> {
+    let text = normalize_newlines(text.trim());
+    if text.is_empty() {
+        Err(String::from("extracted text was empty"))
+    } else {
+        Ok(format!("{text}\n"))
+    }
+}
+
 fn receipt_id(
     artifact_id: &str,
     artifact_hash: &str,
@@ -709,10 +1039,12 @@ fn file_extension(path: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::{
-        DataClassification, LEGAL_BENCHMARK_SCHEMA_VERSION, RunRecord, ScoreReport,
-        artifact_from_file,
+        artifact_from_file, DataClassification, RunRecord, ScoreReport,
+        LEGAL_BENCHMARK_SCHEMA_VERSION,
     };
+    use std::io::Write;
     use std::path::PathBuf;
+    use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
     fn samples_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -730,6 +1062,36 @@ mod tests {
             Some("fixture".to_string()),
         )
         .expect("sample artifact")
+    }
+
+    fn zipped_office_artifact(name: &str, entries: &[(&str, &str)]) -> (SourceArtifact, Vec<u8>) {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let artifact_path = tempdir.path().join(name);
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut archive = ZipWriter::new(&mut cursor);
+            let options =
+                SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+            for (entry_name, body) in entries {
+                archive
+                    .start_file(*entry_name, options)
+                    .expect("start zip entry");
+                archive.write_all(body.as_bytes()).expect("write zip entry");
+            }
+            archive.finish().expect("finish zip");
+        }
+        let bytes = cursor.into_inner();
+        std::fs::write(&artifact_path, bytes.as_slice()).expect("write office artifact");
+        let artifact = artifact_from_file(
+            format!("fixture.{name}"),
+            ArtifactKind::SourceDocument,
+            tempdir.path(),
+            artifact_path,
+            DataClassification::PublicReference,
+            Some("fixture".to_string()),
+        )
+        .expect("office artifact");
+        (artifact, bytes)
     }
 
     #[test]
@@ -774,6 +1136,48 @@ mod tests {
     }
 
     #[test]
+    fn native_office_xml_extractor_reads_docx_pptx_and_xlsx_text() {
+        let registry = ArtifactExtractorRegistry::default();
+        let policy = ArtifactExtractionPolicy::default();
+        let cases = [
+            (
+                "sample.docx",
+                vec![(
+                    "word/document.xml",
+                    "<w:document><w:body><w:t>Trust amendment</w:t><w:t>Client instruction</w:t></w:body></w:document>",
+                )],
+                "Trust amendment Client instruction",
+            ),
+            (
+                "sample.pptx",
+                vec![(
+                    "ppt/slides/slide1.xml",
+                    "<p:sld><a:t>Board deck</a:t><a:t>Closing checklist</a:t></p:sld>",
+                )],
+                "Board deck Closing checklist",
+            ),
+            (
+                "sample.xlsx",
+                vec![(
+                    "xl/sharedStrings.xml",
+                    "<sst><si><t>Purchase price</t></si><si><t>Escrow amount</t></si></sst>",
+                )],
+                "Purchase price",
+            ),
+        ];
+
+        for (name, entries, expected_text) in cases {
+            let (artifact, bytes) = zipped_office_artifact(name, &entries);
+            let result = registry.extract(&artifact, bytes.as_slice(), &policy);
+
+            assert!(result.receipt.failure_kind.is_none());
+            assert_eq!(result.receipt.extractor_name, "psionic.native_office_xml");
+            let extracted = result.extracted_artifact.expect("office text");
+            assert!(extracted.text.contains(expected_text));
+        }
+    }
+
+    #[test]
     fn major_harvey_extensions_are_supported_or_structurally_failed() {
         let registry = ArtifactExtractorRegistry::default();
         let policy = ArtifactExtractionPolicy::default();
@@ -781,26 +1185,14 @@ mod tests {
             ("sample.txt", None),
             ("sample.md", None),
             ("sample.json", None),
-            (
-                "sample.docx",
-                Some(ExtractionFailureKind::ExternalToolUnavailable),
-            ),
+            ("sample.docx", Some(ExtractionFailureKind::DecodeError)),
             (
                 "sample.pdf",
                 Some(ExtractionFailureKind::ExternalToolUnavailable),
             ),
-            (
-                "sample.pptx",
-                Some(ExtractionFailureKind::ExternalToolUnavailable),
-            ),
-            (
-                "sample.xlsx",
-                Some(ExtractionFailureKind::ExternalToolUnavailable),
-            ),
-            (
-                "sample.eml",
-                Some(ExtractionFailureKind::ExternalToolUnavailable),
-            ),
+            ("sample.pptx", Some(ExtractionFailureKind::DecodeError)),
+            ("sample.xlsx", Some(ExtractionFailureKind::DecodeError)),
+            ("sample.eml", None),
         ];
 
         for (name, expected_failure) in expected {
@@ -816,8 +1208,8 @@ mod tests {
     #[test]
     fn external_policy_denial_is_structured() {
         let registry = ArtifactExtractorRegistry::default();
-        let artifact = sample_artifact("sample.docx");
-        let bytes = std::fs::read(samples_root().join("sample.docx")).expect("read sample");
+        let artifact = sample_artifact("sample.pdf");
+        let bytes = std::fs::read(samples_root().join("sample.pdf")).expect("read sample");
         let result = registry.extract(
             &artifact,
             bytes.as_slice(),

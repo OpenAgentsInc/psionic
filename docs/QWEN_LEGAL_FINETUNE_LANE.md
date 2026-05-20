@@ -93,13 +93,25 @@ model run to the synthetic smoke fixture.
 Run the focused tests from the repo root:
 
 ```bash
-cargo test -p psionic-train qwen_legal_adapter
+cargo test -p psionic-train --lib qwen_legal
+cargo test -p psionic-train --lib live_rl_update
 ```
 
-The test fixture runs a four-step deterministic adapter update, exports a
-loadable LM-head LoRA artifact, saves a checkpoint, restores from a midpoint
-checkpoint, emits an Autopilot4 score-import bundle, and materializes the
-next-phase RL hillclimb plan plus local benchmark reports.
+The `qwen_legal` fixture runs a four-step deterministic adapter update,
+exports a loadable LM-head LoRA artifact, saves a checkpoint, restores from a
+midpoint checkpoint, emits an Autopilot4 score-import bundle, and materializes
+the next-phase RL hillclimb plan plus local benchmark reports. The
+`live_rl_update` fixture materializes rollout evidence and promotes a new
+revision only when teacher-logprob alignment is valid.
+
+The 2026-05-20 local run executed the broader filters with binary targets
+included:
+
+- `cargo test -p psionic-train qwen_legal`: 14 passed
+- `cargo test -p psionic-train live_rl_update`: 2 passed
+
+Those are still local training/RL substrate tests. They are not retained Harvey
+score claims.
 
 ## RL Hillclimb Plan
 

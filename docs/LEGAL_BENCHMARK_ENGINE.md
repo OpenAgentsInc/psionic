@@ -146,12 +146,34 @@ It defines:
 - `ExtractionFailureKind`
 - `ArtifactExtractorRegistry`
 
-Day-one native extraction handles text, Markdown, JSON, CSV/TSV, XML/HTML,
-YAML, TOML, and log-like UTF-8 inputs without external tools. The registry also
-declares pinned sandboxed external adapter specs for DOCX, PDF, PPTX, XLSX,
-and EML. Until a live sandbox command executor is attached, those external
-adapters return structured `external_tool_unavailable` or policy-denied
-receipts instead of panicking or crashing a sweep.
+Native extraction handles text, Markdown, JSON, CSV/TSV, XML/HTML, YAML, TOML,
+log-like UTF-8 inputs, DOCX, PPTX, XLSX, and EML without external tools. The
+Office path reads the Open XML ZIP container and preserves text from supported
+document, slide, workbook, shared-string, header, and footer XML parts. The EML
+path preserves common headers and readable body text. Both native paths are
+lossy by design and emit extraction warnings because layout, attachments,
+tracked changes, formulas, comments, MIME encodings, and hidden workbook
+semantics still require a higher-fidelity sandboxed extractor.
+
+The registry still declares pinned sandboxed external adapter specs for PDF and
+future high-fidelity Office/EML extraction. Until a live sandbox command
+executor is attached, those external adapters return structured
+`external_tool_unavailable` or policy-denied receipts instead of panicking or
+crashing a sweep.
+
+The 2026-05-20 local run against the audited Harvey checkout proves the native
+path across the full corpus:
+
+```bash
+cargo run -q -p psionic-eval --no-default-features \
+  --example legal_benchmark_extract_slice -- \
+  /Users/christopherdavid/work/competition/repos/harvey-labs/tasks \
+  5aa41694 1251
+```
+
+Result: 1,251 tasks scanned, 9,537 source artifacts extracted, and zero
+structured extraction failures. The prior 25-task pre-change slice extracted
+1 of 198 artifacts and returned 197 `ExternalToolUnavailable` failures.
 
 Run records and score reports now retain `extraction_receipt_refs` so operator
 surfaces can distinguish extraction failure, missing content, and bad
