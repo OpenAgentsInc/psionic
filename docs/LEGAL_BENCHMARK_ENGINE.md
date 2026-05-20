@@ -502,6 +502,28 @@ scorer. It is useful for proving that the evaluator, receipts, ordering, and
 promotion inputs are stable. It is not proof that a model improved on hidden
 Harvey tasks. Hidden audit suites are rejected if marked training-allowed.
 
+## Distributed Adapter Merge
+
+`crates/psionic-train/src/qwen_legal_lora_merge.rs` adds the merge step between
+Pylon worker training and benchmark evaluation. It reads a JSON manifest,
+verifies each worker adapter artifact hash, loads real LM-head LoRA
+safetensors files, and writes one aggregate adapter plus a receipt.
+
+Run the retained smoke merge with:
+
+```bash
+cargo run -p psionic-train -- merge-lora \
+  --manifest merge/legal-sft-round-001.json
+```
+
+The receipt records the parent adapter hash, worker adapter hashes, dataset
+shard hashes, token counts, merge weights, output adapter hash, validation
+metrics from `suites/harvey_public_three.json`, and the deterministic replay
+command. The command supports both token-weighted delta averaging and
+sequential shard handoff. The promotion gate is explicit and conservative: the
+merged adapter is only promotable if the same-suite local eval beats the
+declared champion and has no integrity, tool, or timeout failures.
+
 ## Adapter Registry And Promotion Gates
 
 `crates/psionic-train/src/qwen_legal_adapter_registry.rs` adds the first local

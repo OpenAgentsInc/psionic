@@ -32,8 +32,8 @@ use psionic_train::{
     persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
     persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
     run_psion_cs336_a1_demo_cli, run_psion_cs336_a1_demo_manifest, run_psionic_legal_dpo_cli,
-    run_psionic_legal_grpo_cli, run_psionic_legal_sft_cli, runtime_build_digest,
-    validate_psionic_train_grouped_stage_input_transport,
+    run_psionic_legal_grpo_cli, run_psionic_legal_merge_lora_cli, run_psionic_legal_sft_cli,
+    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
 };
 
 #[allow(dead_code)]
@@ -76,11 +76,12 @@ fn main() -> ExitCode {
         "sft" => run_sft_passthrough(&args[1..]),
         "dpo" => run_dpo_passthrough(&args[1..]),
         "grpo" => run_grpo_passthrough(&args[1..]),
+        "merge-lora" => run_merge_lora_passthrough(&args[1..]),
         "actual-pretraining" => run_actual_pretraining_passthrough(&args[1..]),
         "cs336-a1-demo" => run_cs336_a1_demo_passthrough(&args[1..]),
         other => {
             eprintln!(
-                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, sft, dpo, grpo, actual-pretraining, cs336-a1-demo"
+                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, sft, dpo, grpo, merge-lora, actual-pretraining, cs336-a1-demo"
             );
             ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
         }
@@ -134,6 +135,25 @@ fn run_grpo_passthrough(args: &[String]) -> ExitCode {
             }
             Err(error) => {
                 eprintln!("error: failed to serialize GRPO receipt: {error}");
+                ExitCode::from(PsionicTrainRefusalClass::InternalError.exit_code())
+            }
+        },
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
+        }
+    }
+}
+
+fn run_merge_lora_passthrough(args: &[String]) -> ExitCode {
+    match run_psionic_legal_merge_lora_cli(args) {
+        Ok(receipt) => match serde_json::to_string_pretty(&receipt) {
+            Ok(json) => {
+                println!("{json}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: failed to serialize merge-lora receipt: {error}");
                 ExitCode::from(PsionicTrainRefusalClass::InternalError.exit_code())
             }
         },
