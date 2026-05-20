@@ -1,0 +1,51 @@
+{
+  "answer_files": [
+    {
+      "content_hash": "afce6d4956899adf7dd28eda7fba065bfb1245b0e1a8bd807585f30b6b35ab56",
+      "creation_actor": "model",
+      "integrity_valid": true,
+      "last_modifying_actor": "model",
+      "relative_path": "answer.md"
+    }
+  ],
+  "integrity": {
+    "valid": true
+  },
+  "run_spec": {
+    "base_model": "synthetic-base-workflow-policy-v1",
+    "benchmark_visibility": "synthetic",
+    "required_output_paths": [
+      "answer.md"
+    ],
+    "run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0021.base",
+    "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0021",
+    "task_version": "synthetic-v1"
+  },
+  "schema_version": "psionic.legal_benchmark.synthetic_base_run_receipt.v1",
+  "synthetic": true,
+  "tool_calls": [
+    {
+      "actor": "model",
+      "path": "litigation-note.txt",
+      "tool_name": "read_source"
+    },
+    {
+      "actor": "model",
+      "path": "answer.md",
+      "tool_name": "write_file"
+    },
+    {
+      "actor": "model",
+      "path": "answer.md",
+      "tool_name": "validate_file"
+    },
+    {
+      "actor": "model",
+      "tool_name": "submit"
+    }
+  ],
+  "workflow_result": {
+    "reported_harvey_score": false,
+    "success": true
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "base_model": "synthetic-base-workflow-policy-v1",
+  "base_task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0090",
+  "benchmark_visibility": "synthetic",
+  "example_id": "bad_run.run.synthetic_legal_workflow_v1_employment_agreement_summary_0090.base",
+  "failure_class": "missing_answer",
+  "full_model_response": "I reviewed the issue and would answer in prose, but I did not create answer.md.",
+  "full_prompt": "Read the generated employment agreement excerpt and write answer.md summarizing compensation, confidentiality, nonsolicit scope, and one legal follow-up. Use only the generated source document. This is a synthetic training task, not a Harvey benchmark task.\n\nRequired output path: answer.md\nSource document: employment-agreement.txt",
+  "integrity": {
+    "valid": true
+  },
+  "required_file_paths": [
+    "answer.md"
+  ],
+  "schema_version": "psionic.legal_benchmark.synthetic_bad_run.v1",
+  "suggested_correction": "Read the generated source text, write answer.md with the required legal work product, validate that answer.md exists, and submit. A correct answer should cover: mentions base salary; confidentiality lasts indefinitely; nonsolicit lasts 7 months; asks whether local law permits the covenant.",
+  "synthetic": true,
+  "tool_call_transcript": [],
+  "training_eligibility_reasons": [
+    "synthetic workflow failure with generated source text only",
+    "no Harvey score is claimed"
+  ],
+  "training_eligible": true
+}

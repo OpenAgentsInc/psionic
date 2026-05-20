@@ -1,0 +1,24 @@
+{
+  "base_model": "synthetic-base-workflow-policy-v1",
+  "base_task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0030",
+  "benchmark_visibility": "synthetic",
+  "example_id": "bad_run.run.synthetic_legal_workflow_v1_statute_to_facts_application_0030.base",
+  "failure_class": "missing_answer",
+  "full_model_response": "I reviewed the issue and would answer in prose, but I did not create answer.md.",
+  "full_prompt": "Read the generated statute and facts and write answer.md applying the rule to the facts. Use only the generated source document. This is a synthetic training task, not a Harvey benchmark task.\n\nRequired output path: answer.md\nSource document: statute-and-facts.txt",
+  "integrity": {
+    "valid": true
+  },
+  "required_file_paths": [
+    "answer.md"
+  ],
+  "schema_version": "psionic.legal_benchmark.synthetic_bad_run.v1",
+  "suggested_correction": "Read the generated source text, write answer.md with the required legal work product, validate that answer.md exists, and submit. A correct answer should cover: threshold is prepaid services over $5500; facts exceed the threshold; performance delay is 45 days; written notice due within 5 business days.",
+  "synthetic": true,
+  "tool_call_transcript": [],
+  "training_eligibility_reasons": [
+    "synthetic workflow failure with generated source text only",
+    "no Harvey score is claimed"
+  ],
+  "training_eligible": true
+}

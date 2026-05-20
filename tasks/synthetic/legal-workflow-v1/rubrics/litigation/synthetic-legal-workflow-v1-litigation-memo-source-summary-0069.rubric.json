@@ -1,0 +1,16 @@
+{
+  "schema_version": "psionic.legal_benchmark.synthetic_workflow_rubric.v1",
+  "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0069",
+  "synthetic": true,
+  "task_type": "litigation_memo_source_summary",
+  "expected_answer_path": "answer.md",
+  "expected_answer": "# Litigation source summary\n\nThe source says milestone two slipped because client data arrived late, according to the March 7 project-manager note. Outside counsel then asked on March 9 for preservation of schedule emails and a mediation chronology.",
+  "expected_points": [
+    "mentions March 7 project-manager note",
+    "identifies late client data as the cause",
+    "mentions outside counsel preservation request",
+    "mentions mediation chronology"
+  ],
+  "scoring_visibility": "judge_only_not_model_visible",
+  "claim_boundary": "this rubric is for synthetic workflow reward only and is not Harvey benchmark evidence"
+}

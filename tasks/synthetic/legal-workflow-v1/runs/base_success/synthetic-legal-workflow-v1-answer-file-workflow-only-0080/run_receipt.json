@@ -1,0 +1,51 @@
+{
+  "answer_files": [
+    {
+      "content_hash": "ac2cc27e63a3e0ddef613bf2e45aced1f983a47fa64dbbde715ff12441b30a7e",
+      "creation_actor": "model",
+      "integrity_valid": true,
+      "last_modifying_actor": "model",
+      "relative_path": "answer.md"
+    }
+  ],
+  "integrity": {
+    "valid": true
+  },
+  "run_spec": {
+    "base_model": "synthetic-base-workflow-policy-v1",
+    "benchmark_visibility": "synthetic",
+    "required_output_paths": [
+      "answer.md"
+    ],
+    "run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0080.base",
+    "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0080",
+    "task_version": "synthetic-v1"
+  },
+  "schema_version": "psionic.legal_benchmark.synthetic_base_run_receipt.v1",
+  "synthetic": true,
+  "tool_calls": [
+    {
+      "actor": "model",
+      "path": "workflow-instruction.txt",
+      "tool_name": "read_source"
+    },
+    {
+      "actor": "model",
+      "path": "answer.md",
+      "tool_name": "write_file"
+    },
+    {
+      "actor": "model",
+      "path": "answer.md",
+      "tool_name": "validate_file"
+    },
+    {
+      "actor": "model",
+      "tool_name": "submit"
+    }
+  ],
+  "workflow_result": {
+    "reported_harvey_score": false,
+    "success": true
+  }
+}

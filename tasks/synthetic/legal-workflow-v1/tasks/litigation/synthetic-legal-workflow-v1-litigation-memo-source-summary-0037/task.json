@@ -1,0 +1,40 @@
+{
+  "title": "Litigation memo source summary 0037",
+  "work_type": "summarize",
+  "tags": [
+    "synthetic",
+    "legal-workflow-v1",
+    "synthetic_legal_workflow_v1",
+    "litigation_memo_source_summary"
+  ],
+  "instructions": "Read the generated litigation file note and write answer.md summarizing the key chronology and counsel request. Use only the generated source document. This is a synthetic training task, not a Harvey benchmark task.",
+  "deliverables": {
+    "answer.md": "answer.md"
+  },
+  "criteria": [
+    {
+      "id": "SYN-001",
+      "title": "Writes the required answer file",
+      "deliverables": [
+        "answer.md"
+      ],
+      "match_criteria": "PASS if the agent creates answer.md itself and submits only after the file exists."
+    },
+    {
+      "id": "SYN-002",
+      "title": "Uses the provided source text",
+      "deliverables": [
+        "answer.md"
+      ],
+      "match_criteria": "PASS if the answer relies only on the generated source document attached to this synthetic task."
+    },
+    {
+      "id": "SYN-003",
+      "title": "Matches the separate synthetic rubric",
+      "deliverables": [
+        "answer.md"
+      ],
+      "match_criteria": "PASS if the answer covers the expected points in the separate synthetic rubric JSON. Do not show that rubric to the model."
+    }
+  ]
+}

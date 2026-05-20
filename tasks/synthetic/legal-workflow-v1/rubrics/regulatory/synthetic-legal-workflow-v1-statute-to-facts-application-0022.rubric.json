@@ -1,0 +1,16 @@
+{
+  "schema_version": "psionic.legal_benchmark.synthetic_workflow_rubric.v1",
+  "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0022",
+  "synthetic": true,
+  "task_type": "statute_to_facts_application",
+  "expected_answer_path": "answer.md",
+  "expected_answer": "# Statute-to-facts application\n\nThe notice rule likely applies because the customer prepaid more than $8500, the service cannot be performed within 30 days, and the vendor knows it cannot staff the workshop for 45 days. The vendor should send written cancellation notice within 5 business days.",
+  "expected_points": [
+    "threshold is prepaid services over $8500",
+    "facts exceed the threshold",
+    "performance delay is 45 days",
+    "written notice due within 5 business days"
+  ],
+  "scoring_visibility": "judge_only_not_model_visible",
+  "claim_boundary": "this rubric is for synthetic workflow reward only and is not Harvey benchmark evidence"
+}

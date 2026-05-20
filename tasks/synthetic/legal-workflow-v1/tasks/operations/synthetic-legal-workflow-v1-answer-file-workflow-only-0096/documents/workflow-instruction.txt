@@ -1,0 +1,2 @@
+Generated workflow instruction.
+The client asks for a one-page answer. The only required filing is answer.md. Include the deadline of 8 calendar days and say that no separate appendix is needed.

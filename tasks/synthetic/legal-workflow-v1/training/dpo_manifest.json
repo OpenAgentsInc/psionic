@@ -1,0 +1,39 @@
+{
+  "schema_version": "psionic.legal_benchmark.dpo_dataset_manifest.v1",
+  "dataset_id": "synthetic_legal_workflow_v1.dpo",
+  "output_jsonl": "tasks/synthetic/legal-workflow-v1/training/dpo_dataset.jsonl",
+  "included_count": 1408,
+  "excluded_count": 0,
+  "pair_counts_by_failure_class": {
+    "MissingAnswer": 704,
+    "WrongPath": 704
+  },
+  "pair_counts_by_family": {
+    "conciseness": 256,
+    "correct_path": 256,
+    "file_discipline": 256,
+    "integrity_safe": 128,
+    "source_grounding": 256,
+    "submission": 256
+  },
+  "source_receipts": [
+    "base_success/synthetic-legal-workflow-v1-answer-file-workflow-only-0008/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-answer-file-workflow-only-0016/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-contract-clause-extraction-0001/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-contract-clause-extraction-0009/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-lease-obligation-extraction-0004/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-lease-obligation-extraction-0012/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-litigation-memo-source-summary-0005/run_receipt.json",
+    "base_success/synthetic-legal-workflow-v1-litigation-memo-source-summary-0013/run_receipt.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-employment-agreement-summary-0002.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-employment-agreement-summary-0010.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-nda-risk-list-0003.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-nda-risk-list-0011.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-privilege-log-classification-0007.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-privilege-log-classification-0015.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-statute-to-facts-application-0006.bad_run.json",
+    "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample/base_failure/synthetic-legal-workflow-v1-statute-to-facts-application-0014.bad_run.json"
+  ],
+  "excluded_inputs": [],
+  "dataset_hash": "8023f7c4c0e80ed71268eb000fe2c978b809fe55d333178aed1b15763ebd1ab3"
+}

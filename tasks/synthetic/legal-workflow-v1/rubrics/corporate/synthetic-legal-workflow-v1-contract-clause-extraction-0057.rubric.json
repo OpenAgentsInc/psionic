@@ -1,0 +1,15 @@
+{
+  "schema_version": "psionic.legal_benchmark.synthetic_workflow_rubric.v1",
+  "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0057",
+  "synthetic": true,
+  "task_type": "contract_clause_extraction",
+  "expected_answer_path": "answer.md",
+  "expected_answer": "# Contract clause extraction\n\nTermination requires 19 days written notice for an uncured material breach. Fees are due within 24 days after invoice receipt. Email notice is allowed if receipt is confirmed.",
+  "expected_points": [
+    "termination notice period is 19 days",
+    "payment deadline is 24 days",
+    "email notice requires confirmation"
+  ],
+  "scoring_visibility": "judge_only_not_model_visible",
+  "claim_boundary": "this rubric is for synthetic workflow reward only and is not Harvey benchmark evidence"
+}
