@@ -425,6 +425,63 @@ generation is explicitly penalized, then run that objective on a reachable
 Pylon with enough GPU memory. Until then, 005 remains the current usable
 Harvey MFN local adapter.
 
+## Current Preference/RL Bundle
+
+The accepted 005 Harvey MFN rollout and rejected 006/007 rollouts are now
+materialized as a machine-readable preference/RL seed bundle:
+
+- bundle id: `harvey_mfn_preference_rl_2026_05_20_008`
+- path:
+  `fixtures/qwen_legal/real_finetune/harvey_mfn_preference_rl_2026_05_20_008`
+- current usable policy:
+  `qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005`
+- current usable adapter digest:
+  `b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed`
+- trace preference pairs:
+  `trace_preference_pairs.jsonl`
+- trace preference pairs digest:
+  `d4ef208f3ea3ba6c7e5fac389a69850e6011fee2bde983192c090679491d8d5c`
+- DPO seed pairs:
+  `dpo_seed_pairs.jsonl`
+- DPO seed pairs digest:
+  `eb7a3a381aad1b0f842ff4294bb9a8333916fe1358b888de0d3e443358785b26`
+- rollout reward ledger:
+  `rollout_reward_ledger.json`
+- rollout reward ledger digest:
+  `8dc2f03308fb1014f551d27de6696718d28d713bb7c2c72cd94e3c5f5f8c0d69`
+- manifest:
+  `preference_rl_bundle_manifest.json`
+- manifest digest:
+  `35218b715fc876025cbac7dd75aa90d980549d64056ecb061654469716ab2ae1`
+- builder:
+  `scripts/build-qwen35-08b-harvey-mfn-preference-rl-bundle.sh`
+- checker:
+  `scripts/check-qwen35-08b-harvey-mfn-preference-rl-bundle.sh`
+
+The reward ledger uses a simple transparent reward:
+
+```text
+criterion_pass_count/criterion_count
++ terminal submission component
++ tool-use component
++ output-artifact component
++ max-token component
+```
+
+That gives 005 a total reward of `3.7590361445783134` and gives each failed
+006/007 rollout `-4`, so both preference edges have a positive reward delta of
+`7.759036144578314`.
+
+This bundle is the next honest RL artifact. It is real data over committed
+Harvey rollouts, but it is not a new trained adapter. The installed local
+`mlx_lm.lora` entrypoint supports SFT LoRA, DoRA, and full fine-tuning; it
+does not expose DPO, GRPO, or PPO on this host. The rejected 006/007 max-token
+runs also preserved response metadata and raw response hashes, but not the full
+rejected text bodies, so direct text-DPO remains blocked until the runner
+captures failed completions. Use this bundle for trace-level preference/RL
+admission, and keep adapter 005 as the actual Harvey-runnable fine-tuned Qwen
+model until a real preference/RL trainer produces a better candidate.
+
 ## Rust API
 
 The implementation lives in:

@@ -1,0 +1,75 @@
+{
+  "schema": "psionic.harvey_mfn.preference_rl_bundle_manifest.v1",
+  "bundle_id": "harvey_mfn_preference_rl_2026_05_20_008",
+  "created_on": "2026-05-20",
+  "task_id": "harvey.funds-asset-management.analyze_mfn_waterfall",
+  "current_usable_policy": {
+    "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005",
+    "base_model": "Qwen/Qwen3.5-0.8B",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_reward_2026_05_20_005/adapters.safetensors",
+    "adapter_sha256": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "score": "63/83 public Harvey MFN training-slice criterion-title/token score",
+    "terminal_state": "submitted",
+    "usable_for_harvey_benchmark_run": true
+  },
+  "rejected_policy_updates": [
+    {
+      "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_miss_repair_2026_05_20_006",
+      "adapter_sha256": "06b9ac95ae10120240122bca4678b7424a071111495bf3cb1dd113a774c2a6da",
+      "terminal_state": "max_tokens",
+      "score": "0/83",
+      "promoted": false
+    },
+    {
+      "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_tool_discipline_2026_05_20_007",
+      "adapter_sha256": "2d71869052508a23e0cf3085fae64ebc580a8b5912ccca3293f4c31fc961b3a1",
+      "terminal_state": "max_tokens",
+      "score": "0/83",
+      "promoted": false
+    }
+  ],
+  "outputs": {
+    "trace_preference_pairs": {
+      "path": "fixtures/qwen_legal/real_finetune/harvey_mfn_preference_rl_2026_05_20_008/trace_preference_pairs.jsonl",
+      "sha256": "d4ef208f3ea3ba6c7e5fac389a69850e6011fee2bde983192c090679491d8d5c",
+      "record_count": 2
+    },
+    "dpo_seed_pairs": {
+      "path": "fixtures/qwen_legal/real_finetune/harvey_mfn_preference_rl_2026_05_20_008/dpo_seed_pairs.jsonl",
+      "sha256": "eb7a3a381aad1b0f842ff4294bb9a8333916fe1358b888de0d3e443358785b26",
+      "record_count": 2,
+      "direct_text_dpo_ready": false
+    },
+    "rollout_reward_ledger": {
+      "path": "fixtures/qwen_legal/real_finetune/harvey_mfn_preference_rl_2026_05_20_008/rollout_reward_ledger.json",
+      "sha256": "8dc2f03308fb1014f551d27de6696718d28d713bb7c2c72cd94e3c5f5f8c0d69"
+    }
+  },
+  "local_trainer_status": {
+    "mlx_lm_lora_help_checked": true,
+    "supported_here": [
+      "SFT LoRA",
+      "DoRA",
+      "full fine-tune"
+    ],
+    "missing_here": [
+      "DPO entrypoint",
+      "GRPO entrypoint",
+      "PPO entrypoint"
+    ],
+    "operational_conclusion": "Use 005 as the current fine-tuned Qwen model. Use this bundle as the next objective for a real preference/RL trainer or Pylon job; do not promote 006/007."
+  },
+  "tailnet_status_at_update": {
+    "archlinux": "online, but prior unattended Tailscale SSH required reauthentication",
+    "imac_pro_bertha": "online, but prior noninteractive SSH auth was denied",
+    "macbook_pro_m2": "offline at this update",
+    "local_m5": "used for bundle generation"
+  },
+  "claim_boundary": [
+    "This is a real preference/RL data artifact over committed Harvey MFN rollouts.",
+    "It is not itself a new trained adapter.",
+    "The current actually fine-tuned Qwen model for the Harvey route remains adapter 005.",
+    "The rejected max_tokens rollouts did not persist full rejected text bodies, so text-DPO requires future runner capture of rejected completions."
+  ],
+  "manifest_sha256_before_self_field": "83293eb1144fff42a386be45196bdf1faf6bff5150d031b5b86e67f8cb920931"
+}
