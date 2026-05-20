@@ -482,6 +482,46 @@ captures failed completions. Use this bundle for trace-level preference/RL
 admission, and keep adapter 005 as the actual Harvey-runnable fine-tuned Qwen
 model until a real preference/RL trainer produces a better candidate.
 
+## Current Simulated-Pylon Real Fine-Tune Run
+
+After bundle 008, the lane ran an actual local MLX LoRA fine-tune sequence
+with three simulated logical Pylons on this Mac:
+
+- run id:
+  `qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009`
+- base model: `Qwen/Qwen3.5-0.8B`
+- parent policy: 005 reward-refresh adapter
+- source preference/RL bundle: 008
+- data:
+  `fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009`
+- report:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/report.json`
+- report digest:
+  `541ba01f6e5ecb22b07a83441d2b349ef7352c7f590705cbf9d880beb8ce6ffd`
+- checker:
+  `scripts/check-qwen35-08b-harvey-mfn-simulated-pylons-run.sh`
+
+The three local logical Pylon phases were:
+
+| Worker | Resume | Iterations | LR | Final Val | Adapter Digest |
+| --- | --- | ---: | ---: | ---: | --- |
+| `pylon.local.macos.mlx.sim.01.coverage` | 005 | 4 | `0.000002` | `2.036` | `201a2083883f8b6123d66e4317be69cc0b7e475395d742531f7f4421afcaf982` |
+| `pylon.local.macos.mlx.sim.02.tool_discipline` | Pylon 01 | 4 | `0.000001` | `2.009` | `b592d4efccba0763b59a7d490346290f71f5f972f8a79460fc5c82d00dc6a3e0` |
+| `pylon.local.macos.mlx.sim.03.score_push` | Pylon 02 | 6 | `0.000008` | `2.291` | `4c9e8981b74170f068ade64bba73fdbca313d5ef7eda3e8bf5905e1ad4b763fd` |
+
+Both scored candidates were served through the MLX OpenAI-compatible server
+and run through the Rust Harvey MFN slice:
+
+- Pylon 02 final adapter: `submitted`, two tool receipts, one output artifact,
+  `63 / 83`
+- Pylon 03 score-push adapter: `submitted`, two tool receipts, one output
+  artifact, `63 / 83`
+
+Decision: this was a real fine-tune run, not a gate, and it successfully
+avoided the `max_tokens` no-tool failure from 006/007. It did not improve over
+005, so it is retained as empirical rejection evidence and not promoted.
+Adapter 005 remains the current best Harvey-runnable local Qwen policy.
+
 ## Rust API
 
 The implementation lives in:

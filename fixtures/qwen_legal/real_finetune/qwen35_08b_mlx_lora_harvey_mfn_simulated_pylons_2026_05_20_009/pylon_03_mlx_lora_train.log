@@ -1,0 +1,26 @@
+Loading pretrained model
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 24980.96it/s]
+Loading datasets
+Training
+Loading fine-tuned weights from fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_02_tool_discipline/adapters.safetensors
+Trainable parameters: 0.479% (3.608M/752.392M)
+Starting training..., iters: 6
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3563 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:02<00:00,  2.62s/it]Calculating loss...: 100%|██████████| 1/1 [00:02<00:00,  2.62s/it]
+Iter 1: Val loss 2.006, Val took 2.627s
+Iter 1: Train loss 0.876, Learning Rate 8.000e-06, It/sec 0.019, Tokens/sec 38.601, Trained Tokens 2047, Peak mem 53.759 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 4922 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 2: Train loss 0.491, Learning Rate 8.000e-06, It/sec 0.021, Tokens/sec 43.505, Trained Tokens 4094, Peak mem 53.769 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 4922 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 24.72it/s]
+Iter 3: Val loss 3.321, Val took 0.042s
+Iter 3: Train loss 0.413, Learning Rate 8.000e-06, It/sec 0.115, Tokens/sec 234.676, Trained Tokens 6141, Peak mem 53.769 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 4922 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 4: Train loss 0.330, Learning Rate 8.000e-06, It/sec 0.116, Tokens/sec 238.031, Trained Tokens 8188, Peak mem 53.769 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 5154 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Iter 5: Train loss 0.510, Learning Rate 8.000e-06, It/sec 0.118, Tokens/sec 241.215, Trained Tokens 10235, Peak mem 53.769 GB
+[WARNING] Some sequences are longer than 2048 tokens. The longest sentence 3578 will be truncated to 2048. Consider pre-splitting your data to save memory.
+Calculating loss...:   0%|          | 0/1 [00:00<?, ?it/s]Calculating loss...: 100%|██████████| 1/1 [00:00<00:00, 34.30it/s]
+Iter 6: Val loss 2.291, Val took 0.031s
+Iter 6: Train loss 0.603, Learning Rate 8.000e-06, It/sec 0.117, Tokens/sec 238.507, Trained Tokens 12282, Peak mem 53.769 GB
+Saved final weights to fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_03_score_push/adapters.safetensors.

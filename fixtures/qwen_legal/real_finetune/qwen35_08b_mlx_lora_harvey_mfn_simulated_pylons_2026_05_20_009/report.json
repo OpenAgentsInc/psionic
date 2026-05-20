@@ -1,0 +1,133 @@
+{
+  "schema": "psionic.qwen_legal_mlx_lora_harvey_mfn_simulated_pylons_report.v1",
+  "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009",
+  "base_model": "Qwen/Qwen3.5-0.8B",
+  "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+  "backend": "mlx_lm.lora",
+  "parent_policy": {
+    "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005",
+    "adapter_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+    "score": "63/83"
+  },
+  "source_preference_bundle": "harvey_mfn_preference_rl_2026_05_20_008",
+  "dataset_manifest": {
+    "path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/dataset_manifest.json",
+    "sha256": "ca52ac1fe89b240a4c4f221d0a66ca15a763471fc51f9942cda425cfd6eee007",
+    "content": {
+      "schema": "psionic.harvey_mfn.simulated_pylon_mlx_data.v1",
+      "dataset_id": "mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009",
+      "output_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009",
+      "source_policy": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005",
+      "source_preference_bundle": "harvey_mfn_preference_rl_2026_05_20_008",
+      "minimum_reward_delta": 7.759036144578314,
+      "ideal_output": {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/ideal_output.md",
+        "sha256": "1860a88d045425042b3deb3b0d5fe9c30fa9350c4cd17408f95c17cc04900bce"
+      },
+      "simulated_pylons": [
+        {
+          "worker_id": "pylon.local.macos.mlx.sim.01.coverage",
+          "shard_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_01_coverage",
+          "train_sha256": "3dff72f93f6794bb04dd169ce8557c44788a52659d628c54b5dcfe5e3d4a674b",
+          "role": "criterion coverage and full write trajectory"
+        },
+        {
+          "worker_id": "pylon.local.macos.mlx.sim.02.tool_discipline",
+          "shard_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_02_tool_discipline",
+          "train_sha256": "2307c176503452872182afd63fa2a23e6f16fc6c655211f0a9be58423cc4f453",
+          "role": "tool-discipline repair for max_tokens no-tool failures"
+        },
+        {
+          "worker_id": "pylon.local.macos.mlx.sim.03.score_push",
+          "shard_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_03_score_push",
+          "train_sha256": "130ebd371f68f8079d2c578592385a2ce6ba7868c035c340e0476af3960858b7",
+          "role": "duplicated score-push pressure test over pylon 01 and 02 shards"
+        }
+      ],
+      "claim_boundary": "This is local simulated-Pylon MLX SFT data generated from public Harvey criteria and committed local rollout rewards. It contains no hidden Harvey labels."
+    }
+  },
+  "simulated_pylon_training": [
+    {
+      "worker_id": "pylon.local.macos.mlx.sim.01.coverage",
+      "resume_adapter_digest": "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed",
+      "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_01_coverage/adapters.safetensors",
+      "adapter_sha256": "201a2083883f8b6123d66e4317be69cc0b7e475395d742531f7f4421afcaf982",
+      "adapter_config_sha256": "715ff35b42cce8336e0de92cc1a2277d9dc8c8768479ce24b3b4e2e3c6403668",
+      "train_log_sha256": "98fc3ca8afac835aa37182a1af2d05efd96971d3c7298aa6253a54daec5214fc",
+      "iterations": 4,
+      "learning_rate": 0.000002,
+      "first_validation_loss": 2.085,
+      "final_validation_loss": 2.036,
+      "final_train_loss": 0.591,
+      "trained_tokens": 8188,
+      "peak_memory_gb": 53.791
+    },
+    {
+      "worker_id": "pylon.local.macos.mlx.sim.02.tool_discipline",
+      "resume_adapter_digest": "201a2083883f8b6123d66e4317be69cc0b7e475395d742531f7f4421afcaf982",
+      "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_02_tool_discipline/adapters.safetensors",
+      "adapter_sha256": "b592d4efccba0763b59a7d490346290f71f5f972f8a79460fc5c82d00dc6a3e0",
+      "adapter_config_sha256": "720b21c1f7eff0d626fb26de66bede3f502421a8396067fb6f6299c10d83e45b",
+      "train_log_sha256": "5c9e67f839f90427a248decea5eb408fe5fcd8c2a118e16454dd1a96a1c9913d",
+      "iterations": 4,
+      "learning_rate": 0.000001,
+      "first_validation_loss": 2.008,
+      "final_validation_loss": 2.009,
+      "final_train_loss": 0.521,
+      "trained_tokens": 8188,
+      "peak_memory_gb": 53.769
+    },
+    {
+      "worker_id": "pylon.local.macos.mlx.sim.03.score_push",
+      "resume_adapter_digest": "b592d4efccba0763b59a7d490346290f71f5f972f8a79460fc5c82d00dc6a3e0",
+      "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_03_score_push/adapters.safetensors",
+      "adapter_sha256": "4c9e8981b74170f068ade64bba73fdbca313d5ef7eda3e8bf5905e1ad4b763fd",
+      "adapter_config_sha256": "97eff6389e186d74e24e56be63f6fac67c3701f2ef6d8289daf521b2f7b4557c",
+      "train_log_sha256": "5b6ba4cf175272eb1a2c4aac81a6d4b20d3135f46378e50380a3213dae1cc7fb",
+      "iterations": 6,
+      "learning_rate": 0.000008,
+      "first_validation_loss": 2.006,
+      "best_validation_loss": 2.006,
+      "final_validation_loss": 2.291,
+      "final_train_loss": 0.603,
+      "trained_tokens": 12282,
+      "peak_memory_gb": 53.769
+    }
+  ],
+  "harvey_runs": [
+    {
+      "label": "pylon_02_final",
+      "report_sha256": "0e9ede27306fb8debeca24fe94d7c3896910f58fe9570e850f926a7186d17d3b",
+      "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.a8b50723bc84.qwen35-08b-mlx-lora-harvey-mfn-simulated-pylons-2026-05-20",
+      "terminal_state": "submitted",
+      "criterion_pass_count": 63,
+      "criterion_count": 83,
+      "tool_receipt_count": 2,
+      "output_artifact_count": 1,
+      "score_report_digest": "a69c01b0ca67e9a7ef2edaf921508c594f46bfb052f16db3d8faf7862d1edc52",
+      "training_record_bundle_digest": "ffe5c464e656c2acfb51556558de734e1cdfef837404038a8d9aa8fd6e9785e8"
+    },
+    {
+      "label": "pylon_03_score_push",
+      "report_sha256": "315a1786d002a4207befe71387718746f449c2af1b104ca56a617b1b316529b2",
+      "run_id": "run.harvey.funds-asset-management.analyze_mfn_waterfall.a7a07aeea570.qwen35-08b-mlx-lora-harvey-mfn-simulated-pylon03-score-push-2026-05-20",
+      "terminal_state": "submitted",
+      "criterion_pass_count": 63,
+      "criterion_count": 83,
+      "tool_receipt_count": 2,
+      "output_artifact_count": 1,
+      "score_report_digest": "90eb70340aed08c9b6592482d60bf171f178f6a3b6c9ee0a630fa7bbf2a3b6bf",
+      "training_record_bundle_digest": "0e4731295b9bf7e4eee766eef204b20ab93503806993139f6c33e71274c7741b"
+    }
+  ],
+  "decision": {
+    "promoted_over_005": false,
+    "reason": "Both simulated-Pylon adapters stayed tool-safe and submitted output.md, but neither improved the 63/83 public Harvey MFN training-slice score over adapter 005. Adapter 005 remains the current best Harvey-runnable policy."
+  },
+  "claim_boundary": [
+    "This is a real local MLX LoRA fine-tune sequence over Qwen/Qwen3.5-0.8B using three simulated logical Pylon workers.",
+    "It is not live multi-host Pylon/Nexus settlement and not DPO/GRPO/PPO.",
+    "It did not improve the Harvey MFN training-slice score; the value is empirical rejection evidence for the next trainer."
+  ]
+}

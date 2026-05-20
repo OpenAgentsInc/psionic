@@ -1,0 +1,33 @@
+{
+  "schema": "psionic.harvey_mfn.simulated_pylon_mlx_data.v1",
+  "dataset_id": "mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009",
+  "output_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009",
+  "source_policy": "qwen_legal_real_qwen35_08b_mlx_lora_harvey_mfn_reward_refresh_2026_05_20_005",
+  "source_preference_bundle": "harvey_mfn_preference_rl_2026_05_20_008",
+  "minimum_reward_delta": 7.759036144578314,
+  "ideal_output": {
+    "path": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/ideal_output.md",
+    "sha256": "1860a88d045425042b3deb3b0d5fe9c30fa9350c4cd17408f95c17cc04900bce"
+  },
+  "simulated_pylons": [
+    {
+      "worker_id": "pylon.local.macos.mlx.sim.01.coverage",
+      "shard_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_01_coverage",
+      "train_sha256": "3dff72f93f6794bb04dd169ce8557c44788a52659d628c54b5dcfe5e3d4a674b",
+      "role": "criterion coverage and full write trajectory"
+    },
+    {
+      "worker_id": "pylon.local.macos.mlx.sim.02.tool_discipline",
+      "shard_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_02_tool_discipline",
+      "train_sha256": "2307c176503452872182afd63fa2a23e6f16fc6c655211f0a9be58423cc4f453",
+      "role": "tool-discipline repair for max_tokens no-tool failures"
+    },
+    {
+      "worker_id": "pylon.local.macos.mlx.sim.03.score_push",
+      "shard_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_harvey_mfn_simulated_pylons_2026_05_20_009/pylon_03_score_push",
+      "train_sha256": "130ebd371f68f8079d2c578592385a2ce6ba7868c035c340e0476af3960858b7",
+      "role": "duplicated score-push pressure test over pylon 01 and 02 shards"
+    }
+  ],
+  "claim_boundary": "This is local simulated-Pylon MLX SFT data generated from public Harvey criteria and committed local rollout rewards. It contains no hidden Harvey labels."
+}
