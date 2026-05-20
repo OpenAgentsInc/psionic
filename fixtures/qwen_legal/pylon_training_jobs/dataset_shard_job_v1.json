@@ -1,0 +1,55 @@
+{
+  "schema_version": "psionic.qwen_legal_pylon_training_job.v1",
+  "job_id": "job.qwen-legal.dataset-shard.000001",
+  "parent_run_id": "run.qwen-legal.pylon.protocol.000001",
+  "job_kind": "dataset_shard_build",
+  "model_id": "Qwen/Qwen3.6-27B",
+  "model_hash": "sha256:synthetic-qwen36-legal-smoke",
+  "adapter_id": "qwen36-27b-legal-grpo-smoke",
+  "adapter_hash": "825b2d81aeae56d395a4fee7608eead91adf25ac24bae9ff995959df2b95732f",
+  "dataset_manifest_hash": "sha256:dataset-manifest-qwen-legal-pylon-protocol-smoke",
+  "shard_assignment": {
+    "assignment_id": "assignment.job.qwen-legal.dataset-shard.000001",
+    "shard_id": "shard.qwen-legal.public-smoke.000001",
+    "shard_index": 0,
+    "shard_count": 1,
+    "start_index": 0,
+    "end_index": 3
+  },
+  "training_config_hash": "a1e896ad711ccce93bcf9e3efa4b49d3ef461e397f3b02348debc5740b165a02",
+  "expected_input_artifacts": [
+    {
+      "artifact_id": "qwen36-grpo-config",
+      "artifact_type": "training_config",
+      "path": "configs/legal/qwen36_grpo_smoke.json",
+      "sha256": "a1e896ad711ccce93bcf9e3efa4b49d3ef461e397f3b02348debc5740b165a02"
+    }
+  ],
+  "expected_output_artifacts": [
+    {
+      "artifact_id": "artifact.job.qwen-legal.dataset-shard.000001.output",
+      "artifact_type": "dataset_shard_manifest",
+      "path": "target/legal/pylon_jobs/dataset_shard_manifest.json",
+      "required": true
+    }
+  ],
+  "max_runtime_ms": 60000,
+  "hardware_requirements": {
+    "min_memory_bytes": 536870912,
+    "require_accelerator": false,
+    "accepted_backend_labels": ["local_protocol_smoke"]
+  },
+  "payment_budget": {
+    "budget_id": "budget.qwen-legal.pylon.protocol.000001",
+    "max_cost_microusd": 0,
+    "payment_account_ref": "ledger://local-smoke/no-payment"
+  },
+  "receipt_requirements": {
+    "require_signature": true,
+    "require_logs_hash": true,
+    "require_metrics": true,
+    "required_output_artifact_types": ["dataset_shard_manifest"]
+  },
+  "output_dir": "target/legal/pylon_jobs",
+  "receipt_path": "target/legal/pylon_jobs/job.qwen-legal.dataset-shard.000001.receipt.json"
+}

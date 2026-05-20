@@ -201,6 +201,42 @@ eval compatibility on a synthetic local smoke. It is not proof of full dense
 Qwen3.6 RL, distributed Pylon sampling, or hidden Harvey benchmark
 performance.
 
+## Pylon Worker Job Protocol
+
+`crates/psionic-train/src/qwen_legal_pylon_training_job.rs` defines the first
+worker job protocol for sending legal benchmark training work to Pylon
+workers. It supports dataset shard builds, SFT shard work, DPO shard work,
+GRPO sampling, GRPO shard work, eval shards, adapter merges, and artifact
+verification.
+
+The job spec records the parent run, model and adapter identity, dataset and
+training config hashes, shard assignment, expected inputs, required outputs,
+hardware needs, budget metadata, and receipt requirements. The worker receipt
+records the worker id, public key, job id, input and output hashes, timings,
+hardware summary, Psionic version, git commit, logs hash, metrics, failure
+reason when there is one, Ed25519 signature, and receipt digest.
+
+Run the current local dataset-shard fixture with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_pylon_worker_run_once -- \
+  --job fixtures/qwen_legal/pylon_training_jobs/dataset_shard_job_v1.json
+```
+
+Then verify the receipt with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_verify_worker_receipt -- \
+  target/legal/pylon_jobs/job.qwen-legal.dataset-shard.000001.receipt.json
+```
+
+The matching eval-shard fixture is
+`fixtures/qwen_legal/pylon_training_jobs/eval_shard_job_v1.json`.
+
+This is a local protocol proof. It does not train a live Qwen model by itself;
+it gives Nexus/Pylon the signed job and receipt shape needed before those
+workers run real SFT, DPO, or GRPO shards.
+
 `crates/psionic-data/src/legal_benchmark_sft_dataset.rs` builds canonical
 `legal_sft_v1` JSONL from honest successful receipts and training-eligible
 bad-run examples. It refuses hidden/private-by-default receipts, unknown
