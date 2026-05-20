@@ -6,7 +6,8 @@
 > training-slice LoRA and Rust task run added on 2026-05-20; local MFN
 > reward-refresh LoRA and `63 / 83` public training-slice run added on
 > 2026-05-20; no-cheat runner correction, single-task run 016, broad suite
-> runs 019/025, and adapter 020 added on 2026-05-20.
+> runs 019/025, adapter 020, and Rust-only Qwen3.6 GRPO smoke added on
+> 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -24,6 +25,61 @@ update, and the Autopilot4 import loop are green.
 
 The Qwen replacement model set and the current `qwen36_alias_qwen35`
 conformance decision live in `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`.
+
+## Current Rust GRPO Smoke
+
+The lane now includes a Rust-only GRPO smoke trainer for the Qwen3.6 legal
+adapter path:
+
+```bash
+cargo run -p psionic-train -- grpo --config configs/legal/qwen36_grpo_smoke.json
+```
+
+Recorded result:
+
+- run id: `qwen36-legal-grpo-smoke`
+- trainer: `psionic.open_adapter.qwen36_legal_lm_head_lora_grpo.v1`
+- prompt groups: `2`
+- sampled completions: `6`
+- bad completions preserved: `4`
+- completed steps: `8`
+- initial file-write preference accuracy: `0.5`
+- final file-write preference accuracy: `1.0`
+- initial average reward margin: `-0.0031223297`
+- final average reward margin: `15.182666`
+- adapter:
+  `target/legal/qwen36_grpo_smoke/adapter.safetensors`
+- adapter digest:
+  `825b2d81aeae56d395a4fee7608eead91adf25ac24bae9ff995959df2b95732f`
+- reward traces:
+  `target/legal/qwen36_grpo_smoke/reward_traces.jsonl`
+- receipt:
+  `target/legal/qwen36_grpo_smoke/training_receipt.json`
+- receipt digest:
+  `f030e22b3590c8b5bf51bf355e7eedf84963cf7bccc177499140e91c2edcaf32`
+
+The exported adapter is compatible with the Rust legal benchmark suite path:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite suites/harvey_public_three.json \
+  --model Qwen/Qwen3.6-27B \
+  --adapter target/legal/qwen36_grpo_smoke/adapter.safetensors \
+  --out target/legal/qwen36_grpo_eval_smoke
+```
+
+Recorded eval result:
+
+- base score: `3333` bps
+- adapter score: `10000` bps
+- delta: `6667` bps
+- report hash:
+  `df8cbe47739b27de9cd9ca629f51de789cd8584ca8588242ff31b1826efea215`
+
+This is a local synthetic trainer smoke. It proves group sampling, reward
+traces, group-normalized adapter updates, bad-completion preservation, and
+adapter eval compatibility. It does not prove a retained Harvey score, full
+dense Qwen3.6 RL, or distributed Pylon sampling.
 
 ## Current Real-Weight Result
 

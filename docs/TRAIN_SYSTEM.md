@@ -185,8 +185,19 @@ run directories, reads run records, score reports, answer-integrity receipts,
 and output manifests, then emits deterministic JSONL traces. The current
 reward separates workflow behavior from legal-content score, penalizes missing
 required files without excluding them, and fatally excludes hidden scoring
-leakage or harness-created answer content. The same
-run now also emits a typed RL hillclimb plan that points Pylon/Nexus at
+leakage or harness-created answer content. Psionic now also owns the first
+Rust-only legal GRPO smoke command in
+`crates/psionic-train/src/legal_grpo_cli.rs`; it samples deterministic local
+completion groups, scores each completion with a verifier-style legal workflow
+reward, normalizes reward inside each prompt group, updates only the
+Qwen3.6-compatible adapter, preserves bad completions in reward traces, and
+exports adapter, loss-curve, checkpoint-summary, reward-trace, and
+training-receipt artifacts without invoking Python. The current local smoke
+run improves file-write preference accuracy from `0.5` to `1.0` and evaluates
+through the same Rust legal suite path at `10000` adapter bps on
+`suites/harvey_public_three.json`. This is a synthetic smoke, not a claim
+about retained Harvey performance or distributed Pylon sampling. The same run
+now also emits a typed RL hillclimb plan that points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and

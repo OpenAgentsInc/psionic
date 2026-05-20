@@ -140,6 +140,67 @@ cargo test -p psionic-eval failed_trajectory_capture
 cargo run -p psionic-eval --example legal_benchmark_inspect_failures -- <run-dir>
 ```
 
+## Rust GRPO Smoke Trainer
+
+`psionic-train` now has a Rust-only legal GRPO smoke command:
+
+```bash
+cargo run -p psionic-train -- grpo --config configs/legal/qwen36_grpo_smoke.json
+```
+
+What it does today:
+
+- samples deterministic local completion groups for public legal workflow
+  prompts
+- scores each completion with a verifier-style reward plugin for file writing,
+  correct path, non-empty answer, source use, submission, and answer integrity
+- normalizes reward inside each prompt group
+- applies adapter-only weighted updates through the open-adapter backend
+- preserves lower-reward completions in `reward_traces.jsonl` for later
+  preference/RL data building
+- writes `adapter.safetensors`, `loss_curve.json`,
+  `checkpoint_summary.json`, `reward_traces.jsonl`, and
+  `training_receipt.json`
+
+Recorded local smoke result:
+
+- run id: `qwen36-legal-grpo-smoke`
+- prompt groups: `2`
+- sampled completions: `6`
+- bad completions preserved: `4`
+- completed steps: `8`
+- initial file-write preference accuracy: `0.5`
+- final file-write preference accuracy: `1.0`
+- initial average reward margin: `-0.0031223297`
+- final average reward margin: `15.182666`
+- adapter digest:
+  `825b2d81aeae56d395a4fee7608eead91adf25ac24bae9ff995959df2b95732f`
+- receipt digest:
+  `f030e22b3590c8b5bf51bf355e7eedf84963cf7bccc177499140e91c2edcaf32`
+
+The exported adapter also runs through the same Rust legal eval suite:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite suites/harvey_public_three.json \
+  --model Qwen/Qwen3.6-27B \
+  --adapter target/legal/qwen36_grpo_smoke/adapter.safetensors \
+  --out target/legal/qwen36_grpo_eval_smoke
+```
+
+Recorded eval result:
+
+- base score: `3333` bps
+- adapter score: `10000` bps
+- delta: `6667` bps
+- report hash:
+  `df8cbe47739b27de9cd9ca629f51de789cd8584ca8588242ff31b1826efea215`
+
+This proves the Rust GRPO training path, reward traces, adapter export, and
+eval compatibility on a synthetic local smoke. It is not proof of full dense
+Qwen3.6 RL, distributed Pylon sampling, or hidden Harvey benchmark
+performance.
+
 `crates/psionic-data/src/legal_benchmark_sft_dataset.rs` builds canonical
 `legal_sft_v1` JSONL from honest successful receipts and training-eligible
 bad-run examples. It refuses hidden/private-by-default receipts, unknown
