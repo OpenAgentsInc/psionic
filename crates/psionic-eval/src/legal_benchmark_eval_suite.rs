@@ -924,6 +924,8 @@ fn task_report_from_score(
     if outcome == LegalBenchmarkEvalReplayOutcome::Timeout {
         failure_classes.push(String::from("timeout"));
     }
+    failure_classes.sort();
+    failure_classes.dedup();
     LegalBenchmarkEvalTaskReport {
         task_id: task.task_id.clone(),
         model_role: binding.role.clone(),
@@ -1283,14 +1285,11 @@ fn write_tool_call(
 }
 
 fn answer_content(
-    manifest: &LegalBenchmarkEvalSuiteManifest,
-    binding: &LegalBenchmarkEvalModelBinding,
+    _manifest: &LegalBenchmarkEvalSuiteManifest,
+    _binding: &LegalBenchmarkEvalModelBinding,
     task: &LegalBenchmarkEvalTaskFixture,
 ) -> String {
-    format!(
-        "{}\n\n---\nSuite: {}\nModel role: {}\nPrompt template: {}\n",
-        task.replay_answer_markdown, manifest.suite_id, binding.role, manifest.prompt_template_hash
-    )
+    task.replay_answer_markdown.clone()
 }
 
 fn run_id(binding: &LegalBenchmarkEvalModelBinding, task_id: &str) -> String {
@@ -1475,6 +1474,14 @@ mod tests {
         );
         assert!(output.path().join("run/eval_report.json").is_file());
         assert!(output.path().join("run/replay_receipt.json").is_file());
+        let answer = fs::read_to_string(output.path().join("run/adapter/task.one/answer.md"))
+            .expect("adapter answer");
+        assert_eq!(
+            answer,
+            "# Answer\n\nThe lease requires written notice within ten days.\n"
+        );
+        assert!(!answer.contains("Model role:"));
+        assert!(!answer.contains("Prompt template:"));
     }
 
     #[test]
