@@ -341,6 +341,48 @@ This dry run is the last rehearsal before a separate perfect-score campaign.
 It is still readiness evidence only; public score claims require imported score
 reports and release-gate approval.
 
+## Pylon Network SFT Smoke
+
+The lane now has a first network-shaped Qwen legal training result:
+`qwen_legal_pylon_network_sft_v1`.
+
+This is not the final Qwen3.6 fine-tune. It is the smallest honest replacement
+for the CS336-first proof path:
+
+- objective id: `harvey_legal_qwen_finetune_v1`
+- parent lane id: `qwen_legal_adapter_sft_v1`
+- base model binding: `Qwen/Qwen3.5-4B`
+- retained target model: `Qwen/Qwen3.6-35B-A3B`
+- artifact mode: `synthetic_hidden_state_smoke`
+- contributors: two logical Pylon workers
+- aggregation rule: `trusted_weighted_lora_factor_average_v1`
+- aggregate artifact:
+  `fixtures/qwen_legal/pylon_network_sft/aggregate-qwen-legal-lm-head-lora.safetensors`
+- report:
+  `fixtures/qwen_legal/pylon_network_sft/pylon_network_sft_report_v1.json`
+- generator:
+  `crates/psionic-train/examples/qwen_legal_pylon_network_sft_fixture.rs`
+- checker:
+  `scripts/check-qwen-legal-pylon-network-sft.sh`
+
+The retained report records per-contributor assignment ids, worker ids, node
+pubkeys, shard refs, sample ids, training losses, checkpoint digests, adapter
+artifact digests, contribution receipt digests, aggregate receipt digest,
+model-progress participant count, and aggregate adapter identity digest.
+
+The aggregate adapter is loadable as an LM-head LoRA safetensors artifact. The
+two contributors train different legal smoke shards and produce different
+adapter digests before trusted aggregation. That gives the legal lane a real
+multi-contributor trained artifact while keeping the claim boundary explicit:
+it proves Pylon-network training shape and aggregation, not real Qwen3.6
+full-weight fine-tuning or retained Harvey score lift.
+
+Run it locally with:
+
+```bash
+scripts/check-qwen-legal-pylon-network-sft.sh
+```
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:

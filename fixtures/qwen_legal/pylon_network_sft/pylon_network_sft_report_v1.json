@@ -1,0 +1,96 @@
+{
+  "schema_version": "psionic.qwen_legal_pylon_network_sft_report.v1",
+  "report_id": "qwen_legal_pylon_network_sft_report_000001",
+  "objective_id": "harvey_legal_qwen_finetune_v1",
+  "lane_id": "qwen_legal_pylon_network_sft_v1",
+  "parent_lane_id": "qwen_legal_adapter_sft_v1",
+  "public_model_id": "Qwen/Qwen3.5-4B",
+  "retained_target_model_id": "Qwen/Qwen3.6-35B-A3B",
+  "served_model_id": "qwen3.5-4b",
+  "artifact_mode": "synthetic_hidden_state_smoke",
+  "base_served_artifact_digest": "sha256:synthetic-qwen35-4b-legal-smoke",
+  "checkpoint_family": "psionic.qwen35_4b.legal_adapter_sft",
+  "dataset_digest": "sha256:legal-training-record-bundle-smoke",
+  "eval_pack_digest": "sha256:legal-retained-smoke-eval-pack",
+  "claim_boundary": "This is a real multi-contributor LM-head LoRA adapter-SFT artifact over synthetic Qwen legal hidden-state smoke samples. It proves the Pylon-network training and aggregation shape. It does not claim Qwen3.6 full-weight fine-tuning or retained Harvey benchmark score lift.",
+  "contributions": [
+    {
+      "contributor": {
+        "pylon_node_id": "pylon.local.legal.cuda.01",
+        "node_pubkey": "npub1qwenlegalcuda000000000000000000000000000000000001",
+        "worker_id": "worker.qwen-legal.cuda.01",
+        "assignment_id": "assignment.qwen-legal-pylon-sft.000001.a",
+        "contribution_id": "contribution.qwen-legal-pylon-sft.000001.a",
+        "shard_ref": "shard://harvey-legal-smoke/train/even",
+        "adapter_artifact_path": "contributor-pylon-local-legal-cuda-01.safetensors",
+        "started_at_ms": 2000
+      },
+      "sample_ids": [
+        "legal-network-a",
+        "legal-network-c",
+        "legal-network-e"
+      ],
+      "legal_training_record_ids": [
+        "legal-record-a",
+        "legal-record-c",
+        "legal-record-e"
+      ],
+      "sample_count": 3,
+      "source_token_count": 140,
+      "completed_steps": 4,
+      "first_step_loss": 5.5248795,
+      "final_step_loss": 4.7146974,
+      "checkpoint_digest": "f781784c25ef3a7d173cdc7d02e75daf046e338db2ec65773bfc2a2bc828ebe4",
+      "adapter_artifact_digest": "5298c62de7f6b318f8889957433fe401ba693911997c1c606ce5099e73ca41cb",
+      "adapter_identity_digest": "0effc0d27941c603301e83804ba445918315604414f3f22242031db78bb63fe1",
+      "run_summary_digest": "68decca24e154ee27f280fcf57e12b58f5791c782593a9210474917f4e850eaa",
+      "contribution_receipt_digest": "0fe2ce756b431bd6cca399d0299fbc0928c4c0c1da24744213c46b92277fc470",
+      "accepted_for_aggregation": true
+    },
+    {
+      "contributor": {
+        "pylon_node_id": "pylon.local.legal.metal.01",
+        "node_pubkey": "npub1qwenlegalmetal00000000000000000000000000000000001",
+        "worker_id": "worker.qwen-legal.metal.01",
+        "assignment_id": "assignment.qwen-legal-pylon-sft.000001.b",
+        "contribution_id": "contribution.qwen-legal-pylon-sft.000001.b",
+        "shard_ref": "shard://harvey-legal-smoke/train/odd",
+        "adapter_artifact_path": "contributor-pylon-local-legal-metal-01.safetensors",
+        "started_at_ms": 2500
+      },
+      "sample_ids": [
+        "legal-network-b",
+        "legal-network-d",
+        "legal-network-f"
+      ],
+      "legal_training_record_ids": [
+        "legal-record-b",
+        "legal-record-d",
+        "legal-record-f"
+      ],
+      "sample_count": 3,
+      "source_token_count": 132,
+      "completed_steps": 4,
+      "first_step_loss": 5.5143433,
+      "final_step_loss": 5.089317,
+      "checkpoint_digest": "41d78ef249bf2ed9d55c998cf065f79c2dc81307f846444288613214d1e0ebd9",
+      "adapter_artifact_digest": "6e8b6da6083606cbd36105a65d532e48e067094809f9db552ca9a9d13105af9b",
+      "adapter_identity_digest": "26057ef33b1a08086f434745284b0000e58183643e72efece6c30147bcacf415",
+      "run_summary_digest": "e0750519800693b956721df2d17b53e15235fd1398505f79154c9315f5b1077d",
+      "contribution_receipt_digest": "78020c80d33c65df66c93a44ddba34be980abadb062851020025dcb6e55cf404",
+      "accepted_for_aggregation": true
+    }
+  ],
+  "aggregate": {
+    "aggregate_id": "aggregate.qwen_legal_pylon_network_sft.000001",
+    "aggregation_rule": "trusted_weighted_lora_factor_average_v1",
+    "accepted_contribution_count": 2,
+    "model_progress_participant_count": 2,
+    "total_source_token_weight": 272,
+    "aggregate_adapter_artifact_path": "aggregate-qwen-legal-lm-head-lora.safetensors",
+    "aggregate_adapter_artifact_digest": "8e8dea3bc639ed2c147d6901f6ceda9b5f1a176034dc7bb65219daf7dd33116d",
+    "aggregate_adapter_identity_digest": "e650127cfb4f3ea73bb85dd693cc8384181ebaf6d3793016099d6224dec074fc",
+    "aggregate_receipt_digest": "987f68964fe0c8a1d725d0dfe3f3280194972e13908386ab90799dde6b40e131"
+  },
+  "report_digest": "51f1abcddcf11a06499c14bd60be3642b6ba2c88ec554402e19bca6dc71cc214"
+}
