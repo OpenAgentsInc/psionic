@@ -32,10 +32,13 @@ HTTP request builders use redacted credential placeholders such as
 `<secret_ref:secret.google.vertex.adc>` so serialized run artifacts can identify the
 credential route without leaking the credential value.
 
-The active hosted benchmark route is `google_vertex_gemini` with
-`gemini-3-flash-preview` on Vertex AI `generateContent`. The OpenAI-compatible
-route is retained for local/self-hosted fallback models and historical baselines
-only; it is not the product-aligned Harvey benchmark default.
+The active benchmark authority is outside the adapter layer: Autopilot
+Blueprint/Program policy selects the model route, and Psionic records the
+selected route as runtime metadata. The current hosted adapter snapshot can be
+`google_vertex_gemini` with `gemini-3-flash-preview` on Vertex AI
+`generateContent`, but that is not benchmark authority. The OpenAI-compatible
+route is retained for local/self-hosted models, Qwen fine-tune serving, and
+historical baselines; it is not a direct product-bypass path.
 
 ## Tool Calling
 

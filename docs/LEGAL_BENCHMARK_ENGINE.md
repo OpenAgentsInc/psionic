@@ -7,6 +7,13 @@ Psionic owns the Rust execution and evaluation substrate for legal-agent
 benchmark runs. The first landed contract is the schema foundation in
 `crates/psionic-eval/src/legal_benchmark.rs`.
 
+Operating boundary: the upstream Harvey Python harness is reference/backfill
+only. Owned Harvey-compatible execution runs through Psionic's Rust legal
+benchmark engine, while Autopilot Blueprint/Program policy selects the
+upgradable prompts/modules, provider adapter, judge policy, release gates, and
+promotion rules. Provider names such as Gemini, OpenAI-compatible local
+servers, or Qwen fine-tunes are adapter metadata, not benchmark authority.
+
 ## Current Contract
 
 The `psionic-eval` legal benchmark module defines:

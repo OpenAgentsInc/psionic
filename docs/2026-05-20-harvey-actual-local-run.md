@@ -15,10 +15,12 @@ benchmark lane. It distinguishes real corpus execution from planning gates.
 
 ## Upstream Harness Attempt
 
-The upstream Harvey Python harness was invoked for a live model smoke against
+The upstream Harvey Python harness was invoked only as a reference/backfill
+check against
 `trusts-estates-private-client/compare-trust-documents-against-client-instructions`.
-It failed before model execution because this host did not have `podman` on
-`PATH`.
+Owned benchmark execution should use the Psionic Rust agent loop launched under
+Autopilot Blueprint/Program policy. The reference harness attempt failed before
+model execution because this host did not have `podman` on `PATH`.
 
 Failure class:
 
