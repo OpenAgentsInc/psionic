@@ -64,6 +64,9 @@ pub const QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_SCHEMA_VERSION: &str =
 /// Stable schema version for the legal RL residual burn-down report.
 pub const QWEN_LEGAL_RL_RESIDUAL_BURN_DOWN_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_residual_burn_down.v1";
+/// Stable schema version for the legal RL final-campaign rehearsal report.
+pub const QWEN_LEGAL_RL_FINAL_CAMPAIGN_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_final_campaign.v1";
 /// Stable plan id for the next Harvey legal hillclimb phase.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID: &str = "qwen_legal_rl_hillclimb_plan_v1";
 /// Stable report id for the next Harvey legal RL benchmark projection.
@@ -85,6 +88,8 @@ pub const QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_REPORT_ID: &str =
 /// Stable report id for the phase-eight Harvey legal residual burn-down dry run.
 pub const QWEN_LEGAL_RL_RESIDUAL_BURN_DOWN_REPORT_ID: &str =
     "qwen_legal_rl_residual_burn_down_phase_008";
+/// Stable report id for the phase-nine Harvey legal final-campaign rehearsal.
+pub const QWEN_LEGAL_RL_FINAL_CAMPAIGN_REPORT_ID: &str = "qwen_legal_rl_final_campaign_phase_009";
 /// Phase-two retained target aligned with Blueprint optimizer batch `phase_002`.
 pub const QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS: u16 = 7_000;
 /// Phase-three retained target aligned with Blueprint shadow-eval shortlist.
@@ -99,6 +104,8 @@ pub const QWEN_LEGAL_PHASE_SIX_TARGET_SCORE_BPS: u16 = 9_500;
 pub const QWEN_LEGAL_PHASE_SEVEN_TARGET_SCORE_BPS: u16 = 9_800;
 /// Phase-eight retained target aligned with Blueprint residual burn-down plan.
 pub const QWEN_LEGAL_PHASE_EIGHT_TARGET_SCORE_BPS: u16 = 9_900;
+/// Phase-nine retained target aligned with Blueprint final-campaign rehearsal plan.
+pub const QWEN_LEGAL_PHASE_NINE_TARGET_SCORE_BPS: u16 = 9_950;
 /// Blueprint frontier consumed by the Psionic legal RL plan.
 pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
     "blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001";
@@ -114,6 +121,8 @@ pub const QWEN_LEGAL_BLUEPRINT_EXPANDED_CORPUS_PLAN_REF: &str = "blueprint://har
 pub const QWEN_LEGAL_BLUEPRINT_FULL_CORPUS_MATRIX_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_seven_full_corpus_matrix_plan/optimizer_plan.harvey_legal_qwen.phase_007.full_corpus_matrix";
 /// Blueprint phase-eight residual burn-down plan consumed by Psionic.
 pub const QWEN_LEGAL_BLUEPRINT_RESIDUAL_BURN_DOWN_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_eight_residual_burn_down_plan/optimizer_plan.harvey_legal_qwen.phase_008.residual_burn_down";
+/// Blueprint phase-nine final-campaign rehearsal plan consumed by Psionic.
+pub const QWEN_LEGAL_BLUEPRINT_FINAL_CAMPAIGN_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_nine_final_campaign_plan/optimizer_plan.harvey_legal_qwen.phase_009.final_campaign_rehearsal";
 /// Stable target-set id for the first narrow LM-head-only adapter.
 pub const QWEN_LEGAL_ADAPTER_TARGET_SET_ID: &str = "qwen3.5-4b.legal.lm_head_lora.v1";
 /// Stable adapter target id for the first smoke lane.
@@ -1543,6 +1552,94 @@ pub struct QwenLegalRlResidualBurnDownReport {
     pub report_digest: String,
 }
 
+/// One failure-family allocation inside the phase-nine final-campaign report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlFinalCampaignTarget {
+    /// Failure family shared with Blueprint and Autopilot4.
+    pub failure_family: String,
+    /// Optimizer method assigned to this family.
+    pub optimizer_method: QwenLegalRlOptimizerMethod,
+    /// Blueprint module receiving the final-campaign candidate.
+    pub blueprint_module_slug: String,
+    /// Dataset or review request admitted into the final campaign matrix.
+    pub dataset_request_ref: String,
+    /// Planned accepted rollouts or reviewed traces for this family.
+    pub planned_accepted_rollouts: u16,
+    /// Conservative lift this target should support in final-campaign scoring.
+    pub planned_final_lift_basis_points: u16,
+    /// Full Harvey corpus task count this family must be evaluated against.
+    pub full_corpus_task_count: u16,
+    /// Number of Qwen/Blueprint/RL matrix cells this family must cover.
+    pub model_matrix_cell_count: u16,
+    /// Remaining residual miss clusters permitted for this family.
+    pub residual_cluster_budget: u16,
+    /// Human-adjudicated sample task-runs required for this family.
+    pub final_adjudication_sample_count: u16,
+    /// Whether every audited practice area must remain represented.
+    pub practice_area_balance_required: bool,
+    /// Per-family scorecard that must exist before promotion review.
+    pub scorecard_ref: String,
+    /// Per-family receipt that must exist before promotion review.
+    pub receipt_ref: String,
+}
+
+/// Phase-nine offline RL/adjudication report for final retained-campaign rehearsal.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlFinalCampaignReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable report id.
+    pub report_id: String,
+    /// Source phase-eight report id.
+    pub source_residual_burn_down_report_id: String,
+    /// Stable digest of the phase-eight report payload.
+    pub source_residual_burn_down_report_digest: String,
+    /// Plan id this final-campaign rehearsal still executes.
+    pub plan_id: String,
+    /// Stable digest of the plan payload.
+    pub plan_digest: String,
+    /// Baseline retained score used for the final-campaign rehearsal.
+    pub baseline_score_basis_points: u16,
+    /// Previous target carried forward from phase eight.
+    pub previous_target_score_basis_points: u16,
+    /// New phase-nine conservative target.
+    pub phase_nine_target_score_basis_points: u16,
+    /// Sum of family-level planned final-campaign lifts.
+    pub total_planned_final_lift_basis_points: u16,
+    /// Target model family for retained scoring.
+    pub retained_target_model_id: String,
+    /// Rollout window id widened for phase nine.
+    pub rollout_window_id: String,
+    /// Full Harvey task corpus size.
+    pub full_corpus_task_count: u16,
+    /// Audited Harvey practice areas that must be represented.
+    pub practice_area_count: u8,
+    /// Number of Qwen/Blueprint/RL matrix cells required before import.
+    pub model_matrix_cell_count: u16,
+    /// Maximum residual miss clusters permitted before score import.
+    pub residual_cluster_budget: u16,
+    /// Minimum human-adjudicated sample task-runs for final rehearsal.
+    pub final_adjudication_sample_count: u16,
+    /// Minimum accepted rollout count for the phase-nine dry run.
+    pub accepted_rollout_minimum: u16,
+    /// Maximum quarantined rollout count for the phase-nine dry run.
+    pub quarantined_rollout_budget: u16,
+    /// Minimum adversarial holdout task-runs for the dry run.
+    pub adversarial_holdout_run_count: u16,
+    /// Maximum permitted holdout regression for promotion review.
+    pub holdout_max_regression_basis_points: u16,
+    /// Maximum unresolved judge-disagreement budget.
+    pub calibrated_judge_disagreement_budget_basis_points: u16,
+    /// Blueprint final-campaign plan ref consumed by this report.
+    pub blueprint_final_campaign_plan_ref: String,
+    /// Per-family target allocations.
+    pub targets: Vec<QwenLegalRlFinalCampaignTarget>,
+    /// Autopilot4 export/update target.
+    pub benchmark_export_ref: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
 impl QwenLegalRlBenchmarkReadinessReport {
     /// Returns the stable digest over the report payload.
     #[must_use]
@@ -2338,6 +2435,144 @@ impl QwenLegalRlResidualBurnDownReport {
     }
 }
 
+impl QwenLegalRlFinalCampaignReport {
+    /// Returns the stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(b"psionic_qwen_legal_rl_final_campaign|", &clone)
+    }
+
+    fn validate(&self) -> Result<(), QwenLegalAdapterSftError> {
+        if self.schema_version != QWEN_LEGAL_RL_FINAL_CAMPAIGN_SCHEMA_VERSION {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL final-campaign schema version drifted"),
+            });
+        }
+        if self.report_id != QWEN_LEGAL_RL_FINAL_CAMPAIGN_REPORT_ID {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL final-campaign report id drifted"),
+            });
+        }
+        require_nonempty(
+            self.source_residual_burn_down_report_id.as_str(),
+            "source_residual_burn_down_report_id",
+        )?;
+        require_nonempty(
+            self.source_residual_burn_down_report_digest.as_str(),
+            "source_residual_burn_down_report_digest",
+        )?;
+        require_nonempty(self.plan_id.as_str(), "plan_id")?;
+        require_nonempty(self.plan_digest.as_str(), "plan_digest")?;
+        if self.previous_target_score_basis_points != QWEN_LEGAL_PHASE_EIGHT_TARGET_SCORE_BPS
+            || self.phase_nine_target_score_basis_points != QWEN_LEGAL_PHASE_NINE_TARGET_SCORE_BPS
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL final-campaign target drifted"),
+            });
+        }
+        if self.baseline_score_basis_points >= self.previous_target_score_basis_points
+            || self.previous_target_score_basis_points >= self.phase_nine_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL final-campaign requires monotonic targets"),
+            });
+        }
+        if self
+            .baseline_score_basis_points
+            .saturating_add(self.total_planned_final_lift_basis_points)
+            < self.phase_nine_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("planned final-campaign lift does not support target"),
+            });
+        }
+        require_nonempty(
+            self.retained_target_model_id.as_str(),
+            "retained_target_model_id",
+        )?;
+        require_nonempty(self.rollout_window_id.as_str(), "rollout_window_id")?;
+        if self.full_corpus_task_count < 1251
+            || self.practice_area_count < 24
+            || self.model_matrix_cell_count < 144
+            || self.residual_cluster_budget > 12
+            || self.final_adjudication_sample_count < 96
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from(
+                    "final campaign requires corpus, practice areas, matrix coverage, residual budget, and adjudication sample",
+                ),
+            });
+        }
+        if self.accepted_rollout_minimum <= self.quarantined_rollout_budget {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from(
+                    "accepted final-campaign rollouts must exceed quarantine budget",
+                ),
+            });
+        }
+        if self.adversarial_holdout_run_count < 432 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("final campaign requires adversarial holdout task-runs"),
+            });
+        }
+        if self.holdout_max_regression_basis_points != 0 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("phase-nine Harvey dry run allows no holdout regression"),
+            });
+        }
+        if self.calibrated_judge_disagreement_budget_basis_points > 10 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("final-campaign judge disagreement budget is too loose"),
+            });
+        }
+        require_nonempty(
+            self.blueprint_final_campaign_plan_ref.as_str(),
+            "blueprint_final_campaign_plan_ref",
+        )?;
+        if self.targets.len() < 9 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("final campaign requires all frontier families"),
+            });
+        }
+        for target in &self.targets {
+            require_nonempty(target.failure_family.as_str(), "target.failure_family")?;
+            require_nonempty(
+                target.blueprint_module_slug.as_str(),
+                "target.blueprint_module_slug",
+            )?;
+            require_nonempty(
+                target.dataset_request_ref.as_str(),
+                "target.dataset_request_ref",
+            )?;
+            require_nonempty(target.scorecard_ref.as_str(), "target.scorecard_ref")?;
+            require_nonempty(target.receipt_ref.as_str(), "target.receipt_ref")?;
+            if target.planned_accepted_rollouts == 0
+                || target.planned_final_lift_basis_points == 0
+                || target.full_corpus_task_count < 1251
+                || target.model_matrix_cell_count < 144
+                || target.residual_cluster_budget > 12
+                || target.final_adjudication_sample_count < 96
+                || !target.practice_area_balance_required
+            {
+                return Err(QwenLegalAdapterSftError::InvalidConfig {
+                    detail: String::from(
+                        "final-campaign targets require rollouts, lift, corpus, matrix, residual budget, adjudication, and practice balance",
+                    ),
+                });
+            }
+        }
+        require_nonempty(self.benchmark_export_ref.as_str(), "benchmark_export_ref")?;
+        if self.report_digest != self.stable_digest() {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL final-campaign digest drifted"),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Builds the offline benchmark projection for a legal RL plan.
 pub fn qwen_legal_rl_benchmark_readiness_report(
     plan: &QwenLegalRlHillclimbPlan,
@@ -2924,6 +3159,93 @@ pub fn qwen_legal_rl_phase_eight_residual_burn_down_report(
     Ok(report)
 }
 
+pub fn qwen_legal_rl_phase_nine_final_campaign_report(
+    plan: &QwenLegalRlHillclimbPlan,
+    residual_report: &QwenLegalRlResidualBurnDownReport,
+) -> Result<QwenLegalRlFinalCampaignReport, QwenLegalAdapterSftError> {
+    plan.validate()?;
+    residual_report.validate()?;
+    if residual_report.plan_digest != plan.plan_digest
+        || residual_report.plan_id != plan.plan_id
+        || residual_report.phase_eight_target_score_basis_points
+            != QWEN_LEGAL_PHASE_EIGHT_TARGET_SCORE_BPS
+    {
+        return Err(QwenLegalAdapterSftError::InvalidConfig {
+            detail: String::from("phase-nine final-campaign source report mismatch"),
+        });
+    }
+
+    let targets = residual_report
+        .targets
+        .iter()
+        .map(|target| QwenLegalRlFinalCampaignTarget {
+            failure_family: target.failure_family.clone(),
+            optimizer_method: target.optimizer_method,
+            blueprint_module_slug: target.blueprint_module_slug.clone(),
+            dataset_request_ref: target.dataset_request_ref.clone(),
+            planned_accepted_rollouts: target.planned_accepted_rollouts + 36,
+            planned_final_lift_basis_points: ((target.planned_residual_lift_basis_points as u32
+                * 108)
+                / 100) as u16,
+            full_corpus_task_count: 1251,
+            model_matrix_cell_count: 144,
+            residual_cluster_budget: 12,
+            final_adjudication_sample_count: 96,
+            practice_area_balance_required: true,
+            scorecard_ref: target.scorecard_ref.replace(
+                "phase_008.residual_burn_down",
+                "phase_009.final_campaign_rehearsal",
+            ),
+            receipt_ref: format!(
+                "receipt.psionic.qwen_legal.{}.phase_009.final_campaign_rehearsal",
+                target.failure_family
+            ),
+        })
+        .collect::<Vec<_>>();
+    let total_planned_final_lift_basis_points = targets
+        .iter()
+        .map(|target| target.planned_final_lift_basis_points)
+        .sum::<u16>();
+    let accepted_rollout_minimum = targets
+        .iter()
+        .map(|target| target.planned_accepted_rollouts)
+        .sum::<u16>();
+
+    let mut report = QwenLegalRlFinalCampaignReport {
+        schema_version: String::from(QWEN_LEGAL_RL_FINAL_CAMPAIGN_SCHEMA_VERSION),
+        report_id: String::from(QWEN_LEGAL_RL_FINAL_CAMPAIGN_REPORT_ID),
+        source_residual_burn_down_report_id: residual_report.report_id.clone(),
+        source_residual_burn_down_report_digest: residual_report.report_digest.clone(),
+        plan_id: plan.plan_id.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        baseline_score_basis_points: residual_report.baseline_score_basis_points,
+        previous_target_score_basis_points: residual_report.phase_eight_target_score_basis_points,
+        phase_nine_target_score_basis_points: QWEN_LEGAL_PHASE_NINE_TARGET_SCORE_BPS,
+        total_planned_final_lift_basis_points,
+        retained_target_model_id: plan.retained_target_model_id.clone(),
+        rollout_window_id: String::from("harvey-legal-final-campaign-window-009"),
+        full_corpus_task_count: 1251,
+        practice_area_count: 24,
+        model_matrix_cell_count: 144,
+        residual_cluster_budget: 12,
+        final_adjudication_sample_count: 96,
+        accepted_rollout_minimum,
+        quarantined_rollout_budget: residual_report.quarantined_rollout_budget + 4,
+        adversarial_holdout_run_count: 432,
+        holdout_max_regression_basis_points: 0,
+        calibrated_judge_disagreement_budget_basis_points: 10,
+        blueprint_final_campaign_plan_ref: String::from(
+            QWEN_LEGAL_BLUEPRINT_FINAL_CAMPAIGN_PLAN_REF,
+        ),
+        targets,
+        benchmark_export_ref: String::from("autopilot4://benchmarks/harvey/progress/phase-009"),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    report.validate()?;
+    Ok(report)
+}
+
 /// Full higher-level Qwen legal adapter smoke outcome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QwenLegalAdapterSftRunOutcome {
@@ -2961,6 +3283,8 @@ pub struct QwenLegalAdapterSftRunOutcome {
     pub rl_full_corpus_matrix_report: QwenLegalRlFullCorpusMatrixReport,
     /// Phase-eight residual burn-down report for the RL hillclimb plan.
     pub rl_residual_burn_down_report: QwenLegalRlResidualBurnDownReport,
+    /// Phase-nine final-campaign rehearsal report for the RL hillclimb plan.
+    pub rl_final_campaign_report: QwenLegalRlFinalCampaignReport,
 }
 
 /// First honest Qwen legal adapter-SFT smoke trainer.
@@ -3286,6 +3610,10 @@ impl QwenLegalAdapterSftTrainer {
             &rl_hillclimb_plan,
             &rl_full_corpus_matrix_report,
         )?;
+        let rl_final_campaign_report = qwen_legal_rl_phase_nine_final_campaign_report(
+            &rl_hillclimb_plan,
+            &rl_residual_burn_down_report,
+        )?;
         let summary = QwenLegalAdapterSftSummary {
             run_summary,
             lane_id: String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID),
@@ -3328,6 +3656,7 @@ impl QwenLegalAdapterSftTrainer {
             rl_expanded_corpus_report,
             rl_full_corpus_matrix_report,
             rl_residual_burn_down_report,
+            rl_final_campaign_report,
         })
     }
 
@@ -3679,6 +4008,16 @@ mod tests {
         assert_eq!(
             outcome.rl_residual_burn_down_report.report_digest,
             outcome.rl_residual_burn_down_report.stable_digest()
+        );
+        assert_eq!(
+            outcome
+                .rl_final_campaign_report
+                .phase_nine_target_score_basis_points,
+            QWEN_LEGAL_PHASE_NINE_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            outcome.rl_final_campaign_report.report_digest,
+            outcome.rl_final_campaign_report.stable_digest()
         );
         let loaded = outcome.exported_artifact.load_lm_head_lora_artifact()?;
         assert_eq!(loaded.hidden_size, 4);
@@ -4279,6 +4618,101 @@ mod tests {
         }));
         assert!(residual.benchmark_export_ref.ends_with("phase-008"));
         assert_eq!(residual.report_digest, residual.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn qwen_legal_rl_phase_nine_final_campaign_targets_995_percent()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = canonical_qwen_legal_rl_hillclimb_plan(
+            sample_dataset_binding(),
+            sample_eval_pack_binding(),
+            "qwen35-4b-legal-smoke-r1-score-import",
+        )?;
+        let readiness_report = qwen_legal_rl_benchmark_readiness_report(&plan, 5_260)?;
+        let window =
+            qwen_legal_rl_phase_three_optimization_window_report(&plan, &readiness_report)?;
+        let push = qwen_legal_rl_phase_four_perfect_score_push_report(&plan, &window)?;
+        let rehearsal = qwen_legal_rl_phase_five_retained_rehearsal_report(&plan, &push)?;
+        let expanded = qwen_legal_rl_phase_six_expanded_corpus_report(&plan, &rehearsal)?;
+        let full_corpus = qwen_legal_rl_phase_seven_full_corpus_matrix_report(&plan, &expanded)?;
+        let residual = qwen_legal_rl_phase_eight_residual_burn_down_report(&plan, &full_corpus)?;
+        let final_campaign = qwen_legal_rl_phase_nine_final_campaign_report(&plan, &residual)?;
+        let families = final_campaign
+            .targets
+            .iter()
+            .map(|target| target.failure_family.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            final_campaign.schema_version,
+            QWEN_LEGAL_RL_FINAL_CAMPAIGN_SCHEMA_VERSION
+        );
+        assert_eq!(final_campaign.plan_digest, plan.plan_digest);
+        assert_eq!(
+            final_campaign.source_residual_burn_down_report_digest,
+            residual.report_digest
+        );
+        assert_eq!(
+            final_campaign.previous_target_score_basis_points,
+            QWEN_LEGAL_PHASE_EIGHT_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            final_campaign.phase_nine_target_score_basis_points,
+            QWEN_LEGAL_PHASE_NINE_TARGET_SCORE_BPS
+        );
+        assert!(
+            final_campaign
+                .baseline_score_basis_points
+                .saturating_add(final_campaign.total_planned_final_lift_basis_points)
+                >= final_campaign.phase_nine_target_score_basis_points
+        );
+        assert_eq!(final_campaign.full_corpus_task_count, 1251);
+        assert_eq!(final_campaign.practice_area_count, 24);
+        assert_eq!(final_campaign.model_matrix_cell_count, 144);
+        assert_eq!(final_campaign.residual_cluster_budget, 12);
+        assert_eq!(final_campaign.final_adjudication_sample_count, 96);
+        assert_eq!(final_campaign.accepted_rollout_minimum, 950);
+        assert_eq!(final_campaign.quarantined_rollout_budget, 52);
+        assert_eq!(final_campaign.adversarial_holdout_run_count, 432);
+        assert_eq!(final_campaign.holdout_max_regression_basis_points, 0);
+        assert!(final_campaign.calibrated_judge_disagreement_budget_basis_points <= 10);
+        assert!(
+            final_campaign
+                .blueprint_final_campaign_plan_ref
+                .contains("phase_nine_final_campaign_plan")
+        );
+        assert_eq!(final_campaign.targets.len(), 9);
+        for family in [
+            "document_coverage",
+            "citation_evidence",
+            "legal_reasoning",
+            "spreadsheet_reasoning",
+            "missing_fact",
+            "pre_submit_self_check",
+            "deliverable_completeness",
+            "fine_tune_data_selection",
+            "task_intake_routing",
+        ] {
+            assert!(families.contains(&family), "missing {family}");
+        }
+        assert!(final_campaign.targets.iter().all(|target| {
+            target.practice_area_balance_required
+                && target.full_corpus_task_count == 1251
+                && target.model_matrix_cell_count == 144
+                && target.residual_cluster_budget == 12
+                && target.final_adjudication_sample_count == 96
+                && target.planned_accepted_rollouts > 0
+                && target.planned_final_lift_basis_points > 0
+                && target
+                    .scorecard_ref
+                    .contains("phase_009.final_campaign_rehearsal")
+                && target
+                    .receipt_ref
+                    .contains("phase_009.final_campaign_rehearsal")
+        }));
+        assert!(final_campaign.benchmark_export_ref.ends_with("phase-009"));
+        assert_eq!(final_campaign.report_digest, final_campaign.stable_digest());
         Ok(())
     }
 

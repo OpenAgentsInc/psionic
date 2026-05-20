@@ -216,6 +216,14 @@ tasks in scope, requires 96 Qwen/Blueprint/RL matrix cells, caps residual miss
 clusters at 24, requires 626 accepted rollouts, caps quarantine at 48 rollouts,
 adds 288 adversarial holdout task-runs, allows zero holdout regression, and
 lowers the judge-disagreement budget to 15 bps.
+The lane now also emits a phase-nine final-campaign rehearsal report that
+consumes the Blueprint final-campaign rehearsal plan, carries the 9900 bps
+target forward, raises the next local benchmark target to 9950 bps, keeps all
+1251 Harvey tasks in scope, requires 144 Qwen/Blueprint/RL matrix cells, caps
+residual miss clusters at 12, requires 96 human-adjudicated sample task-runs,
+requires 950 accepted rollouts, caps quarantine at 52 rollouts, adds 432
+adversarial holdout task-runs, allows zero holdout regression, and lowers the
+judge-disagreement budget to 10 bps.
 Those reports are readiness evidence only; retained score claims still require
 the actual retained slice and Autopilot4 release-gate approval.
 The paired serving/eval metadata path is in

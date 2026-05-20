@@ -301,6 +301,34 @@ This dry run narrows the final residual error budget before any perfect-score
 push. It is still readiness evidence only; public score claims require imported
 score reports and release-gate approval.
 
+## Phase-Nine Final-Campaign Rehearsal Dry Run
+
+The lane now also emits `QwenLegalRlFinalCampaignReport` with schema
+`psionic.qwen_legal_rl_final_campaign.v1`. It consumes the phase-eight residual
+burn-down report and the Blueprint final-campaign rehearsal plan:
+
+- phase-eight target carried forward: 9900 bps
+- phase-nine conservative target: 9950 bps
+- full corpus: 1251 Harvey tasks
+- practice-area coverage: all 24 audited practice areas
+- Qwen/Blueprint/RL matrix cells: 144
+- residual miss cluster budget: 12
+- human-adjudicated sample task-runs: 96
+- accepted rollout minimum: 950
+- quarantine budget: 52
+- adversarial holdout task-runs: 432
+- holdout regression allowance: 0 bps
+- calibrated judge disagreement budget: 10 bps
+- family coverage: all nine Blueprint optimizer frontier families
+- Blueprint plan ref:
+  `blueprint://harvey_legal_qwen_phase_nine_final_campaign_plan/optimizer_plan.harvey_legal_qwen.phase_009.final_campaign_rehearsal`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-009`
+
+This dry run is the last rehearsal before a separate perfect-score campaign.
+It is still readiness evidence only; public score claims require imported score
+reports and release-gate approval.
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:
