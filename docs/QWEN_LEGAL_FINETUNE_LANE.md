@@ -145,6 +145,53 @@ and not proof of live legal reasoning quality. Its value is that the complete
 Psionic path can now build data, train an adapter, evaluate the same frozen
 suite, avoid answer injection, record receipts, and promote only on a win.
 
+## Distributed Public Harvey SFT Milestone
+
+The lane now has the first two-worker Pylon/Psionic legal SFT milestone:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_distributed_run_milestone
+```
+
+The command performs the first end-to-end distributed shape for the same
+public three-task Harvey suite:
+
+- builds a public training-allowed SFT JSONL dataset
+- splits it into two deterministic worker shards
+- runs Rust Psionic SFT once per local Pylon worker identity
+- verifies the worker adapter artifact hash
+- writes and verifies signed Pylon worker receipts
+- settles local payment decisions for both workers
+- merges the worker LoRA adapters with the existing Rust merge path
+- evaluates the merged adapter through the Rust legal benchmark suite
+- writes `reports/legal-ft-distributed-run-001.md`
+
+Recorded local result:
+
+- worker count: `2`
+- all worker receipts signed: `true`
+- all worker outputs hash verified: `true`
+- all worker payments payable: `true`
+- payable total: `10000` micro-USD
+- champion score: `3333` bps
+- candidate score: `10000` bps
+- delta: `6667` bps
+- promotion decision: `Promote`
+- no Python in worker path: `true`
+- hidden benchmark training: `false`
+- merged adapter sha256:
+  `a66f97b6c69e5ac2d4022bc3405949cbc5fdc7f76c432b7aa7a6f4a63b2c90c7`
+- eval report hash:
+  `34403c9b431426d8074bfbe2ed245e7c28589ed8becc2b3a069742731b7557bf`
+- distributed report digest:
+  `3ae5e9f5660af0a048971556014521ac0072eca430fb7926a287cd0b8d1dd9c2`
+
+The two local workers were `pylon.local.harvey-legal.01` and
+`pylon.local.harvey-legal.02`. This is still local worker simulation, not a
+remote tailnet Pylon run and not hidden Harvey proof. Its value is that the
+repo now has the full Rust path for sharding, worker SFT, worker receipts,
+payments, adapter merge, eval, and promotion gating.
+
 ## Qwen3.6-27B Target Path
 
 The lane now has a concrete Rust smoke path for `Qwen/Qwen3.6-27B`:

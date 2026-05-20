@@ -194,6 +194,23 @@ registers the candidate, promotes only on a win, and writes
 `3333` bps, candidate `10000` bps, delta `6667` bps, candidate promoted
 `true`, Python invoked `false`, all artifacts receipt-backed, and report
 digest `0c65502a09bac4423f2b991e5e0c014b4ac6982259bd5c3a81757844423acd5c`.
+The first two-worker Pylon/Psionic legal SFT milestone command is
+`cargo run -p psionic-train --example qwen_legal_distributed_run_milestone`.
+It builds the same public training-allowed Harvey three-task SFT dataset,
+splits it across `pylon.local.harvey-legal.01` and
+`pylon.local.harvey-legal.02`, trains one Rust adapter per shard, verifies
+signed Pylon worker receipts, settles both worker payment decisions, merges
+the adapters through `merge-lora`, evaluates the merged adapter, and writes
+`reports/legal-ft-distributed-run-001.md`. The recorded local result is two
+workers, all worker outputs hash verified, both payments payable, champion
+`3333` bps, candidate `10000` bps, delta `6667` bps, promotion decision
+`Promote`, no Python in the worker path, no hidden benchmark training, merged
+adapter digest
+`a66f97b6c69e5ac2d4022bc3405949cbc5fdc7f76c432b7aa7a6f4a63b2c90c7`, and
+report digest
+`3ae5e9f5660af0a048971556014521ac0072eca430fb7926a287cd0b8d1dd9c2`.
+This is local Pylon simulation; remote tailnet worker dispatch remains a
+separate Nexus/Pylon step.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
