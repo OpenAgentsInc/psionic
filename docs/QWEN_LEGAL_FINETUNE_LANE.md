@@ -1133,6 +1133,42 @@ Run it locally with:
 scripts/check-qwen-legal-pylon-network-sft.sh
 ```
 
+## Distributed LoRA Merge Command
+
+The Pylon worker aggregation path now has a reusable command:
+
+```bash
+cargo run -p psionic-train -- merge-lora \
+  --manifest merge/legal-sft-round-001.json
+```
+
+The manifest is intentionally small and explicit. It names the parent adapter
+hash, the base model binding, each worker adapter artifact, each worker's
+dataset shard hash, each worker's token count, and the output adapter path.
+The command verifies every worker artifact hash before loading it, refuses
+shape drift, merges real LoRA safetensors factors, writes the aggregate
+adapter, runs the local Rust eval suite when requested, and writes a
+machine-readable merge receipt next to the output adapter.
+
+Two merge modes are supported:
+
+- `delta_averaging`: workers start from the same parent adapter and the
+  aggregator averages LoRA factors by token count.
+- `shard_sequential_training`: workers form a chain and the output is the last
+  adapter after validating that each worker continued from the previous
+  adapter hash.
+
+The smoke manifest uses the two retained Pylon worker adapters from
+`fixtures/qwen_legal/pylon_network_sft/`, writes the aggregate to
+`target/legal/qwen_lora_merge/legal-sft-round-001/`, and checks the aggregate
+against the retained digest
+`8e8dea3bc639ed2c147d6901f6ceda9b5f1a176034dc7bb65219daf7dd33116d`.
+It then runs `suites/harvey_public_three.json` locally and records a promotion
+gate. The gate is simple: the merged adapter is only promotable if it beats
+the declared champion score on the same local suite and has no integrity,
+tool, or timeout failures. The command does not mutate the adapter registry;
+registry promotion remains a separate operator action.
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:

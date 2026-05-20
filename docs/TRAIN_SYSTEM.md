@@ -250,6 +250,24 @@ adversarial holdout task-runs, allows zero holdout regression, and lowers the
 judge-disagreement budget to 10 bps.
 Those reports are readiness evidence only; retained score claims still require
 the actual retained slice and Autopilot4 release-gate approval.
+The distributed legal adapter path now has a reusable aggregation command in
+`crates/psionic-train/src/qwen_legal_lora_merge.rs`:
+
+```bash
+cargo run -p psionic-train -- merge-lora \
+  --manifest merge/legal-sft-round-001.json
+```
+
+The command consumes real worker LoRA safetensors artifacts, verifies each
+declared worker hash, supports both token-weighted delta averaging and
+sequential shard handoff, writes an aggregate adapter, and emits a merge
+receipt with the parent adapter hash, worker adapter hashes, dataset shard
+hashes, token counts, merge weights, output adapter hash, local validation
+metrics, and deterministic replay command. The committed smoke manifest merges
+the two Pylon-network worker adapters and runs the local Harvey public-three
+Rust eval. Promotion is still guarded: a merged adapter is only promotable when
+it beats the declared champion score on the same suite and has no hard eval
+failures.
 The legal lane now also owns the first Pylon worker job protocol in
 `crates/psionic-train/src/qwen_legal_pylon_training_job.rs`. It defines the
 job envelope for dataset shard builds, SFT/DPO/GRPO shard work, eval shards,

@@ -1,0 +1,46 @@
+{
+  "schema_version": "psionic.qwen_legal_lora_merge_manifest.v1",
+  "merge_id": "legal-sft-round-001",
+  "mode": "delta_averaging",
+  "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d",
+  "base_model": {
+    "base_model_id": "Qwen/Qwen3.5-4B",
+    "base_model_revision": "qwen3.5-4b-smoke-revision",
+    "base_served_artifact_digest": "sha256:synthetic-qwen35-4b-legal-smoke"
+  },
+  "output_adapter": {
+    "adapter_id": "qwen35-4b-legal-pylon-network-smoke",
+    "adapter_revision": "r1-trusted-aggregate",
+    "path": "target/legal/qwen_lora_merge/legal-sft-round-001/aggregate-qwen-legal-lm-head-lora.safetensors",
+    "expected_sha256": "8e8dea3bc639ed2c147d6901f6ceda9b5f1a176034dc7bb65219daf7dd33116d"
+  },
+  "worker_adapters": [
+    {
+      "worker_id": "worker.qwen-legal.cuda.01",
+      "adapter_id": "qwen35-4b-legal-pylon-network-smoke",
+      "adapter_revision": "r1-contributor-1",
+      "path": "fixtures/qwen_legal/pylon_network_sft/contributor-pylon-local-legal-cuda-01.safetensors",
+      "sha256": "5298c62de7f6b318f8889957433fe401ba693911997c1c606ce5099e73ca41cb",
+      "dataset_shard_hash": "shard://harvey-legal-smoke/train/even",
+      "token_count": 140,
+      "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d"
+    },
+    {
+      "worker_id": "worker.qwen-legal.metal.01",
+      "adapter_id": "qwen35-4b-legal-pylon-network-smoke",
+      "adapter_revision": "r1-contributor-2",
+      "path": "fixtures/qwen_legal/pylon_network_sft/contributor-pylon-local-legal-metal-01.safetensors",
+      "sha256": "6e8b6da6083606cbd36105a65d532e48e067094809f9db552ca9a9d13105af9b",
+      "dataset_shard_hash": "shard://harvey-legal-smoke/train/odd",
+      "token_count": 132,
+      "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d"
+    }
+  ],
+  "validation": {
+    "suite_path": "suites/harvey_public_three.json",
+    "base_model": "Qwen/Qwen3.6-27B",
+    "output_dir": "target/legal/qwen_lora_merge/legal-sft-round-001/eval",
+    "champion_adapter_id": "qwen36-legal-public-three-champion-000",
+    "champion_score_bps": 3333
+  }
+}
