@@ -76,6 +76,32 @@ The tests prove:
 - the representative `Qwen3.6-35B-A3B` probe admits to
   `qwen36_alias_qwen35`
 
+`Qwen3.6-27B` also has a concrete target-path smoke now:
+
+```bash
+cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- \
+  --model Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt
+```
+
+That path loads the Qwen3.6-27B config fixture, tokenizer fixture, and a
+safetensors shard in Rust, then renders the Qwen3.6 direct-answer legal prompt
+and records a receipt. It is a target-path and artifact-loading proof, not full
+27B weight inference.
+
+The matching Rust-only adapter SFT smoke is:
+
+```bash
+cargo run -p psionic-train -- sft --config configs/legal/qwen36_27b_sft_smoke.json
+```
+
+That run loaded the config/tokenizer artifacts, improved smoke loss from
+`5.5182295` to `2.2927308`, wrote
+`target/legal/qwen36_27b_sft_smoke/adapter.safetensors`, recorded
+`python_invoked: false`, and evaluated through the deterministic Harvey
+public-three fixture at `10000` adapter bps. This is still public-fixture
+proof, not retained Harvey performance.
+
 ## Operator Guidance
 
 Use the rows as follows:
@@ -83,7 +109,8 @@ Use the rows as follows:
 - `Qwen3.5-4B`: first local smoke SFT and base-plus-adapter eval path.
 - `Qwen3.5-9B-Base`: small base-model research and tokenizer/template checks.
 - `Qwen3.5-35B-A3B-Base`: hosted/Tinker MoE base research.
-- `Qwen3.6-27B`: dense retained-score fallback target.
+- `Qwen3.6-27B`: dense retained-score fallback target; now has a Rust config,
+  tokenizer, safetensors, prompt-render, SFT, and public-fixture eval smoke.
 - `Qwen3.6-35B-A3B`: first serious retained-score fine-tune target.
 - `Qwen3.5-397B-A17B`: hosted teacher/judge/distillation row.
 

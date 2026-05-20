@@ -6,8 +6,8 @@
 > training-slice LoRA and Rust task run added on 2026-05-20; local MFN
 > reward-refresh LoRA and `63 / 83` public training-slice run added on
 > 2026-05-20; no-cheat runner correction, single-task run 016, broad suite
-> runs 019/025, adapter 020, and Rust-only Qwen3.6 GRPO smoke added on
-> 2026-05-20.
+> runs 019/025, adapter 020, Rust-only Qwen3.6 GRPO smoke, and the
+> Qwen3.6-27B target-path smoke added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -25,6 +25,89 @@ update, and the Autopilot4 import loop are green.
 
 The Qwen replacement model set and the current `qwen36_alias_qwen35`
 conformance decision live in `docs/QWEN_REPLACEMENT_MODEL_CONFORMANCE.md`.
+
+## Qwen3.6-27B Target Path
+
+The lane now has a concrete Rust smoke path for `Qwen/Qwen3.6-27B`:
+
+```bash
+cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- \
+  --model Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt
+```
+
+What this proves:
+
+- the target id accepts both `Qwen3.6-27B` and `Qwen/Qwen3.6-27B`
+- the Qwen-shaped config loads from `fixtures/qwen36_27b_smoke/config.json`
+- the tokenizer loads from `fixtures/qwen36_27b_smoke/tokenizer.json`
+- a safetensors shard is created and loaded at
+  `target/legal/qwen36_27b_prompt_smoke/model-00001-of-00001.safetensors`
+- the Qwen3.6 direct-answer chat template renders a legal prompt
+- the receipt records the prompt hash, tokenizer hash, shard hash, memory
+  strategy, and claim boundary
+
+Recorded smoke result:
+
+- prompt hash:
+  `a819556c3e7a50184f1630a651089cce60527e7d1ae384f9449e79700c021964`
+- tokenizer hash:
+  `b16a3f8344ab50941f925281fc25ee243f6b05509d07880fd41fbb6c4655fdfe`
+- shard hash:
+  `1acc4b847e41c74995e889ac0722db3109eacda673bcd8633f228297d22941d5`
+- token count: `62`
+
+This is not full 27B inference. It is the smallest honest operator path that
+loads Qwen3.6-27B metadata, tokenizer, and safetensors in Rust before the real
+large-artifact path is wired in.
+
+The exact SFT smoke for this target is:
+
+```bash
+cargo run -p psionic-train -- sft --config configs/legal/qwen36_27b_sft_smoke.json
+```
+
+Recorded SFT result:
+
+- run id: `qwen36-27b-legal-sft-smoke`
+- trainer: `psionic.open_adapter.qwen36_legal_lm_head_lora_sft.v1`
+- base model: `Qwen/Qwen3.6-27B`
+- loaded config hash:
+  `55c45950fd6c4d3395146e32788e619665c455b69794981ee098cb11a94a73b6`
+- loaded tokenizer hash:
+  `b16a3f8344ab50941f925281fc25ee243f6b05509d07880fd41fbb6c4655fdfe`
+- completed steps: `8`
+- initial loss: `5.5182295`
+- final loss: `2.2927308`
+- adapter:
+  `target/legal/qwen36_27b_sft_smoke/adapter.safetensors`
+- adapter digest:
+  `fb49c3fc9bb801c081ca6d4f6ad5349df920ec42a156312d57c3d329b7914c40`
+- receipt digest:
+  `4b4d2e7a91833ab7ae890dd1d9e1edf38371d6b906907d8967c9023c3807fbf3`
+- Python invoked: `false`
+
+The adapter also runs through the Rust Harvey public-three eval path:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite suites/harvey_public_three.json \
+  --model Qwen/Qwen3.6-27B \
+  --adapter target/legal/qwen36_27b_sft_smoke/adapter.safetensors \
+  --out target/legal/qwen36_27b_eval_smoke
+```
+
+Recorded eval result:
+
+- base score: `3333` bps
+- adapter score: `10000` bps
+- delta: `6667` bps
+- report hash:
+  `f938ae768b7d12269c59a75ad03eacf846b960e783bb469aaae44c5dcd473618`
+
+This eval is a deterministic public fixture. It proves the Qwen3.6-27B adapter
+artifact can be consumed by the Rust legal benchmark path. It is not a hidden
+Harvey score.
 
 ## Current Rust GRPO Smoke
 

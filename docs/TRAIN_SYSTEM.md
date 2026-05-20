@@ -308,6 +308,22 @@ adds a compact practice-area issue checklist from public task metadata so
 adapter SFT traces and blueprint module selection can reinforce legal
 issue-spotting without leaking hidden Harvey criteria.
 
+The legal lane now also has an exact `Qwen3.6-27B` target-path smoke. The
+serve-side command
+`cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- --model Qwen3.6-27B --prompt fixtures/legal/smoke.prompt`
+loads `fixtures/qwen36_27b_smoke/config.json`, loads
+`fixtures/qwen36_27b_smoke/tokenizer.json`, creates and reloads a safetensors
+shard, renders the Qwen3.6 direct-answer prompt, and emits a receipt with the
+prompt, tokenizer, and shard hashes. The train-side command
+`cargo run -p psionic-train -- sft --config configs/legal/qwen36_27b_sft_smoke.json`
+then performs a Rust-only adapter update for the same declared target, loads
+the config and tokenizer artifacts into the receipt, improves the tiny smoke
+loss from `5.5182295` to `2.2927308`, and records `python_invoked: false`.
+That adapter evaluates through
+`cargo run -p psionic-eval --example legal_benchmark_eval_suite` at `10000`
+adapter bps on the deterministic public-three fixture. This is still a smoke
+and does not claim full 27B weight inference or retained Harvey performance.
+
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs`, the focused doc
