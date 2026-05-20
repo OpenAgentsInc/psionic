@@ -324,6 +324,23 @@ That adapter evaluates through
 adapter bps on the deterministic public-three fixture. This is still a smoke
 and does not claim full 27B weight inference or retained Harvey performance.
 
+The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
+serve-side command
+`cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- --model Qwen3.6-35B-A3B --prompt fixtures/legal/smoke.prompt`
+loads a `Qwen3MoeForCausalLM` config fixture, the Qwen3.6 tokenizer fixture,
+and a tiny expert safetensors shard that includes two experts plus the
+`model.layers.0.mlp.gate.weight` router tensor. The train-side command
+`cargo run -p psionic-train -- sft --config configs/legal/qwen36_35b_a3b_sft_smoke.json`
+requires explicit LoRA targets, refuses router/gate targets, records the active
+parameter path, records active expert ids and usage counts, and records the
+same router hash before and after the adapter update. The recorded smoke
+improves loss from `5.5602503` to `1.5024384`, emits adapter digest
+`ded1623b0199a6373f91abc0d8195fb34046039fe42024836464050cb88ea05c`, and
+evaluates at `10000` adapter bps on the deterministic public-three fixture,
+matching the local dense 27B smoke there. This is still a small Rust smoke: it
+does not claim full 35B-A3B weight inference, router training, full MoE
+fine-tuning, or retained Harvey performance.
+
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs`, the focused doc

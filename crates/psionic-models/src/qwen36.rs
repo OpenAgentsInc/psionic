@@ -20,6 +20,13 @@ pub const QWEN36_27B_SMOKE_CONFIG_PATH: &str = "fixtures/qwen36_27b_smoke/config
 pub const QWEN36_27B_SMOKE_TOKENIZER_PATH: &str = "fixtures/qwen36_27b_smoke/tokenizer.json";
 pub const QWEN36_27B_SMOKE_SHARD_PATH: &str =
     "target/legal/qwen36_27b_prompt_smoke/model-00001-of-00001.safetensors";
+pub const QWEN36_35B_A3B_MODEL_ID: &str = "Qwen/Qwen3.6-35B-A3B";
+pub const QWEN36_35B_A3B_SHORT_MODEL_ID: &str = "Qwen3.6-35B-A3B";
+pub const QWEN36_35B_A3B_SERVED_MODEL_ID: &str = "qwen3.6-35b-a3b";
+pub const QWEN36_35B_A3B_SMOKE_CONFIG_PATH: &str = "fixtures/qwen36_35b_a3b_smoke/config.json";
+pub const QWEN36_35B_A3B_SMOKE_TOKENIZER_PATH: &str = "fixtures/qwen36_27b_smoke/tokenizer.json";
+pub const QWEN36_35B_A3B_SMOKE_SHARD_PATH: &str =
+    "target/legal/qwen36_35b_a3b_prompt_smoke/model-00001-of-00001.safetensors";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -47,6 +54,12 @@ pub struct Qwen36ModelConfig {
     pub tokenizer_path: String,
     pub chat_template_id: String,
     pub memory_strategy: Qwen36TargetMemoryStrategy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub num_experts: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub num_experts_per_tok: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moe_intermediate_size: Option<usize>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -196,6 +209,29 @@ pub fn normalize_qwen36_27b_model_id(model: &str) -> Result<String, Qwen36Target
     }
 }
 
+pub fn normalize_qwen36_35b_a3b_model_id(model: &str) -> Result<String, Qwen36TargetPathError> {
+    match model {
+        QWEN36_35B_A3B_MODEL_ID | QWEN36_35B_A3B_SHORT_MODEL_ID => {
+            Ok(String::from(QWEN36_35B_A3B_MODEL_ID))
+        }
+        other => Err(Qwen36TargetPathError::InvalidTargetModel(String::from(
+            other,
+        ))),
+    }
+}
+
+pub fn normalize_qwen36_target_model_id(model: &str) -> Result<String, Qwen36TargetPathError> {
+    match model {
+        QWEN36_27B_MODEL_ID | QWEN36_27B_SHORT_MODEL_ID => Ok(String::from(QWEN36_27B_MODEL_ID)),
+        QWEN36_35B_A3B_MODEL_ID | QWEN36_35B_A3B_SHORT_MODEL_ID => {
+            Ok(String::from(QWEN36_35B_A3B_MODEL_ID))
+        }
+        other => Err(Qwen36TargetPathError::InvalidTargetModel(String::from(
+            other,
+        ))),
+    }
+}
+
 pub fn load_qwen36_model_config(
     path: impl AsRef<Path>,
 ) -> Result<Qwen36ModelConfig, Qwen36TargetPathError> {
@@ -212,10 +248,17 @@ pub fn load_qwen36_model_config(
 pub fn validate_qwen36_model_config(
     config: &Qwen36ModelConfig,
 ) -> Result<(), Qwen36TargetPathError> {
-    normalize_qwen36_27b_model_id(config.model_id.as_str())?;
-    if config.served_model_id != QWEN36_27B_SERVED_MODEL_ID {
+    let model_id = normalize_qwen36_target_model_id(config.model_id.as_str())?;
+    if model_id == QWEN36_27B_MODEL_ID && config.served_model_id != QWEN36_27B_SERVED_MODEL_ID {
         return Err(Qwen36TargetPathError::InvalidConfig(String::from(
             "served_model_id must be qwen3.6-27b",
+        )));
+    }
+    if model_id == QWEN36_35B_A3B_MODEL_ID
+        && config.served_model_id != QWEN36_35B_A3B_SERVED_MODEL_ID
+    {
+        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+            "served_model_id must be qwen3.6-35b-a3b",
         )));
     }
     if config.model_type != "qwen3" {
@@ -223,13 +266,23 @@ pub fn validate_qwen36_model_config(
             "model_type must be qwen3",
         )));
     }
-    if !config
+    if model_id == QWEN36_27B_MODEL_ID {
+        if !config
+            .architectures
+            .iter()
+            .any(|architecture| architecture == "Qwen3ForCausalLM")
+        {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "27B architectures must include Qwen3ForCausalLM",
+            )));
+        }
+    } else if !config
         .architectures
         .iter()
-        .any(|architecture| architecture == "Qwen3ForCausalLM")
+        .any(|architecture| architecture == "Qwen3MoeForCausalLM")
     {
         return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-            "architectures must include Qwen3ForCausalLM",
+            "35B-A3B architectures must include Qwen3MoeForCausalLM",
         )));
     }
     if config.hidden_size == 0
@@ -253,6 +306,33 @@ pub fn validate_qwen36_model_config(
         return Err(Qwen36TargetPathError::InvalidConfig(String::from(
             "chat_template_id must match qwen3.6.chat_template.v1",
         )));
+    }
+    if model_id == QWEN36_35B_A3B_MODEL_ID {
+        let Some(num_experts) = config.num_experts else {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "35B-A3B MoE config must declare num_experts",
+            )));
+        };
+        let Some(num_experts_per_tok) = config.num_experts_per_tok else {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "35B-A3B MoE config must declare num_experts_per_tok",
+            )));
+        };
+        let Some(moe_intermediate_size) = config.moe_intermediate_size else {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "35B-A3B MoE config must declare moe_intermediate_size",
+            )));
+        };
+        if num_experts == 0 || num_experts_per_tok == 0 || moe_intermediate_size == 0 {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "35B-A3B MoE dimensions must be non-zero",
+            )));
+        }
+        if num_experts_per_tok > num_experts {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "num_experts_per_tok cannot exceed num_experts",
+            )));
+        }
     }
     Ok(())
 }
@@ -312,6 +392,81 @@ pub fn load_qwen36_safetensors_shard(
     })
 }
 
+pub fn write_qwen36_35b_a3b_moe_smoke_safetensors(
+    path: impl AsRef<Path>,
+) -> Result<Qwen36LoadedShardReport, Qwen36TargetPathError> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| Qwen36TargetPathError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    let router = encode_f32_bytes(&[0.2, 0.8, 0.6, 0.4, 0.3, 0.7, 0.9, 0.1]);
+    let expert_0_gate = encode_f32_bytes(&[0.1, 0.2, 0.3, 0.4]);
+    let expert_0_up = encode_f32_bytes(&[0.4, 0.3, 0.2, 0.1]);
+    let expert_0_down = encode_f32_bytes(&[0.5, 0.6, 0.7, 0.8]);
+    let expert_1_gate = encode_f32_bytes(&[0.8, 0.7, 0.6, 0.5]);
+    let expert_1_up = encode_f32_bytes(&[0.5, 0.6, 0.7, 0.8]);
+    let expert_1_down = encode_f32_bytes(&[0.4, 0.3, 0.2, 0.1]);
+    let router_view = TensorView::new(SafeTensorsDType::F32, vec![2, 4], router.as_slice())
+        .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let expert_0_gate_view =
+        TensorView::new(SafeTensorsDType::F32, vec![2, 2], expert_0_gate.as_slice())
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let expert_0_up_view =
+        TensorView::new(SafeTensorsDType::F32, vec![2, 2], expert_0_up.as_slice())
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let expert_0_down_view =
+        TensorView::new(SafeTensorsDType::F32, vec![2, 2], expert_0_down.as_slice())
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let expert_1_gate_view =
+        TensorView::new(SafeTensorsDType::F32, vec![2, 2], expert_1_gate.as_slice())
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let expert_1_up_view =
+        TensorView::new(SafeTensorsDType::F32, vec![2, 2], expert_1_up.as_slice())
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let expert_1_down_view =
+        TensorView::new(SafeTensorsDType::F32, vec![2, 2], expert_1_down.as_slice())
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    let bytes = serialize(
+        [
+            ("model.layers.0.mlp.gate.weight", router_view),
+            (
+                "model.layers.0.mlp.experts.0.gate_proj.weight",
+                expert_0_gate_view,
+            ),
+            (
+                "model.layers.0.mlp.experts.0.up_proj.weight",
+                expert_0_up_view,
+            ),
+            (
+                "model.layers.0.mlp.experts.0.down_proj.weight",
+                expert_0_down_view,
+            ),
+            (
+                "model.layers.0.mlp.experts.1.gate_proj.weight",
+                expert_1_gate_view,
+            ),
+            (
+                "model.layers.0.mlp.experts.1.up_proj.weight",
+                expert_1_up_view,
+            ),
+            (
+                "model.layers.0.mlp.experts.1.down_proj.weight",
+                expert_1_down_view,
+            ),
+        ],
+        None,
+    )
+    .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+    fs::write(path, bytes).map_err(|source| Qwen36TargetPathError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    load_qwen36_safetensors_shard(path)
+}
+
 pub fn run_qwen36_legal_prompt_smoke(
     model: &str,
     prompt_path: impl AsRef<Path>,
@@ -319,12 +474,12 @@ pub fn run_qwen36_legal_prompt_smoke(
     tokenizer_path: impl AsRef<Path>,
     shard_paths: &[PathBuf],
 ) -> Result<Qwen36LegalPromptSmokeReport, Qwen36TargetPathError> {
-    let model_id = normalize_qwen36_27b_model_id(model)?;
+    let model_id = normalize_qwen36_target_model_id(model)?;
     let prompt_path = prompt_path.as_ref();
     let config_path = config_path.as_ref();
     let tokenizer_path = tokenizer_path.as_ref();
     let config = load_qwen36_model_config(config_path)?;
-    if normalize_qwen36_27b_model_id(config.model_id.as_str())? != model_id {
+    if normalize_qwen36_target_model_id(config.model_id.as_str())? != model_id {
         return Err(Qwen36TargetPathError::InvalidConfig(String::from(
             "requested model and config model_id differ",
         )));
@@ -362,13 +517,27 @@ pub fn run_qwen36_legal_prompt_smoke(
         )));
     }
     let deterministic_output = deterministic_qwen36_legal_smoke_output(
+        model_id.as_str(),
         rendered.prompt_hash.as_str(),
         loaded_shards.as_slice(),
     );
     let prompt_receipt = Qwen36PromptReceipt::from(&rendered);
     let rendered_prompt = rendered.text;
+    let claim_boundary = if model_id == QWEN36_35B_A3B_MODEL_ID {
+        String::from(
+            "This is a Rust Qwen3.6-35B-A3B MoE target-path smoke. It loads config, tokenizer, and expert safetensors shards, renders the Qwen3.6 direct-answer chat template, and emits deterministic local output. It does not claim full 35B-A3B weight inference, router training, or retained Harvey benchmark improvement.",
+        )
+    } else {
+        String::from(
+            "This is a Rust Qwen3.6-27B target-path smoke. It loads config, tokenizer, and safetensors shards, renders the Qwen3.6 direct-answer chat template, and emits deterministic local output. It does not claim full 27B weight inference.",
+        )
+    };
     Ok(Qwen36LegalPromptSmokeReport {
-        schema_version: String::from("psionic.qwen36_27b_legal_prompt_smoke.v1"),
+        schema_version: if model_id == QWEN36_35B_A3B_MODEL_ID {
+            String::from("psionic.qwen36_35b_a3b_legal_prompt_smoke.v1")
+        } else {
+            String::from("psionic.qwen36_27b_legal_prompt_smoke.v1")
+        },
         model_id,
         served_model_id: config.served_model_id,
         config_path: config_path.display().to_string(),
@@ -379,13 +548,12 @@ pub fn run_qwen36_legal_prompt_smoke(
         rendered_prompt,
         deterministic_output,
         memory_strategy: config.memory_strategy,
-        claim_boundary: String::from(
-            "This is a Rust Qwen3.6-27B target-path smoke. It loads config, tokenizer, and safetensors shards, renders the Qwen3.6 direct-answer chat template, and emits deterministic local output. It does not claim full 27B weight inference.",
-        ),
+        claim_boundary,
     })
 }
 
 fn deterministic_qwen36_legal_smoke_output(
+    model_id: &str,
     prompt_hash: &str,
     loaded_shards: &[Qwen36LoadedShardReport],
 ) -> String {
@@ -394,7 +562,7 @@ fn deterministic_qwen36_legal_smoke_output(
         .map(|shard| shard.sha256.as_str())
         .unwrap_or("missing");
     format!(
-        "Qwen3.6-27B legal smoke loaded {} shard(s), rendered prompt {}, and is ready for adapter evaluation. First shard hash: {}.",
+        "{model_id} legal smoke loaded {} shard(s), rendered prompt {}, and is ready for adapter evaluation. First shard hash: {}.",
         loaded_shards.len(),
         &prompt_hash[..12.min(prompt_hash.len())],
         &shard_hash[..12.min(shard_hash.len())]
@@ -674,6 +842,9 @@ mod tests {
             tokenizer_path: String::from(QWEN36_27B_SMOKE_TOKENIZER_PATH),
             chat_template_id: String::from(QWEN36_TEMPLATE_ID),
             memory_strategy: Qwen36TargetMemoryStrategy::CpuOffloadSmoke,
+            num_experts: None,
+            num_experts_per_tok: None,
+            moe_intermediate_size: None,
         };
 
         validate_qwen36_model_config(&config).expect("Qwen3.6-27B target config");
@@ -681,6 +852,55 @@ mod tests {
             normalize_qwen36_27b_model_id(QWEN36_27B_SHORT_MODEL_ID).expect("normalize"),
             QWEN36_27B_MODEL_ID
         );
+    }
+
+    #[test]
+    fn qwen36_35b_a3b_target_config_requires_moe_facts() {
+        let config = Qwen36ModelConfig {
+            model_id: String::from(QWEN36_35B_A3B_MODEL_ID),
+            served_model_id: String::from(QWEN36_35B_A3B_SERVED_MODEL_ID),
+            model_type: String::from("qwen3"),
+            architectures: vec![String::from("Qwen3MoeForCausalLM")],
+            hidden_size: 5120,
+            intermediate_size: 27648,
+            num_hidden_layers: 64,
+            num_attention_heads: 40,
+            num_key_value_heads: 8,
+            vocab_size: 151936,
+            max_position_embeddings: 131072,
+            torch_dtype: String::from("bfloat16"),
+            tokenizer_path: String::from(QWEN36_35B_A3B_SMOKE_TOKENIZER_PATH),
+            chat_template_id: String::from(QWEN36_TEMPLATE_ID),
+            memory_strategy: Qwen36TargetMemoryStrategy::PylonMultiWorker,
+            num_experts: Some(128),
+            num_experts_per_tok: Some(8),
+            moe_intermediate_size: Some(768),
+        };
+
+        validate_qwen36_model_config(&config).expect("Qwen3.6-35B-A3B MoE target config");
+        assert_eq!(
+            normalize_qwen36_35b_a3b_model_id(QWEN36_35B_A3B_SHORT_MODEL_ID).expect("normalize"),
+            QWEN36_35B_A3B_MODEL_ID
+        );
+    }
+
+    #[test]
+    fn qwen36_35b_a3b_moe_smoke_loads_router_and_expert_tensors() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let shard_path = temp.path().join("model-00001-of-00001.safetensors");
+
+        let report =
+            write_qwen36_35b_a3b_moe_smoke_safetensors(&shard_path).expect("write MoE shard");
+
+        assert!(report
+            .tensor_names
+            .contains(&String::from("model.layers.0.mlp.gate.weight")));
+        assert!(report.tensor_names.contains(&String::from(
+            "model.layers.0.mlp.experts.0.gate_proj.weight"
+        )));
+        assert!(report.tensor_names.contains(&String::from(
+            "model.layers.0.mlp.experts.1.down_proj.weight"
+        )));
     }
 
     #[test]
