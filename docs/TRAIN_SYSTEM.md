@@ -184,6 +184,16 @@ report, deterministic replay command, required input hashes, expected output
 paths, and an integrity flag. The recorded `qwen-legal-ft-smoke` report has
 `17 / 17` commands ready, valid integrity, and report digest
 `066baa9148e319742053ac847b9782992d715307f5458f1291136f078d5fd7be`.
+The first complete local milestone command is
+`cargo run -p psionic-train --example qwen_legal_three_task_milestone`. It
+freezes `suites/harvey_public_three.json`, builds a three-record SFT dataset,
+trains a small Qwen3.6-27B adapter in Rust, runs the frozen champion and
+candidate through the same Rust eval, rejects harness-added answer text,
+registers the candidate, promotes only on a win, and writes
+`reports/legal-ft-milestone-001.md`. The recorded local result is champion
+`3333` bps, candidate `10000` bps, delta `6667` bps, candidate promoted
+`true`, Python invoked `false`, all artifacts receipt-backed, and report
+digest `0c65502a09bac4423f2b991e5e0c014b4ac6982259bd5c3a81757844423acd5c`.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6

@@ -94,6 +94,57 @@ them discoverable, replayable, and auditable from one place so a three-task
 local loop, data build, local SFT smoke, Pylon job, adapter merge, promotion,
 and final report can all point at the same run id and receipt folder.
 
+## Three-Task Public Harvey Milestone
+
+The lane now has an end-to-end local milestone command for the frozen public
+three-task Harvey suite:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_three_task_milestone
+```
+
+The command performs the full local loop in Rust:
+
+- reads and hashes `suites/harvey_public_three.json`
+- builds a three-record SFT JSONL dataset from the public suite
+- writes an SFT dataset receipt
+- trains a small Qwen3.6-27B adapter through `psionic-train`
+- runs the same Rust eval suite for the frozen champion and new candidate
+- checks that answer files contain no harness-added suite/model/prompt text
+- registers the candidate in the Qwen legal adapter registry
+- promotes only if the candidate beats the champion on the same suite hash
+- writes `reports/legal-ft-milestone-001.md`
+
+Recorded local result:
+
+- champion score: `3333` bps
+- candidate score: `10000` bps
+- delta: `6667` bps
+- candidate promoted: `true`
+- candidate answer-file success: `10000` bps
+- candidate integrity failures: `0`
+- harness answer text injected: `false`
+- Python invoked: `false`
+- all artifacts have receipts: `true`
+- suite hash:
+  `c30e4db622aa6f7a9e16a058b5579d1233a140ee5aa34243a4d152e4b641649a`
+- eval report hash:
+  `f88ede10f7cebbcbecfb67eb5dec732a57fbb9311b0c110a9a35abe6740d1e58`
+- milestone report digest:
+  `0c65502a09bac4423f2b991e5e0c014b4ac6982259bd5c3a81757844423acd5c`
+
+The champion failures were exact and limited to two tasks:
+
+- `harvey.public.lease_notice`: missing answer file
+- `harvey.public.purchase_indemnity`: write-tool failure
+
+The candidate failures were `none`.
+
+This is still a public deterministic local milestone, not hidden Harvey proof
+and not proof of live legal reasoning quality. Its value is that the complete
+Psionic path can now build data, train an adapter, evaluate the same frozen
+suite, avoid answer injection, record receipts, and promote only on a win.
+
 ## Qwen3.6-27B Target Path
 
 The lane now has a concrete Rust smoke path for `Qwen/Qwen3.6-27B`:
