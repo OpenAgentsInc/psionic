@@ -1,0 +1,15 @@
+{
+  "schema_version": "psionic.legal_benchmark.synthetic_workflow_rubric.v1",
+  "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0064",
+  "synthetic": true,
+  "task_type": "answer_file_workflow_only",
+  "expected_answer_path": "answer.md",
+  "expected_answer": "# Workflow answer\n\nThe answer.md file should state that the deadline is 13 calendar days. No separate appendix is needed. This response is intentionally limited to the required answer file.",
+  "expected_points": [
+    "deadline is 13 calendar days",
+    "no separate appendix is needed",
+    "writes only answer.md"
+  ],
+  "scoring_visibility": "judge_only_not_model_visible",
+  "claim_boundary": "this rubric is for synthetic workflow reward only and is not Harvey benchmark evidence"
+}

@@ -1,0 +1,2035 @@
+{
+  "schema_version": "psionic.legal_benchmark.synthetic_workflow_manifest.v1",
+  "suite_id": "synthetic_legal_workflow_v1",
+  "generator_id": "psionic.legal_benchmark.synthetic_workflow_generator.v1",
+  "seed": 20260520,
+  "synthetic": true,
+  "source_policy": "all task facts and documents are generated synthetic text; no hidden or private benchmark data is used",
+  "claim_boundary": "synthetic workflow tasks are for SFT, DPO, and GRPO reward shaping only; their scores must not be reported as Harvey benchmark scores",
+  "task_count": 100,
+  "task_type_counts": {
+    "answer_file_workflow_only": 12,
+    "contract_clause_extraction": 13,
+    "employment_agreement_summary": 13,
+    "lease_obligation_extraction": 13,
+    "litigation_memo_source_summary": 12,
+    "nda_risk_list": 13,
+    "privilege_log_classification": 12,
+    "statute_to_facts_application": 12
+  },
+  "successful_base_run_count": 50,
+  "failed_base_run_count": 50,
+  "sft_example_count": 250,
+  "dpo_pair_count": 1408,
+  "tasks_root": "tasks/synthetic/legal-workflow-v1/tasks",
+  "rubrics_root": "tasks/synthetic/legal-workflow-v1/rubrics",
+  "runs_root": "tasks/synthetic/legal-workflow-v1/runs",
+  "dpo_sample_runs_root": "tasks/synthetic/legal-workflow-v1/training/dpo_run_sample",
+  "training_root": "tasks/synthetic/legal-workflow-v1/training",
+  "base_model": "synthetic-base-workflow-policy-v1",
+  "tasks": [
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0001",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0001",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0001/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0001.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0001/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "c14135bdc0e2f53f99beca95785ff0198ce18e51242996186d573f0e138cefe7",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0001.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0002",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0002",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0002/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0002.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0002/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "258f3f99218c053d3a1e4a2e0932a00e7515ff1a9a806002a86955940e26ef52",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0002.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0003",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0003",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0003/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0003.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0003/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0003.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0004",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0004",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0004/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0004.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0004/documents/lease.txt"
+      ],
+      "expected_answer_hash": "84b88e82cb1f2466e5a16d36aad4a591775a5a5d9bc427d31230e97ff9f59f97",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0004.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0005",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0005",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0005/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0005.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0005/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "49b3d2f67972db67e3852766c2bbdc18b8ef08c2c51f4d643b9d9e8d6a89f66b",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0005.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0006",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0006",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0006/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0006.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0006/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "99c99549026183c2424c769ce1a8ce957ee52c7d68a5e89e69f92dc42abd52c5",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0006.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0007",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0007",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0007/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0007.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0007/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "612322632f2243da7e302b2395f826a226d666ca60e8729d14d42177623469ee",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0007.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0008",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0008",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0008/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0008.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0008/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "55747aeb8c4af05c14b0100ff736aee669741d3c6c035ab02f86210041c10441",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0008.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0009",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0009",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0009/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0009.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0009/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "d5a6f559bb652dca6400b738cd743e1c99045fa097d5256993f6ebad43a214b4",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0009.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0010",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0010",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0010/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0010.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0010/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "f46d6ca36e516d1f6fd4360fd8ad246a647b5a29d7c88b91f709e404222f6c72",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0010.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0011",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0011",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0011/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0011.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0011/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0011.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0012",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0012",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0012/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0012.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0012/documents/lease.txt"
+      ],
+      "expected_answer_hash": "5e9f294c243266ec011f37d5993e44c8cb1190a83ba4edc2733f3d2c3b49f0b4",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0012.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0013",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0013",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0013/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0013.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0013/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "d653f6e51be088d49a1d9229e10a0850639d5055baadcd198b19d66c09b837f3",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0013.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0014",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0014",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0014/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0014.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0014/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "8352a3362ceab0eb2402e4a6e55e17df978afcf60539f46c8370cf423ae0cf9a",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0014.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0015",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0015",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0015/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0015.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0015/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "84d5497a6ed6afb2fe66d531d112e0651369540890e918190e4f1975e06dc7aa",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0015.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0016",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0016",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0016/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0016.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0016/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "66bc1eb4e6eafb767d52b1309cde88f10a49fab9f8145cf48f5789ced2363e0c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0016.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0017",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0017",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0017/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0017.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0017/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "497b13e87499c5347f02874cc568902517c2eabbcd9d916dfd0a5ce346dfdbc0",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0017.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0018",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0018",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0018/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0018.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0018/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "947238d20bccd3fa2cc1662c9967f5d0ffbdddcc1a424565ea51b8d312c55c88",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0018.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0019",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0019",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0019/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0019.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0019/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0019.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0020",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0020",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0020/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0020.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0020/documents/lease.txt"
+      ],
+      "expected_answer_hash": "9180bd1453f86088f7e4aca02d4cb6fc394962c00293598d2ef880bab10c327f",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0020.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0021",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0021",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0021/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0021.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0021/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "afce6d4956899adf7dd28eda7fba065bfb1245b0e1a8bd807585f30b6b35ab56",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0021.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0022",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0022",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0022/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0022.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0022/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "e3e5675fb3d93656d8cae30ca9a8ae8f8cc61ad52268c07c9bcc0fa4a892af1b",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0022.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0023",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0023",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0023/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0023.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0023/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "c39c8d907c4a572ae1e1c03159f908e4010a0a240ef9106bea819327c871e9f2",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0023.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0024",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0024",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0024/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0024.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0024/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "8c9f07f43f0f625789afb1637f27b568cec471b7bc92efd8ba8c12b33766c699",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0024.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0025",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0025",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0025/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0025.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0025/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "5f5a3162d181d9a78a2e30b9f6be2012263a55fc3173e55d457abaf100b8111d",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0025.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0026",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0026",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0026/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0026.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0026/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "258f3f99218c053d3a1e4a2e0932a00e7515ff1a9a806002a86955940e26ef52",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0026.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0027",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0027",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0027/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0027.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0027/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0027.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0028",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0028",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0028/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0028.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0028/documents/lease.txt"
+      ],
+      "expected_answer_hash": "84b88e82cb1f2466e5a16d36aad4a591775a5a5d9bc427d31230e97ff9f59f97",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0028.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0029",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0029",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0029/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0029.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0029/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "e329f0b108f416ecb2dca7dcc99e69d52d5ec26b3ce4b4394205cb6ca1ef00f4",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0029.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0030",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0030",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0030/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0030.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0030/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "b1952a66f469659f4db2848f4f69ebb880ee139f0638df360f228adafaebec1a",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0030.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0031",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0031",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0031/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0031.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0031/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "e95ccf64ac22fdad289a706e7021c0137645380385501b4aa9be846c755becc5",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0031.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0032",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0032",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0032/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0032.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0032/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "cc0150cc818124e1c35223c3bd16b4a304953e03a10bd97e7febedb7eec91fde",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0032.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0033",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0033",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0033/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0033.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0033/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "4687fd9bcb9c36719395d51b97b8863d4dddf91f801eefd7766b3e831c49b043",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0033.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0034",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0034",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0034/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0034.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0034/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "f46d6ca36e516d1f6fd4360fd8ad246a647b5a29d7c88b91f709e404222f6c72",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0034.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0035",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0035",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0035/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0035.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0035/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0035.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0036",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0036",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0036/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0036.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0036/documents/lease.txt"
+      ],
+      "expected_answer_hash": "5e9f294c243266ec011f37d5993e44c8cb1190a83ba4edc2733f3d2c3b49f0b4",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0036.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0037",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0037",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0037/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0037.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0037/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "5efc19a3d9225940b5650c8115ec3f7309eba43a386a240faec878fd7d3ca5eb",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0037.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0038",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0038",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0038/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0038.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0038/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "de8c3d044f592e1040d70f0e295e3a43783c012799b3c0ed84fb0cc12cc84f9c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0038.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0039",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0039",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0039/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0039.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0039/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "6c5b2e9840a2aca35771b1c1635747f33cc7714a44c7d8bf8dcd6d972b430c3e",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0039.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0040",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0040",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0040/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0040.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0040/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "e3c0a8b93a7dc635345e7be419a6f6e0b8c3d5fae62ff144efc1515645927053",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0040.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0041",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0041",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0041/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0041.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0041/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "c14135bdc0e2f53f99beca95785ff0198ce18e51242996186d573f0e138cefe7",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0041.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0042",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0042",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0042/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0042.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0042/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "947238d20bccd3fa2cc1662c9967f5d0ffbdddcc1a424565ea51b8d312c55c88",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0042.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0043",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0043",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0043/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0043.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0043/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0043.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0044",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0044",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0044/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0044.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0044/documents/lease.txt"
+      ],
+      "expected_answer_hash": "9180bd1453f86088f7e4aca02d4cb6fc394962c00293598d2ef880bab10c327f",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0044.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0045",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0045",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0045/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0045.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0045/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "49b3d2f67972db67e3852766c2bbdc18b8ef08c2c51f4d643b9d9e8d6a89f66b",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0045.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0046",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0046",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0046/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0046.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0046/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "99c99549026183c2424c769ce1a8ce957ee52c7d68a5e89e69f92dc42abd52c5",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0046.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0047",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0047",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0047/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0047.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0047/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "39a9901eb05b5e50d371d4712ee1b2cc8c4c49b532992858a7312077def2db92",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0047.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0048",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0048",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0048/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0048.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0048/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "55747aeb8c4af05c14b0100ff736aee669741d3c6c035ab02f86210041c10441",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0048.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0049",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0049",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0049/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0049.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0049/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "d5a6f559bb652dca6400b738cd743e1c99045fa097d5256993f6ebad43a214b4",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0049.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0050",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0050",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0050/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0050.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0050/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "258f3f99218c053d3a1e4a2e0932a00e7515ff1a9a806002a86955940e26ef52",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0050.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0051",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0051",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0051/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0051.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0051/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0051.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0052",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0052",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0052/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0052.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0052/documents/lease.txt"
+      ],
+      "expected_answer_hash": "84b88e82cb1f2466e5a16d36aad4a591775a5a5d9bc427d31230e97ff9f59f97",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0052.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0053",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0053",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0053/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0053.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0053/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "d653f6e51be088d49a1d9229e10a0850639d5055baadcd198b19d66c09b837f3",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0053.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0054",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0054",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0054/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0054.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0054/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "8352a3362ceab0eb2402e4a6e55e17df978afcf60539f46c8370cf423ae0cf9a",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0054.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0055",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0055",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0055/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0055.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0055/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "0ab9fe600cbe8cb40fa8b9c1b47387cd9370b26ca6a5142817807bb8b39f3244",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0055.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0056",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0056",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0056/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0056.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0056/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "66bc1eb4e6eafb767d52b1309cde88f10a49fab9f8145cf48f5789ced2363e0c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0056.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0057",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0057",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0057/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0057.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0057/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "497b13e87499c5347f02874cc568902517c2eabbcd9d916dfd0a5ce346dfdbc0",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0057.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0058",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0058",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0058/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0058.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0058/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "f46d6ca36e516d1f6fd4360fd8ad246a647b5a29d7c88b91f709e404222f6c72",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0058.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0059",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0059",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0059/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0059.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0059/documents/nda.txt"
+      ],
+      "expected_answer_hash": "4f9501b4c6aef725d1b7c97f9eae027ee131f1ae427953bb586f09c1c20c2bc6",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0059.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0060",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0060",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0060/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0060.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0060/documents/lease.txt"
+      ],
+      "expected_answer_hash": "5e9f294c243266ec011f37d5993e44c8cb1190a83ba4edc2733f3d2c3b49f0b4",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0060.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0061",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0061",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0061/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0061.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0061/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "afce6d4956899adf7dd28eda7fba065bfb1245b0e1a8bd807585f30b6b35ab56",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0061.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0062",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0062",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0062/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0062.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0062/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "e3e5675fb3d93656d8cae30ca9a8ae8f8cc61ad52268c07c9bcc0fa4a892af1b",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0062.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0063",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0063",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0063/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0063.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0063/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "30c2998aacbb89ecbdec058e86b3aac035d59fd72d6a159b015027e6c8e05e10",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0063.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0064",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0064",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0064/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0064.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0064/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "8c9f07f43f0f625789afb1637f27b568cec471b7bc92efd8ba8c12b33766c699",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0064.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0065",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0065",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0065/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0065.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0065/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "95f2f50a7d56d9b199abac13e114bd6b0381dbfe70deafe42f6ce7d474015a53",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0065.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0066",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0066",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0066/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0066.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0066/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "2377654baabc78b965417a7cbfc6230f24fb4a91885cdc0f0b59327ec3bffdf5",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0066.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0067",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0067",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0067/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0067.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0067/documents/nda.txt"
+      ],
+      "expected_answer_hash": "6d040c00b4ab9abc47dae2eba6e3d47d9d435ffb419b9157f21b13d56a49a12c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0067.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0068",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0068",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0068/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0068.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0068/documents/lease.txt"
+      ],
+      "expected_answer_hash": "62985b8aeb2b874fbbe25bcab1314aa76166e314a9d87caae12e8b83d0e36a92",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0068.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0069",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0069",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0069/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0069.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0069/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "fd95b2583fe0392018680d446673559ce8ada0a6376b89a309e41d015b8ed75c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0069.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0070",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0070",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0070/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0070.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0070/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "dd33282bef350a16e9ef7d820f8d4c049849068894cc9f8e84ad75703342b845",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0070.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0071",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0071",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0071/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0071.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0071/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "da3449f118a298623a4d5ed1c53e72cf87b356f8653b3b694cb45c178616169c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0071.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0072",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0072",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0072/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0072.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0072/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "421fc989f73b16417e0d2575a53a6099fd73005c18ce55cc50d20ed67d870c32",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0072.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0073",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0073",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0073/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0073.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0073/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "a2c2f33fb7228bc24c2af838aa0232df49ddf376825b7f45bee2892ca44069b9",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0073.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0074",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0074",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0074/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0074.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0074/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "b3bdb5f41dcf76dcb7457037f5b7cac791492ae98a9136513eeaa742be91250f",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0074.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0075",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0075",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0075/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0075.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0075/documents/nda.txt"
+      ],
+      "expected_answer_hash": "6d040c00b4ab9abc47dae2eba6e3d47d9d435ffb419b9157f21b13d56a49a12c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0075.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0076",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0076",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0076/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0076.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0076/documents/lease.txt"
+      ],
+      "expected_answer_hash": "179f5585ff614b9e9086a4681f07c12ae6239400ad1874ed0e32e30d7898ba6d",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0076.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0077",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0077",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0077/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0077.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0077/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "39d5e8f2325ef56c1d4c99c62a3fdf8092a6e406bf7ebec6f2e66dbed421dca1",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0077.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0078",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0078",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0078/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0078.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0078/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "77a1307b43499ea4aff3791c0292f3f4a5901eaf58fba9f3637fb13065003402",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0078.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0079",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0079",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0079/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0079.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0079/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "a133737cc34d8ecace96781c5f519413c02003c7927fffdaf42039d24896ae33",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0079.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0080",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0080",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0080/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0080.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0080/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "ac2cc27e63a3e0ddef613bf2e45aced1f983a47fa64dbbde715ff12441b30a7e",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0080.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0081",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0081",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0081/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0081.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0081/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "f02a867c4d0b72d2cf7003c8411731ac99b24437534e4817bf1336db6e007577",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0081.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0082",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0082",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0082/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0082.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0082/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "3343983f84f0a0242a62269047e45941bd135ad46cae787d9b46b86b0350721d",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0082.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0083",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0083",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0083/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0083.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0083/documents/nda.txt"
+      ],
+      "expected_answer_hash": "6d040c00b4ab9abc47dae2eba6e3d47d9d435ffb419b9157f21b13d56a49a12c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0083.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0084",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0084",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0084/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0084.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0084/documents/lease.txt"
+      ],
+      "expected_answer_hash": "1c2b566c3c106ee33bb5bb26124cb9bdaac2d88b31a22f355574161efc58accb",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0084.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0085",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0085",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0085/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0085.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0085/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "efdfc9c787e830f7965f6dac4f42a24db90d8df8dd4ffeaa23ca4dc920d7bbbc",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0085.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0086",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0086",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0086/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0086.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0086/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "795f7cd01875138f0d8fb8a7094715d24ca43e0f10a7515764c3739fb2d7944a",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0086.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0087",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0087",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0087/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0087.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0087/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "56f88dac4fc73fa03f214225c29355baecc6b7063c4ac3561fe1c49e840d6dac",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0087.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0088",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0088",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0088/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0088.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0088/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "4e55b8c7babbe08590cba7e3029d6b6a8df8067f73ec7f529f0ac20dd76374ca",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0088.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0089",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0089",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0089/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0089.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0089/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "29a6c3ddaf08a0fdf02154749157ff872ae5e2aff024929d6642cbd5eb2cd1bb",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0089.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0090",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0090",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0090/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0090.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0090/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "2377654baabc78b965417a7cbfc6230f24fb4a91885cdc0f0b59327ec3bffdf5",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0090.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0091",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0091",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0091/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0091.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0091/documents/nda.txt"
+      ],
+      "expected_answer_hash": "6d040c00b4ab9abc47dae2eba6e3d47d9d435ffb419b9157f21b13d56a49a12c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0091.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0092",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0092",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0092/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0092.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0092/documents/lease.txt"
+      ],
+      "expected_answer_hash": "62985b8aeb2b874fbbe25bcab1314aa76166e314a9d87caae12e8b83d0e36a92",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0092.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.litigation_memo_source_summary.0093",
+      "task_type": "litigation_memo_source_summary",
+      "practice_area": "litigation",
+      "work_type": "summarize",
+      "title": "Litigation memo source summary 0093",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0093/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0093.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-litigation-memo-source-summary-0093/documents/litigation-note.txt"
+      ],
+      "expected_answer_hash": "515049b5596b880e353d3fb2543a4886121a652587701d57ddd776e886be56c5",
+      "base_run_id": "run.synthetic_legal_workflow_v1_litigation_memo_source_summary_0093.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "litigation_memo_source_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.statute_to_facts_application.0094",
+      "task_type": "statute_to_facts_application",
+      "practice_area": "regulatory",
+      "work_type": "apply",
+      "title": "Statute-to-facts application 0094",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0094/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0094.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/regulatory/synthetic-legal-workflow-v1-statute-to-facts-application-0094/documents/statute-and-facts.txt"
+      ],
+      "expected_answer_hash": "cf20d739f1e2d8c442e4f7bf159a74d6fbf0e89969ae216851dd4e522fd0a8e0",
+      "base_run_id": "run.synthetic_legal_workflow_v1_statute_to_facts_application_0094.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "statute_to_facts_application"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.privilege_log_classification.0095",
+      "task_type": "privilege_log_classification",
+      "practice_area": "litigation",
+      "work_type": "classify",
+      "title": "Privilege log classification 0095",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0095/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0095.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/litigation/synthetic-legal-workflow-v1-privilege-log-classification-0095/documents/privilege-log.txt"
+      ],
+      "expected_answer_hash": "76b2df82f5be4d416c945a51fd5063ecf396db24664021d22e7d3d539f108c5f",
+      "base_run_id": "run.synthetic_legal_workflow_v1_privilege_log_classification_0095.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "privilege_log_classification"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.answer_file_workflow_only.0096",
+      "task_type": "answer_file_workflow_only",
+      "practice_area": "operations",
+      "work_type": "workflow",
+      "title": "Answer-file workflow task 0096",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0096/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0096.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/operations/synthetic-legal-workflow-v1-answer-file-workflow-only-0096/documents/workflow-instruction.txt"
+      ],
+      "expected_answer_hash": "7f73ab655f97f48479f79180e117a1d578795b2aa8c4de7f9705f06356c60648",
+      "base_run_id": "run.synthetic_legal_workflow_v1_answer_file_workflow_only_0096.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "answer_file_workflow_only"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.contract_clause_extraction.0097",
+      "task_type": "contract_clause_extraction",
+      "practice_area": "corporate",
+      "work_type": "extract",
+      "title": "Contract clause extraction 0097",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0097/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0097.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/corporate/synthetic-legal-workflow-v1-contract-clause-extraction-0097/documents/service-agreement.txt"
+      ],
+      "expected_answer_hash": "91787c91deebf1c1aa835ca493418c987ac7c5b8908b11131dce875451c8260c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_contract_clause_extraction_0097.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "contract_clause_extraction"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0098",
+      "task_type": "employment_agreement_summary",
+      "practice_area": "employment",
+      "work_type": "summarize",
+      "title": "Employment agreement summary 0098",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0098/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0098.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/employment/synthetic-legal-workflow-v1-employment-agreement-summary-0098/documents/employment-agreement.txt"
+      ],
+      "expected_answer_hash": "b3bdb5f41dcf76dcb7457037f5b7cac791492ae98a9136513eeaa742be91250f",
+      "base_run_id": "run.synthetic_legal_workflow_v1_employment_agreement_summary_0098.base",
+      "base_outcome": "missing_answer",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "employment_agreement_summary"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.nda_risk_list.0099",
+      "task_type": "nda_risk_list",
+      "practice_area": "commercial",
+      "work_type": "risk_list",
+      "title": "NDA risk list 0099",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0099/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/commercial/synthetic-legal-workflow-v1-nda-risk-list-0099.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/commercial/synthetic-legal-workflow-v1-nda-risk-list-0099/documents/nda.txt"
+      ],
+      "expected_answer_hash": "6d040c00b4ab9abc47dae2eba6e3d47d9d435ffb419b9157f21b13d56a49a12c",
+      "base_run_id": "run.synthetic_legal_workflow_v1_nda_risk_list_0099.base",
+      "base_outcome": "wrong_path",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "nda_risk_list"
+      ]
+    },
+    {
+      "task_id": "synthetic.legal_workflow_v1.lease_obligation_extraction.0100",
+      "task_type": "lease_obligation_extraction",
+      "practice_area": "real_estate",
+      "work_type": "extract",
+      "title": "Lease obligation extraction 0100",
+      "task_json_path": "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0100/task.json",
+      "rubric_path": "tasks/synthetic/legal-workflow-v1/rubrics/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0100.rubric.json",
+      "source_document_paths": [
+        "tasks/synthetic/legal-workflow-v1/tasks/real_estate/synthetic-legal-workflow-v1-lease-obligation-extraction-0100/documents/lease.txt"
+      ],
+      "expected_answer_hash": "179f5585ff614b9e9086a4681f07c12ae6239400ad1874ed0e32e30d7898ba6d",
+      "base_run_id": "run.synthetic_legal_workflow_v1_lease_obligation_extraction_0100.base",
+      "base_outcome": "success",
+      "training_tags": [
+        "synthetic",
+        "legal_workflow",
+        "lease_obligation_extraction"
+      ]
+    }
+  ],
+  "sft_dataset_manifest": "tasks/synthetic/legal-workflow-v1/training/sft_manifest.json",
+  "dpo_dataset_manifest": "tasks/synthetic/legal-workflow-v1/training/dpo_manifest.json",
+  "manifest_hash": "037ba69d95751849f7a5f92184c15f315b2b51d861269791776623f59392c1e8"
+}

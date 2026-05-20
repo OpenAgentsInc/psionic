@@ -1,0 +1,16 @@
+{
+  "schema_version": "psionic.legal_benchmark.synthetic_workflow_rubric.v1",
+  "task_id": "synthetic.legal_workflow_v1.employment_agreement_summary.0034",
+  "synthetic": true,
+  "task_type": "employment_agreement_summary",
+  "expected_answer_path": "answer.md",
+  "expected_answer": "# Employment agreement summary\n\nThe agreement provides a base salary, indefinite confidentiality, and a 6-month customer nonsolicit limited to customers contacted during employment. The main follow-up is whether local law permits that nonsolicit scope.",
+  "expected_points": [
+    "mentions base salary",
+    "confidentiality lasts indefinitely",
+    "nonsolicit lasts 6 months",
+    "asks whether local law permits the covenant"
+  ],
+  "scoring_visibility": "judge_only_not_model_visible",
+  "claim_boundary": "this rubric is for synthetic workflow reward only and is not Harvey benchmark evidence"
+}

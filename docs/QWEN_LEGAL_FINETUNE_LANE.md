@@ -257,6 +257,43 @@ These are deterministic local replay suites. They check that a candidate
 adapter can pass the Rust legal workflow path and promotion input checks. They
 do not show hidden Harvey benchmark performance.
 
+## Current Synthetic Legal Workflow Corpus
+
+The lane now has a Rust-generated synthetic workflow corpus for SFT, DPO, and
+future GRPO reward shaping:
+
+```bash
+cargo run -p psionic-data --example legal_benchmark_generate_synthetic_tasks -- \
+  --count 100 \
+  --out tasks/synthetic/legal-workflow-v1
+```
+
+Recorded local generation:
+
+- tasks: `100`
+- deterministic base-policy success runs: `50`
+- deterministic base-policy failed runs: `50`
+- SFT examples: `250`
+- sampled DPO pairs: `1,408`
+- SFT dataset hash:
+  `02f31b3c8c481bdd9cb14ac150c80ff01b9e3bbe0953b986b18cece77b578719`
+- DPO dataset hash:
+  `8023f7c4c0e80ed71268eb000fe2c978b809fe55d333178aed1b15763ebd1ab3`
+- manifest:
+  `tasks/synthetic/legal-workflow-v1/manifest.json`
+- manifest hash:
+  `037ba69d95751849f7a5f92184c15f315b2b51d861269791776623f59392c1e8`
+
+The generator covers contract extraction, employment summaries, NDA risks,
+lease obligations, litigation source summaries, statute-to-facts application,
+privilege-log classification, and answer-file-only workflow tasks. The source
+documents are generated text. The answer rubric is stored separately from the
+task prompts under `rubrics/`.
+
+Plain boundary: this corpus can train file discipline and legal work-product
+shape. It is not Harvey benchmark evidence and must not be counted as a Harvey
+score.
+
 ## Current Rust GRPO Smoke
 
 The lane now includes a Rust-only GRPO smoke trainer for the Qwen3.6 legal
