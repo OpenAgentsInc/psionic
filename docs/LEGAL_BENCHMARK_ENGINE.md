@@ -205,6 +205,53 @@ public Harvey tasks with runner output mutation disabled. Adapter 020 is a
 real local MLX LoRA fine-tune over clean no-cheat supervised trajectories, but
 it did not yet improve the broad suite score.
 
+## Deterministic Replay Eval
+
+`crates/psionic-eval/src/legal_benchmark_eval_suite.rs` adds the first local
+replay harness for comparing a base model binding and an adapter binding
+against the exact same suite. The harness freezes:
+
+- suite id and eval mode
+- fixed task order
+- source document hashes
+- prompt template hash
+- scorer version
+- inference settings
+- base model id and adapter id or adapter artifact hash
+
+The checked smoke suite is:
+
+- `suites/harvey_public_three.json`
+- `fixtures/legal_benchmark/eval_suite_public_three/*`
+
+Run it with:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite suites/harvey_public_three.json \
+  --model Qwen/Qwen3.6-27B \
+  --adapter target/legal/qwen36_sft_smoke/adapter.safetensors \
+  --out runs/harvey-public-three-smoke
+```
+
+The output directory contains:
+
+- `eval_report.json`
+- `promotion_gate_input.json`
+- `replay_receipt.json`
+- per-task base and adapter run records and score reports
+- base and adapter static Markdown summaries
+
+The report separates answer-file success rate, legal score, integrity
+failures, tool failures, timeout failures, and failure-class counts. It also
+writes a promotion-gate JSON object so later adapter registry work can make a
+single promote/hold/reject decision without re-parsing scorer internals.
+
+Plain boundary: this harness replays declared local outputs through the Rust
+scorer. It is useful for proving that the evaluator, receipts, ordering, and
+promotion inputs are stable. It is not proof that a model improved on hidden
+Harvey tasks. Hidden audit suites are rejected if marked training-allowed.
+
 ## Artifact Manifests And Hashing
 
 The module exposes SHA-256 helpers over canonical serde JSON encodings:
