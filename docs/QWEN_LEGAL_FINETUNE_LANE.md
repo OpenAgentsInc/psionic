@@ -223,6 +223,31 @@ requires three retained-slice passes, an adversarial holdout, and a tighter
 judge panel before Autopilot4 should import a candidate as ready for a public
 retained campaign.
 
+## Phase-Six Expanded Corpus Dry Run
+
+The lane now also emits `QwenLegalRlExpandedCorpusReport` with schema
+`psionic.qwen_legal_rl_expanded_corpus.v1`. It consumes the phase-five
+retained rehearsal report and the Blueprint expanded corpus plan:
+
+- phase-five target carried forward: 9000 bps
+- phase-six conservative target: 9500 bps
+- expanded stratified slice: 125 Harvey tasks
+- practice-area coverage: all 24 audited practice areas
+- accepted rollout minimum: 266
+- quarantine budget: 30
+- adversarial holdout task-runs: 72
+- holdout regression allowance: 0 bps
+- calibrated judge disagreement budget: 35 bps
+- family coverage: all nine Blueprint optimizer frontier families
+- Blueprint plan ref:
+  `blueprint://harvey_legal_qwen_phase_six_expanded_corpus_plan/optimizer_plan.harvey_legal_qwen.phase_006.expanded_corpus`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-006`
+
+This dry run expands beyond the retained 20-task slice before any all-task
+campaign. It is readiness evidence for a broader benchmark run, not a retained
+score claim.
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:

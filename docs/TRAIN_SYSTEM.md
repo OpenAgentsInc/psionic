@@ -195,6 +195,13 @@ rehearsal plan, carries the 8500 bps target forward, raises the next local
 benchmark target to 9000 bps, requires 60 retained rehearsal task-runs, 194
 accepted rollouts, 24 quarantined rollouts, 36 adversarial holdout task-runs,
 zero holdout regression, and a 50 bps calibrated judge-disagreement budget.
+The lane now also emits a phase-six expanded corpus report that consumes the
+Blueprint expanded corpus plan, carries the 9000 bps target forward, raises
+the next local benchmark target to 9500 bps, expands the dry-run slice to 125
+Harvey tasks with all 24 audited practice areas represented, requires 266
+accepted rollouts, caps quarantine at 30 rollouts, adds 72 adversarial holdout
+task-runs, allows zero holdout regression, and lowers the judge-disagreement
+budget to 35 bps.
 Those reports are readiness evidence only; retained score claims still require
 the actual retained slice and Autopilot4 release-gate approval.
 The paired serving/eval metadata path is in
