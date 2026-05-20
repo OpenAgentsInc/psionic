@@ -15,8 +15,37 @@ pub const QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION: &str =
 /// Pylon legal training worker receipt schema.
 pub const QWEN_LEGAL_PYLON_WORKER_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_pylon_worker_receipt.v1";
+/// Pylon legal training payment decision receipt schema.
+pub const QWEN_LEGAL_PYLON_PAYMENT_DECISION_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_pylon_payment_decision.v1";
 /// Local worker implementation id.
 pub const QWEN_LEGAL_PYLON_LOCAL_WORKER_IMPL_ID: &str = "psionic.qwen_legal_pylon.local_worker.v1";
+
+/// Pylon payment status.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PylonTrainingPaymentStatus {
+    /// Worker has submitted work, but validation has not settled payment.
+    PendingValidation,
+    /// Work is valid and payable, but no payment proof is attached yet.
+    Payable,
+    /// Payment was withheld under the declared payment rules.
+    Withheld,
+    /// Payment has been paid and a proof is attached.
+    Paid,
+}
+
+/// Pylon worker receipt validation status for payment decisions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PylonTrainingPaymentValidationStatus {
+    /// Worker receipt passed signature, digest, output, and integrity checks.
+    Valid,
+    /// Worker receipt was present but did not pass validation.
+    Invalid,
+    /// Worker receipt was missing.
+    MissingReceipt,
+}
 
 /// Pylon legal training job kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,10 +145,16 @@ pub struct PylonTrainingHardwareRequirements {
 pub struct PylonTrainingPaymentBudget {
     /// Stable budget id.
     pub budget_id: String,
+    /// Agreed fixed price for a valid worker receipt in micro-USD.
+    pub agreed_price_microusd: u64,
     /// Max authorized runtime spend in micro-USD.
     pub max_cost_microusd: u64,
+    /// Currency code for the amount fields.
+    pub currency: String,
     /// Payment account or ledger reference.
     pub payment_account_ref: String,
+    /// Whether a failed but otherwise valid eval attempt can still be paid.
+    pub pay_failed_but_valid_eval_attempts: bool,
 }
 
 /// Receipt requirements requested by the job issuer.
@@ -277,7 +312,12 @@ impl PylonTrainingHardwareRequirements {
 impl PylonTrainingPaymentBudget {
     fn validate(&self) -> Result<(), QwenLegalPylonTrainingJobError> {
         require_nonempty(self.budget_id.as_str(), "budget_id")?;
-        require_nonempty(self.payment_account_ref.as_str(), "payment_account_ref")
+        require_nonempty(self.currency.as_str(), "currency")?;
+        require_nonempty(self.payment_account_ref.as_str(), "payment_account_ref")?;
+        if self.agreed_price_microusd > self.max_cost_microusd {
+            return invalid_job("agreed_price_microusd must not exceed max_cost_microusd");
+        }
+        Ok(())
     }
 }
 
@@ -339,6 +379,10 @@ pub struct PylonTrainingWorkerReceipt {
     pub job_kind: PylonTrainingJobKind,
     /// Stable job spec digest.
     pub job_spec_digest: String,
+    /// Budget metadata copied from the job spec.
+    pub payment_budget: PylonTrainingPaymentBudget,
+    /// Agreed fixed price copied from the job budget.
+    pub agreed_price_microusd: u64,
     /// Input artifact hashes observed by the worker.
     pub input_hashes: Vec<PylonTrainingArtifactRef>,
     /// Output artifact hashes observed by the worker.
@@ -370,6 +414,14 @@ pub struct PylonTrainingWorkerReceipt {
     pub signature_hex: String,
     /// Stable digest over the full receipt.
     pub receipt_digest: String,
+    /// Payment status before settlement.
+    pub payment_status: PylonTrainingPaymentStatus,
+    /// Payment proof placeholder or actual payment proof after settlement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_proof: Option<String>,
+    /// Reason payment was withheld, if settlement mutates or copies the receipt later.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withheld_reason: Option<String>,
 }
 
 impl PylonTrainingWorkerReceipt {
@@ -432,6 +484,152 @@ pub struct PylonTrainingWorkerReceiptVerification {
     pub signature_valid: bool,
     /// Whether succeeded output files were rechecked.
     pub output_files_rechecked: bool,
+}
+
+/// Worker contribution and payment row for training reports.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PylonTrainingWorkerContributionPaymentRow {
+    /// Job id.
+    pub job_id: String,
+    /// Worker id when a receipt exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_id: Option<String>,
+    /// Worker Ed25519 public key when a receipt exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_pubkey: Option<String>,
+    /// Work type.
+    pub work_type: PylonTrainingJobKind,
+    /// Stable shard key used for duplicate detection.
+    pub shard_key: String,
+    /// Agreed price.
+    pub agreed_price_microusd: u64,
+    /// Budget cap.
+    pub budget_max_microusd: u64,
+    /// Currency code.
+    pub currency: String,
+    /// Budget id.
+    pub budget_id: String,
+    /// Stable digest of observed or expected inputs.
+    pub input_hash: String,
+    /// Stable digest of observed outputs when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_hash: Option<String>,
+    /// Validation status.
+    pub validation_status: PylonTrainingPaymentValidationStatus,
+    /// Payment status.
+    pub payment_status: PylonTrainingPaymentStatus,
+    /// Payment proof placeholder or actual payment proof.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_proof: Option<String>,
+    /// Reason payment was withheld.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withheld_reason: Option<String>,
+    /// Payment decision receipt path.
+    pub decision_path: String,
+    /// Payment decision digest.
+    pub decision_digest: String,
+}
+
+/// Payment decision receipt for one worker job.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PylonTrainingPaymentDecisionReceipt {
+    /// Schema version.
+    pub schema_version: String,
+    /// Stable decision id.
+    pub decision_id: String,
+    /// Payment decision receipt path.
+    pub decision_path: String,
+    /// Job id.
+    pub job_id: String,
+    /// Parent run id.
+    pub parent_run_id: String,
+    /// Work type.
+    pub work_type: PylonTrainingJobKind,
+    /// Stable shard key used for duplicate detection.
+    pub shard_key: String,
+    /// Worker id when a receipt exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_id: Option<String>,
+    /// Worker Ed25519 public key when a receipt exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_pubkey: Option<String>,
+    /// Budget id.
+    pub budget_id: String,
+    /// Agreed price.
+    pub agreed_price_microusd: u64,
+    /// Budget cap.
+    pub budget_max_microusd: u64,
+    /// Currency code.
+    pub currency: String,
+    /// Payment account or ledger reference.
+    pub payment_account_ref: String,
+    /// Stable job spec digest.
+    pub job_spec_digest: String,
+    /// Worker receipt digest when a receipt exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_receipt_digest: Option<String>,
+    /// Signed payload digest when a receipt exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signed_payload_digest: Option<String>,
+    /// Stable digest of observed or expected inputs.
+    pub input_hash: String,
+    /// Stable digest of observed outputs when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_hash: Option<String>,
+    /// Validation status.
+    pub validation_status: PylonTrainingPaymentValidationStatus,
+    /// Whether output files were rechecked.
+    pub output_files_rechecked: bool,
+    /// Whether another payable receipt already covers this shard.
+    pub duplicate_shard: bool,
+    /// Payment status.
+    pub payment_status: PylonTrainingPaymentStatus,
+    /// Payment proof placeholder or actual payment proof.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_proof: Option<String>,
+    /// Reason payment was withheld.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withheld_reason: Option<String>,
+    /// Payment rules applied to this decision.
+    pub payment_rules_applied: Vec<String>,
+    /// Validation errors observed while settling.
+    pub validation_errors: Vec<String>,
+    /// Stable digest over the decision.
+    pub decision_digest: String,
+}
+
+impl PylonTrainingPaymentDecisionReceipt {
+    /// Stable digest with the digest field cleared.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.decision_digest.clear();
+        stable_json_digest(b"psionic_qwen_legal_pylon_payment_decision|", &clone)
+    }
+
+    /// Report row for this decision.
+    #[must_use]
+    pub fn contribution_payment_row(&self) -> PylonTrainingWorkerContributionPaymentRow {
+        PylonTrainingWorkerContributionPaymentRow {
+            job_id: self.job_id.clone(),
+            worker_id: self.worker_id.clone(),
+            worker_pubkey: self.worker_pubkey.clone(),
+            work_type: self.work_type,
+            shard_key: self.shard_key.clone(),
+            agreed_price_microusd: self.agreed_price_microusd,
+            budget_max_microusd: self.budget_max_microusd,
+            currency: self.currency.clone(),
+            budget_id: self.budget_id.clone(),
+            input_hash: self.input_hash.clone(),
+            output_hash: self.output_hash.clone(),
+            validation_status: self.validation_status,
+            payment_status: self.payment_status,
+            payment_proof: self.payment_proof.clone(),
+            withheld_reason: self.withheld_reason.clone(),
+            decision_path: self.decision_path.clone(),
+            decision_digest: self.decision_digest.clone(),
+        }
+    }
 }
 
 /// Error for Pylon legal training job handling.
@@ -531,6 +729,8 @@ pub fn run_qwen_legal_pylon_worker_job(
         parent_run_id: job.parent_run_id.clone(),
         job_kind: job.job_kind,
         job_spec_digest: job.stable_digest(),
+        payment_budget: job.payment_budget.clone(),
+        agreed_price_microusd: job.payment_budget.agreed_price_microusd,
         input_hashes,
         output_hashes,
         started_at_ms: options.started_at_ms,
@@ -548,6 +748,9 @@ pub fn run_qwen_legal_pylon_worker_job(
         signed_payload_digest: String::new(),
         signature_hex: String::new(),
         receipt_digest: String::new(),
+        payment_status: PylonTrainingPaymentStatus::PendingValidation,
+        payment_proof: None,
+        withheld_reason: None,
     };
     sign_receipt(&mut receipt, &signing_key);
     write_json(Path::new(&job.receipt_path), &receipt)?;
@@ -621,6 +824,274 @@ pub fn verify_qwen_legal_pylon_worker_receipt(
         signature_valid: true,
         output_files_rechecked: receipt.status == PylonTrainingWorkerJobStatus::Succeeded,
     })
+}
+
+/// Settles one canonical Pylon legal training job by id.
+pub fn settle_qwen_legal_pylon_training_job(
+    job_id: &str,
+) -> Result<PylonTrainingPaymentDecisionReceipt, QwenLegalPylonTrainingJobError> {
+    let job = canonical_qwen_legal_pylon_training_jobs()
+        .into_iter()
+        .find(|job| job.job_id == job_id)
+        .ok_or_else(|| QwenLegalPylonTrainingJobError::InvalidJob {
+            detail: format!("unknown canonical Pylon legal training job `{job_id}`"),
+        })?;
+    settle_qwen_legal_pylon_training_job_spec(&job)
+}
+
+/// Settles one Pylon legal training job spec.
+pub fn settle_qwen_legal_pylon_training_job_spec(
+    job: &PylonTrainingJobSpec,
+) -> Result<PylonTrainingPaymentDecisionReceipt, QwenLegalPylonTrainingJobError> {
+    job.validate()?;
+    let receipt_path = resolve_workspace_path(job.receipt_path.as_str());
+    let decision_path = payment_decision_path(job);
+    let decision_path_string = payment_decision_receipt_path(job);
+    let mut validation_errors = Vec::new();
+    let mut receipt = None;
+    let mut verification = None;
+    let mut validation_status = PylonTrainingPaymentValidationStatus::MissingReceipt;
+
+    if receipt_path.is_file() {
+        match read_json::<PylonTrainingWorkerReceipt>(receipt_path.as_path()) {
+            Ok(candidate_receipt) => {
+                match verify_qwen_legal_pylon_worker_receipt(
+                    &candidate_receipt,
+                    receipt_path.as_path(),
+                ) {
+                    Ok(candidate_verification) => {
+                        validation_status = PylonTrainingPaymentValidationStatus::Valid;
+                        verification = Some(candidate_verification);
+                    }
+                    Err(error) => {
+                        validation_status = PylonTrainingPaymentValidationStatus::Invalid;
+                        validation_errors.push(error.to_string());
+                    }
+                }
+                receipt = Some(candidate_receipt);
+            }
+            Err(error) => {
+                validation_status = PylonTrainingPaymentValidationStatus::Invalid;
+                validation_errors.push(error.to_string());
+            }
+        }
+    } else {
+        validation_errors.push(format!(
+            "missing worker receipt at `{}`",
+            receipt_path.display()
+        ));
+    }
+
+    let duplicate_shard = receipt
+        .as_ref()
+        .is_some_and(|receipt| duplicate_payable_shard_exists(job, receipt, &decision_path));
+    let mut decision = build_payment_decision(
+        job,
+        receipt.as_ref(),
+        verification.as_ref(),
+        validation_status,
+        duplicate_shard,
+        validation_errors,
+        decision_path_string,
+    );
+    decision.decision_digest = decision.stable_digest();
+    write_json(decision_path.as_path(), &decision)?;
+    Ok(decision)
+}
+
+/// Builds payment table rows for the canonical Pylon legal jobs.
+pub fn qwen_legal_pylon_worker_contribution_payment_table(
+) -> Result<Vec<PylonTrainingWorkerContributionPaymentRow>, QwenLegalPylonTrainingJobError> {
+    canonical_qwen_legal_pylon_training_jobs()
+        .iter()
+        .map(settle_qwen_legal_pylon_training_job_spec)
+        .map(|decision| decision.map(|decision| decision.contribution_payment_row()))
+        .collect()
+}
+
+fn build_payment_decision(
+    job: &PylonTrainingJobSpec,
+    receipt: Option<&PylonTrainingWorkerReceipt>,
+    verification: Option<&PylonTrainingWorkerReceiptVerification>,
+    validation_status: PylonTrainingPaymentValidationStatus,
+    duplicate_shard: bool,
+    mut validation_errors: Vec<String>,
+    decision_path: String,
+) -> PylonTrainingPaymentDecisionReceipt {
+    let worker_id = receipt.map(|receipt| receipt.worker_id.clone());
+    let worker_pubkey = receipt.map(|receipt| receipt.worker_pubkey.clone());
+    let input_hash = receipt
+        .map(|receipt| stable_json_digest(b"psionic_pylon_observed_inputs|", &receipt.input_hashes))
+        .unwrap_or_else(|| {
+            stable_json_digest(
+                b"psionic_pylon_expected_inputs|",
+                &job.expected_input_artifacts,
+            )
+        });
+    let output_hash = receipt.and_then(|receipt| {
+        (!receipt.output_hashes.is_empty())
+            .then(|| stable_json_digest(b"psionic_pylon_observed_outputs|", &receipt.output_hashes))
+    });
+    let mut payment_status = PylonTrainingPaymentStatus::Withheld;
+    let mut payment_proof = None;
+    let mut withheld_reason = None;
+    if duplicate_shard {
+        validation_errors.push(String::from(
+            "duplicate shard already has a payable decision",
+        ));
+    }
+    if validation_status == PylonTrainingPaymentValidationStatus::MissingReceipt {
+        withheld_reason = Some(String::from("missing_worker_receipt"));
+    } else if validation_status == PylonTrainingPaymentValidationStatus::Invalid {
+        withheld_reason = Some(classify_invalid_receipt_reason(
+            validation_errors.as_slice(),
+        ));
+    } else if duplicate_shard {
+        withheld_reason = Some(String::from("duplicate_shard"));
+    } else if let Some(receipt) = receipt {
+        match receipt.status {
+            PylonTrainingWorkerJobStatus::Succeeded => {
+                payment_status = PylonTrainingPaymentStatus::Payable;
+                payment_proof = Some(format!(
+                    "pending_payment_proof:{}:{}:{}",
+                    job.payment_budget.payment_account_ref,
+                    job.payment_budget.budget_id,
+                    job.job_id
+                ));
+            }
+            PylonTrainingWorkerJobStatus::Failed
+                if job.job_kind == PylonTrainingJobKind::EvalShard
+                    && job.payment_budget.pay_failed_but_valid_eval_attempts =>
+            {
+                payment_status = PylonTrainingPaymentStatus::Payable;
+                payment_proof = Some(format!(
+                    "pending_failed_eval_attempt_payment:{}:{}:{}",
+                    job.payment_budget.payment_account_ref,
+                    job.payment_budget.budget_id,
+                    job.job_id
+                ));
+            }
+            PylonTrainingWorkerJobStatus::Failed => {
+                withheld_reason = Some(classify_worker_failure_reason(
+                    receipt.failure_reason.as_deref().unwrap_or_default(),
+                ));
+            }
+        }
+    }
+    PylonTrainingPaymentDecisionReceipt {
+        schema_version: String::from(QWEN_LEGAL_PYLON_PAYMENT_DECISION_SCHEMA_VERSION),
+        decision_id: format!("decision.{}.payment", job.job_id),
+        decision_path,
+        job_id: job.job_id.clone(),
+        parent_run_id: job.parent_run_id.clone(),
+        work_type: job.job_kind,
+        shard_key: pylon_payment_shard_key(job),
+        worker_id,
+        worker_pubkey,
+        budget_id: job.payment_budget.budget_id.clone(),
+        agreed_price_microusd: job.payment_budget.agreed_price_microusd,
+        budget_max_microusd: job.payment_budget.max_cost_microusd,
+        currency: job.payment_budget.currency.clone(),
+        payment_account_ref: job.payment_budget.payment_account_ref.clone(),
+        job_spec_digest: job.stable_digest(),
+        worker_receipt_digest: receipt.map(|receipt| receipt.receipt_digest.clone()),
+        signed_payload_digest: receipt.map(|receipt| receipt.signed_payload_digest.clone()),
+        input_hash,
+        output_hash,
+        validation_status,
+        output_files_rechecked: verification
+            .is_some_and(|verification| verification.output_files_rechecked),
+        duplicate_shard,
+        payment_status,
+        payment_proof,
+        withheld_reason,
+        payment_rules_applied: vec![
+            String::from("withhold_wrong_input_hash"),
+            String::from("withhold_missing_output"),
+            String::from("withhold_invalid_receipt"),
+            String::from("withhold_corrupted_artifact"),
+            String::from("withhold_duplicate_shard"),
+            String::from("withhold_failed_integrity_validation"),
+            String::from("pay_failed_valid_eval_attempts_only_when_job_budget_allows"),
+        ],
+        validation_errors,
+        decision_digest: String::new(),
+    }
+}
+
+fn payment_decision_path(job: &PylonTrainingJobSpec) -> PathBuf {
+    resolve_workspace_path(payment_decision_receipt_path(job))
+}
+
+fn payment_decision_receipt_path(job: &PylonTrainingJobSpec) -> String {
+    Path::new(job.output_dir.as_str())
+        .join("settlements")
+        .join(format!("{}.payment_decision.json", job.job_id))
+        .display()
+        .to_string()
+}
+
+fn duplicate_payable_shard_exists(
+    job: &PylonTrainingJobSpec,
+    receipt: &PylonTrainingWorkerReceipt,
+    decision_path: &Path,
+) -> bool {
+    let Some(dir) = decision_path.parent() else {
+        return false;
+    };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return false;
+    };
+    let shard_key = pylon_payment_shard_key(job);
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path == decision_path || path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(decision) = read_json::<PylonTrainingPaymentDecisionReceipt>(path.as_path()) else {
+            continue;
+        };
+        if decision.shard_key == shard_key
+            && decision.payment_status == PylonTrainingPaymentStatus::Payable
+            && decision.worker_receipt_digest.as_deref() != Some(receipt.receipt_digest.as_str())
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn pylon_payment_shard_key(job: &PylonTrainingJobSpec) -> String {
+    format!(
+        "{}:{:?}:{}:{}",
+        job.parent_run_id,
+        job.job_kind,
+        job.shard_assignment.shard_id,
+        job.shard_assignment.shard_index
+    )
+}
+
+fn classify_invalid_receipt_reason(errors: &[String]) -> String {
+    let joined = errors.join(" | ");
+    if joined.contains("hash drifted") {
+        String::from("corrupted_artifact")
+    } else if joined.contains("signature") || joined.contains("digest drifted") {
+        String::from("invalid_receipt")
+    } else if joined.contains("missing worker receipt") {
+        String::from("missing_worker_receipt")
+    } else {
+        String::from("failed_integrity_validation")
+    }
+}
+
+fn classify_worker_failure_reason(reason: &str) -> String {
+    if reason.contains("hash mismatch") {
+        String::from("wrong_input_hash")
+    } else if reason.contains("required output artifact") {
+        String::from("missing_output")
+    } else {
+        String::from("failed_integrity_validation")
+    }
 }
 
 fn validate_inputs(job: &PylonTrainingJobSpec) -> Result<(), String> {
@@ -913,6 +1384,15 @@ pub fn canonical_qwen_legal_eval_shard_job() -> PylonTrainingJobSpec {
     )
 }
 
+/// Builds the canonical Pylon legal job set.
+#[must_use]
+pub fn canonical_qwen_legal_pylon_training_jobs() -> Vec<PylonTrainingJobSpec> {
+    vec![
+        canonical_qwen_legal_dataset_shard_job(),
+        canonical_qwen_legal_eval_shard_job(),
+    ]
+}
+
 fn canonical_job(
     job_id: &str,
     job_kind: PylonTrainingJobKind,
@@ -960,8 +1440,11 @@ fn canonical_job(
         },
         payment_budget: PylonTrainingPaymentBudget {
             budget_id: String::from("budget.qwen-legal.pylon.protocol.000001"),
-            max_cost_microusd: 0,
-            payment_account_ref: String::from("ledger://local-smoke/no-payment"),
+            agreed_price_microusd: 2_500,
+            max_cost_microusd: 2_500,
+            currency: String::from("USD"),
+            payment_account_ref: String::from("ledger://local-smoke/qwen-legal-pylon"),
+            pay_failed_but_valid_eval_attempts: false,
         },
         receipt_requirements: PylonTrainingReceiptRequirements {
             require_signature: true,
@@ -1006,8 +1489,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pylon_worker_accepts_dataset_shard_and_verifies_receipt()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_worker_accepts_dataset_shard_and_verifies_receipt(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let mut job = canonical_qwen_legal_dataset_shard_job();
         job.output_dir = temp.path().display().to_string();
@@ -1027,8 +1510,8 @@ mod tests {
     }
 
     #[test]
-    fn pylon_worker_accepts_eval_shard_and_verifies_receipt()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_worker_accepts_eval_shard_and_verifies_receipt(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let mut job = canonical_qwen_legal_eval_shard_job();
         job.output_dir = temp.path().display().to_string();
@@ -1059,13 +1542,11 @@ mod tests {
         let receipt =
             run_qwen_legal_pylon_worker_job(&job, &PylonLocalWorkerRunOptions::default())?;
         assert_eq!(receipt.status, PylonTrainingWorkerJobStatus::Failed);
-        assert!(
-            receipt
-                .failure_reason
-                .as_deref()
-                .unwrap_or_default()
-                .contains("hash mismatch")
-        );
+        assert!(receipt
+            .failure_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("hash mismatch"));
         verify_qwen_legal_pylon_worker_receipt_path(&job.receipt_path)?;
         Ok(())
     }
@@ -1088,14 +1569,115 @@ mod tests {
 
         let receipt = run_qwen_legal_pylon_worker_job(&job, &options)?;
         assert_eq!(receipt.status, PylonTrainingWorkerJobStatus::Failed);
-        assert!(
-            receipt
-                .failure_reason
-                .as_deref()
-                .unwrap_or_default()
-                .contains("required output artifact")
-        );
+        assert!(receipt
+            .failure_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("required output artifact"));
         verify_qwen_legal_pylon_worker_receipt_path(&job.receipt_path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_payment_settlement_marks_valid_receipt_payable(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let mut job = canonical_qwen_legal_dataset_shard_job();
+        job.output_dir = temp.path().display().to_string();
+        job.receipt_path = temp.path().join("receipt.json").display().to_string();
+        job.expected_output_artifacts[0].path =
+            temp.path().join("dataset_shard.json").display().to_string();
+
+        run_qwen_legal_pylon_worker_job(&job, &PylonLocalWorkerRunOptions::default())?;
+        let decision = settle_qwen_legal_pylon_training_job_spec(&job)?;
+        assert_eq!(
+            decision.validation_status,
+            PylonTrainingPaymentValidationStatus::Valid
+        );
+        assert_eq!(decision.payment_status, PylonTrainingPaymentStatus::Payable);
+        assert_eq!(decision.agreed_price_microusd, 2_500);
+        assert!(decision.payment_proof.is_some());
+        assert!(Path::new(&decision.decision_path).is_file());
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_payment_settlement_withholds_invalid_receipt() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempfile::tempdir()?;
+        let mut job = canonical_qwen_legal_dataset_shard_job();
+        job.output_dir = temp.path().display().to_string();
+        job.receipt_path = temp.path().join("receipt.json").display().to_string();
+        job.expected_output_artifacts[0].path =
+            temp.path().join("dataset_shard.json").display().to_string();
+        job.expected_input_artifacts[0].sha256 =
+            String::from("0000000000000000000000000000000000000000000000000000000000000000");
+
+        run_qwen_legal_pylon_worker_job(&job, &PylonLocalWorkerRunOptions::default())?;
+        let decision = settle_qwen_legal_pylon_training_job_spec(&job)?;
+        assert_eq!(
+            decision.validation_status,
+            PylonTrainingPaymentValidationStatus::Valid
+        );
+        assert_eq!(
+            decision.payment_status,
+            PylonTrainingPaymentStatus::Withheld
+        );
+        assert_eq!(
+            decision.withheld_reason.as_deref(),
+            Some("wrong_input_hash")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_payment_settlement_withholds_duplicate_shard() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempfile::tempdir()?;
+        let mut first = canonical_qwen_legal_dataset_shard_job();
+        first.output_dir = temp.path().display().to_string();
+        first.receipt_path = temp.path().join("first_receipt.json").display().to_string();
+        first.expected_output_artifacts[0].path = temp
+            .path()
+            .join("first_dataset_shard.json")
+            .display()
+            .to_string();
+        run_qwen_legal_pylon_worker_job(&first, &PylonLocalWorkerRunOptions::default())?;
+        let first_decision = settle_qwen_legal_pylon_training_job_spec(&first)?;
+        assert_eq!(
+            first_decision.payment_status,
+            PylonTrainingPaymentStatus::Payable
+        );
+
+        let mut duplicate = first.clone();
+        duplicate.job_id = String::from("job.qwen-legal.dataset-shard.duplicate");
+        duplicate.receipt_path = temp
+            .path()
+            .join("second_receipt.json")
+            .display()
+            .to_string();
+        duplicate.expected_output_artifacts[0].artifact_id =
+            String::from("artifact.job.qwen-legal.dataset-shard.duplicate.output");
+        duplicate.expected_output_artifacts[0].path = temp
+            .path()
+            .join("second_dataset_shard.json")
+            .display()
+            .to_string();
+        let options = PylonLocalWorkerRunOptions {
+            worker_id: String::from("pylon.local.qwen-legal.duplicate"),
+            ..PylonLocalWorkerRunOptions::default()
+        };
+        run_qwen_legal_pylon_worker_job(&duplicate, &options)?;
+        let duplicate_decision = settle_qwen_legal_pylon_training_job_spec(&duplicate)?;
+        assert!(duplicate_decision.duplicate_shard);
+        assert_eq!(
+            duplicate_decision.payment_status,
+            PylonTrainingPaymentStatus::Withheld
+        );
+        assert_eq!(
+            duplicate_decision.withheld_reason.as_deref(),
+            Some("duplicate_shard")
+        );
         Ok(())
     }
 

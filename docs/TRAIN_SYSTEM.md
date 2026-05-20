@@ -289,6 +289,15 @@ materializes required outputs, writes a signed Ed25519 receipt, and verifies
 that receipt locally. This is still a protocol smoke; it proves job admission
 and receipt integrity before Nexus dispatch work starts, not live distributed
 Qwen training.
+That same protocol now records payment budgets and settlement decisions.
+Worker receipts carry the agreed price and start as `pending_validation`.
+`cargo run -p psionic-train --example qwen_legal_settle_training_job -- <job-id>`
+verifies the worker receipt, required input hashes, output hashes, duplicate
+shard status, and failed-eval payment policy before marking the job
+`payable` or `withheld`. The legal fine-tuning report includes the resulting
+contribution/payment table, so a training run can show which worker did the
+work, what artifact it produced, why it is payable or withheld, and the
+decision digest for audit.
 The data side of that handoff now lives in
 `crates/psionic-data/src/legal_benchmark_dataset_sharding.rs`. It sorts legal
 SFT examples by `example_id`, computes one canonical global dataset hash,
