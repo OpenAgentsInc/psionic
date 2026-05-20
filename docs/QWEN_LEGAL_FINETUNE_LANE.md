@@ -248,6 +248,32 @@ This dry run expands beyond the retained 20-task slice before any all-task
 campaign. It is readiness evidence for a broader benchmark run, not a retained
 score claim.
 
+## Phase-Seven Full-Corpus Matrix Dry Run
+
+The lane now also emits `QwenLegalRlFullCorpusMatrixReport` with schema
+`psionic.qwen_legal_rl_full_corpus_matrix.v1`. It consumes the phase-six
+expanded corpus report and the Blueprint full-corpus matrix plan:
+
+- phase-six target carried forward: 9500 bps
+- phase-seven conservative target: 9800 bps
+- full corpus: 1251 Harvey tasks
+- practice-area coverage: all 24 audited practice areas
+- Qwen/Blueprint/RL matrix cells: 48
+- accepted rollout minimum: 410
+- quarantine budget: 38
+- adversarial holdout task-runs: 144
+- holdout regression allowance: 0 bps
+- calibrated judge disagreement budget: 25 bps
+- family coverage: all nine Blueprint optimizer frontier families
+- Blueprint plan ref:
+  `blueprint://harvey_legal_qwen_phase_seven_full_corpus_matrix_plan/optimizer_plan.harvey_legal_qwen.phase_007.full_corpus_matrix`
+- export ref:
+  `autopilot4://benchmarks/harvey/progress/phase-007`
+
+This dry run is the first local matrix contract over the full Harvey corpus. It
+is still readiness evidence only; public score claims require imported score
+reports and release-gate approval.
+
 ## Runtime Admission
 
 `train_runtime.rs` admits the lane as a CUDA adapter-training machine lane:

@@ -58,6 +58,9 @@ pub const QWEN_LEGAL_RL_RETAINED_REHEARSAL_SCHEMA_VERSION: &str =
 /// Stable schema version for the legal RL expanded corpus report.
 pub const QWEN_LEGAL_RL_EXPANDED_CORPUS_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_expanded_corpus.v1";
+/// Stable schema version for the legal RL full-corpus matrix report.
+pub const QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_full_corpus_matrix.v1";
 /// Stable plan id for the next Harvey legal hillclimb phase.
 pub const QWEN_LEGAL_RL_HILLCLIMB_PLAN_ID: &str = "qwen_legal_rl_hillclimb_plan_v1";
 /// Stable report id for the next Harvey legal RL benchmark projection.
@@ -73,6 +76,9 @@ pub const QWEN_LEGAL_RL_RETAINED_REHEARSAL_REPORT_ID: &str =
     "qwen_legal_rl_retained_rehearsal_phase_005";
 /// Stable report id for the phase-six Harvey legal expanded corpus dry run.
 pub const QWEN_LEGAL_RL_EXPANDED_CORPUS_REPORT_ID: &str = "qwen_legal_rl_expanded_corpus_phase_006";
+/// Stable report id for the phase-seven Harvey legal full-corpus matrix dry run.
+pub const QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_REPORT_ID: &str =
+    "qwen_legal_rl_full_corpus_matrix_phase_007";
 /// Phase-two retained target aligned with Blueprint optimizer batch `phase_002`.
 pub const QWEN_LEGAL_PHASE_TWO_TARGET_SCORE_BPS: u16 = 7_000;
 /// Phase-three retained target aligned with Blueprint shadow-eval shortlist.
@@ -83,6 +89,8 @@ pub const QWEN_LEGAL_PHASE_FOUR_TARGET_SCORE_BPS: u16 = 8_500;
 pub const QWEN_LEGAL_PHASE_FIVE_TARGET_SCORE_BPS: u16 = 9_000;
 /// Phase-six retained target aligned with Blueprint expanded corpus plan.
 pub const QWEN_LEGAL_PHASE_SIX_TARGET_SCORE_BPS: u16 = 9_500;
+/// Phase-seven retained target aligned with Blueprint full-corpus matrix plan.
+pub const QWEN_LEGAL_PHASE_SEVEN_TARGET_SCORE_BPS: u16 = 9_800;
 /// Blueprint frontier consumed by the Psionic legal RL plan.
 pub const QWEN_LEGAL_BLUEPRINT_OPTIMIZER_FRONTIER_REF: &str =
     "blueprint://harvey_legal_qwen_optimizer_frontier/optimizer_frontier_001";
@@ -94,6 +102,8 @@ pub const QWEN_LEGAL_BLUEPRINT_PERFECT_SCORE_PUSH_PLAN_REF: &str = "blueprint://
 pub const QWEN_LEGAL_BLUEPRINT_RETAINED_REHEARSAL_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_five_retained_rehearsal_plan/optimizer_plan.harvey_legal_qwen.phase_005.retained_rehearsal";
 /// Blueprint phase-six expanded corpus plan consumed by Psionic.
 pub const QWEN_LEGAL_BLUEPRINT_EXPANDED_CORPUS_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_six_expanded_corpus_plan/optimizer_plan.harvey_legal_qwen.phase_006.expanded_corpus";
+/// Blueprint phase-seven full-corpus matrix plan consumed by Psionic.
+pub const QWEN_LEGAL_BLUEPRINT_FULL_CORPUS_MATRIX_PLAN_REF: &str = "blueprint://harvey_legal_qwen_phase_seven_full_corpus_matrix_plan/optimizer_plan.harvey_legal_qwen.phase_007.full_corpus_matrix";
 /// Stable target-set id for the first narrow LM-head-only adapter.
 pub const QWEN_LEGAL_ADAPTER_TARGET_SET_ID: &str = "qwen3.5-4b.legal.lm_head_lora.v1";
 /// Stable adapter target id for the first smoke lane.
@@ -1359,6 +1369,86 @@ pub struct QwenLegalRlExpandedCorpusReport {
     pub report_digest: String,
 }
 
+/// One failure-family allocation inside the phase-seven full-corpus matrix report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlFullCorpusMatrixTarget {
+    /// Failure family shared with Blueprint and Autopilot4.
+    pub failure_family: String,
+    /// Optimizer method assigned to this family.
+    pub optimizer_method: QwenLegalRlOptimizerMethod,
+    /// Blueprint module receiving the full-corpus candidate.
+    pub blueprint_module_slug: String,
+    /// Dataset or review request admitted into the full-corpus matrix.
+    pub dataset_request_ref: String,
+    /// Planned accepted rollouts or reviewed traces for this family.
+    pub planned_accepted_rollouts: u16,
+    /// Conservative lift this target should support in full-corpus scoring.
+    pub planned_full_corpus_lift_basis_points: u16,
+    /// Full Harvey corpus task count this family must be evaluated against.
+    pub full_corpus_task_count: u16,
+    /// Number of Qwen/Blueprint/RL matrix cells this family must cover.
+    pub model_matrix_cell_count: u16,
+    /// Whether every audited practice area must remain represented.
+    pub practice_area_balance_required: bool,
+    /// Per-family scorecard that must exist before promotion review.
+    pub scorecard_ref: String,
+    /// Per-family receipt that must exist before promotion review.
+    pub receipt_ref: String,
+}
+
+/// Phase-seven offline RL/adjudication report for full Harvey corpus scoring.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalRlFullCorpusMatrixReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable report id.
+    pub report_id: String,
+    /// Source phase-six report id.
+    pub source_expanded_report_id: String,
+    /// Stable digest of the phase-six report payload.
+    pub source_expanded_report_digest: String,
+    /// Plan id this full-corpus matrix dry run still executes.
+    pub plan_id: String,
+    /// Stable digest of the plan payload.
+    pub plan_digest: String,
+    /// Baseline retained score used for the full-corpus matrix dry run.
+    pub baseline_score_basis_points: u16,
+    /// Previous target carried forward from phase six.
+    pub previous_target_score_basis_points: u16,
+    /// New phase-seven conservative target.
+    pub phase_seven_target_score_basis_points: u16,
+    /// Sum of family-level planned full-corpus lifts.
+    pub total_planned_full_corpus_lift_basis_points: u16,
+    /// Target model family for retained scoring.
+    pub retained_target_model_id: String,
+    /// Rollout window id widened for phase seven.
+    pub rollout_window_id: String,
+    /// Full Harvey task corpus size.
+    pub full_corpus_task_count: u16,
+    /// Audited Harvey practice areas that must be represented.
+    pub practice_area_count: u8,
+    /// Number of Qwen/Blueprint/RL matrix cells required before import.
+    pub model_matrix_cell_count: u16,
+    /// Minimum accepted rollout count for the phase-seven dry run.
+    pub accepted_rollout_minimum: u16,
+    /// Maximum quarantined rollout count for the phase-seven dry run.
+    pub quarantined_rollout_budget: u16,
+    /// Minimum adversarial holdout task-runs for the dry run.
+    pub adversarial_holdout_run_count: u16,
+    /// Maximum permitted holdout regression for promotion review.
+    pub holdout_max_regression_basis_points: u16,
+    /// Maximum unresolved judge-disagreement budget.
+    pub calibrated_judge_disagreement_budget_basis_points: u16,
+    /// Blueprint full-corpus matrix plan ref consumed by this report.
+    pub blueprint_full_corpus_matrix_plan_ref: String,
+    /// Per-family target allocations.
+    pub targets: Vec<QwenLegalRlFullCorpusMatrixTarget>,
+    /// Autopilot4 export/update target.
+    pub benchmark_export_ref: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
 impl QwenLegalRlBenchmarkReadinessReport {
     /// Returns the stable digest over the report payload.
     #[must_use]
@@ -1888,6 +1978,138 @@ impl QwenLegalRlExpandedCorpusReport {
     }
 }
 
+impl QwenLegalRlFullCorpusMatrixReport {
+    /// Returns the stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(b"psionic_qwen_legal_rl_full_corpus_matrix|", &clone)
+    }
+
+    fn validate(&self) -> Result<(), QwenLegalAdapterSftError> {
+        if self.schema_version != QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_SCHEMA_VERSION {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL full-corpus matrix schema version drifted"),
+            });
+        }
+        if self.report_id != QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_REPORT_ID {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL full-corpus matrix report id drifted"),
+            });
+        }
+        require_nonempty(
+            self.source_expanded_report_id.as_str(),
+            "source_expanded_report_id",
+        )?;
+        require_nonempty(
+            self.source_expanded_report_digest.as_str(),
+            "source_expanded_report_digest",
+        )?;
+        require_nonempty(self.plan_id.as_str(), "plan_id")?;
+        require_nonempty(self.plan_digest.as_str(), "plan_digest")?;
+        if self.previous_target_score_basis_points != QWEN_LEGAL_PHASE_SIX_TARGET_SCORE_BPS
+            || self.phase_seven_target_score_basis_points != QWEN_LEGAL_PHASE_SEVEN_TARGET_SCORE_BPS
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL full-corpus matrix target drifted"),
+            });
+        }
+        if self.baseline_score_basis_points >= self.previous_target_score_basis_points
+            || self.previous_target_score_basis_points >= self.phase_seven_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL full-corpus matrix requires monotonic targets"),
+            });
+        }
+        if self
+            .baseline_score_basis_points
+            .saturating_add(self.total_planned_full_corpus_lift_basis_points)
+            < self.phase_seven_target_score_basis_points
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("planned full-corpus lift does not support target"),
+            });
+        }
+        require_nonempty(
+            self.retained_target_model_id.as_str(),
+            "retained_target_model_id",
+        )?;
+        require_nonempty(self.rollout_window_id.as_str(), "rollout_window_id")?;
+        if self.full_corpus_task_count < 1251
+            || self.practice_area_count < 24
+            || self.model_matrix_cell_count < 48
+        {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from(
+                    "full-corpus matrix requires corpus, practice areas, and matrix coverage",
+                ),
+            });
+        }
+        if self.accepted_rollout_minimum <= self.quarantined_rollout_budget {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("accepted full-corpus rollouts must exceed quarantine budget"),
+            });
+        }
+        if self.adversarial_holdout_run_count < 144 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("full-corpus matrix requires adversarial holdout task-runs"),
+            });
+        }
+        if self.holdout_max_regression_basis_points != 0 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("phase-seven Harvey dry run allows no holdout regression"),
+            });
+        }
+        if self.calibrated_judge_disagreement_budget_basis_points > 25 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("full-corpus matrix judge disagreement budget is too loose"),
+            });
+        }
+        require_nonempty(
+            self.blueprint_full_corpus_matrix_plan_ref.as_str(),
+            "blueprint_full_corpus_matrix_plan_ref",
+        )?;
+        if self.targets.len() < 9 {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("full-corpus matrix requires all frontier families"),
+            });
+        }
+        for target in &self.targets {
+            require_nonempty(target.failure_family.as_str(), "target.failure_family")?;
+            require_nonempty(
+                target.blueprint_module_slug.as_str(),
+                "target.blueprint_module_slug",
+            )?;
+            require_nonempty(
+                target.dataset_request_ref.as_str(),
+                "target.dataset_request_ref",
+            )?;
+            require_nonempty(target.scorecard_ref.as_str(), "target.scorecard_ref")?;
+            require_nonempty(target.receipt_ref.as_str(), "target.receipt_ref")?;
+            if target.planned_accepted_rollouts == 0
+                || target.planned_full_corpus_lift_basis_points == 0
+                || target.full_corpus_task_count < 1251
+                || target.model_matrix_cell_count < 48
+                || !target.practice_area_balance_required
+            {
+                return Err(QwenLegalAdapterSftError::InvalidConfig {
+                    detail: String::from(
+                        "full-corpus matrix targets require rollouts, lift, corpus, matrix, and practice balance",
+                    ),
+                });
+            }
+        }
+        require_nonempty(self.benchmark_export_ref.as_str(), "benchmark_export_ref")?;
+        if self.report_digest != self.stable_digest() {
+            return Err(QwenLegalAdapterSftError::InvalidConfig {
+                detail: String::from("legal RL full-corpus matrix digest drifted"),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Builds the offline benchmark projection for a legal RL plan.
 pub fn qwen_legal_rl_benchmark_readiness_report(
     plan: &QwenLegalRlHillclimbPlan,
@@ -2302,6 +2524,90 @@ pub fn qwen_legal_rl_phase_six_expanded_corpus_report(
     Ok(report)
 }
 
+/// Builds the phase-seven full-corpus matrix dry-run report from the expanded corpus report.
+pub fn qwen_legal_rl_phase_seven_full_corpus_matrix_report(
+    plan: &QwenLegalRlHillclimbPlan,
+    expanded_report: &QwenLegalRlExpandedCorpusReport,
+) -> Result<QwenLegalRlFullCorpusMatrixReport, QwenLegalAdapterSftError> {
+    plan.validate()?;
+    expanded_report.validate()?;
+    if expanded_report.plan_digest != plan.plan_digest
+        || expanded_report.plan_id != plan.plan_id
+        || expanded_report.phase_six_target_score_basis_points
+            != QWEN_LEGAL_PHASE_SIX_TARGET_SCORE_BPS
+    {
+        return Err(QwenLegalAdapterSftError::InvalidConfig {
+            detail: String::from("phase-seven full-corpus matrix source report mismatch"),
+        });
+    }
+
+    let targets = expanded_report
+        .targets
+        .iter()
+        .map(|target| QwenLegalRlFullCorpusMatrixTarget {
+            failure_family: target.failure_family.clone(),
+            optimizer_method: target.optimizer_method,
+            blueprint_module_slug: target.blueprint_module_slug.clone(),
+            dataset_request_ref: target.dataset_request_ref.clone(),
+            planned_accepted_rollouts: target.planned_accepted_rollouts + 16,
+            planned_full_corpus_lift_basis_points: ((target.planned_expanded_lift_basis_points
+                as u32
+                * 108)
+                / 100) as u16,
+            full_corpus_task_count: 1251,
+            model_matrix_cell_count: 48,
+            practice_area_balance_required: true,
+            scorecard_ref: target
+                .scorecard_ref
+                .replace("phase_006.expanded_corpus", "phase_007.full_corpus_matrix"),
+            receipt_ref: format!(
+                "receipt.psionic.qwen_legal.{}.phase_007.full_corpus_matrix",
+                target.failure_family
+            ),
+        })
+        .collect::<Vec<_>>();
+    let total_planned_full_corpus_lift_basis_points = targets
+        .iter()
+        .map(|target| target.planned_full_corpus_lift_basis_points)
+        .sum::<u16>();
+    let accepted_rollout_minimum = targets
+        .iter()
+        .map(|target| target.planned_accepted_rollouts)
+        .sum::<u16>();
+
+    let mut report = QwenLegalRlFullCorpusMatrixReport {
+        schema_version: String::from(QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_SCHEMA_VERSION),
+        report_id: String::from(QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_REPORT_ID),
+        source_expanded_report_id: expanded_report.report_id.clone(),
+        source_expanded_report_digest: expanded_report.report_digest.clone(),
+        plan_id: plan.plan_id.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        baseline_score_basis_points: expanded_report.baseline_score_basis_points,
+        previous_target_score_basis_points: expanded_report.phase_six_target_score_basis_points,
+        phase_seven_target_score_basis_points: QWEN_LEGAL_PHASE_SEVEN_TARGET_SCORE_BPS,
+        total_planned_full_corpus_lift_basis_points,
+        retained_target_model_id: plan.retained_target_model_id.clone(),
+        rollout_window_id: String::from("harvey-legal-full-corpus-matrix-window-007"),
+        full_corpus_task_count: 1251,
+        practice_area_count: 24,
+        model_matrix_cell_count: 48,
+        accepted_rollout_minimum,
+        quarantined_rollout_budget: expanded_report.quarantined_rollout_budget + 8,
+        adversarial_holdout_run_count: 144,
+        holdout_max_regression_basis_points: 0,
+        calibrated_judge_disagreement_budget_basis_points: 25,
+        blueprint_full_corpus_matrix_plan_ref: String::from(
+            QWEN_LEGAL_BLUEPRINT_FULL_CORPUS_MATRIX_PLAN_REF,
+        ),
+        targets,
+        benchmark_export_ref: String::from("autopilot4://benchmarks/harvey/progress/phase-007"),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    report.validate()?;
+    Ok(report)
+}
+
 /// Full higher-level Qwen legal adapter smoke outcome.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QwenLegalAdapterSftRunOutcome {
@@ -2335,6 +2641,8 @@ pub struct QwenLegalAdapterSftRunOutcome {
     pub rl_retained_rehearsal_report: QwenLegalRlRetainedRehearsalReport,
     /// Phase-six expanded corpus report for the RL hillclimb plan.
     pub rl_expanded_corpus_report: QwenLegalRlExpandedCorpusReport,
+    /// Phase-seven full-corpus matrix report for the RL hillclimb plan.
+    pub rl_full_corpus_matrix_report: QwenLegalRlFullCorpusMatrixReport,
 }
 
 /// First honest Qwen legal adapter-SFT smoke trainer.
@@ -2652,6 +2960,10 @@ impl QwenLegalAdapterSftTrainer {
             &rl_hillclimb_plan,
             &rl_retained_rehearsal_report,
         )?;
+        let rl_full_corpus_matrix_report = qwen_legal_rl_phase_seven_full_corpus_matrix_report(
+            &rl_hillclimb_plan,
+            &rl_expanded_corpus_report,
+        )?;
         let summary = QwenLegalAdapterSftSummary {
             run_summary,
             lane_id: String::from(QWEN_LEGAL_ADAPTER_SFT_LANE_ID),
@@ -2692,6 +3004,7 @@ impl QwenLegalAdapterSftTrainer {
             rl_perfect_score_push_report,
             rl_retained_rehearsal_report,
             rl_expanded_corpus_report,
+            rl_full_corpus_matrix_report,
         })
     }
 
@@ -3023,6 +3336,16 @@ mod tests {
         assert_eq!(
             outcome.rl_expanded_corpus_report.report_digest,
             outcome.rl_expanded_corpus_report.stable_digest()
+        );
+        assert_eq!(
+            outcome
+                .rl_full_corpus_matrix_report
+                .phase_seven_target_score_basis_points,
+            QWEN_LEGAL_PHASE_SEVEN_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            outcome.rl_full_corpus_matrix_report.report_digest,
+            outcome.rl_full_corpus_matrix_report.stable_digest()
         );
         let loaded = outcome.exported_artifact.load_lm_head_lora_artifact()?;
         assert_eq!(loaded.hidden_size, 4);
@@ -3446,6 +3769,93 @@ mod tests {
         }));
         assert!(expanded.benchmark_export_ref.ends_with("phase-006"));
         assert_eq!(expanded.report_digest, expanded.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn qwen_legal_rl_phase_seven_full_corpus_matrix_targets_98_percent()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = canonical_qwen_legal_rl_hillclimb_plan(
+            sample_dataset_binding(),
+            sample_eval_pack_binding(),
+            "qwen35-4b-legal-smoke-r1-score-import",
+        )?;
+        let readiness_report = qwen_legal_rl_benchmark_readiness_report(&plan, 5_260)?;
+        let window =
+            qwen_legal_rl_phase_three_optimization_window_report(&plan, &readiness_report)?;
+        let push = qwen_legal_rl_phase_four_perfect_score_push_report(&plan, &window)?;
+        let rehearsal = qwen_legal_rl_phase_five_retained_rehearsal_report(&plan, &push)?;
+        let expanded = qwen_legal_rl_phase_six_expanded_corpus_report(&plan, &rehearsal)?;
+        let full_corpus = qwen_legal_rl_phase_seven_full_corpus_matrix_report(&plan, &expanded)?;
+        let families = full_corpus
+            .targets
+            .iter()
+            .map(|target| target.failure_family.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            full_corpus.schema_version,
+            QWEN_LEGAL_RL_FULL_CORPUS_MATRIX_SCHEMA_VERSION
+        );
+        assert_eq!(full_corpus.plan_digest, plan.plan_digest);
+        assert_eq!(
+            full_corpus.source_expanded_report_digest,
+            expanded.report_digest
+        );
+        assert_eq!(
+            full_corpus.previous_target_score_basis_points,
+            QWEN_LEGAL_PHASE_SIX_TARGET_SCORE_BPS
+        );
+        assert_eq!(
+            full_corpus.phase_seven_target_score_basis_points,
+            QWEN_LEGAL_PHASE_SEVEN_TARGET_SCORE_BPS
+        );
+        assert!(
+            full_corpus
+                .baseline_score_basis_points
+                .saturating_add(full_corpus.total_planned_full_corpus_lift_basis_points)
+                >= full_corpus.phase_seven_target_score_basis_points
+        );
+        assert_eq!(full_corpus.full_corpus_task_count, 1251);
+        assert_eq!(full_corpus.practice_area_count, 24);
+        assert_eq!(full_corpus.model_matrix_cell_count, 48);
+        assert_eq!(full_corpus.accepted_rollout_minimum, 410);
+        assert_eq!(full_corpus.quarantined_rollout_budget, 38);
+        assert_eq!(full_corpus.adversarial_holdout_run_count, 144);
+        assert_eq!(full_corpus.holdout_max_regression_basis_points, 0);
+        assert!(full_corpus.calibrated_judge_disagreement_budget_basis_points <= 25);
+        assert!(
+            full_corpus
+                .blueprint_full_corpus_matrix_plan_ref
+                .contains("phase_seven_full_corpus_matrix_plan")
+        );
+        assert_eq!(full_corpus.targets.len(), 9);
+        for family in [
+            "document_coverage",
+            "citation_evidence",
+            "legal_reasoning",
+            "spreadsheet_reasoning",
+            "missing_fact",
+            "pre_submit_self_check",
+            "deliverable_completeness",
+            "fine_tune_data_selection",
+            "task_intake_routing",
+        ] {
+            assert!(families.contains(&family), "missing {family}");
+        }
+        assert!(full_corpus.targets.iter().all(|target| {
+            target.practice_area_balance_required
+                && target.full_corpus_task_count == 1251
+                && target.model_matrix_cell_count == 48
+                && target.planned_accepted_rollouts > 0
+                && target.planned_full_corpus_lift_basis_points > 0
+                && target
+                    .scorecard_ref
+                    .contains("phase_007.full_corpus_matrix")
+                && target.receipt_ref.contains("phase_007.full_corpus_matrix")
+        }));
+        assert!(full_corpus.benchmark_export_ref.ends_with("phase-007"));
+        assert_eq!(full_corpus.report_digest, full_corpus.stable_digest());
         Ok(())
     }
 

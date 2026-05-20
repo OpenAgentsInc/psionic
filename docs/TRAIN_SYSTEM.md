@@ -202,6 +202,13 @@ Harvey tasks with all 24 audited practice areas represented, requires 266
 accepted rollouts, caps quarantine at 30 rollouts, adds 72 adversarial holdout
 task-runs, allows zero holdout regression, and lowers the judge-disagreement
 budget to 35 bps.
+The lane now also emits a phase-seven full-corpus matrix report that consumes
+the Blueprint full-corpus matrix plan, carries the 9500 bps target forward,
+raises the next local benchmark target to 9800 bps, expands the dry-run surface
+to all 1251 Harvey tasks, requires 48 Qwen/Blueprint/RL matrix cells, keeps all
+24 audited practice areas represented, requires 410 accepted rollouts, caps
+quarantine at 38 rollouts, adds 144 adversarial holdout task-runs, allows zero
+holdout regression, and lowers the judge-disagreement budget to 25 bps.
 Those reports are readiness evidence only; retained score claims still require
 the actual retained slice and Autopilot4 release-gate approval.
 The paired serving/eval metadata path is in
