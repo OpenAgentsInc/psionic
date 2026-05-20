@@ -260,6 +260,15 @@ materializes required outputs, writes a signed Ed25519 receipt, and verifies
 that receipt locally. This is still a protocol smoke; it proves job admission
 and receipt integrity before Nexus dispatch work starts, not live distributed
 Qwen training.
+The data side of that handoff now lives in
+`crates/psionic-data/src/legal_benchmark_dataset_sharding.rs`. It sorts legal
+SFT examples by `example_id`, computes one canonical global dataset hash,
+assigns rows with `sha256(example_id) mod shard_count`, writes shard JSONL
+files plus uploaded artifact copies, and records an immutable dataset lock in
+the shard manifest. The worker receipt path refuses manifest-hash drift,
+verifies shard artifact hashes, supports failed-shard reassignment, and
+detects duplicate successful submissions so retries cannot earn duplicate
+credit.
 The paired serving/eval metadata path is in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
 compare base and tuned Qwen candidates through one OpenAI-compatible route

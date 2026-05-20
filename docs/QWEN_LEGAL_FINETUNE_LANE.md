@@ -134,6 +134,36 @@ does prove local Pylon intake, input hash enforcement, required output
 enforcement, deterministic output materialization, signed receipts, and
 receipt verification for dataset-shard and eval-shard jobs.
 
+## Distributed Dataset Shards
+
+The lane now has deterministic legal SFT dataset sharding in
+`crates/psionic-data/src/legal_benchmark_dataset_sharding.rs`.
+
+The sharder:
+
+- sorts examples by stable `example_id`
+- hashes the sorted dataset into one global dataset hash
+- assigns each row with `sha256(example_id) mod shard_count`
+- writes one shard JSONL per shard
+- writes uploaded artifact copies for worker transport
+- writes an immutable dataset lock into `dataset_shard_manifest.json`
+- verifies worker shard receipts without giving duplicate credit for retries
+
+Smoke input:
+
+```text
+fixtures/legal_benchmark/sharding/legal-sft-v1.jsonl
+```
+
+Run:
+
+```bash
+cargo run -p psionic-data --example legal_benchmark_shard_dataset -- \
+  --dataset fixtures/legal_benchmark/sharding/legal-sft-v1.jsonl \
+  --shards 4 \
+  --out target/legal/dataset_shards
+```
+
 ## Current Real-Weight Result
 
 On 2026-05-20, the lane gained a material local Qwen-family LoRA result in
