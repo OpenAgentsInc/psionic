@@ -252,6 +252,46 @@ scorer. It is useful for proving that the evaluator, receipts, ordering, and
 promotion inputs are stable. It is not proof that a model improved on hidden
 Harvey tasks. Hidden audit suites are rejected if marked training-allowed.
 
+## Adapter Registry And Promotion Gates
+
+`crates/psionic-train/src/qwen_legal_adapter_registry.rs` adds the first local
+Qwen legal adapter registry. Each registry entry records the adapter id, base
+model id and hash, training dataset id and hash, training config id and hash,
+Psionic version, git commit, training workers, training receipt hash, eval
+suite id and hash, eval result hash, parent adapter id, promotion status, and
+the eval summary used by hard gates.
+
+Register adapters with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_register_adapter -- \
+  fixtures/legal_benchmark/adapter_registry/qwen_legal_champion_adapter_manifest.json
+
+cargo run -p psionic-train --example qwen_legal_register_adapter -- \
+  fixtures/legal_benchmark/adapter_registry/qwen_legal_candidate_adapter_manifest.json
+```
+
+Promote a candidate with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_promote_adapter -- \
+  --candidate qwen36-legal-public-three-candidate-001 \
+  --suite harvey_public_three_deterministic_replay_v1
+```
+
+Set `PSIONIC_LEGAL_ADAPTER_REGISTRY` or pass `--registry <path>` to use a
+non-default local registry path. The default path is
+`target/legal/qwen_adapter_registry/registry.json`.
+
+Registration rejects missing training receipts, missing eval receipts, empty
+worker sets, excluded training data, invalid hashes, hidden benchmark leakage,
+harness-modified answer text, integrity failures, and adapters that were not
+produced by an allowed Psionic/Pylon path. Promotion rejects lower scores,
+different suite hashes, answer-file write-rate regressions, required-workflow
+regressions, hidden leakage, incomplete receipts, and non-Psionic production
+paths. A promoted candidate supersedes the previous champion for that suite and
+writes a promotion receipt next to the registry.
+
 ## Artifact Manifests And Hashing
 
 The module exposes SHA-256 helpers over canonical serde JSON encodings:

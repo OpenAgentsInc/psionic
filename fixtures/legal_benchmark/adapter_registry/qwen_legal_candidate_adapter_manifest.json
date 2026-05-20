@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "adapter_id": "qwen36-legal-public-three-candidate-001",
+  "base_model_id": "Qwen/Qwen3.6-27B",
+  "base_model_hash": {
+    "algorithm": "sha256",
+    "value": "cae662172fd450bb0cd710a769079c05bfc5d8e35efa6576edc7d0377afdd4a2"
+  },
+  "training_dataset_id": "legal-sft-v1-public-smoke",
+  "training_dataset_hash": {
+    "algorithm": "sha256",
+    "value": "b277fd623676a525c29b9eb155afc8c9010681814ceafb2d7627f47b9a232576"
+  },
+  "training_config_id": "qwen36-legal-sft-smoke-v1",
+  "training_config_hash": {
+    "algorithm": "sha256",
+    "value": "b79606fb3afea5bd1609ed40b622142f1c98125abcfe89a76a661b0e8e343910"
+  },
+  "psionic_version": "0.1.1",
+  "git_commit": "091ad93",
+  "training_worker_ids": [
+    "pylon.local.1",
+    "pylon.local.2"
+  ],
+  "training_receipt_hash": {
+    "algorithm": "sha256",
+    "value": "c2fb788c7deedbeaa296e424d4c2921b871a4f6cb4cf393c1c1105653ab399b4"
+  },
+  "eval_suite_id": "harvey_public_three_deterministic_replay_v1",
+  "eval_suite_hash": {
+    "algorithm": "sha256",
+    "value": "f8ebd43dbef1f029bf4930c65c9b7c5cc76af476927cee861ff18fcc73bfc4ab"
+  },
+  "eval_result_hash": {
+    "algorithm": "sha256",
+    "value": "c31a969f62fba621dda06828545d5c2de9128c153f7d76f7a462286183d1f9cd"
+  },
+  "promotion_status": "candidate",
+  "parent_adapter_id": "qwen36-legal-public-three-champion-000",
+  "training_data_allowed": true,
+  "excluded_training_data": false,
+  "produced_by_allowed_psionic_path": true,
+  "eval_summary": {
+    "legal_score_bps": 10000,
+    "answer_file_success_rate_bps": 10000,
+    "required_workflow_success_rate_bps": 10000,
+    "integrity_failure_count": 0,
+    "tool_failure_count": 0,
+    "timeout_failure_count": 0,
+    "harness_modified_answer_text": false,
+    "hidden_benchmark_leakage": false
+  },
+  "metadata": {
+    "boundary": "Fixture candidate for local adapter registry promotion tests."
+  }
+}
