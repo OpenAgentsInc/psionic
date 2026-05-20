@@ -267,6 +267,46 @@ adapter `10000` bps, and delta `6667` bps with report hash
 `bd01ce5a8653414a2189d935c80c835c774f55f195ed6809021c135a352faa66`. That is
 replay-harness compatibility evidence, not retained benchmark proof.
 
+The first verifier reward-trace builder for GRPO-style training is:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_build_reward_traces -- \
+  --runs target/legal/reward_trace_public_three \
+  --out target/legal/reward_trace_public_three/legal-reward-v1.jsonl
+```
+
+The builder recursively finds run directories with `run_record.json`, loads
+optional `score_report.json`, `run_receipt.json`, `task_spec.json`, and output
+manifests, and emits one deterministic JSONL trace per run. It computes
+workflow reward from receipts and verifier artifacts only: required file
+presence, correct path, non-empty answer, answer length, source-use evidence,
+submission state, answer integrity, public score delta, and hidden-leakage
+status. It keeps workflow reward separate from the legal-content score so RL
+can train on file/tool behavior without confusing that with judge quality.
+
+Hidden or private scoring leakage is a fatal exclusion. Harness-assisted answer
+content is also a fatal exclusion. Missing required files are not fatal; they
+stay in the dataset with low reward so GRPO can learn from them.
+
+The 2026-05-20 local public-three replay command:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite suites/harvey_public_three.json \
+  --model Qwen/Qwen3.6-27B \
+  --adapter qwen36-legal-reward-smoke \
+  --out target/legal/reward_trace_public_three
+```
+
+reported base `3333` bps, adapter `10000` bps, delta `6667` bps, and report
+hash `3e382da304b9eb756675fc3daf9a68a7c0d41ae560def0ac710d1229d930fa5b`.
+Building reward traces from that output produced 6 traces, 0 fatal exclusions,
+and dataset hash `e85352b832dceed154282ff5e6b0de510b6af808b0cce945140387b7710a3e26`.
+The three adapter-pass traces scored total reward `12`; the base missing-answer
+and tool-failure traces scored total reward `0`. Source-use reward stays `0`
+on this deterministic replay because these replay records do not include
+model-authored document-read tool evidence.
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

@@ -576,6 +576,7 @@ sources without any runner-added answer text.
 
 The implementation lives in:
 
+- `crates/psionic-eval/src/legal_benchmark_reward_traces.rs`
 - `crates/psionic-train/src/legal_dpo_cli.rs`
 - `crates/psionic-train/src/qwen_legal_adapter_sft.rs`
 - `crates/psionic-train/src/open_adapter.rs`
@@ -647,11 +648,16 @@ model run to the synthetic smoke fixture.
 Run the focused tests from the repo root:
 
 ```bash
+cargo test -p psionic-eval --lib legal_reward
 cargo test -p psionic-train --lib qwen_legal
 cargo test -p psionic-train --lib legal_qwen36_dpo
 cargo test -p psionic-train --lib live_rl_update
 ```
 
+The `legal_reward` fixture builds verifier reward traces from run receipts,
+score reports, answer-integrity reports, and output manifests. It checks that
+missing required files receive low reward without exclusion, harness-created
+answers are excluded, and replay produces the same trace digest and JSONL bytes.
 The `qwen_legal` fixture runs a four-step deterministic adapter update,
 exports a loadable LM-head LoRA artifact, saves a checkpoint, restores from a
 midpoint checkpoint, emits an Autopilot4 score-import bundle, and materializes
@@ -689,9 +695,28 @@ adapter `10000` bps, delta `6667` bps, and report hash
 `bd01ce5a8653414a2189d935c80c835c774f55f195ed6809021c135a352faa66`. Treat
 that as replay compatibility evidence only.
 
+Build reward traces for GRPO-style training with:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_build_reward_traces -- \
+  --runs target/legal/reward_trace_public_three \
+  --out target/legal/reward_trace_public_three/legal-reward-v1.jsonl
+```
+
+The 2026-05-20 local public-three replay generated 6 traces from base and
+adapter task runs. The builder wrote dataset hash
+`e85352b832dceed154282ff5e6b0de510b6af808b0cce945140387b7710a3e26`, with
+0 fatal exclusions. Adapter-pass traces scored total reward `12`; base
+missing-answer and tool-failure traces scored `0`. The reward is computed from
+receipts, answer integrity, score reports, and output manifests only. Source-use
+reward requires model/run evidence such as document-root tool calls or
+run-record coverage. Hidden scoring leakage and harness-created answers are
+fatal exclusions.
+
 The 2026-05-20 local run executed the broader filters with binary targets
 included:
 
+- `cargo test -p psionic-eval legal_reward`: 3 passed
 - `cargo test -p psionic-train qwen_legal`: 14 passed
 - `cargo test -p psionic-train legal_qwen36_dpo`: 1 passed
 - `cargo test -p psionic-train live_rl_update`: 2 passed
