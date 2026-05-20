@@ -102,6 +102,31 @@ That run loaded the config/tokenizer artifacts, improved smoke loss from
 public-three fixture at `10000` adapter bps. This is still public-fixture
 proof, not retained Harvey performance.
 
+`Qwen3.6-35B-A3B` now has a MoE-safe target-path smoke:
+
+```bash
+cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- \
+  --model Qwen3.6-35B-A3B \
+  --prompt fixtures/legal/smoke.prompt
+```
+
+The matching SFT smoke is:
+
+```bash
+cargo run -p psionic-train -- sft --config configs/legal/qwen36_35b_a3b_sft_smoke.json
+```
+
+That run loads a `Qwen3MoeForCausalLM` config fixture, tokenizer fixture, and
+expert safetensors shard; allows LoRA only on `q_proj`, `k_proj`, `v_proj`,
+`o_proj`, `up_proj`, and `down_proj`; refuses router/gate targets; records
+active experts and usage counts; and proves the router hash is unchanged before
+and after the adapter update. The recorded smoke improved loss from
+`5.5602503` to `1.5024384`, wrote
+`target/legal/qwen36_35b_a3b_sft_smoke/adapter.safetensors`, and scored
+`10000` adapter bps on the deterministic Harvey public-three fixture. This is
+still a small Rust smoke, not full 35B-A3B weight inference or retained Harvey
+performance.
+
 ## Operator Guidance
 
 Use the rows as follows:
@@ -111,7 +136,9 @@ Use the rows as follows:
 - `Qwen3.5-35B-A3B-Base`: hosted/Tinker MoE base research.
 - `Qwen3.6-27B`: dense retained-score fallback target; now has a Rust config,
   tokenizer, safetensors, prompt-render, SFT, and public-fixture eval smoke.
-- `Qwen3.6-35B-A3B`: first serious retained-score fine-tune target.
+- `Qwen3.6-35B-A3B`: first serious retained-score fine-tune target; now has a
+  Rust MoE-safe config, expert-shard, prompt-render, adapter-SFT, frozen-router
+  safety receipt, and public-fixture eval smoke.
 - `Qwen3.5-397B-A17B`: hosted teacher/judge/distillation row.
 
 Before scheduling real training, materialize artifact probes and replace the

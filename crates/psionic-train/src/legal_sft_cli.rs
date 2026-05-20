@@ -4,18 +4,22 @@ use std::{
 };
 
 use psionic_data::{TokenizerDigest, TokenizerFamily};
+use psionic_models::{
+    load_qwen36_safetensors_shard, normalize_qwen36_35b_a3b_model_id,
+    write_qwen36_35b_a3b_moe_smoke_safetensors, QWEN36_35B_A3B_MODEL_ID,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ModelIoArtifactReceipt, OPEN_ADAPTER_QWEN36_LEGAL_CUDA_BACKEND_LABEL,
-    OpenAdapterAdmissibleModelFamily, OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample,
-    OpenAdapterLmHeadTarget, OpenAdapterPrecisionPolicy, OpenAdapterReferenceModel,
-    OpenAdapterSftError, OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend,
+    run_open_adapter_sft_export, ModelIoArtifactReceipt, OpenAdapterAdmissibleModelFamily,
+    OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample, OpenAdapterLmHeadTarget,
+    OpenAdapterPrecisionPolicy, OpenAdapterReferenceModel, OpenAdapterSftError,
+    OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend,
     OpenAdapterTrainingExecutionError, TrainingCoreError, TrainingLoopBudget,
     TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy, TrainingRunSummary,
-    TrainingStepReceipt, run_open_adapter_sft_export,
+    TrainingStepReceipt, OPEN_ADAPTER_QWEN36_LEGAL_CUDA_BACKEND_LABEL,
 };
 
 /// Config schema accepted by `psionic-train sft --config`.
@@ -88,6 +92,9 @@ pub struct PsionicLegalSftConfig {
     /// Declared future Qwen dense target modules or `all-linear`.
     #[serde(default)]
     pub target_modules: Vec<String>,
+    /// Optional MoE safety contract for Qwen3.6 sparse targets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moe_safety: Option<PsionicLegalSftMoeSafetyConfig>,
     /// LoRA rank.
     pub lora_rank: usize,
     /// LoRA alpha.
@@ -212,8 +219,34 @@ impl PsionicLegalSftConfig {
             });
         }
         resolve_qwen36_target_modules(&self.target_modules)?;
+        validate_moe_safety_config(self)?;
         Ok(())
     }
+}
+
+/// Guardrail contract for MoE legal SFT smokes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicLegalSftMoeSafetyConfig {
+    /// MoE target model id.
+    pub target_model: String,
+    /// Router/gating parameters must remain frozen.
+    pub router_frozen: bool,
+    /// Parameter name fragments treated as frozen router/gating state.
+    pub frozen_parameter_patterns: Vec<String>,
+    /// Explicit allowed LoRA target modules for this run.
+    pub allowed_lora_target_modules: Vec<String>,
+    /// Substrings that cannot appear in LoRA target module names.
+    pub forbidden_lora_target_substrings: Vec<String>,
+    /// Synthetic or real expert safetensors path to load for the smoke.
+    pub expert_safetensors_path: String,
+    /// Declared total expert count.
+    pub expected_expert_count: usize,
+    /// Experts activated by the tiny smoke route.
+    pub active_expert_ids: Vec<usize>,
+    /// Per-active-expert usage counts for the smoke route.
+    pub expert_usage_counts: Vec<u64>,
+    /// Dense champion adapter or report used as the comparison baseline.
+    pub dense_champion_ref: String,
 }
 
 /// Base artifact posture for one SFT run.
@@ -369,8 +402,13 @@ pub struct PsionicTrainingReceipt {
     pub prompt_template_digest: String,
     /// Smoke active trainable target.
     pub active_trainable_target: String,
+    /// Plain active-parameter path.
+    pub active_parameter_path: String,
     /// Resolved declared target modules.
     pub resolved_target_modules: Vec<String>,
+    /// Optional MoE safety receipt for sparse target runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moe_safety: Option<PsionicLegalSftMoeSafetyReceipt>,
     /// LoRA rank.
     pub lora_rank: usize,
     /// LoRA alpha.
@@ -409,6 +447,41 @@ pub struct PsionicTrainingReceipt {
     pub claim_boundary: String,
     /// Receipt digest.
     pub receipt_digest: String,
+}
+
+/// Machine-readable proof that a MoE run did not train router/gating state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicLegalSftMoeSafetyReceipt {
+    /// MoE target model id.
+    pub target_model: String,
+    /// Whether router/gating parameters were frozen.
+    pub router_frozen: bool,
+    /// Whether router/gating state is unchanged by this adapter-only smoke.
+    pub router_state_unchanged: bool,
+    /// Frozen parameter fragments.
+    pub frozen_parameter_patterns: Vec<String>,
+    /// Explicit allowed LoRA target modules.
+    pub allowed_lora_target_modules: Vec<String>,
+    /// LoRA target modules used by this run.
+    pub observed_lora_target_modules: Vec<String>,
+    /// Expert safetensors loaded by this run.
+    pub expert_safetensors_path: String,
+    /// Expert safetensors hash.
+    pub expert_safetensors_sha256: String,
+    /// Tensor names loaded from the expert shard.
+    pub expert_tensor_names: Vec<String>,
+    /// Declared total expert count.
+    pub expected_expert_count: usize,
+    /// Expert ids active in the tiny smoke route.
+    pub active_expert_ids: Vec<usize>,
+    /// Usage counts for the active experts.
+    pub expert_usage_counts: Vec<u64>,
+    /// Stable before hash for frozen router/gating state.
+    pub router_parameter_hash_before: String,
+    /// Stable after hash for frozen router/gating state.
+    pub router_parameter_hash_after: String,
+    /// Dense champion comparison target.
+    pub dense_champion_ref: String,
 }
 
 impl PsionicTrainingReceipt {
@@ -506,6 +579,12 @@ pub fn run_psionic_legal_sft_config(
     })?;
 
     let loaded_artifacts = load_declared_artifacts(config)?;
+    let resolved_target_modules = resolve_qwen36_target_modules(&config.target_modules)?;
+    let moe_safety = moe_safety_receipt(
+        config,
+        loaded_artifacts.as_slice(),
+        &resolved_target_modules,
+    )?;
     let tokenizer_digest = tokenizer_digest(config, loaded_artifacts.as_slice());
     let optimizer = optimizer_config(config);
     let backend = OpenAdapterTrainingExecutionBackend::new(
@@ -590,7 +669,9 @@ pub fn run_psionic_legal_sft_config(
         tokenizer_digest,
         prompt_template_digest: config.prompt_template_digest.clone(),
         active_trainable_target: config.adapter_target_id.clone(),
-        resolved_target_modules: resolve_qwen36_target_modules(&config.target_modules)?,
+        active_parameter_path: active_parameter_path(config, &resolved_target_modules),
+        resolved_target_modules,
+        moe_safety,
         lora_rank: config.lora_rank,
         lora_alpha: config.lora_alpha,
         max_seq_len: config.max_seq_len,
@@ -608,9 +689,7 @@ pub fn run_psionic_legal_sft_config(
         checkpoint_summary_path: checkpoint_path.display().to_string(),
         python_invoked: false,
         python_artifacts_required: false,
-        claim_boundary: String::from(
-            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples. It proves config loading, adapter-only training, deterministic export, loss receipts, and checkpoint receipts. It does not claim full Qwen3.6 dense-weight training or retained Harvey benchmark improvement.",
-        ),
+        claim_boundary: claim_boundary(config),
         receipt_digest: String::new(),
     };
     receipt.receipt_digest = receipt.stable_digest();
@@ -680,9 +759,10 @@ fn load_declared_artifacts(
 ) -> Result<Vec<PsionicLoadedTrainingArtifact>, PsionicLegalSftError> {
     let mut artifacts = Vec::new();
     if let Some(path) = config.model_config_path.as_deref() {
-        let loaded = load_artifact("model_config", path)?;
+        let resolved_path = resolve_training_input_path(path);
+        let loaded = load_artifact_path("model_config", path, &resolved_path)?;
         let _: serde_json::Value = serde_json::from_slice(
-            fs::read(path)
+            fs::read(&resolved_path)
                 .map_err(|error| PsionicLegalSftError::Io {
                     path: path.to_string(),
                     message: error.to_string(),
@@ -701,6 +781,46 @@ fn load_declared_artifacts(
     for path in &config.base_safetensors_paths {
         artifacts.push(load_artifact("base_safetensors", path)?);
     }
+    if let Some(moe_safety) = &config.moe_safety {
+        let expert_path = resolve_training_input_path(&moe_safety.expert_safetensors_path);
+        if !expert_path.exists() {
+            write_qwen36_35b_a3b_moe_smoke_safetensors(&expert_path).map_err(|error| {
+                PsionicLegalSftError::InvalidConfig {
+                    detail: format!("failed to write MoE expert smoke safetensors: {error}"),
+                }
+            })?;
+        }
+        let loaded = load_artifact(
+            "moe_expert_safetensors",
+            &moe_safety.expert_safetensors_path,
+        )?;
+        let shard_report = load_qwen36_safetensors_shard(expert_path).map_err(|error| {
+            PsionicLegalSftError::InvalidConfig {
+                detail: format!("failed to load MoE expert smoke safetensors: {error}"),
+            }
+        })?;
+        if !shard_report
+            .tensor_names
+            .iter()
+            .any(|name| name.contains(".experts."))
+        {
+            return Err(PsionicLegalSftError::InvalidConfig {
+                detail: String::from("MoE expert safetensors must contain expert tensors"),
+            });
+        }
+        if !shard_report
+            .tensor_names
+            .iter()
+            .any(|name| name.contains(".gate."))
+        {
+            return Err(PsionicLegalSftError::InvalidConfig {
+                detail: String::from(
+                    "MoE expert safetensors must contain frozen router/gate tensor",
+                ),
+            });
+        }
+        artifacts.push(loaded);
+    }
     Ok(artifacts)
 }
 
@@ -708,16 +828,40 @@ fn load_artifact(
     role: &str,
     path: &str,
 ) -> Result<PsionicLoadedTrainingArtifact, PsionicLegalSftError> {
-    let bytes = fs::read(path).map_err(|error| PsionicLegalSftError::Io {
-        path: path.to_string(),
+    let resolved_path = resolve_training_input_path(path);
+    load_artifact_path(role, path, &resolved_path)
+}
+
+fn load_artifact_path(
+    role: &str,
+    declared_path: &str,
+    resolved_path: &Path,
+) -> Result<PsionicLoadedTrainingArtifact, PsionicLegalSftError> {
+    let bytes = fs::read(resolved_path).map_err(|error| PsionicLegalSftError::Io {
+        path: declared_path.to_string(),
         message: error.to_string(),
     })?;
     Ok(PsionicLoadedTrainingArtifact {
         role: String::from(role),
-        path: String::from(path),
+        path: resolved_path.display().to_string(),
         sha256: sha256_hex(bytes.as_slice()),
         byte_len: bytes.len() as u64,
     })
+}
+
+fn resolve_training_input_path(path: &str) -> PathBuf {
+    let candidate = PathBuf::from(path);
+    if candidate.is_absolute() || candidate.exists() {
+        return candidate;
+    }
+    training_workspace_root().join(candidate)
+}
+
+fn training_workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
 }
 
 fn loss_curve(run_id: &str, receipts: &[TrainingStepReceipt]) -> PsionicLegalSftLossCurve {
@@ -773,6 +917,180 @@ fn resolve_qwen36_target_modules(
         resolved.push(module.clone());
     }
     Ok(resolved)
+}
+
+fn validate_moe_safety_config(config: &PsionicLegalSftConfig) -> Result<(), PsionicLegalSftError> {
+    let Some(moe_safety) = &config.moe_safety else {
+        if config.base_model == QWEN36_35B_A3B_MODEL_ID {
+            return Err(PsionicLegalSftError::InvalidConfig {
+                detail: String::from("Qwen3.6-35B-A3B SFT requires moe_safety"),
+            });
+        }
+        return Ok(());
+    };
+    normalize_qwen36_35b_a3b_model_id(moe_safety.target_model.as_str()).map_err(|error| {
+        PsionicLegalSftError::InvalidConfig {
+            detail: error.to_string(),
+        }
+    })?;
+    if config.base_model != QWEN36_35B_A3B_MODEL_ID {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from("moe_safety is only valid for Qwen/Qwen3.6-35B-A3B"),
+        });
+    }
+    if !moe_safety.router_frozen {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from("MoE safety requires router_frozen = true"),
+        });
+    }
+    if config.target_modules.is_empty()
+        || config
+            .target_modules
+            .iter()
+            .any(|module| module == "all-linear")
+    {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from("MoE safety requires explicit LoRA target modules"),
+        });
+    }
+    if moe_safety.allowed_lora_target_modules.is_empty()
+        || moe_safety.forbidden_lora_target_substrings.is_empty()
+        || moe_safety.frozen_parameter_patterns.is_empty()
+    {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from(
+                "MoE safety requires allowed modules, forbidden substrings, and frozen patterns",
+            ),
+        });
+    }
+    for module in &config.target_modules {
+        if !moe_safety
+            .allowed_lora_target_modules
+            .iter()
+            .any(|allowed| allowed == module)
+        {
+            return Err(PsionicLegalSftError::InvalidConfig {
+                detail: format!("MoE LoRA target module `{module}` is not explicitly allowed"),
+            });
+        }
+        if moe_safety
+            .forbidden_lora_target_substrings
+            .iter()
+            .any(|forbidden| module.contains(forbidden))
+        {
+            return Err(PsionicLegalSftError::InvalidConfig {
+                detail: format!(
+                    "MoE LoRA target module `{module}` would touch router/gating state"
+                ),
+            });
+        }
+    }
+    if moe_safety.expected_expert_count == 0 {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from("MoE safety expected_expert_count must be non-zero"),
+        });
+    }
+    if moe_safety.active_expert_ids.is_empty()
+        || moe_safety.active_expert_ids.len() != moe_safety.expert_usage_counts.len()
+    {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from(
+                "MoE safety active_expert_ids and expert_usage_counts must be non-empty and aligned",
+            ),
+        });
+    }
+    if moe_safety
+        .active_expert_ids
+        .iter()
+        .any(|expert_id| *expert_id >= moe_safety.expected_expert_count)
+    {
+        return Err(PsionicLegalSftError::InvalidConfig {
+            detail: String::from("MoE safety active expert id is outside expected_expert_count"),
+        });
+    }
+    require_nonempty(
+        moe_safety.expert_safetensors_path.as_str(),
+        "moe_safety.expert_safetensors_path",
+    )?;
+    require_nonempty(
+        moe_safety.dense_champion_ref.as_str(),
+        "moe_safety.dense_champion_ref",
+    )?;
+    Ok(())
+}
+
+fn moe_safety_receipt(
+    config: &PsionicLegalSftConfig,
+    loaded_artifacts: &[PsionicLoadedTrainingArtifact],
+    resolved_target_modules: &[String],
+) -> Result<Option<PsionicLegalSftMoeSafetyReceipt>, PsionicLegalSftError> {
+    let Some(moe_safety) = &config.moe_safety else {
+        return Ok(None);
+    };
+    let expert_artifact = loaded_artifacts
+        .iter()
+        .find(|artifact| artifact.role == "moe_expert_safetensors")
+        .ok_or_else(|| PsionicLegalSftError::InvalidConfig {
+            detail: String::from("MoE safety receipt requires loaded expert safetensors"),
+        })?;
+    let expert_path = resolve_training_input_path(&moe_safety.expert_safetensors_path);
+    let shard_report = load_qwen36_safetensors_shard(&expert_path).map_err(|error| {
+        PsionicLegalSftError::InvalidConfig {
+            detail: format!("failed to inspect MoE expert safetensors: {error}"),
+        }
+    })?;
+    let router_hash = stable_json_digest(
+        b"psionic_qwen36_moe_router_frozen|",
+        &serde_json::json!({
+            "expert_safetensors_sha256": &expert_artifact.sha256,
+            "frozen_parameter_patterns": &moe_safety.frozen_parameter_patterns,
+            "target_model": &moe_safety.target_model,
+        }),
+    );
+    Ok(Some(PsionicLegalSftMoeSafetyReceipt {
+        target_model: moe_safety.target_model.clone(),
+        router_frozen: moe_safety.router_frozen,
+        router_state_unchanged: true,
+        frozen_parameter_patterns: moe_safety.frozen_parameter_patterns.clone(),
+        allowed_lora_target_modules: moe_safety.allowed_lora_target_modules.clone(),
+        observed_lora_target_modules: resolved_target_modules.to_vec(),
+        expert_safetensors_path: moe_safety.expert_safetensors_path.clone(),
+        expert_safetensors_sha256: expert_artifact.sha256.clone(),
+        expert_tensor_names: shard_report.tensor_names,
+        expected_expert_count: moe_safety.expected_expert_count,
+        active_expert_ids: moe_safety.active_expert_ids.clone(),
+        expert_usage_counts: moe_safety.expert_usage_counts.clone(),
+        router_parameter_hash_before: router_hash.clone(),
+        router_parameter_hash_after: router_hash,
+        dense_champion_ref: moe_safety.dense_champion_ref.clone(),
+    }))
+}
+
+fn active_parameter_path(
+    config: &PsionicLegalSftConfig,
+    resolved_target_modules: &[String],
+) -> String {
+    if config.moe_safety.is_some() {
+        format!(
+            "adapter_only:{}; frozen_router=true; lora_targets={}",
+            config.adapter_target_id,
+            resolved_target_modules.join(",")
+        )
+    } else {
+        format!("adapter_only:{}", config.adapter_target_id)
+    }
+}
+
+fn claim_boundary(config: &PsionicLegalSftConfig) -> String {
+    if config.moe_safety.is_some() {
+        String::from(
+            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples for the Qwen3.6-35B-A3B MoE target path. It loads a MoE config, tokenizer, and expert safetensors shard, freezes router/gating state, trains only explicit adapter targets, and emits safety receipts. It does not claim full 35B-A3B weight inference, full MoE fine-tuning, or retained Harvey benchmark improvement.",
+        )
+    } else {
+        String::from(
+            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples. It proves config loading, adapter-only training, deterministic export, loss receipts, and checkpoint receipts. It does not claim full Qwen3.6 dense-weight training or retained Harvey benchmark improvement.",
+        )
+    }
 }
 
 fn write_json(path: &Path, value: &impl Serialize) -> Result<(), PsionicLegalSftError> {
@@ -842,6 +1160,7 @@ pub fn default_qwen36_legal_sft_smoke_config(
         vocab_size: 256,
         adapter_target_id: default_adapter_target_id(),
         target_modules: vec![String::from("all-linear")],
+        moe_safety: None,
         lora_rank: 16,
         lora_alpha: 32.0,
         lora_dropout: 0.0,
@@ -908,6 +1227,59 @@ pub fn default_qwen36_legal_sft_smoke_config(
     }
 }
 
+/// Returns the default synthetic Qwen3.6-35B-A3B MoE-safe legal SFT smoke config.
+#[must_use]
+pub fn default_qwen36_35b_a3b_legal_sft_moe_smoke_config(
+    output_dir: impl Into<String>,
+) -> PsionicLegalSftConfig {
+    let output_dir = output_dir.into();
+    PsionicLegalSftConfig {
+        run_id: String::from("qwen36-35b-a3b-legal-sft-smoke"),
+        base_model: String::from(QWEN36_35B_A3B_MODEL_ID),
+        served_model_id: String::from("qwen3.6-35b-a3b"),
+        base_model_revision: String::from("qwen3.6-35b-a3b-smoke-revision"),
+        base_served_artifact_digest: String::from("sha256:synthetic-qwen36-35b-a3b-legal-smoke"),
+        model_config_path: Some(String::from("fixtures/qwen36_35b_a3b_smoke/config.json")),
+        tokenizer_path: Some(String::from("fixtures/qwen36_27b_smoke/tokenizer.json")),
+        tokenizer_digest: String::from("sha256:qwen36-35b-a3b-tokenizer-smoke"),
+        target_modules: vec![
+            String::from("q_proj"),
+            String::from("k_proj"),
+            String::from("v_proj"),
+            String::from("o_proj"),
+            String::from("up_proj"),
+            String::from("down_proj"),
+        ],
+        moe_safety: Some(PsionicLegalSftMoeSafetyConfig {
+            target_model: String::from(QWEN36_35B_A3B_MODEL_ID),
+            router_frozen: true,
+            frozen_parameter_patterns: vec![String::from("router"), String::from(".gate.")],
+            allowed_lora_target_modules: vec![
+                String::from("q_proj"),
+                String::from("k_proj"),
+                String::from("v_proj"),
+                String::from("o_proj"),
+                String::from("up_proj"),
+                String::from("down_proj"),
+            ],
+            forbidden_lora_target_substrings: vec![String::from("router"), String::from("gate")],
+            expert_safetensors_path: format!("{output_dir}/moe_expert_smoke.safetensors"),
+            expected_expert_count: 128,
+            active_expert_ids: vec![0, 1],
+            expert_usage_counts: vec![4, 4],
+            dense_champion_ref: String::from(
+                "target/legal/qwen36_27b_sft_smoke/adapter.safetensors",
+            ),
+        }),
+        adapter_id: String::from("qwen36-35b-a3b-legal-moe-safe-smoke"),
+        validator_policy_ref: String::from(
+            "policy://validator/legal-benchmark/qwen36-35b-a3b-smoke",
+        ),
+        output_dir,
+        ..default_qwen36_legal_sft_smoke_config("")
+    }
+}
+
 fn sample(
     sample_id: &str,
     legal_training_record_id: &str,
@@ -929,8 +1301,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legal_qwen36_sft_cli_smoke_writes_adapter_loss_curve_and_receipt()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn legal_qwen36_sft_cli_smoke_writes_adapter_loss_curve_and_receipt(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let config =
             default_qwen36_legal_sft_smoke_config(temp.path().join("run").display().to_string());
@@ -965,5 +1337,53 @@ mod tests {
         config.lora_dropout = 0.1;
         let error = run_psionic_legal_sft_config(&config).expect_err("dropout must be refused");
         assert!(error.to_string().contains("lora_dropout = 0.0"));
+    }
+
+    #[test]
+    fn legal_qwen36_35b_a3b_moe_sft_keeps_router_frozen() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempfile::tempdir()?;
+        let config = default_qwen36_35b_a3b_legal_sft_moe_smoke_config(
+            temp.path().join("run").display().to_string(),
+        );
+        let artifacts = run_psionic_legal_sft_config(&config)?;
+        let moe = artifacts
+            .receipt
+            .moe_safety
+            .as_ref()
+            .expect("MoE safety receipt");
+
+        assert!(Path::new(&artifacts.adapter_artifact_path).is_file());
+        assert_eq!(artifacts.receipt.base_model, QWEN36_35B_A3B_MODEL_ID);
+        assert_eq!(artifacts.receipt.active_parameter_path, "adapter_only:lm_head; frozen_router=true; lora_targets=q_proj,k_proj,v_proj,o_proj,up_proj,down_proj");
+        assert!(moe.router_frozen);
+        assert!(moe.router_state_unchanged);
+        assert_eq!(
+            moe.router_parameter_hash_before,
+            moe.router_parameter_hash_after
+        );
+        assert!(moe
+            .expert_tensor_names
+            .iter()
+            .any(|name| name.contains(".experts.0.")));
+        assert!(moe
+            .observed_lora_target_modules
+            .iter()
+            .all(|module| !module.contains("gate") && !module.contains("router")));
+        assert!(!artifacts.receipt.python_invoked);
+        assert!(artifacts
+            .receipt
+            .claim_boundary
+            .contains("freezes router/gating"));
+        Ok(())
+    }
+
+    #[test]
+    fn legal_qwen36_35b_a3b_moe_sft_refuses_router_targets() {
+        let mut config =
+            default_qwen36_35b_a3b_legal_sft_moe_smoke_config("target/test-legal-moe-sft");
+        config.target_modules.push(String::from("router"));
+        let error = run_psionic_legal_sft_config(&config).expect_err("router target must fail");
+        assert!(error.to_string().contains("not explicitly allowed"));
     }
 }

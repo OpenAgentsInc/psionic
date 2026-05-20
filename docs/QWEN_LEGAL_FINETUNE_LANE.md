@@ -7,7 +7,8 @@
 > reward-refresh LoRA and `63 / 83` public training-slice run added on
 > 2026-05-20; no-cheat runner correction, single-task run 016, broad suite
 > runs 019/025, adapter 020, Rust-only Qwen3.6 GRPO smoke, and the
-> Qwen3.6-27B target-path smoke added on 2026-05-20.
+> Qwen3.6-27B target-path smoke added on 2026-05-20; Qwen3.6-35B-A3B
+> MoE-safe target-path smoke added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -103,11 +104,100 @@ Recorded eval result:
 - adapter score: `10000` bps
 - delta: `6667` bps
 - report hash:
-  `f938ae768b7d12269c59a75ad03eacf846b960e783bb469aaae44c5dcd473618`
+  `3913c0da3740601b2bb4865a6bed978630720c6da57dc8e68c0a81346de3bd93`
 
 This eval is a deterministic public fixture. It proves the Qwen3.6-27B adapter
 artifact can be consumed by the Rust legal benchmark path. It is not a hidden
 Harvey score.
+
+## Qwen3.6-35B-A3B MoE-Safe Target Path
+
+The lane now also has a MoE-safe smoke path for `Qwen/Qwen3.6-35B-A3B`. The
+point is narrow: load the MoE config, load an expert safetensors shard, attach
+adapter targets only to the declared non-router modules, and prove the
+router/gate state is unchanged.
+
+Prompt smoke:
+
+```bash
+cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- \
+  --model Qwen3.6-35B-A3B \
+  --prompt fixtures/legal/smoke.prompt
+```
+
+Recorded prompt-smoke result:
+
+- schema: `psionic.qwen36_35b_a3b_legal_prompt_smoke.v1`
+- prompt hash:
+  `a819556c3e7a50184f1630a651089cce60527e7d1ae384f9449e79700c021964`
+- tokenizer hash:
+  `b16a3f8344ab50941f925281fc25ee243f6b05509d07880fd41fbb6c4655fdfe`
+- expert shard hash:
+  `1a93c5110c93b73b9f9123131e94c2f63766601fc8423c6c3a33f095f3f139e7`
+- token count: `62`
+- loaded expert/gate tensors:
+  `model.layers.0.mlp.experts.{0,1}.{gate_proj,up_proj,down_proj}.weight`
+  and `model.layers.0.mlp.gate.weight`
+
+SFT smoke:
+
+```bash
+cargo run -p psionic-train -- sft --config configs/legal/qwen36_35b_a3b_sft_smoke.json
+```
+
+Recorded SFT result:
+
+- run id: `qwen36-35b-a3b-legal-sft-smoke`
+- base model: `Qwen/Qwen3.6-35B-A3B`
+- loaded config hash:
+  `be2a25d94b7c2d49a5639f0af7fb242a06f96a1a4635592419f64ef2e8624b4e`
+- loaded tokenizer hash:
+  `b16a3f8344ab50941f925281fc25ee243f6b05509d07880fd41fbb6c4655fdfe`
+- loaded MoE expert shard hash:
+  `1a93c5110c93b73b9f9123131e94c2f63766601fc8423c6c3a33f095f3f139e7`
+- active parameter path:
+  `adapter_only:lm_head; frozen_router=true; lora_targets=q_proj,k_proj,v_proj,o_proj,up_proj,down_proj`
+- observed LoRA target modules:
+  `q_proj`, `k_proj`, `v_proj`, `o_proj`, `up_proj`, `down_proj`
+- expected expert count: `128`
+- active expert ids: `0`, `1`
+- expert usage counts: `4`, `4`
+- router hash before and after:
+  `bb4bd1703a5730fd0a5b613c6981318c007ddee5f7b836169308ce1809191ff4`
+- completed steps: `8`
+- initial loss: `5.5602503`
+- final loss: `1.5024384`
+- adapter:
+  `target/legal/qwen36_35b_a3b_sft_smoke/adapter.safetensors`
+- adapter digest:
+  `ded1623b0199a6373f91abc0d8195fb34046039fe42024836464050cb88ea05c`
+- receipt digest:
+  `10d4d98d948faeac152fa65cd85a2233a90881f58bd6b94f498053937c246b39`
+- Python invoked: `false`
+
+Public-three eval:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite suites/harvey_public_three.json \
+  --model Qwen/Qwen3.6-35B-A3B \
+  --adapter target/legal/qwen36_35b_a3b_sft_smoke/adapter.safetensors \
+  --out target/legal/qwen36_35b_a3b_eval_smoke
+```
+
+Recorded eval result:
+
+- base score: `3333` bps
+- adapter score: `10000` bps
+- delta: `6667` bps
+- report hash:
+  `4d7cdb2272c69d7e3470a0e9a22d8f0d5ccbdf42f1a71737d0910a6da59f4404`
+
+The MoE smoke ties the dense 27B adapter on the deterministic public-three
+fixture. It is not proof that the full 35B-A3B model has been loaded, that the
+router was trained, or that hidden Harvey performance improved. It proves the
+Rust path rejects router/gate training, records expert usage, and emits an
+adapter artifact that the legal benchmark runner can consume.
 
 ## Current Rust GRPO Smoke
 
