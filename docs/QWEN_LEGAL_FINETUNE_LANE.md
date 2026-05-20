@@ -81,6 +81,59 @@ traces, group-normalized adapter updates, bad-completion preservation, and
 adapter eval compatibility. It does not prove a retained Harvey score, full
 dense Qwen3.6 RL, or distributed Pylon sampling.
 
+## Pylon Training Job Protocol
+
+The lane now has a typed local Pylon job protocol for legal fine-tuning work in
+`crates/psionic-train/src/qwen_legal_pylon_training_job.rs`.
+
+The protocol covers the job types Pylon/Nexus need to split legal model work
+across workers:
+
+- `DatasetShardBuild`
+- `SftTrainShard`
+- `DpoTrainShard`
+- `GrpoSampleBatch`
+- `GrpoTrainShard`
+- `EvalShard`
+- `AdapterMerge`
+- `ArtifactVerify`
+
+Each job carries a stable job id, parent run id, model id/hash, optional
+adapter id/hash, dataset manifest hash, shard assignment, training config
+hash, expected input artifact hashes, expected output artifact declarations,
+runtime cap, hardware requirements, payment/budget metadata, and receipt
+requirements.
+
+Each worker receipt carries the worker id, worker Ed25519 public key, job id,
+input and output hashes, start/end timestamps, hardware summary, Psionic
+version, git commit, logs hash, metrics, failure reason when needed, signature,
+and receipt digest.
+
+Canonical local fixtures live under
+`fixtures/qwen_legal/pylon_training_jobs/`:
+
+- `dataset_shard_job_v1.json`
+- `eval_shard_job_v1.json`
+
+Run a local worker once with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_pylon_worker_run_once -- \
+  --job fixtures/qwen_legal/pylon_training_jobs/dataset_shard_job_v1.json
+```
+
+Verify its signed receipt with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_verify_worker_receipt -- \
+  target/legal/pylon_jobs/job.qwen-legal.dataset-shard.000001.receipt.json
+```
+
+The current worker is a protocol smoke, not a live distributed trainer. It
+does prove local Pylon intake, input hash enforcement, required output
+enforcement, deterministic output materialization, signed receipts, and
+receipt verification for dataset-shard and eval-shard jobs.
+
 ## Current Real-Weight Result
 
 On 2026-05-20, the lane gained a material local Qwen-family LoRA result in

@@ -250,6 +250,16 @@ adversarial holdout task-runs, allows zero holdout regression, and lowers the
 judge-disagreement budget to 10 bps.
 Those reports are readiness evidence only; retained score claims still require
 the actual retained slice and Autopilot4 release-gate approval.
+The legal lane now also owns the first Pylon worker job protocol in
+`crates/psionic-train/src/qwen_legal_pylon_training_job.rs`. It defines the
+job envelope for dataset shard builds, SFT/DPO/GRPO shard work, eval shards,
+adapter merges, and artifact verification. A local worker example accepts the
+canonical dataset-shard and eval-shard fixtures under
+`fixtures/qwen_legal/pylon_training_jobs/`, checks expected input hashes,
+materializes required outputs, writes a signed Ed25519 receipt, and verifies
+that receipt locally. This is still a protocol smoke; it proves job admission
+and receipt integrity before Nexus dispatch work starts, not live distributed
+Qwen training.
 The paired serving/eval metadata path is in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`; it lets the legal benchmark provider
 compare base and tuned Qwen candidates through one OpenAI-compatible route
