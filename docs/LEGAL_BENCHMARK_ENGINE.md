@@ -469,10 +469,31 @@ against the exact same suite. The harness freezes:
 - inference settings
 - base model id and adapter id or adapter artifact hash
 
-The checked smoke suite is:
+The checked smoke suite from the first pass is still available as:
 
 - `suites/harvey_public_three.json`
 - `fixtures/legal_benchmark/eval_suite_public_three/*`
+
+The current public suite catalog is broader and can be listed with:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_list_suites
+```
+
+Materialized suite names:
+
+- `harvey_public_001_single`: one task, smoke only.
+- `harvey_public_003_workflow`: three frozen workflow tasks.
+- `harvey_public_010_mixed`: ten public-style tasks across review, analysis,
+  classification, calculation, and drafting workflows.
+
+Reserved suite names:
+
+- `harvey_public_025_regression`
+- `harvey_public_050_candidate_gate`
+
+Those two names are intentionally not materialized yet. They are placeholders
+for future real public tasks, not padded copies of the current ten-task set.
 
 Run it with:
 
@@ -484,6 +505,16 @@ cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
   --out runs/harvey-public-three-smoke
 ```
 
+Named suites can also be run directly:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite harvey_public_003_workflow
+
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite harvey_public_010_mixed
+```
+
 The output directory contains:
 
 - `eval_report.json`
@@ -492,10 +523,21 @@ The output directory contains:
 - per-task base and adapter run records and score reports
 - base and adapter static Markdown summaries
 
-The report separates answer-file success rate, legal score, integrity
-failures, tool failures, timeout failures, and failure-class counts. It also
-writes a promotion-gate JSON object so later adapter registry work can make a
-single promote/hold/reject decision without re-parsing scorer internals.
+The report separates answer-file write rate, correct answer-path rate, submit
+rate, integrity-valid rate, mean legal score, median legal score, per-task
+score, score by task type, failure-class counts, and candidate regression
+against the champion binding. It also writes a promotion-gate JSON object so
+later adapter registry work can make a single promote/hold/reject decision
+without re-parsing scorer internals.
+
+Recorded local smoke results on 2026-05-20:
+
+- `harvey_public_003_workflow`: base `3333` bps, adapter `10000` bps, delta
+  `6667` bps, median adapter `10000` bps, report hash
+  `47b7125199cb642e550a4133938b3dc30de031c64768894848da085e5e1b4636`.
+- `harvey_public_010_mixed`: base `3000` bps, adapter `10000` bps, delta
+  `7000` bps, median adapter `10000` bps, report hash
+  `704198a15af55cf5aa742dcec1861b65baeb577b62b4f35d9c5bd5db6b013df3`.
 
 Plain boundary: this harness replays declared local outputs through the Rust
 scorer. It is useful for proving that the evaluator, receipts, ordering, and

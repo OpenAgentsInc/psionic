@@ -199,6 +199,64 @@ router was trained, or that hidden Harvey performance improved. It proves the
 Rust path rejects router/gate training, records expert usage, and emits an
 adapter artifact that the legal benchmark runner can consume.
 
+## Current Public Harvey Eval Suite Levels
+
+The Rust evaluator now has named public suite levels for local adapter checks:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_list_suites
+```
+
+The materialized levels are:
+
+- `harvey_public_001_single`
+- `harvey_public_003_workflow`
+- `harvey_public_010_mixed`
+
+The reserved levels are:
+
+- `harvey_public_025_regression`
+- `harvey_public_050_candidate_gate`
+
+The reserved levels are not filled with repeated tasks. They stay disabled
+until enough real public tasks are available.
+
+Run the current workflow gate with:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite harvey_public_003_workflow
+```
+
+Recorded local result:
+
+- base score: `3333` bps
+- adapter score: `10000` bps
+- delta: `6667` bps
+- median adapter score: `10000` bps
+- report hash:
+  `47b7125199cb642e550a4133938b3dc30de031c64768894848da085e5e1b4636`
+
+Run the current ten-task mixed gate with:
+
+```bash
+cargo run -p psionic-eval --example legal_benchmark_eval_suite -- \
+  --suite harvey_public_010_mixed
+```
+
+Recorded local result:
+
+- base score: `3000` bps
+- adapter score: `10000` bps
+- delta: `7000` bps
+- median adapter score: `10000` bps
+- report hash:
+  `704198a15af55cf5aa742dcec1861b65baeb577b62b4f35d9c5bd5db6b013df3`
+
+These are deterministic local replay suites. They check that a candidate
+adapter can pass the Rust legal workflow path and promotion input checks. They
+do not show hidden Harvey benchmark performance.
+
 ## Current Rust GRPO Smoke
 
 The lane now includes a Rust-only GRPO smoke trainer for the Qwen3.6 legal

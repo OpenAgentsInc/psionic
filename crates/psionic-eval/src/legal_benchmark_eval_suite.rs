@@ -11,18 +11,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ArtifactKind, BenchmarkTaskSpec, CriterionKind, CriterionSpec, DataClassification,
-    DeliverableKind, DeliverableSpec, JudgeMode, JudgePolicy, LegalBenchmarkEvaluationInput,
-    LegalBenchmarkEvaluationResult, LegalBenchmarkReportInput, Metadata, MockLegalBenchmarkJudge,
-    RunMetrics, RunRecord, RunTerminalState, ScoreReport, SourceArtifact, ToolCallRecord,
-    ToolPolicy, TranscriptEvent, TranscriptEventKind, artifact_from_file, artifact_manifest_digest,
-    build_input_artifact_manifest, build_output_artifact_manifest, evaluate_legal_benchmark_run,
-    generate_legal_benchmark_static_report, stable_json_digest,
+    artifact_from_file, artifact_manifest_digest, build_input_artifact_manifest,
+    build_output_artifact_manifest, evaluate_legal_benchmark_run,
+    generate_legal_benchmark_static_report, stable_json_digest, ArtifactKind, BenchmarkTaskSpec,
+    CriterionKind, CriterionSpec, DataClassification, DeliverableKind, DeliverableSpec, JudgeMode,
+    JudgePolicy, LegalBenchmarkEvaluationInput, LegalBenchmarkEvaluationResult,
+    LegalBenchmarkReportInput, Metadata, MockLegalBenchmarkJudge, RunMetrics, RunRecord,
+    RunTerminalState, ScoreReport, SourceArtifact, ToolCallRecord, ToolPolicy, TranscriptEvent,
+    TranscriptEventKind,
 };
 
 pub const LEGAL_BENCHMARK_EVAL_SUITE_SCHEMA_VERSION: u16 = 1;
@@ -130,7 +131,10 @@ pub struct LegalBenchmarkEvalTaskReport {
     pub task_id: String,
     pub model_role: String,
     pub run_id: String,
+    pub task_type: String,
     pub outcome: LegalBenchmarkEvalReplayOutcome,
+    pub submitted: bool,
+    pub correct_path: bool,
     pub answer_file_success: bool,
     pub legal_score_bps: u32,
     pub integrity_valid: bool,
@@ -142,20 +146,44 @@ pub struct LegalBenchmarkEvalTaskReport {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkEvalTaskTypeScore {
+    pub task_type: String,
+    pub task_count: u64,
+    pub mean_legal_score_bps: u32,
+    pub median_legal_score_bps: u32,
+    pub answer_file_write_rate_bps: u32,
+    pub correct_path_rate_bps: u32,
+    pub submit_rate_bps: u32,
+    pub integrity_valid_rate_bps: u32,
+    pub failure_class_counts: BTreeMap<String, u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LegalBenchmarkEvalSuiteModelReport {
     pub model_binding: LegalBenchmarkEvalModelBinding,
+    pub answer_file_write_rate_bps: u32,
     pub answer_file_success_rate_bps: u32,
+    pub correct_path_rate_bps: u32,
+    pub submit_rate_bps: u32,
+    pub integrity_valid_rate_bps: u32,
+    pub mean_legal_score_bps: u32,
+    pub median_legal_score_bps: u32,
     pub legal_score_bps: u32,
     pub integrity_failure_count: u64,
     pub tool_failure_count: u64,
     pub timeout_failure_count: u64,
     pub failure_class_counts: BTreeMap<String, u64>,
+    pub score_by_task_type: BTreeMap<String, LegalBenchmarkEvalTaskTypeScore>,
+    pub score_confidence_notes: Vec<String>,
     pub task_reports: Vec<LegalBenchmarkEvalTaskReport>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LegalBenchmarkEvalComparison {
+    pub champion_legal_score_bps: u32,
+    pub candidate_legal_score_bps: u32,
     pub score_delta_bps: i32,
+    pub regression_vs_champion_bps: i32,
     pub answer_file_success_delta_bps: i32,
     pub integrity_failure_delta: i64,
     pub tool_failure_delta: i64,
@@ -228,6 +256,97 @@ pub struct LegalBenchmarkEvalSuiteRunConfig {
     pub adapter: String,
     pub output_dir: PathBuf,
     pub replay_command: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LegalBenchmarkEvalSuiteCatalogEntry {
+    pub suite_level: String,
+    pub suite_id: String,
+    pub path: String,
+    pub task_count: usize,
+    pub materialized: bool,
+    pub promotion_target: bool,
+    pub notes: String,
+}
+
+pub fn legal_benchmark_public_suite_catalog() -> Vec<LegalBenchmarkEvalSuiteCatalogEntry> {
+    vec![
+        suite_catalog_entry(
+            "harvey_public_001_single",
+            "suites/harvey_public_001_single.json",
+            1,
+            true,
+            true,
+            "single-task smoke gate",
+        ),
+        suite_catalog_entry(
+            "harvey_public_003_workflow",
+            "suites/harvey_public_003_workflow.json",
+            3,
+            true,
+            true,
+            "frozen three-task workflow gate",
+        ),
+        suite_catalog_entry(
+            "harvey_public_010_mixed",
+            "suites/harvey_public_010_mixed.json",
+            10,
+            true,
+            true,
+            "mixed public-style regression suite",
+        ),
+        suite_catalog_entry(
+            "harvey_public_025_regression",
+            "suites/harvey_public_025_regression.json",
+            25,
+            false,
+            false,
+            "reserved until enough public tasks are materialized",
+        ),
+        suite_catalog_entry(
+            "harvey_public_050_candidate_gate",
+            "suites/harvey_public_050_candidate_gate.json",
+            50,
+            false,
+            false,
+            "reserved until enough public tasks are materialized",
+        ),
+    ]
+}
+
+pub fn resolve_legal_benchmark_eval_suite_ref(suite_ref: &str) -> PathBuf {
+    let path = PathBuf::from(suite_ref);
+    if path.is_absolute() || path.exists() || path.extension().is_some() {
+        return path;
+    }
+    legal_benchmark_public_suite_catalog()
+        .into_iter()
+        .find(|entry| entry.suite_level == suite_ref || entry.suite_id == suite_ref)
+        .map(|entry| PathBuf::from(entry.path))
+        .unwrap_or_else(|| PathBuf::from(suite_ref))
+}
+
+pub fn default_legal_benchmark_eval_output_dir(suite_ref: &str) -> PathBuf {
+    PathBuf::from("target/legal").join(format!("{}_eval_smoke", sanitize_path_component(suite_ref)))
+}
+
+fn suite_catalog_entry(
+    suite_level: &str,
+    path: &str,
+    task_count: usize,
+    materialized: bool,
+    promotion_target: bool,
+    notes: &str,
+) -> LegalBenchmarkEvalSuiteCatalogEntry {
+    LegalBenchmarkEvalSuiteCatalogEntry {
+        suite_level: String::from(suite_level),
+        suite_id: String::from(suite_level),
+        path: String::from(path),
+        task_count,
+        materialized,
+        promotion_target,
+        notes: String::from(notes),
+    }
 }
 
 #[derive(Debug, Error)]
@@ -608,7 +727,8 @@ fn build_task_spec(
         instructions: task.instructions.clone(),
         work_type: task.workflow.clone(),
         tags: vec![
-            String::from("harvey_public_three"),
+            manifest.suite_id.clone(),
+            String::from("harvey_public"),
             String::from("deterministic_replay"),
         ],
         source_artifacts,
@@ -788,6 +908,8 @@ fn task_report_from_score(
         .and_then(|value| value.get("valid"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let submitted = outcome == LegalBenchmarkEvalReplayOutcome::Pass;
+    let correct_path = submitted;
     let answer_file_success = score_report.all_pass && integrity_valid;
     let mut failure_classes = Vec::new();
     if !answer_file_success {
@@ -806,7 +928,10 @@ fn task_report_from_score(
         task_id: task.task_id.clone(),
         model_role: binding.role.clone(),
         run_id: score_report.run_id.clone(),
+        task_type: task_type(task),
         outcome,
+        submitted,
+        correct_path,
         answer_file_success,
         legal_score_bps: score_report.criterion_pass_rate_bps,
         integrity_valid,
@@ -827,6 +952,16 @@ fn model_report(
         .iter()
         .filter(|task| task.answer_file_success)
         .count();
+    let answer_write_count = task_reports.iter().filter(|task| task.correct_path).count();
+    let submitted_count = task_reports.iter().filter(|task| task.submitted).count();
+    let integrity_valid_count = task_reports
+        .iter()
+        .filter(|task| task.integrity_valid)
+        .count();
+    let scores = task_reports
+        .iter()
+        .map(|task| task.legal_score_bps)
+        .collect::<Vec<_>>();
     let score_sum = task_reports
         .iter()
         .map(|task| u64::from(task.legal_score_bps))
@@ -837,13 +972,29 @@ fn model_report(
             *failure_class_counts.entry(class.clone()).or_insert(0) += 1;
         }
     }
+    let mean_legal_score_bps = average_bps(score_sum, task_count);
     LegalBenchmarkEvalSuiteModelReport {
         model_binding: binding,
+        answer_file_write_rate_bps: ratio_bps(
+            u64::try_from(answer_write_count).unwrap_or(0),
+            task_count,
+        ),
         answer_file_success_rate_bps: ratio_bps(
             u64::try_from(answer_success_count).unwrap_or(0),
             task_count,
         ),
-        legal_score_bps: average_bps(score_sum, task_count),
+        correct_path_rate_bps: ratio_bps(
+            u64::try_from(answer_write_count).unwrap_or(0),
+            task_count,
+        ),
+        submit_rate_bps: ratio_bps(u64::try_from(submitted_count).unwrap_or(0), task_count),
+        integrity_valid_rate_bps: ratio_bps(
+            u64::try_from(integrity_valid_count).unwrap_or(0),
+            task_count,
+        ),
+        mean_legal_score_bps,
+        median_legal_score_bps: median_bps(scores.as_slice()),
+        legal_score_bps: mean_legal_score_bps,
         integrity_failure_count: u64::try_from(
             task_reports
                 .iter()
@@ -863,6 +1014,8 @@ fn model_report(
         )
         .unwrap_or(u64::MAX),
         failure_class_counts,
+        score_by_task_type: score_by_task_type(task_reports.as_slice()),
+        score_confidence_notes: score_confidence_notes(task_reports.as_slice()),
         task_reports,
     }
 }
@@ -889,13 +1042,97 @@ fn compare_model_reports(
         || tool_failure_delta > 0
         || timeout_failure_delta > 0;
     LegalBenchmarkEvalComparison {
+        champion_legal_score_bps: base.legal_score_bps,
+        candidate_legal_score_bps: adapter.legal_score_bps,
         score_delta_bps,
+        regression_vs_champion_bps: score_delta_bps,
         answer_file_success_delta_bps,
         integrity_failure_delta,
         tool_failure_delta,
         timeout_failure_delta,
         regression_detected,
     }
+}
+
+fn score_by_task_type(
+    task_reports: &[LegalBenchmarkEvalTaskReport],
+) -> BTreeMap<String, LegalBenchmarkEvalTaskTypeScore> {
+    let mut grouped = BTreeMap::<String, Vec<&LegalBenchmarkEvalTaskReport>>::new();
+    for task in task_reports {
+        grouped
+            .entry(task.task_type.clone())
+            .or_default()
+            .push(task);
+    }
+    grouped
+        .into_iter()
+        .map(|(task_type, tasks)| {
+            let task_count = u64::try_from(tasks.len()).unwrap_or(0);
+            let scores = tasks
+                .iter()
+                .map(|task| task.legal_score_bps)
+                .collect::<Vec<_>>();
+            let score_sum = scores.iter().map(|score| u64::from(*score)).sum::<u64>();
+            let answer_write_count = tasks.iter().filter(|task| task.correct_path).count();
+            let submitted_count = tasks.iter().filter(|task| task.submitted).count();
+            let integrity_valid_count = tasks.iter().filter(|task| task.integrity_valid).count();
+            let mut failure_class_counts = BTreeMap::new();
+            for task in &tasks {
+                for class in &task.failure_classes {
+                    *failure_class_counts.entry(class.clone()).or_insert(0) += 1;
+                }
+            }
+            (
+                task_type.clone(),
+                LegalBenchmarkEvalTaskTypeScore {
+                    task_type,
+                    task_count,
+                    mean_legal_score_bps: average_bps(score_sum, task_count),
+                    median_legal_score_bps: median_bps(scores.as_slice()),
+                    answer_file_write_rate_bps: ratio_bps(
+                        u64::try_from(answer_write_count).unwrap_or(0),
+                        task_count,
+                    ),
+                    correct_path_rate_bps: ratio_bps(
+                        u64::try_from(answer_write_count).unwrap_or(0),
+                        task_count,
+                    ),
+                    submit_rate_bps: ratio_bps(
+                        u64::try_from(submitted_count).unwrap_or(0),
+                        task_count,
+                    ),
+                    integrity_valid_rate_bps: ratio_bps(
+                        u64::try_from(integrity_valid_count).unwrap_or(0),
+                        task_count,
+                    ),
+                    failure_class_counts,
+                },
+            )
+        })
+        .collect()
+}
+
+fn score_confidence_notes(task_reports: &[LegalBenchmarkEvalTaskReport]) -> Vec<String> {
+    let mut notes = vec![String::from(
+        "Deterministic replay fixture: scores measure harness behavior for declared outcomes, not live model legal quality or hidden Harvey performance.",
+    )];
+    if task_reports.len() < 10 {
+        notes.push(format!(
+            "Small suite: {} task(s), so use this only as a smoke/workflow gate.",
+            task_reports.len()
+        ));
+    } else {
+        notes.push(format!(
+            "Mixed suite: {} task(s) across {} task type(s); use as a local regression signal before retained evaluation.",
+            task_reports.len(),
+            task_reports
+                .iter()
+                .map(|task| task.task_type.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        ));
+    }
+    notes
 }
 
 fn promotion_gate_input(
@@ -1070,6 +1307,10 @@ fn sanitize_path_component(value: &str) -> String {
         .collect()
 }
 
+fn task_type(task: &LegalBenchmarkEvalTaskFixture) -> String {
+    format!("{}/{}", task.practice_area, task.workflow)
+}
+
 fn resolve_suite_relative_path(suite_path: &Path, relative_path: &str) -> PathBuf {
     let path = PathBuf::from(relative_path);
     if path.is_absolute() || path.exists() {
@@ -1125,6 +1366,21 @@ fn average_bps(sum: u64, count: u64) -> u32 {
         return 0;
     }
     u32::try_from(sum / count).unwrap_or(u32::MAX)
+}
+
+fn median_bps(scores: &[u32]) -> u32 {
+    if scores.is_empty() {
+        return 0;
+    }
+    let mut sorted = scores.to_vec();
+    sorted.sort_unstable();
+    let middle = sorted.len() / 2;
+    if sorted.len() % 2 == 1 {
+        sorted[middle]
+    } else {
+        u32::try_from((u64::from(sorted[middle - 1]) + u64::from(sorted[middle])) / 2)
+            .unwrap_or(u32::MAX)
+    }
 }
 
 #[cfg(test)]

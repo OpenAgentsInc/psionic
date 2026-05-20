@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "suite_id": "harvey_public_001_single",
+  "mode": "public_harvey_expanded",
+  "fixed_task_order": [
+    "harvey.public.lease_notice"
+  ],
+  "prompt_template_id": "autopilot.legal.direct_answer.v1",
+  "prompt_template_hash": "419ccc8b3507fb02f376004d6046809966e124dbe3caed77d326d561d4bb724a",
+  "scorer_version": "psionic-rust-legal-scorer-v1",
+  "inference_settings": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_output_tokens": 2048,
+    "seed": 20260520
+  },
+  "source_documents": [
+    {
+      "document_id": "lease_notice",
+      "relative_path": "fixtures/legal_benchmark/eval_suite_public_three/lease_notice.txt",
+      "media_type": "text/plain",
+      "byte_size": 200,
+      "sha256": "e42e52b5f48a499c3948c2452fe01b6f1aa0a515974b9850b7380e12f2416de8"
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "harvey.public.lease_notice",
+      "task_version": "v1",
+      "title": "Lease notice memo",
+      "practice_area": "real_estate",
+      "workflow": "review",
+      "instructions": "Write a short memo stating whether notice is required and how it may be sent.",
+      "source_document_ids": [
+        "lease_notice"
+      ],
+      "required_answer_path": "answer.md",
+      "base_outcome": "missing_answer",
+      "adapter_outcome": "pass",
+      "replay_answer_markdown": "# Lease notice memo\n\nThe tenant should send written notice within ten calendar days after learning of the material service interruption. Email can satisfy the notice requirement if the landlord acknowledges receipt."
+    }
+  ],
+  "training_allowed": true,
+  "metadata": {
+    "boundary": "Deterministic single-task public replay fixture for smoke validation. It is not hidden Harvey performance.",
+    "suite_level": "harvey_public_001_single",
+    "source": "Psionic local fixture built from public-style legal task patterns."
+  }
+}
