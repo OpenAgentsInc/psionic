@@ -172,8 +172,19 @@ in `docs/QWEN_LEGAL_FINETUNE_LANE.md`. The lane admits
 `qwen_legal_adapter_sft_v1` through the machine-runtime contract as a CUDA
 adapter-training smoke, binds #1018 legal training records, exports a typed
 LM-head LoRA artifact and exact checkpoint, and emits score-import metadata
-for Autopilot4 without claiming a retained Harvey score improvement. The repo
-now also owns the first Rust-only legal benchmark DPO smoke command in
+for Autopilot4 without claiming a retained Harvey score improvement. The same
+lane now exposes a single operator command surface through
+`psionic-train legal ft <command>` and the report example
+`crates/psionic-train/examples/qwen_legal_ft_report.rs`. It covers `init-run`,
+`run-task`, `eval`, `build-sft`, `build-dpo`, `build-rewards`, `train-sft`,
+`train-dpo`, `train-grpo`, `submit-pylon-job`, `collect-pylon-receipts`,
+`merge-adapters`, `register-adapter`, `promote`, `report`, `replay`, and
+`verify-integrity`. The command surface writes a human summary, JSON receipt or
+report, deterministic replay command, required input hashes, expected output
+paths, and an integrity flag. The recorded `qwen-legal-ft-smoke` report has
+`17 / 17` commands ready, valid integrity, and report digest
+`066baa9148e319742053ac847b9782992d715307f5458f1291136f078d5fd7be`.
+The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
 direct-answer prompts, runs adapter-only weighted chosen/rejected updates, and
