@@ -172,7 +172,13 @@ in `docs/QWEN_LEGAL_FINETUNE_LANE.md`. The lane admits
 `qwen_legal_adapter_sft_v1` through the machine-runtime contract as a CUDA
 adapter-training smoke, binds #1018 legal training records, exports a typed
 LM-head LoRA artifact and exact checkpoint, and emits score-import metadata
-for Autopilot4 without claiming a retained Harvey score improvement. The same
+for Autopilot4 without claiming a retained Harvey score improvement. The repo
+now also owns the first Rust-only legal benchmark DPO smoke command in
+`crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
+loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
+direct-answer prompts, runs adapter-only weighted chosen/rejected updates, and
+emits adapter, loss-curve, checkpoint-summary, and training-receipt artifacts
+without invoking Python. The same
 run now also emits a typed RL hillclimb plan that points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation

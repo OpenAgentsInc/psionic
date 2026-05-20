@@ -237,6 +237,36 @@ Python process or Python-generated trainer artifact was used. It proves the
 Rust config, training, receipt, and export loop. Full dense Qwen3.6 causal-LM
 target coverage remains the next model-path expansion work.
 
+The first Rust-only Qwen3.6 DPO command is now:
+
+```bash
+cargo run -p psionic-train -- dpo \
+  --config configs/legal/qwen36_dpo_smoke.json
+```
+
+That smoke config loads the parent SFT LoRA adapter, bootstraps it from
+`configs/legal/qwen36_sft_smoke.json` when the local target artifact is
+missing, loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders prompts
+through the Qwen3.6 direct-answer template, and runs adapter-only weighted
+chosen/rejected updates with `beta = 0.25`. It writes the same core artifact
+family as SFT: `adapter.safetensors`, `loss_curve.json`,
+`checkpoint_summary.json`, and `training_receipt.json`.
+
+The checked smoke DPO dataset lives at
+`fixtures/legal_benchmark/dpo_smoke/legal-dpo-v1.jsonl`. The 2026-05-20 local
+command run completed 6 Rust-only steps over 22 pairs, moved the synthetic
+preference accuracy from `0.59090906` to `0.95454544`, and moved the average
+chosen-minus-rejected logprob margin from `0.3191057` to `4.2714095`. This is
+evidence that the adapter-only DPO path can train toward file-writing
+preference behavior on the synthetic smoke surface. It is not a hidden Harvey
+score claim.
+
+The same DPO adapter path was accepted by the deterministic replay eval suite:
+`harvey_public_three_deterministic_replay_v1` reported base `3333` bps,
+adapter `10000` bps, and delta `6667` bps with report hash
+`bd01ce5a8653414a2189d935c80c835c774f55f195ed6809021c135a352faa66`. That is
+replay-harness compatibility evidence, not retained benchmark proof.
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite
