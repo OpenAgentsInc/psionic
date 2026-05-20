@@ -1,7 +1,8 @@
 # Qwen Legal Adapter Fine-Tune Lane
 
 > Status: implemented smoke lane for `psionic-train` on 2026-05-19; real
-> local Qwen/MLX LoRA plus Rust legal-agent smoke added on 2026-05-20.
+> local Qwen/MLX LoRA plus Rust legal-agent smoke added on 2026-05-20; local
+> RL-seed resumed Qwen LoRA added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -100,6 +101,85 @@ workspace and output roots and tune the tool-use policy on retained slices.
 The result exports one canonical legal benchmark training record and is usable
 as a seed trajectory for legal RL ingestion, but it is not itself an RL-trained
 model update or a retained Harvey score claim.
+
+## Current RL-Seed Adapter Result
+
+The next local candidate resumes from the first adapter and trains on the
+accepted tool-backed smoke trajectory plus the original public-safe legal seed
+examples:
+
+- run id: `qwen_legal_real_qwen35_08b_mlx_lora_rl_seed_2026_05_20_003`
+- base model: `Qwen/Qwen3.5-0.8B`
+- parent adapter:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors`
+- backend: `mlx_lm.lora`
+- logical Pylon worker: `pylon.local.macos.mlx.01.rl_seed`
+- data:
+  `fixtures/qwen_legal/real_finetune/mlx_lora_rl_seed_2026_05_20_003`
+- adapter:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapters.safetensors`
+- adapter digest:
+  `06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623`
+- report:
+  `fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/report.json`
+- report SHA-256:
+  `1637bc930dbe06607899bf0ebc9c7f8c37bf15562728edd42fe1bfa175bf194c`
+- checker:
+  `scripts/check-qwen35-08b-legal-mlx-lora-rl-seed-fixture.sh`
+
+Observed training facts:
+
+- resumed from adapter digest:
+  `378e8b55e3320224c20c7c6c47d916dc590cb09c7eefbd1c7618e5adb71d27e4`
+- iterations: `8`
+- first validation loss: `3.442`
+- final validation loss: `2.552`
+- final train loss: `1.149`
+- trained tokens: `2,662`
+- peak memory: `4.238 GB`
+
+Run it locally with:
+
+```bash
+MODEL_ID=Qwen/Qwen3.5-0.8B \
+ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003 \
+PORT=18089 \
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+Then run the Rust benchmark-agent smoke:
+
+```bash
+QWEN_LEGAL_MLX_BASE_URL=http://127.0.0.1:18089/v1 \
+QWEN_LEGAL_ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapters.safetensors \
+QWEN_LEGAL_ADAPTER_DIGEST=06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623 \
+QWEN_LEGAL_PYLON_WORKER_ID=pylon.local.macos.mlx.01.rl_seed \
+QWEN_LEGAL_RUN_NONCE=qwen35-08b-mlx-lora-rl-seed-2026-05-20 \
+scripts/run-qwen35-08b-legal-mlx-lora-harvey-smoke.sh \
+  fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/harvey_agent_smoke
+```
+
+Recorded smoke result:
+
+- run id:
+  `run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20`
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `1`
+- run record hash:
+  `0df6c6767ea204c70a16f1b513ec2517a638790852f219f26413929712d131cf`
+- smoke report digest:
+  `db934020917452de144e330d3767b3242590a8adb838eac1a9676429b691f206`
+- score report digest:
+  `1402538472788138e97f1055422a75bbbd3f3d2c208a2e4c1783645eb040d48f`
+- training record bundle digest:
+  `e8efbbedfaba5d4af1de3250c05ab912550e5ff83e1d9ffdfb0d6dcba8b52ede`
+
+Claim boundary: this is an actual resumed Qwen-family LoRA update trained from
+an accepted benchmark trajectory. It is useful as a local RL-seed/policy
+refresh candidate for the Harvey lane. It is not full GRPO/PPO, not a retained
+Harvey score claim, not a Qwen3.6 run, and not live distributed Pylon/Nexus
+settlement.
 
 ## Rust API
 

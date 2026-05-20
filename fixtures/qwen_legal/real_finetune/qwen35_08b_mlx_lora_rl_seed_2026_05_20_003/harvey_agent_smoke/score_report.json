@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "score_report_id": "score.qwen35_08b_mlx_lora.harvey_tool_smoke.2026_05_20",
+  "run_id": "run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20",
+  "task_id": "legal.qwen35_08b_mlx_lora.harvey_tool_smoke",
+  "task_version": "2026-05-20",
+  "run_record_hash": "0df6c6767ea204c70a16f1b513ec2517a638790852f219f26413929712d131cf",
+  "output_artifact_manifest_hash": "0cf35b1f56110a6cc596e8b51f19692fe53c20e46f102a2c74e13ced55f8dcbc",
+  "all_pass": true,
+  "criterion_pass_rate_bps": 10000,
+  "criterion_results": [
+    {
+      "criterion_id": "criterion.tool_smoke.writes_and_submits_required_path",
+      "passed": true,
+      "verdict": "pass",
+      "reasoning": "Deterministic smoke scorer observed a submitted run with one generated deliverable and one write-tool receipt.",
+      "evidence_refs": [
+        "artifact.output.0"
+      ],
+      "judge_model": "psionic-deterministic-tool-smoke",
+      "judge_prompt_hash": "hash.psionic.tool_smoke.v1",
+      "raw_response_hash": "ea63dc97be2982158802512f342a88d7ff371d3af0bf539a6265cae267562220",
+      "confidence_bps": 10000,
+      "judge_latency_ms": 0,
+      "judge_cost_micro_usd": 0
+    }
+  ],
+  "metrics": {
+    "model_turns": 2,
+    "tool_call_count": 1,
+    "input_tokens": 1312,
+    "output_tokens": 102,
+    "wall_time_ms": 853,
+    "estimated_cost_micro_usd": 0
+  },
+  "document_coverage_bps": 10000,
+  "coverage_snapshot": {
+    "schema_version": 1,
+    "mode": "integrity",
+    "hidden_criteria_visible": false,
+    "derived_checklist_items": [],
+    "documents": [],
+    "facts": [],
+    "evidence_refs": [],
+    "deliverable_sections": [
+      {
+        "deliverable_id": "memo",
+        "relative_path": "outputs/memo.md",
+        "section_id": "output_manifest.artifact.output.0",
+        "drafted": true
+      },
+      {
+        "deliverable_id": "memo",
+        "relative_path": "outputs/memo.md",
+        "section_id": "tool.write.outputs.memo.md",
+        "drafted": true
+      }
+    ],
+    "validations": [
+      {
+        "validation_id": "validation.deliverable.memo",
+        "target_ref": "memo",
+        "passed": true,
+        "detail": "deliverable outputs/memo.md exists"
+      }
+    ],
+    "self_checks": []
+  },
+  "metadata": {
+    "adapter_artifact_digest": "06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623",
+    "score_scope": "no_source_tool_smoke"
+  }
+}

@@ -1,7 +1,8 @@
 # Qwen Tuned Adapter Serving
 
 > Status: implemented local smoke metadata path on 2026-05-19; real local
-> Qwen/MLX tool-backed Rust agent smoke added on 2026-05-20.
+> Qwen/MLX tool-backed Rust agent smoke added on 2026-05-20; local RL-seed
+> resumed adapter smoke added on 2026-05-20.
 
 This document describes the first Psionic legal benchmark path for comparing a
 base Qwen candidate with a tuned Qwen adapter candidate through one
@@ -99,6 +100,56 @@ deliverable through the Rust `write` tool, produced a receipt-backed output
 artifact, submitted through the legal benchmark agent loop, and exported one
 canonical legal benchmark training record. It is still a no-source smoke task,
 not a retained Harvey benchmark score.
+
+## RL-Seed Adapter Smoke
+
+The current local policy-refresh candidate resumes from the first adapter and
+trains on the accepted benchmark trajectory:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapters.safetensors
+```
+
+Report:
+
+```text
+fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/report.json
+```
+
+Report SHA-256:
+
+```text
+1637bc930dbe06607899bf0ebc9c7f8c37bf15562728edd42fe1bfa175bf194c
+```
+
+Serve it:
+
+```bash
+MODEL_ID=Qwen/Qwen3.5-0.8B \
+ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003 \
+PORT=18089 \
+scripts/run-qwen35-08b-legal-mlx-lora-server.sh
+```
+
+The recorded Rust agent smoke against this adapter has:
+
+- terminal state: `submitted`
+- output artifact count: `1`
+- tool receipt count: `1`
+- run record hash:
+  `0df6c6767ea204c70a16f1b513ec2517a638790852f219f26413929712d131cf`
+- transcript hash:
+  `74c3211b61e78b4424bc50d74db388afef6131535fbcc99da071e97a3bf80ab3`
+- smoke report digest:
+  `db934020917452de144e330d3767b3242590a8adb838eac1a9676429b691f206`
+- score report digest:
+  `1402538472788138e97f1055422a75bbbd3f3d2c208a2e4c1783645eb040d48f`
+- training record bundle digest:
+  `e8efbbedfaba5d4af1de3250c05ab912550e5ff83e1d9ffdfb0d6dcba8b52ede`
+
+This is now the strongest local Qwen candidate for the Harvey smoke route. It
+is a resumed LoRA policy refresh from accepted benchmark behavior, not a
+retained Harvey score claim or full RL run.
 
 ## Candidate Identity
 

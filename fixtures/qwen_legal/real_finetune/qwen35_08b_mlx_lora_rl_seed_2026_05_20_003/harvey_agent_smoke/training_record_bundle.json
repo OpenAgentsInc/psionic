@@ -1,0 +1,108 @@
+{
+  "schema_version": "psionic.legal_benchmark.training_record_bundle.v1",
+  "bundle_id": "qwen35_08b_mlx_lora_harvey_tool_smoke_rl_seed_2026_05_20",
+  "suite_id": "harvey_legal_qwen_local_smoke",
+  "source_report_id": "score.qwen35_08b_mlx_lora.harvey_tool_smoke.2026_05_20",
+  "source_report_digest": "7404bb04d22d192d99635b569b0c30f763a75dff60518bef11a659db32be80e0",
+  "split_counts": [
+    {
+      "split": "retained_smoke",
+      "record_count": 1
+    }
+  ],
+  "records": [
+    {
+      "schema_version": "psionic.legal_benchmark.training_record.v1",
+      "record_id": "legal.training.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20",
+      "suite_id": "harvey_legal_qwen_local_smoke",
+      "task_id": "legal.qwen35_08b_mlx_lora.harvey_tool_smoke",
+      "task_version": "2026-05-20",
+      "practice_area": "contracts",
+      "work_type": "benchmark_route_smoke",
+      "source_artifact_manifest_digest": "5a97b3eabe676d3d21f8225610aa2c79884bebd3e5ec688ea0d28f43a263b4c5",
+      "tool_policy_hash": "16e21515b985f043ef7b808944d13817d982ed58585c63e13f4159bd6cc641bb",
+      "tool_invocations": [
+        {
+          "tool_call_id": "57d4d7bf-3466-4490-a281-c2c484a0a3f0",
+          "tool_name": "write",
+          "call_event_index": 3,
+          "result_event_index": 4,
+          "input": {
+            "tool": "write",
+            "input": {
+              "root": "workspace",
+              "relative_path": "outputs/memo.md",
+              "content": "# Memo\n\nThis no-source legal benchmark smoke confirms the adapter can create a required deliverable through the benchmark tool route.",
+              "overwrite": true
+            }
+          },
+          "output": {
+            "tool": "write",
+            "output": {
+              "relative_path": "outputs/memo.md",
+              "bytes_written": 133,
+              "after_hash": "13ac4386636c30cd23d97c10065b45edfdbbac78808bc852caa28db065c69db2"
+            }
+          }
+        }
+      ],
+      "deliverable_refs": [
+        {
+          "deliverable_id": "memo",
+          "relative_path": "outputs/memo.md",
+          "required": true
+        }
+      ],
+      "coverage_snapshot_ref": "66e33033ab2f3f4c0de591d29313fe78ac28ca57f48ad12338cda52a75c3c500",
+      "score_report_ref": "score.qwen35_08b_mlx_lora.harvey_tool_smoke.2026_05_20",
+      "score_report_digest": "1402538472788138e97f1055422a75bbbd3f3d2c208a2e4c1783645eb040d48f",
+      "failure_family_labels": [
+        "passed"
+      ],
+      "judge_provenance": [
+        "psionic-deterministic-tool-smoke@hash.psionic.tool_smoke.v1:ea63dc97be2982158802512f342a88d7ff371d3af0bf539a6265cae267562220"
+      ],
+      "hidden_criterion_policy": "judge_only_excluded",
+      "split": "retained_smoke",
+      "examples": [
+        {
+          "example_id": "legal.qwen35_08b_mlx_lora.harvey_tool_smoke.directive",
+          "example_kind": "task_directive",
+          "visibility": "model_visible",
+          "input_text": "Create the required deliverable by calling the write tool exactly once. Use root output, relative_path outputs/memo.md, overwrite true, and markdown content '# Memo\\n\\nThis no-source legal benchmark smoke confirms the adapter can create a required deliverable through the benchmark tool route.' After the tool succeeds, return only exact JSON: {\"action\":\"submit\",\"deliverables\":[\"outputs/memo.md\"]}."
+        },
+        {
+          "example_id": "run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20.final_answer",
+          "example_kind": "evidence_backed_draft",
+          "visibility": "model_visible",
+          "input_text": "Produce the final legal benchmark deliverable.",
+          "target_text": "{\"action\":\"submit\",\"deliverables\":[\"outputs/memo.md\"]}"
+        },
+        {
+          "example_id": "run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20.tool_trace",
+          "example_kind": "tool_trace",
+          "visibility": "model_visible",
+          "input_text": "[{\"tool_call_id\":\"57d4d7bf-3466-4490-a281-c2c484a0a3f0\",\"tool_name\":\"write\",\"call_event_index\":3,\"result_event_index\":4,\"input\":{\"tool\":\"write\",\"input\":{\"root\":\"workspace\",\"relative_path\":\"outputs/memo.md\",\"content\":\"# Memo\\n\\nThis no-source legal benchmark smoke confirms the adapter can create a required deliverable through the benchmark tool route.\",\"overwrite\":true}},\"output\":{\"tool\":\"write\",\"output\":{\"relative_path\":\"outputs/memo.md\",\"bytes_written\":133,\"after_hash\":\"13ac4386636c30cd23d97c10065b45edfdbbac78808bc852caa28db065c69db2\"}},\"elapsed_ms\":1}]"
+        },
+        {
+          "example_id": "score.qwen35_08b_mlx_lora.harvey_tool_smoke.2026_05_20.judge",
+          "example_kind": "judge_rationale",
+          "visibility": "judge_only",
+          "input_text": "criterion.tool_smoke.writes_and_submits_required_path:pass:Deterministic smoke scorer observed a submitted run with one generated deliverable and one write-tool receipt.",
+          "source_refs": [
+            "artifact.output.0"
+          ]
+        }
+      ],
+      "metadata": {
+        "criterion_pass_rate_bps": 10000,
+        "run_record_digest": "0df6c6767ea204c70a16f1b513ec2517a638790852f219f26413929712d131cf",
+        "terminal_state": "submitted",
+        "transcript_digest": "74c3211b61e78b4424bc50d74db388afef6131535fbcc99da071e97a3bf80ab3"
+      },
+      "record_digest": "9d9bffdfd8dc80747eaede7c2bdd4ab444fb98b89056a66414387992144a19aa"
+    }
+  ],
+  "claim_boundary": "legal benchmark training records preserve source evidence and judge-only scoring provenance; they are dataset artifacts, not score-lift claims",
+  "bundle_digest": "d74956aeb1978ec23994c9d5d5cf0392cb695e8962ad86a89cf69e172eb1a735"
+}

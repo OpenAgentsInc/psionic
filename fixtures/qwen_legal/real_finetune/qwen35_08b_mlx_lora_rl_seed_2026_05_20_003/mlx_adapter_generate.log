@@ -1,0 +1,7 @@
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 15202.26it/s]
+==========
+{"artifact_path":"outputs/memo.md","run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"{"run":"
+==========
+Prompt: 54 tokens, 1483.022 tokens-per-sec
+Generation: 80 tokens, 205.219 tokens-per-sec
+Peak memory: 1.642 GB

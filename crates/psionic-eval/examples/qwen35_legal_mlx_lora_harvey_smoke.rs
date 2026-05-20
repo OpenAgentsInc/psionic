@@ -26,6 +26,8 @@ const ADAPTER_DIGEST: &str = "378e8b55e3320224c20c7c6c47d916dc590cb09c7eefbd1c76
 const ADAPTER_REPORT_DIGEST: &str =
     "b9c3c9dac55c469be1e946c9ea2e7be9255dfa2f02a097d31df97bf9d64592d5";
 const MODEL_REVISION: &str = "2fc06364715b967f1860aea9cf38778875588b17";
+const DEFAULT_PYLON_WORKER_ID: &str = "pylon.local.macos.mlx.01";
+const DEFAULT_RUN_NONCE: &str = "qwen35-08b-mlx-lora-2026-05-20";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output_dir = env::args()
@@ -42,6 +44,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| String::from(DEFAULT_MODEL));
+    let adapter_path = env_string("QWEN_LEGAL_ADAPTER_PATH", ADAPTER_PATH);
+    let adapter_digest = env_string("QWEN_LEGAL_ADAPTER_DIGEST", ADAPTER_DIGEST);
+    let adapter_report_digest =
+        env_string("QWEN_LEGAL_ADAPTER_REPORT_DIGEST", ADAPTER_REPORT_DIGEST);
+    let pylon_worker_id = env_string("QWEN_LEGAL_PYLON_WORKER_ID", DEFAULT_PYLON_WORKER_ID);
+    let run_nonce = env_string("QWEN_LEGAL_RUN_NONCE", DEFAULT_RUN_NONCE);
 
     let documents_root = output_dir.join("documents");
     let output_root = output_dir.join("output");
@@ -51,7 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&workspace_root)?;
     fs::create_dir_all(&output_root)?;
 
-    let task = smoke_task();
+    let task = smoke_task(&adapter_digest);
     let task_for_export = task.clone();
     let input_manifest = build_input_artifact_manifest(&task);
     let run_config = smoke_run_config(&task, &model);
@@ -63,15 +71,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     route.metadata.insert(
         String::from("adapter_path"),
-        Value::String(String::from(ADAPTER_PATH)),
+        Value::String(adapter_path.clone()),
     );
     route.metadata.insert(
         String::from("adapter_artifact_digest"),
-        Value::String(String::from(ADAPTER_DIGEST)),
+        Value::String(adapter_digest.clone()),
     );
     route.metadata.insert(
         String::from("adapter_report_digest"),
-        Value::String(String::from(ADAPTER_REPORT_DIGEST)),
+        Value::String(adapter_report_digest.clone()),
     );
     route.metadata.insert(
         String::from("base_model_revision"),
@@ -79,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     route.metadata.insert(
         String::from("pylon_worker_id"),
-        Value::String(String::from("pylon.local.macos.mlx.01")),
+        Value::String(pylon_worker_id.clone()),
     );
     route.metadata.insert(
         String::from("training_backend"),
@@ -121,13 +129,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ),
             ],
             extraction_receipt_refs: Vec::new(),
-            run_nonce: Some(String::from("qwen35-08b-mlx-lora-2026-05-20")),
+            run_nonce: Some(run_nonce),
         },
         &mut adapter,
     )?;
 
     let run_record_hash = run_record_digest(&result.run_record)?;
-    let score_report = deterministic_smoke_score_report(&result, &run_record_hash)?;
+    let score_report =
+        deterministic_smoke_score_report(&result, &run_record_hash, &adapter_digest)?;
     let score_report_path = output_dir.join("score_report.json");
     fs::write(
         &score_report_path,
@@ -175,11 +184,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "retained_score_claim": false,
         "base_url": base_url,
         "model": model,
-        "adapter_path": ADAPTER_PATH,
-        "adapter_artifact_digest": ADAPTER_DIGEST,
-        "adapter_report_digest": ADAPTER_REPORT_DIGEST,
+        "adapter_path": adapter_path,
+        "adapter_artifact_digest": adapter_digest,
+        "adapter_report_digest": adapter_report_digest,
         "base_model_revision": MODEL_REVISION,
-        "pylon_worker_id": "pylon.local.macos.mlx.01",
+        "pylon_worker_id": pylon_worker_id,
         "workspace_output_roots_shared_for_smoke": true,
         "run_record_path": result.paths.run_record_json,
         "run_receipt_path": result.paths.run_receipt_json,
@@ -207,7 +216,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn smoke_task() -> BenchmarkTaskSpec {
+fn env_string(name: &str, fallback: &str) -> String {
+    env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| String::from(fallback))
+}
+
+fn smoke_task(adapter_digest: &str) -> BenchmarkTaskSpec {
     let mut metadata = psionic_eval::Metadata::new();
     metadata.insert(
         String::from("smoke_kind"),
@@ -215,7 +231,7 @@ fn smoke_task() -> BenchmarkTaskSpec {
     );
     metadata.insert(
         String::from("adapter_artifact_digest"),
-        Value::String(String::from(ADAPTER_DIGEST)),
+        Value::String(String::from(adapter_digest)),
     );
     BenchmarkTaskSpec {
         schema_version: psionic_eval::LEGAL_BENCHMARK_SCHEMA_VERSION,
@@ -303,6 +319,7 @@ fn smoke_run_config(task: &BenchmarkTaskSpec, model: &str) -> RunConfig {
 fn deterministic_smoke_score_report(
     result: &psionic_eval::LegalBenchmarkAgentRunResult,
     run_record_hash: &str,
+    adapter_digest: &str,
 ) -> Result<ScoreReport, Box<dyn Error>> {
     let output_artifact_manifest_hash = artifact_manifest_digest(&result.output_artifact_manifest)?;
     let mut metadata = Metadata::new();
@@ -312,7 +329,7 @@ fn deterministic_smoke_score_report(
     );
     metadata.insert(
         String::from("adapter_artifact_digest"),
-        Value::String(String::from(ADAPTER_DIGEST)),
+        Value::String(String::from(adapter_digest)),
     );
     Ok(ScoreReport {
         schema_version: psionic_eval::LEGAL_BENCHMARK_SCHEMA_VERSION,

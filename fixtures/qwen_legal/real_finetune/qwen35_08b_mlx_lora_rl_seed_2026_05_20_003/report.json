@@ -1,0 +1,142 @@
+{
+  "schema_version": "psionic.qwen_legal_real_qwen_mlx_lora_report.v1",
+  "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_rl_seed_2026_05_20_003",
+  "created_at": "2026-05-20",
+  "training_backend": "mlx_lm.lora",
+  "trainer_version_observed": "mlx_lm 0.31.3 / mlx 0.31.2",
+  "base_model": {
+    "model_id": "Qwen/Qwen3.5-0.8B",
+    "model_family": "qwen3_5",
+    "huggingface_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "source": "huggingface"
+  },
+  "parent_adapter": {
+    "run_id": "qwen_legal_real_qwen35_08b_mlx_lora_2026_05_20_002",
+    "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors",
+    "sha256": "378e8b55e3320224c20c7c6c47d916dc590cb09c7eefbd1c7618e5adb71d27e4"
+  },
+  "retained_target_model": {
+    "model_id": "Qwen/Qwen3.6-35B-A3B",
+    "status": "target_for_later_cuda_or_hosted_pylon_run"
+  },
+  "pylon_execution": {
+    "mode": "single_local_logical_pylon_rl_seed",
+    "worker_ids": [
+      "pylon.local.macos.mlx.01.rl_seed"
+    ],
+    "settlement": "not_live_nexus_settlement",
+    "notes": [
+      "This run used the local Mac MLX backend as one logical Pylon worker.",
+      "The data includes the accepted Rust Harvey tool-smoke trajectory exported as a canonical legal benchmark training-record seed.",
+      "This is a local policy-improvement/SFT refresh from accepted benchmark behavior, not full retained-slice GRPO."
+    ]
+  },
+  "dataset": {
+    "description": "public-safe legal seed examples plus the accepted tool-backed Harvey smoke trajectory",
+    "mlx_data_dir": "fixtures/qwen_legal/real_finetune/mlx_lora_rl_seed_2026_05_20_003",
+    "source_training_record_bundle": {
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/harvey_agent_smoke/training_record_bundle.json",
+      "digest": "db28588382457abf216b31e00d6875c0525e026a706c3448e78e26c6497e74e3"
+    },
+    "splits": [
+      {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_rl_seed_2026_05_20_003/train.jsonl",
+        "sha256": "e38e976144d78177fd23b42ebeca344580f84b0b7cc2be6566f6ef7acffc41d9",
+        "examples": 3
+      },
+      {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_rl_seed_2026_05_20_003/valid.jsonl",
+        "sha256": "a99924903cb4ae32cae78258f263ab305995f6ab2eae197c03202b5ab857cf4a",
+        "examples": 2
+      },
+      {
+        "path": "fixtures/qwen_legal/real_finetune/mlx_lora_rl_seed_2026_05_20_003/test.jsonl",
+        "sha256": "bd7b69705b7467dd4cddcfdcb11192a5f610ab1ef50d248e1f4b9dc4fe761e7a",
+        "examples": 2
+      }
+    ],
+    "hidden_harvey_rubric_exposure": "none"
+  },
+  "training_command": "uvx --from mlx-lm mlx_lm.lora --model Qwen/Qwen3.5-0.8B --train --data fixtures/qwen_legal/real_finetune/mlx_lora_rl_seed_2026_05_20_003 --fine-tune-type lora --optimizer adamw --num-layers 8 --batch-size 1 --iters 8 --val-batches 1 --learning-rate 8e-6 --steps-per-report 1 --steps-per-eval 4 --resume-adapter-file fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors --adapter-path target/qwen_legal_real_finetune/run_2026_05_20_003_qwen35_08b_rl_seed/mlx_adapter --max-seq-length 768 --grad-checkpoint",
+  "training_summary": {
+    "trainable_parameters": 1804000,
+    "trainable_parameter_fraction": 0.0024,
+    "iterations": 8,
+    "batch_size": 1,
+    "max_seq_length": 768,
+    "learning_rate": 0.000008,
+    "lora_rank": 8,
+    "lora_scale": 20.0,
+    "num_lora_layers": 8,
+    "gradient_checkpointing": true,
+    "first_validation_loss": 3.442,
+    "final_validation_loss": 2.552,
+    "final_train_loss": 1.149,
+    "trained_tokens": 2662,
+    "peak_memory_gb": 4.238
+  },
+  "artifacts": [
+    {
+      "kind": "adapter_weights",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapters.safetensors",
+      "sha256": "06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623",
+      "bytes": 7230451
+    },
+    {
+      "kind": "adapter_config",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapter_config.json",
+      "sha256": "9054e3a3c78955c6aabb3c2476e68852892b9abdd174762979b42802fdd411a3",
+      "bytes": 1135
+    },
+    {
+      "kind": "training_log",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/mlx_lora_train.log",
+      "sha256": "19dac2be42a0e7b4ba4943576b005dfecd0935b8ef0680ae9c7f4bb2f935c33c"
+    },
+    {
+      "kind": "adapter_generate_smoke_log",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/mlx_adapter_generate.log",
+      "sha256": "771ef87f639ffb2ac1cdaa32dec2a5f719c56c92f559a6e0462f5188cfad6977"
+    },
+    {
+      "kind": "rust_agent_smoke_report",
+      "path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/harvey_agent_smoke/harvey_agent_smoke_report.json",
+      "sha256": "c8e334b0841760acf447bfa0112286b01ef994c1b4ed9d5371e4b6e39de1d46f"
+    }
+  ],
+  "serving": {
+    "server_command": "MODEL_ID=Qwen/Qwen3.5-0.8B ADAPTER_PATH=fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003 PORT=18089 scripts/run-qwen35-08b-legal-mlx-lora-server.sh",
+    "openai_compatible_base_url": "http://127.0.0.1:18089/v1",
+    "request_model_id": "Qwen/Qwen3.5-0.8B",
+    "verified_endpoint": "POST /v1/chat/completions through psionic-eval ReqwestBlockingHttpTransport",
+    "direct_generate_note": "The raw mlx_lm.generate probe is retained as a log artifact but is not the benchmark route; the OpenAI-compatible server plus Rust agent smoke is the authoritative use path."
+  },
+  "benchmark_readiness": {
+    "usable_for_harvey_smoke": true,
+    "usable_for_tool_backed_rl_seed": true,
+    "usable_for_retained_score_claim": false,
+    "rust_agent_smoke": {
+      "run_id": "run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20",
+      "terminal_state": "submitted",
+      "run_record_hash": "0df6c6767ea204c70a16f1b513ec2517a638790852f219f26413929712d131cf",
+      "transcript_hash": "74c3211b61e78b4424bc50d74db388afef6131535fbcc99da071e97a3bf80ab3",
+      "score_report_digest": "1402538472788138e97f1055422a75bbbd3f3d2c208a2e4c1783645eb040d48f",
+      "training_record_bundle_digest": "e8efbbedfaba5d4af1de3250c05ab912550e5ff83e1d9ffdfb0d6dcba8b52ede",
+      "output_artifact_count": 1,
+      "tool_receipt_count": 1
+    },
+    "required_next_integration": [
+      "Run the same policy-update loop on a retained public-safe Harvey slice with source documents.",
+      "Export accepted and failed retained-slice trajectories into preference/RL records.",
+      "Repeat with two live Pylon workers under Nexus accounting.",
+      "Promote only after retained scoring shows lift with no holdout regression."
+    ]
+  },
+  "claim_boundary": [
+    "This is an actual resumed LoRA fine-tune of a Qwen-family model from an accepted benchmark trajectory.",
+    "It is local policy-improvement/SFT over an RL seed, not full GRPO or PPO.",
+    "It is not a full Qwen3.6 model fine-tune.",
+    "It is not live distributed Pylon/Nexus settlement; it used one local logical Pylon worker.",
+    "It does not establish retained Harvey score lift."
+  ]
+}

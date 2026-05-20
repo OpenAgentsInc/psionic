@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest.output.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.2026-05-20.run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20",
+  "task_id": "legal.qwen35_08b_mlx_lora.harvey_tool_smoke",
+  "task_version": "2026-05-20",
+  "manifest_role": "output",
+  "artifacts": [
+    {
+      "artifact_id": "artifact.output.0",
+      "artifact_kind": "generated_deliverable",
+      "relative_path": "outputs/memo.md",
+      "original_filename": "memo.md",
+      "media_type": "text/markdown",
+      "byte_size": 133,
+      "sha256": "13ac4386636c30cd23d97c10065b45edfdbbac78808bc852caa28db065c69db2",
+      "data_classification": "benchmark_confidential",
+      "provenance": "legal_benchmark_agent_run"
+    }
+  ]
+}

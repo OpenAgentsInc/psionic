@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "run_id": "run.legal.qwen35_08b_mlx_lora.harvey_tool_smoke.f2972e6fead2.qwen35-08b-mlx-lora-rl-seed-2026-05-20",
+  "task_id": "legal.qwen35_08b_mlx_lora.harvey_tool_smoke",
+  "task_version": "2026-05-20",
+  "terminal_state": "submitted",
+  "task_spec_hash": "7bba182f8bf6d9cc18cef9794fa22877ec6b8f2ad07f47fec854eeba3e746793",
+  "input_artifact_manifest_hash": "5a97b3eabe676d3d21f8225610aa2c79884bebd3e5ec688ea0d28f43a263b4c5",
+  "run_config_hash": "f2972e6fead2670f468bc49d5ae662f39829e826b6f976852505bd3262fc86ef",
+  "output_artifact_manifest_hash": "0cf35b1f56110a6cc596e8b51f19692fe53c20e46f102a2c74e13ced55f8dcbc",
+  "transcript_hash": "74c3211b61e78b4424bc50d74db388afef6131535fbcc99da071e97a3bf80ab3",
+  "metrics_hash": "7f564d8e62b463c43e66c373dd1e75461d10e6cf75276e6c0b6d75e1bd0cb379",
+  "tool_receipts_hash": "359560b37f2146380d09b48ece74fdeece567a7a4ea5b19e8207b4b5a4cbc685",
+  "run_record_hash": "0df6c6767ea204c70a16f1b513ec2517a638790852f219f26413929712d131cf",
+  "output_artifact_count": 1,
+  "tool_receipt_count": 1,
+  "created_at_ms": 1779255696263,
+  "metadata": {
+    "adapter_artifact_digest": "06057bf6e5b3be70ea64b87b35371062b3bfc429acd3d82fcc44b6848b003623",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_rl_seed_2026_05_20_003/adapters.safetensors",
+    "adapter_report_digest": "pending",
+    "base_model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+    "pylon_worker_id": "pylon.local.macos.mlx.01.rl_seed",
+    "route_config_hash": "2842822bfe48ee72d017a24b324105d695aeb0228e3601f607e33de511ffae94",
+    "route_id": "route.qwen35_08b_legal_mlx_lora.local",
+    "route_model_id": "Qwen/Qwen3.5-0.8B",
+    "training_backend": "mlx_lm.lora"
+  }
+}

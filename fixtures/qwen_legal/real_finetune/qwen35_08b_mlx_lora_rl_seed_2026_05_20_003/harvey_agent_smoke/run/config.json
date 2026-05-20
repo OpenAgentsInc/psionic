@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "run_config_id": "run_config.qwen35_08b_mlx_lora.harvey_tool_smoke",
+  "provider": "openai_compatible.local_mlx",
+  "model": "Qwen/Qwen3.5-0.8B",
+  "agent_protocol_version": "legal-agent-loop.v1",
+  "tool_policy": {
+    "allowed_tools": [
+      "write"
+    ],
+    "network_allowed": false,
+    "source_artifacts_read_only": true,
+    "max_turns": 2,
+    "max_wall_time_seconds": 120
+  },
+  "judge_policy": {
+    "mode": "deterministic",
+    "provider": "psionic",
+    "model": "deterministic-route-smoke",
+    "prompt_template_id": "judge.route_smoke.v1",
+    "prompt_template_hash": "hash.route_smoke.v1",
+    "all_pass_required": true,
+    "sample_count": 1
+  },
+  "random_seed": 7,
+  "metadata": {
+    "adapter_artifact_digest": "378e8b55e3320224c20c7c6c47d916dc590cb09c7eefbd1c7618e5adb71d27e4",
+    "adapter_path": "fixtures/qwen_legal/real_finetune/qwen35_08b_mlx_lora_2026_05_20_002/adapters.safetensors",
+    "pylon_worker_id": "pylon.local.macos.mlx.01"
+  }
+}
