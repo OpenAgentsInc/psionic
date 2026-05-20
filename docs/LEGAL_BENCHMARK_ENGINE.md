@@ -180,6 +180,23 @@ cargo test -p psionic-models qwen36_template
 cargo test -p psionic-transformer qwen36_loss_masks
 ```
 
+The first Rust-only Qwen3.6 SFT command is now:
+
+```bash
+cargo run -p psionic-train -- sft \
+  --config configs/legal/qwen36_sft_smoke.json
+```
+
+That smoke config uses `Qwen/Qwen3.6-27B` metadata, QLoRA-style adapter
+settings, assistant-only loss flags, and the `all-linear` Qwen3.6 target-module
+declaration. The current executable training surface is intentionally smaller:
+it trains an adapter-only LM-head LoRA update over tiny legal hidden-state
+samples, writes `adapter.safetensors`, `loss_curve.json`,
+`checkpoint_summary.json`, and `training_receipt.json`, and records that no
+Python process or Python-generated trainer artifact was used. It proves the
+Rust config, training, receipt, and export loop. Full dense Qwen3.6 causal-LM
+target coverage remains the next model-path expansion work.
+
 The current honest Harvey MFN local result is run 016: the actual local Qwen
 LoRA adapter 005 submitted through the Rust tool loop, wrote its own output,
 and scored `4 / 18` on a rubric-free legal work-product proxy. Broad suite

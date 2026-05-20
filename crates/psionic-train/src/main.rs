@@ -31,8 +31,8 @@ use psionic_train::{
     materialize_psionic_train_checkpoint_handoff,
     persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
     persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
-    run_psion_cs336_a1_demo_cli, run_psion_cs336_a1_demo_manifest, runtime_build_digest,
-    validate_psionic_train_grouped_stage_input_transport,
+    run_psion_cs336_a1_demo_cli, run_psion_cs336_a1_demo_manifest, run_psionic_legal_sft_cli,
+    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
 };
 
 #[allow(dead_code)]
@@ -72,12 +72,32 @@ fn main() -> ExitCode {
 
     match args[0].as_str() {
         "manifest" => run_manifest_mode(&args[1..]),
+        "sft" => run_sft_passthrough(&args[1..]),
         "actual-pretraining" => run_actual_pretraining_passthrough(&args[1..]),
         "cs336-a1-demo" => run_cs336_a1_demo_passthrough(&args[1..]),
         other => {
             eprintln!(
-                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, actual-pretraining, cs336-a1-demo"
+                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, sft, actual-pretraining, cs336-a1-demo"
             );
+            ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
+        }
+    }
+}
+
+fn run_sft_passthrough(args: &[String]) -> ExitCode {
+    match run_psionic_legal_sft_cli(args) {
+        Ok(receipt) => match serde_json::to_string_pretty(&receipt) {
+            Ok(json) => {
+                println!("{json}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: failed to serialize SFT receipt: {error}");
+                ExitCode::from(PsionicTrainRefusalClass::InternalError.exit_code())
+            }
+        },
+        Err(error) => {
+            eprintln!("error: {error}");
             ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
         }
     }
@@ -2542,7 +2562,7 @@ fn current_time_ms() -> Result<u64, String> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
+        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train sft --config <path>\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
         psionic_train::PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION,
         psionic_train::PSIONIC_TRAIN_STATUS_PACKET_SCHEMA_VERSION
     );
