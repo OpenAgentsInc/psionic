@@ -437,6 +437,29 @@ checkpoint execution check, but it is still not the full transformer forward:
 Psionic does not yet run attention, MLP, linear attention, MTP, generation, or
 LoRA training through this path.
 
+The same command now has a stronger bounded full-layer smoke:
+
+```bash
+cargo run -p psionic-serve --example qwen36_forward_admission -- \
+  --model-dir target/models/qwen/Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt \
+  --backend local-full-forward \
+  --out target/legal/qwen36_27b_forward_admission/full_forward_report.json
+```
+
+This mode reports `forward_execution_status: full_forward`. It walks every
+declared Qwen3.6-27B text layer in Rust, reads real safetensor rows for
+attention, linear attention, MLP, norms, the MTP layer, and sampled `lm_head`
+rows, and emits deterministic sampled logits. It is intentionally
+memory-bounded and row-sparse: it proves the Rust layer order, tensor lookup,
+row decoding, layer visitation, deterministic replay, and sampled-logit report
+shape. The report records the command line, config hash, tokenizer hash,
+tensor-index hash, prompt hash, tensor-read hashes, and sampled-logit hash. It
+does not claim full-width attention, full MLP activation
+materialization, full-vocabulary logits, multi-token generation, or training
+gradients. Unsupported model families, missing tensors, failed text tensor
+admission, and MoE/router paths still refuse plainly.
+
 The first real-weight sampled LoRA SFT command is:
 
 ```bash

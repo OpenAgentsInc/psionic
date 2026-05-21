@@ -11,14 +11,15 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    PromptMessage, PromptMessageRole, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
+    load_qwen36_model_config, normalize_qwen36_target_model_id, PromptMessage, PromptMessageRole,
     Qwen36PromptOptions, Qwen36PromptReceipt, Qwen36PromptRenderer, Qwen36ReasoningMode,
-    Qwen36TargetPathError, load_qwen36_model_config, normalize_qwen36_target_model_id,
+    Qwen36TargetPathError, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
 };
 
 pub const QWEN36_FORWARD_ADMISSION_SCHEMA_VERSION: &str = "psionic.qwen36_27b_forward_admission.v1";
 pub const QWEN36_FORWARD_REFUSAL_CODE: &str = "qwen3_5_text_forward_not_implemented";
 pub const QWEN36_SAMPLED_PROJECTION_BACKEND: &str = "local-sampled-projection";
+pub const QWEN36_FULL_FORWARD_BACKEND: &str = "local-full-forward";
 const QWEN36_EMBED_TOKENS_WEIGHT: &str = "model.language_model.embed_tokens.weight";
 const QWEN36_LM_HEAD_WEIGHT: &str = "lm_head.weight";
 
@@ -113,6 +114,7 @@ pub struct Qwen36TensorAdmissionReport {
 pub enum Qwen36ForwardExecutionStatus {
     Refused,
     SampledProjection,
+    FullForward,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -146,6 +148,36 @@ pub struct Qwen36ForwardProjectionReceipt {
     pub used_full_transformer_layers: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36FullForwardLayerReceipt {
+    pub layer_index: usize,
+    pub layer_type: String,
+    pub tensor_names: Vec<String>,
+    pub read_count: usize,
+    pub hidden_state_sha256: String,
+    pub residual_delta_l1: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36FullForwardReceipt {
+    pub mode: String,
+    pub input_token_id: u32,
+    pub input_token_label: String,
+    pub candidate_token_ids: Vec<u32>,
+    pub sampled_logits: Vec<Qwen36SampledLogit>,
+    pub logits_sha256: String,
+    pub tensor_reads: Vec<Qwen36TensorRowReadReceipt>,
+    pub layer_receipts: Vec<Qwen36FullForwardLayerReceipt>,
+    pub hidden_size: usize,
+    pub visited_layer_count: usize,
+    pub visited_full_attention_layer_count: usize,
+    pub visited_linear_attention_layer_count: usize,
+    pub visited_mtp_layer_count: usize,
+    pub used_full_transformer_layers: bool,
+    pub exact_full_width_logits: bool,
+    pub claim_boundary: String,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Qwen36SampledProjectionTrainingSurface {
     pub prompt_receipt: Qwen36PromptReceipt,
@@ -176,10 +208,13 @@ pub struct Qwen36ForwardAdmissionRunReport {
     pub tensor_admission: Qwen36TensorAdmissionReport,
     pub tensor_admission_sha256: String,
     pub backend: String,
+    pub command_line: Vec<String>,
     pub precision: String,
     pub forward_execution_status: Qwen36ForwardExecutionStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projection_receipt: Option<Qwen36ForwardProjectionReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_forward_receipt: Option<Qwen36FullForwardReceipt>,
     pub refusal_code: String,
     pub refusal_detail: String,
     pub claim_boundary: String,
@@ -189,6 +224,20 @@ pub fn run_qwen36_forward_admission(
     model_dir: impl AsRef<Path>,
     prompt_path: impl AsRef<Path>,
     backend: &str,
+) -> Result<Qwen36ForwardAdmissionRunReport, Qwen36TargetPathError> {
+    run_qwen36_forward_admission_with_command_line(
+        model_dir,
+        prompt_path,
+        backend,
+        Vec::<String>::new(),
+    )
+}
+
+pub fn run_qwen36_forward_admission_with_command_line(
+    model_dir: impl AsRef<Path>,
+    prompt_path: impl AsRef<Path>,
+    backend: &str,
+    command_line: Vec<String>,
 ) -> Result<Qwen36ForwardAdmissionRunReport, Qwen36TargetPathError> {
     let model_dir = model_dir.as_ref();
     let prompt_path = prompt_path.as_ref();
@@ -256,17 +305,41 @@ pub fn run_qwen36_forward_admission(
     } else {
         None
     };
-    let forward_execution_status = if projection_receipt.is_some() {
+    let full_forward_receipt = if should_run_full_forward(backend) {
+        if !tensor_admission.text_tensor_admission_passed {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "full Qwen3.6 forward smoke requires text tensor admission to pass first",
+            )));
+        }
+        Some(qwen36_full_forward_receipt(
+            model_dir,
+            &weight_map,
+            &architecture,
+            &rendered,
+        )?)
+    } else {
+        None
+    };
+    let forward_execution_status = if full_forward_receipt.is_some() {
+        Qwen36ForwardExecutionStatus::FullForward
+    } else if projection_receipt.is_some() {
         Qwen36ForwardExecutionStatus::SampledProjection
     } else {
         Qwen36ForwardExecutionStatus::Refused
     };
-    let refusal_code = if projection_receipt.is_some() {
+    let refusal_code = if full_forward_receipt.is_some() {
+        String::from("qwen3_5_text_full_layer_forward_smoke_admitted")
+    } else if projection_receipt.is_some() {
         String::from("qwen3_5_text_full_transformer_forward_not_implemented")
     } else {
         String::from(QWEN36_FORWARD_REFUSAL_CODE)
     };
-    let refusal_detail = if projection_receipt.is_some() {
+    let refusal_detail = if let Some(full_forward) = &full_forward_receipt {
+        format!(
+            "Psionic ran a bounded Rust full-layer forward smoke over {} Qwen3.6-27B text layers, read real safetensor rows from each layer, and produced sampled logits. This path is row-sparse and memory-bounded; it is not full-width production generation.",
+            full_forward.visited_layer_count
+        )
+    } else if projection_receipt.is_some() {
         String::from(
             "Psionic read real Qwen3.6-27B embed_tokens and lm_head rows from safetensors and computed deterministic sampled projection logits. It still does not run the qwen3_5_text transformer stack, so this is not a full model forward pass.",
         )
@@ -275,7 +348,11 @@ pub fn run_qwen36_forward_admission(
             "Psionic can now verify the real Qwen3.6-27B text tensor table from safetensors headers. It still lacks the qwen3_5_text mixed linear-attention/full-attention/MTP forward kernels, so it refuses logits instead of pretending to run inference.",
         )
     };
-    let claim_boundary = if projection_receipt.is_some() {
+    let claim_boundary = if full_forward_receipt.is_some() {
+        String::from(
+            "This report reads the real Qwen/Qwen3.6-27B config, tokenizer, index, safetensors headers, embedding rows, layer tensor rows, norm vectors, MTP rows, and sampled lm_head rows; it executes a deterministic bounded full-layer smoke through the Qwen3.6 text layer order and produces sampled logits. It does not materialize full-width attention matrices, full vocabulary logits, multi-token generation, or training gradients.",
+        )
+    } else if projection_receipt.is_some() {
         String::from(
             "This report reads the real Qwen/Qwen3.6-27B config, tokenizer, index, safetensors headers, one real embedding row, and sampled real lm_head rows; it computes sampled projection logits and hashes the rows and logits. It does not run attention, MLP, linear attention, MTP, generation, or LoRA training.",
         )
@@ -301,9 +378,11 @@ pub fn run_qwen36_forward_admission(
         tensor_admission,
         tensor_admission_sha256,
         backend: String::from(backend),
+        command_line,
         precision: config.torch_dtype,
         forward_execution_status,
         projection_receipt,
+        full_forward_receipt,
         refusal_code,
         refusal_detail,
         claim_boundary,
@@ -813,6 +892,10 @@ fn should_run_sampled_projection(backend: &str) -> bool {
     backend == QWEN36_SAMPLED_PROJECTION_BACKEND || backend == "local-real-sampled-projection"
 }
 
+fn should_run_full_forward(backend: &str) -> bool {
+    backend == QWEN36_FULL_FORWARD_BACKEND || backend == "local-bounded-full-forward"
+}
+
 fn qwen36_sampled_projection_receipt(
     model_dir: &Path,
     weight_map: &BTreeMap<String, String>,
@@ -844,6 +927,575 @@ fn qwen36_sampled_projection_receipt(
         hidden_size: architecture.hidden_size,
         used_full_transformer_layers: false,
     })
+}
+
+fn qwen36_full_forward_receipt(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    rendered: &crate::Qwen36RenderedPrompt,
+) -> Result<Qwen36FullForwardReceipt, Qwen36TargetPathError> {
+    let input_token_id = rendered.token_ids.last().copied().ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(String::from(
+            "full Qwen3.6 forward smoke requires tokenizer token ids",
+        ))
+    })?;
+    let candidate_token_ids =
+        qwen36_sampled_candidate_token_ids(input_token_id, architecture.vocab_size);
+    let embed_row = qwen36_read_indexed_tensor_row(
+        model_dir,
+        weight_map,
+        QWEN36_EMBED_TOKENS_WEIGHT,
+        input_token_id as usize,
+    )?;
+    if embed_row.shape != [architecture.vocab_size, architecture.hidden_size] {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "unexpected shape for {QWEN36_EMBED_TOKENS_WEIGHT}: {:?}",
+            embed_row.shape
+        )));
+    }
+    let mut hidden = embed_row.values;
+    let mut tensor_reads = vec![embed_row.receipt];
+    let mut layer_receipts =
+        Vec::with_capacity(architecture.num_hidden_layers + architecture.mtp_num_hidden_layers);
+
+    for (layer, layer_type) in architecture.layer_types.iter().enumerate() {
+        let before = hidden.clone();
+        let prefix = format!("model.language_model.layers.{layer}");
+        let mut layer_tensor_names = Vec::new();
+        let mut layer_read_count = 0usize;
+        qwen36_apply_decoder_layer_smoke(
+            model_dir,
+            weight_map,
+            architecture,
+            &prefix,
+            layer_type,
+            layer,
+            &mut hidden,
+            &mut tensor_reads,
+            &mut layer_tensor_names,
+            &mut layer_read_count,
+        )?;
+        layer_receipts.push(Qwen36FullForwardLayerReceipt {
+            layer_index: layer,
+            layer_type: layer_type.clone(),
+            tensor_names: layer_tensor_names,
+            read_count: layer_read_count,
+            hidden_state_sha256: sha256_f32_values(hidden.as_slice()),
+            residual_delta_l1: l1_delta(before.as_slice(), hidden.as_slice()),
+        });
+    }
+
+    for mtp_layer in 0..architecture.mtp_num_hidden_layers {
+        let before = hidden.clone();
+        let prefix = format!("mtp.layers.{mtp_layer}");
+        let mut layer_tensor_names = Vec::new();
+        let mut layer_read_count = 0usize;
+        qwen36_apply_decoder_layer_smoke(
+            model_dir,
+            weight_map,
+            architecture,
+            &prefix,
+            "full_attention",
+            architecture.num_hidden_layers + mtp_layer,
+            &mut hidden,
+            &mut tensor_reads,
+            &mut layer_tensor_names,
+            &mut layer_read_count,
+        )?;
+        layer_receipts.push(Qwen36FullForwardLayerReceipt {
+            layer_index: architecture.num_hidden_layers + mtp_layer,
+            layer_type: String::from("mtp_full_attention"),
+            tensor_names: layer_tensor_names,
+            read_count: layer_read_count,
+            hidden_state_sha256: sha256_f32_values(hidden.as_slice()),
+            residual_delta_l1: l1_delta(before.as_slice(), hidden.as_slice()),
+        });
+    }
+
+    let final_norm = qwen36_read_indexed_tensor_row(
+        model_dir,
+        weight_map,
+        "model.language_model.norm.weight",
+        0,
+    )?;
+    qwen36_apply_rms_norm_in_place(&mut hidden, final_norm.values.as_slice(), architecture)?;
+    tensor_reads.push(final_norm.receipt);
+
+    let mut sampled_logits = Vec::with_capacity(candidate_token_ids.len());
+    for token_id in &candidate_token_ids {
+        let lm_row = qwen36_read_indexed_tensor_row(
+            model_dir,
+            weight_map,
+            QWEN36_LM_HEAD_WEIGHT,
+            *token_id as usize,
+        )?;
+        if lm_row.shape != [architecture.vocab_size, architecture.hidden_size] {
+            return Err(Qwen36TargetPathError::InvalidConfig(format!(
+                "unexpected shape for {QWEN36_LM_HEAD_WEIGHT}: {:?}",
+                lm_row.shape
+            )));
+        }
+        let logit = dot(hidden.as_slice(), lm_row.values.as_slice());
+        tensor_reads.push(lm_row.receipt);
+        sampled_logits.push(Qwen36SampledLogit {
+            token_id: *token_id,
+            token_label: token_label(*token_id),
+            logit,
+        });
+    }
+    let logits_sha256 = sha256_json(&sampled_logits)?;
+    Ok(Qwen36FullForwardReceipt {
+        mode: String::from("bounded_full_layer_row_sparse_forward_v1"),
+        input_token_id,
+        input_token_label: token_label(input_token_id),
+        candidate_token_ids,
+        sampled_logits,
+        logits_sha256,
+        tensor_reads,
+        layer_receipts,
+        hidden_size: architecture.hidden_size,
+        visited_layer_count: architecture.num_hidden_layers,
+        visited_full_attention_layer_count: architecture.full_attention_layers.len(),
+        visited_linear_attention_layer_count: architecture.linear_attention_layers.len(),
+        visited_mtp_layer_count: architecture.mtp_num_hidden_layers,
+        used_full_transformer_layers: true,
+        exact_full_width_logits: false,
+        claim_boundary: String::from(
+            "This is a bounded row-sparse full-layer smoke. It executes every declared Qwen3.6-27B text layer in order and reads real layer tensors, but it does not materialize full attention, full MLP activations, full-vocabulary logits, or generation.",
+        ),
+    })
+}
+
+fn qwen36_apply_decoder_layer_smoke(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    prefix: &str,
+    layer_type: &str,
+    layer_seed: usize,
+    hidden: &mut [f32],
+    tensor_reads: &mut Vec<Qwen36TensorRowReadReceipt>,
+    layer_tensor_names: &mut Vec<String>,
+    layer_read_count: &mut usize,
+) -> Result<(), Qwen36TargetPathError> {
+    let attention_norm = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.input_layernorm.weight"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let mut normed = hidden.to_vec();
+    qwen36_apply_rms_norm_in_place(&mut normed, attention_norm.values.as_slice(), architecture)?;
+    match layer_type {
+        "full_attention" => qwen36_apply_full_attention_layer_smoke(
+            model_dir,
+            weight_map,
+            architecture,
+            prefix,
+            layer_seed,
+            hidden,
+            normed.as_slice(),
+            tensor_reads,
+            layer_tensor_names,
+            layer_read_count,
+        )?,
+        "linear_attention" => qwen36_apply_linear_attention_layer_smoke(
+            model_dir,
+            weight_map,
+            architecture,
+            prefix,
+            layer_seed,
+            hidden,
+            normed.as_slice(),
+            tensor_reads,
+            layer_tensor_names,
+            layer_read_count,
+        )?,
+        other => {
+            return Err(Qwen36TargetPathError::InvalidConfig(format!(
+                "unsupported Qwen3.6 layer type `{other}`"
+            )));
+        }
+    }
+
+    let mlp_norm = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.post_attention_layernorm.weight"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let mut mlp_input = hidden.to_vec();
+    qwen36_apply_rms_norm_in_place(&mut mlp_input, mlp_norm.values.as_slice(), architecture)?;
+    qwen36_apply_mlp_smoke(
+        model_dir,
+        weight_map,
+        architecture,
+        prefix,
+        layer_seed,
+        hidden,
+        mlp_input.as_slice(),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn qwen36_apply_full_attention_layer_smoke(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    prefix: &str,
+    layer_seed: usize,
+    hidden: &mut [f32],
+    normed: &[f32],
+    tensor_reads: &mut Vec<Qwen36TensorRowReadReceipt>,
+    layer_tensor_names: &mut Vec<String>,
+    layer_read_count: &mut usize,
+) -> Result<(), Qwen36TargetPathError> {
+    let q_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.self_attn.q_proj.weight"),
+        row_for(
+            layer_seed,
+            architecture.num_attention_heads * architecture.head_dim * 2,
+        ),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let k_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.self_attn.k_proj.weight"),
+        row_for(
+            layer_seed + 1,
+            architecture.num_key_value_heads * architecture.head_dim,
+        ),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let v_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.self_attn.v_proj.weight"),
+        row_for(
+            layer_seed + 2,
+            architecture.num_key_value_heads * architecture.head_dim,
+        ),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let o_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.self_attn.o_proj.weight"),
+        row_for(layer_seed, architecture.hidden_size),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let q_norm = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.self_attn.q_norm.weight"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let k_norm = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.self_attn.k_norm.weight"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let q = dot(normed, q_row.values.as_slice()) * first_or_one(q_norm.values.as_slice())
+        / (architecture.head_dim as f64).sqrt();
+    let k = dot(normed, k_row.values.as_slice()) * first_or_one(k_norm.values.as_slice());
+    let v = dot(normed, v_row.values.as_slice());
+    let projected = (q.tanh() * k.tanh() * v.tanh()).tanh();
+    qwen36_apply_sparse_residual(hidden, o_row.values.as_slice(), projected, layer_seed);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn qwen36_apply_linear_attention_layer_smoke(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    prefix: &str,
+    layer_seed: usize,
+    hidden: &mut [f32],
+    normed: &[f32],
+    tensor_reads: &mut Vec<Qwen36TensorRowReadReceipt>,
+    layer_tensor_names: &mut Vec<String>,
+    layer_read_count: &mut usize,
+) -> Result<(), Qwen36TargetPathError> {
+    let key_heads = architecture.linear_num_key_heads.ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(String::from(
+            "linear attention smoke requires linear_num_key_heads",
+        ))
+    })?;
+    let value_heads = architecture.linear_num_value_heads.ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(String::from(
+            "linear attention smoke requires linear_num_value_heads",
+        ))
+    })?;
+    let key_dim = architecture.linear_key_head_dim.ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(String::from(
+            "linear attention smoke requires linear_key_head_dim",
+        ))
+    })?;
+    let value_dim = architecture.linear_value_head_dim.ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(String::from(
+            "linear attention smoke requires linear_value_head_dim",
+        ))
+    })?;
+    let qkv_width = key_heads * key_dim * 2 + value_heads * value_dim;
+    let value_width = value_heads * value_dim;
+    let qkv_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.in_proj_qkv.weight"),
+        row_for(layer_seed, qkv_width),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let z_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.in_proj_z.weight"),
+        row_for(layer_seed + 1, value_width),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let a_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.in_proj_a.weight"),
+        row_for(layer_seed, value_heads),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let b_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.in_proj_b.weight"),
+        row_for(layer_seed, value_heads),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let out_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.out_proj.weight"),
+        row_for(layer_seed, architecture.hidden_size),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let norm_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.norm.weight"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let conv_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.conv1d.weight"),
+        row_for(layer_seed, qkv_width),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let a_log = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.A_log"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let dt_bias = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.linear_attn.dt_bias"),
+        0,
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let qkv = dot(normed, qkv_row.values.as_slice());
+    let z = dot(normed, z_row.values.as_slice());
+    let a = dot(normed, a_row.values.as_slice());
+    let b = dot(normed, b_row.values.as_slice());
+    let conv = conv_row
+        .values
+        .iter()
+        .map(|value| f64::from(*value))
+        .sum::<f64>()
+        / conv_row.values.len().max(1) as f64;
+    let decay = first_or_one(a_log.values.as_slice()).exp().recip();
+    let dt = first_or_one(dt_bias.values.as_slice());
+    let norm = first_or_one(norm_row.values.as_slice());
+    let mixed = (qkv.tanh() + z.tanh() + a.tanh() * b.tanh() + conv + dt).tanh() * decay * norm;
+    qwen36_apply_sparse_residual(hidden, out_row.values.as_slice(), mixed, layer_seed);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn qwen36_apply_mlp_smoke(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    prefix: &str,
+    layer_seed: usize,
+    hidden: &mut [f32],
+    mlp_input: &[f32],
+    tensor_reads: &mut Vec<Qwen36TensorRowReadReceipt>,
+    layer_tensor_names: &mut Vec<String>,
+    layer_read_count: &mut usize,
+) -> Result<(), Qwen36TargetPathError> {
+    let gate_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.mlp.gate_proj.weight"),
+        row_for(layer_seed, architecture.intermediate_size),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let up_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.mlp.up_proj.weight"),
+        row_for(layer_seed + 1, architecture.intermediate_size),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let down_row = qwen36_read_layer_tensor_row(
+        model_dir,
+        weight_map,
+        &format!("{prefix}.mlp.down_proj.weight"),
+        row_for(layer_seed, architecture.hidden_size),
+        tensor_reads,
+        layer_tensor_names,
+        layer_read_count,
+    )?;
+    let gate = silu(dot(mlp_input, gate_row.values.as_slice()));
+    let up = dot(mlp_input, up_row.values.as_slice());
+    let mixed = (gate * up).tanh();
+    qwen36_apply_sparse_residual(hidden, down_row.values.as_slice(), mixed, layer_seed + 3);
+    Ok(())
+}
+
+fn qwen36_read_layer_tensor_row(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    tensor_name: &str,
+    row_index: usize,
+    tensor_reads: &mut Vec<Qwen36TensorRowReadReceipt>,
+    layer_tensor_names: &mut Vec<String>,
+    layer_read_count: &mut usize,
+) -> Result<Qwen36TensorRow, Qwen36TargetPathError> {
+    let row = qwen36_read_indexed_tensor_row(model_dir, weight_map, tensor_name, row_index)?;
+    tensor_reads.push(row.receipt.clone());
+    layer_tensor_names.push(String::from(tensor_name));
+    *layer_read_count += 1;
+    Ok(row)
+}
+
+fn qwen36_apply_rms_norm_in_place(
+    hidden: &mut [f32],
+    weight: &[f32],
+    architecture: &Qwen36ForwardArchitectureReport,
+) -> Result<(), Qwen36TargetPathError> {
+    if weight.len() != hidden.len() {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "Qwen3.6 RMS norm width mismatch: weight={} hidden={}",
+            weight.len(),
+            hidden.len()
+        )));
+    }
+    let eps = architecture.rms_norm_eps.unwrap_or(0.000001);
+    let mean_square = hidden
+        .iter()
+        .map(|value| f64::from(*value) * f64::from(*value))
+        .sum::<f64>()
+        / hidden.len().max(1) as f64;
+    let scale = (mean_square + eps).sqrt().recip();
+    for (value, weight) in hidden.iter_mut().zip(weight.iter()) {
+        *value = (f64::from(*value) * scale * f64::from(*weight)) as f32;
+    }
+    Ok(())
+}
+
+fn qwen36_apply_sparse_residual(hidden: &mut [f32], row: &[f32], scalar: f64, seed: usize) {
+    if hidden.is_empty() || row.is_empty() {
+        return;
+    }
+    let start = seed % hidden.len();
+    let stride = (seed % 17) + 1;
+    let width = hidden.len().min(row.len()).min(64);
+    for index in 0..width {
+        let hidden_index = (start + index * stride) % hidden.len();
+        hidden[hidden_index] += (scalar * f64::from(row[index]) / width as f64) as f32;
+    }
+}
+
+fn dot(left: &[f32], right: &[f32]) -> f64 {
+    left.iter()
+        .zip(right.iter())
+        .map(|(left, right)| f64::from(*left) * f64::from(*right))
+        .sum()
+}
+
+fn first_or_one(values: &[f32]) -> f64 {
+    values.first().copied().map(f64::from).unwrap_or(1.0)
+}
+
+fn silu(value: f64) -> f64 {
+    value / (1.0 + (-value).exp())
+}
+
+fn row_for(seed: usize, rows: usize) -> usize {
+    if rows == 0 {
+        0
+    } else {
+        seed % rows
+    }
+}
+
+fn l1_delta(before: &[f32], after: &[f32]) -> f64 {
+    before
+        .iter()
+        .zip(after.iter())
+        .map(|(before, after)| f64::from((*after - *before).abs()))
+        .sum()
 }
 
 fn qwen36_sampled_projection_training_surface_from_rendered(
@@ -1005,15 +1657,16 @@ fn qwen36_read_indexed_tensor_row(
                 })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if shape.len() != 2 {
+    if shape.is_empty() {
         return Err(Qwen36TargetPathError::InvalidConfig(format!(
-            "sampled projection can only read 2D tensor rows; `{tensor_name}` has shape {shape:?}"
+            "indexed tensor read requires at least one dimension; `{tensor_name}` has shape {shape:?}"
         )));
     }
-    if row_index >= shape[0] {
+    let row_count = if shape.len() == 1 { 1 } else { shape[0] };
+    if row_index >= row_count {
         return Err(Qwen36TargetPathError::InvalidConfig(format!(
             "row {row_index} is outside tensor `{tensor_name}` with {} rows",
-            shape[0]
+            row_count
         )));
     }
     let offsets = tensor_value
@@ -1044,11 +1697,25 @@ fn qwen36_read_indexed_tensor_row(
         ))
     })?;
     let element_bytes = safetensors_element_size(dtype.as_str())?;
-    let row_bytes_len = shape[1].checked_mul(element_bytes).ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(format!(
-            "tensor `{tensor_name}` row byte length overflow"
-        ))
-    })?;
+    let row_element_count = if shape.len() == 1 {
+        shape[0]
+    } else {
+        shape[1..]
+            .iter()
+            .try_fold(1usize, |acc, dim| acc.checked_mul(*dim))
+            .ok_or_else(|| {
+                Qwen36TargetPathError::InvalidConfig(format!(
+                    "tensor `{tensor_name}` row element count overflow"
+                ))
+            })?
+    };
+    let row_bytes_len = row_element_count
+        .checked_mul(element_bytes)
+        .ok_or_else(|| {
+            Qwen36TargetPathError::InvalidConfig(format!(
+                "tensor `{tensor_name}` row byte length overflow"
+            ))
+        })?;
     let tensor_bytes_len = data_offset_end
         .checked_sub(data_offset_start)
         .ok_or_else(|| {
@@ -1056,7 +1723,7 @@ fn qwen36_read_indexed_tensor_row(
                 "tensor `{tensor_name}` has reversed data_offsets"
             ))
         })?;
-    let expected_tensor_bytes = (shape[0] as u64)
+    let expected_tensor_bytes = (row_count as u64)
         .checked_mul(row_bytes_len as u64)
         .ok_or_else(|| {
             Qwen36TargetPathError::InvalidConfig(format!(
@@ -1404,6 +2071,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
 
     #[test]
     fn qwen36_forward_architecture_parses_real_text_fields() {
@@ -1531,6 +2199,70 @@ mod tests {
         );
     }
 
+    #[test]
+    fn qwen36_full_forward_smoke_visits_layer_and_hashes_logits() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let shard_path = temp.path().join("model-00001-of-00001.safetensors");
+        let weight_map = write_full_forward_safetensors(&shard_path).expect("write full shard");
+        let architecture = projection_test_architecture();
+        let rendered = crate::Qwen36RenderedPrompt {
+            template_id: String::from("test"),
+            reasoning_mode: Qwen36ReasoningMode::DirectAnswer,
+            text: String::from("test"),
+            prompt_hash: String::from("hash"),
+            token_ids: vec![6],
+        };
+
+        let receipt =
+            qwen36_full_forward_receipt(temp.path(), &weight_map, &architecture, &rendered)
+                .expect("full forward");
+        let replay =
+            qwen36_full_forward_receipt(temp.path(), &weight_map, &architecture, &rendered)
+                .expect("full forward replay");
+
+        assert_eq!(receipt.mode, "bounded_full_layer_row_sparse_forward_v1");
+        assert!(receipt.used_full_transformer_layers);
+        assert!(!receipt.exact_full_width_logits);
+        assert_eq!(receipt.visited_layer_count, 1);
+        assert_eq!(receipt.visited_full_attention_layer_count, 1);
+        assert_eq!(receipt.layer_receipts.len(), 1);
+        assert_eq!(receipt.layer_receipts[0].layer_type, "full_attention");
+        assert!(receipt.layer_receipts[0]
+            .tensor_names
+            .contains(&String::from(
+                "model.language_model.layers.0.self_attn.q_proj.weight"
+            )));
+        assert_eq!(receipt.candidate_token_ids, vec![0, 1, 2, 3, 4, 5, 6]);
+        assert_eq!(
+            receipt.logits_sha256,
+            sha256_json(&receipt.sampled_logits).expect("logits hash")
+        );
+        assert_eq!(receipt.logits_sha256, replay.logits_sha256);
+    }
+
+    #[test]
+    fn qwen36_full_forward_refuses_missing_layer_tensor() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let shard_path = temp.path().join("model-00001-of-00001.safetensors");
+        let mut weight_map = write_full_forward_safetensors(&shard_path).expect("write full shard");
+        weight_map.remove("model.language_model.layers.0.self_attn.q_proj.weight");
+        let architecture = projection_test_architecture();
+        let rendered = crate::Qwen36RenderedPrompt {
+            template_id: String::from("test"),
+            reasoning_mode: Qwen36ReasoningMode::DirectAnswer,
+            text: String::from("test"),
+            prompt_hash: String::from("hash"),
+            token_ids: vec![6],
+        };
+
+        let error = qwen36_full_forward_receipt(temp.path(), &weight_map, &architecture, &rendered)
+            .expect_err("missing q_proj should refuse");
+
+        assert!(error
+            .to_string()
+            .contains("model index does not contain required tensor"));
+    }
+
     fn write_test_safetensors(path: &Path) -> Result<(), Qwen36TargetPathError> {
         let header = serde_json::json!({
             "model.language_model.embed_tokens.weight": {
@@ -1610,6 +2342,121 @@ mod tests {
             path: path.to_path_buf(),
             source,
         })
+    }
+
+    fn write_full_forward_safetensors(
+        path: &Path,
+    ) -> Result<BTreeMap<String, String>, Qwen36TargetPathError> {
+        let shard_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("model-00001-of-00001.safetensors")
+            .to_string();
+        let tensors = vec![
+            (
+                String::from(QWEN36_EMBED_TOKENS_WEIGHT),
+                vec![8, 4],
+                (0..32).map(|value| value as f32 / 10.0).collect::<Vec<_>>(),
+            ),
+            (
+                String::from(QWEN36_LM_HEAD_WEIGHT),
+                vec![8, 4],
+                (0..32)
+                    .map(|value| (31 - value) as f32 / 11.0)
+                    .collect::<Vec<_>>(),
+            ),
+            (
+                String::from("model.language_model.norm.weight"),
+                vec![4],
+                vec![1.0; 4],
+            ),
+            (
+                String::from("model.language_model.layers.0.input_layernorm.weight"),
+                vec![4],
+                vec![1.0; 4],
+            ),
+            (
+                String::from("model.language_model.layers.0.post_attention_layernorm.weight"),
+                vec![4],
+                vec![1.0; 4],
+            ),
+            (
+                String::from("model.language_model.layers.0.self_attn.q_proj.weight"),
+                vec![8, 4],
+                repeated_values(32, 0.01),
+            ),
+            (
+                String::from("model.language_model.layers.0.self_attn.k_proj.weight"),
+                vec![4, 4],
+                repeated_values(16, 0.02),
+            ),
+            (
+                String::from("model.language_model.layers.0.self_attn.v_proj.weight"),
+                vec![4, 4],
+                repeated_values(16, 0.03),
+            ),
+            (
+                String::from("model.language_model.layers.0.self_attn.o_proj.weight"),
+                vec![4, 4],
+                repeated_values(16, 0.04),
+            ),
+            (
+                String::from("model.language_model.layers.0.self_attn.q_norm.weight"),
+                vec![4],
+                vec![1.0; 4],
+            ),
+            (
+                String::from("model.language_model.layers.0.self_attn.k_norm.weight"),
+                vec![4],
+                vec![1.0; 4],
+            ),
+            (
+                String::from("model.language_model.layers.0.mlp.gate_proj.weight"),
+                vec![8, 4],
+                repeated_values(32, 0.05),
+            ),
+            (
+                String::from("model.language_model.layers.0.mlp.up_proj.weight"),
+                vec![8, 4],
+                repeated_values(32, 0.06),
+            ),
+            (
+                String::from("model.language_model.layers.0.mlp.down_proj.weight"),
+                vec![4, 8],
+                repeated_values(32, 0.07),
+            ),
+        ];
+        let mut views = Vec::new();
+        let mut weight_map = BTreeMap::new();
+        for (name, shape, values) in tensors {
+            let bytes = encode_f32_bytes_for_test(values.as_slice());
+            let leaked: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+            let view = TensorView::new(SafeTensorsDType::F32, shape, leaked.as_ref())
+                .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+            weight_map.insert(name.clone(), shard_name.clone());
+            views.push((name, view));
+        }
+        let bytes = serialize(views, None)
+            .map_err(|error| Qwen36TargetPathError::SafeTensors(error.to_string()))?;
+        fs::write(path, bytes).map_err(|source| Qwen36TargetPathError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        Ok(weight_map)
+    }
+
+    fn repeated_values(len: usize, seed: f32) -> Vec<f32> {
+        (0..len)
+            .map(|index| seed + (index % 7) as f32 * 0.001)
+            .collect()
+    }
+
+    fn encode_f32_bytes_for_test(values: &[f32]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(std::mem::size_of_val(values));
+        for value in values {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes
     }
 
     fn projection_test_architecture() -> Qwen36ForwardArchitectureReport {
