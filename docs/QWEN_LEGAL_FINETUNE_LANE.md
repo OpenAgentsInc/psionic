@@ -9,7 +9,8 @@
 > runs 019/025, adapter 020, Rust-only Qwen3.6 GRPO smoke, and the
 > Qwen3.6-27B target-path smoke added on 2026-05-20; Qwen3.6-35B-A3B
 > MoE-safe target-path smoke added on 2026-05-20; unified legal fine-tuning
-> command surface and Pylon payment settlement receipts added on 2026-05-20.
+> command surface and Pylon payment settlement receipts added on 2026-05-20;
+> Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -191,6 +192,58 @@ The two local workers were `pylon.local.harvey-legal.01` and
 remote tailnet Pylon run and not hidden Harvey proof. Its value is that the
 repo now has the full Rust path for sharding, worker SFT, worker receipts,
 payments, adapter merge, eval, and promotion gating.
+
+## Qwen3.6-27B Legal Fine-Tuning Milestone 001
+
+The lane now has a single Rust command that runs the Qwen3.6-27B target path
+through the full local legal optimization ladder:
+
+```bash
+cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone
+```
+
+The command does the following:
+
+- verifies the Qwen3.6-27B smoke config, tokenizer, and safetensors shard
+- runs the base model through the public Harvey three-task eval
+- builds a public training-allowed SFT dataset
+- trains an SFT adapter through `psionic-train`
+- trains DPO and GRPO candidates from that SFT adapter
+- evaluates base, SFT, DPO, and GRPO candidates side by side
+- promotes only the winning candidate
+- writes `reports/qwen36-27b-legal-ft-001.md`
+
+Recorded local result:
+
+- model: `Qwen/Qwen3.6-27B`
+- model load verified: `true`
+- base score: `3333` bps
+- SFT score: `10000` bps
+- DPO score: `10000` bps
+- GRPO score: `10000` bps
+- promoted candidate: `qwen36_27b_sft_grpo_round_001`
+- score delta versus base: `6667` bps
+- no Python invoked: `true`
+- hidden benchmark training: `false`
+- all receipts present: `true`
+- target load report sha256:
+  `4fe429f16d9cd4e91fffdd46564e9ea794cae47e28d03dc2169bebeed911eda7`
+- SFT adapter sha256:
+  `5e029be91ab5470d6abd63ad460f4d05f4b982f9be8276a97b88f542b872ba6d`
+- DPO adapter sha256:
+  `12d2f1450441e7e86291e5dadd7b5c28b25b919c1dff09c0746bef1dafd4cc24`
+- GRPO adapter sha256:
+  `1b46e62898d32ee592f78efddc10b2d3786c92dbbafeb9cb7b0230542c82848d`
+- promotion receipt digest:
+  `1968ea399ff5a7be941568dbdb64092b973256f60e62a804358f1a1a2798e4fd`
+- milestone report digest:
+  `1e1d9d203b3a3c7c33ddf1abeace28484318372c73355ee2f903d6951bcd8ce7`
+
+This is still a target-path milestone, not full 27B weight training. It proves
+the Qwen3.6-27B legal path can load the declared artifacts, train SFT, DPO, and
+GRPO adapters in Rust, evaluate the candidates, and record receipts. The next
+honest step is to point the same command shape at real 27B shards and remote
+Pylon workers.
 
 ## Qwen3.6-27B Target Path
 
