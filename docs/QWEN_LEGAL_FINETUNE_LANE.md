@@ -13,7 +13,7 @@
 > Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20;
 > real Qwen3.6-27B text tensor admission added on 2026-05-21; Qwen3.6
 > training placement planner and locked corpus bundle builder added on
-> 2026-05-21.
+> 2026-05-21; signed two-node Pylon dispatch smoke added on 2026-05-21.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -816,6 +816,40 @@ Settle the job payment decision with:
 cargo run -p psionic-train --example qwen_legal_settle_training_job -- \
   job.qwen-legal.dataset-shard.000001
 ```
+
+Run the two-node dispatcher smoke with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- \
+  --mode loopback \
+  --out target/legal/pylon_dispatch/qwen-legal-loopback-dispatch
+```
+
+That command creates signed scheduler job envelopes, assigns jobs across two
+loopback Pylon identities, runs the worker path for dataset, SFT, DPO, GRPO,
+eval, merge, and artifact verification jobs, writes signed worker receipts,
+records output artifact hashes, and records payment decisions. Duplicate
+successful submissions for the same shard are withheld so a retry cannot be
+paid twice.
+
+The local-only worker path is still the single fixture command above. The
+tailnet and production dispatch command shapes are now explicit, but the
+current repo records them as blocked until the real Pylon transport client is
+merged:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- \
+  --mode tailnet \
+  --out target/legal/pylon_dispatch/qwen-legal-tailnet-dispatch
+
+cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- \
+  --mode production \
+  --out target/legal/pylon_dispatch/qwen-legal-production-dispatch
+```
+
+The resulting `dispatch_report.json` includes every assignment, retry or
+blocked-mode decision, blocked node, signed envelope, worker receipt, artifact
+hash, payment decision, duplicate-shard guard entry, and report digest.
 
 Recorded local payment-settlement smoke:
 

@@ -513,16 +513,25 @@ fn command_spec(command: &str, run_id: &str) -> CommandSpec {
             acceptance_coverage: vec![String::from("local SFT")],
         },
         "submit-pylon-job" => CommandSpec {
-            purpose: String::from("Submit or materialize a local Pylon legal training job."),
-            human_summary: String::from("runs the local Pylon dataset-shard job fixture"),
-            replay_command: split_command(
-                "cargo run -p psionic-train --example qwen_legal_pylon_worker_run_once -- --job fixtures/qwen_legal/pylon_training_jobs/dataset_shard_job_v1.json",
+            purpose: String::from(
+                "Submit a Qwen legal training job set through the Pylon dispatch path.",
             ),
-            required_artifacts: vec![artifact("pylon_job", PYLON_DATASET_JOB)],
+            human_summary: String::from("runs the two-node Pylon loopback dispatch smoke"),
+            replay_command: split_command(
+                "cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- --mode loopback --out target/legal/pylon_dispatch/qwen-legal-loopback-dispatch",
+            ),
+            required_artifacts: vec![
+                artifact("pylon_job", PYLON_DATASET_JOB),
+                artifact("grpo_config", QWEN36_GRPO_CONFIG),
+            ],
             expected_outputs: vec![String::from(
-                "target/legal/pylon_jobs/job.qwen-legal.dataset-shard.000001.receipt.json",
+                "target/legal/pylon_dispatch/qwen-legal-loopback-dispatch/dispatch_report.json",
             )],
-            acceptance_coverage: vec![String::from("Pylon distributed job")],
+            acceptance_coverage: vec![
+                String::from("Pylon distributed job"),
+                String::from("signed dispatch envelope"),
+                String::from("duplicate shard payment guard"),
+            ],
         },
         "collect-pylon-receipts" => CommandSpec {
             purpose: String::from("Verify worker receipts before merge or payment."),

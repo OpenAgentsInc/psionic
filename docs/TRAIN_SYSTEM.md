@@ -212,6 +212,17 @@ report digest
 `3ae5e9f5660af0a048971556014521ac0072eca430fb7926a287cd0b8d1dd9c2`.
 This is local Pylon simulation; remote tailnet worker dispatch remains a
 separate Nexus/Pylon step.
+The `submit-pylon-job` command now points at the signed two-node dispatcher
+smoke:
+`cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- --mode loopback --out target/legal/pylon_dispatch/qwen-legal-loopback-dispatch`.
+That path consumes node capability reports, writes signed scheduler envelopes,
+assigns legal dataset/SFT/DPO/GRPO/eval/merge/verify jobs across two Pylon
+worker identities, records retry and blocked-node decisions, captures signed
+worker receipts and output artifact hashes, and withholds duplicate successful
+shard submissions so retries cannot be paid twice. Tailnet and production
+mode commands are available with `--mode tailnet` and `--mode production`;
+they currently produce typed blocked-mode reports until the real Pylon network
+transport lands.
 The Qwen3.6-27B legal fine-tuning milestone command is
 `cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads
 the Qwen3.6-27B smoke target artifacts, runs the base model through the public
