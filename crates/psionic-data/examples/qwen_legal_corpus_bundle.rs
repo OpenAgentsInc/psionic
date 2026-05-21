@@ -1,6 +1,6 @@
 use std::{env, error::Error, io, path::PathBuf};
 
-use psionic_data::{QwenLegalCorpusBundleConfig, build_qwen_legal_corpus_bundle};
+use psionic_data::{build_qwen_legal_corpus_bundle, QwenLegalCorpusBundleConfig};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = env::args().skip(1).collect::<Vec<_>>();
@@ -50,11 +50,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let result = build_qwen_legal_corpus_bundle(&config)?;
     println!(
-        "wrote Qwen legal corpus bundle: corpus={} sft_train={} dpo_train={} grpo_seeds={} pylon_shards={} manifest={} receipt={} hash={}",
+        "wrote Qwen legal corpus bundle: corpus={} sft_train={} sft_holdout={} dpo_train={} dpo_holdout={} grpo_seeds={} grpo_holdout={} trace_records={} pylon_shards={} manifest={} receipt={} hash={}",
         result.manifest.corpus_id,
         result.manifest.sft_train_count,
+        result.manifest.sft_holdout_count,
         result.manifest.dpo_train_count,
+        result.manifest.dpo_holdout_count,
         result.manifest.grpo_seed_count,
+        result.manifest.grpo_holdout_count,
+        result.manifest.trace_store_count,
         result.manifest.pylon_shard_refs.len(),
         result.manifest_path.display(),
         result.receipt_path.display(),

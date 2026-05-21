@@ -611,9 +611,14 @@ cargo run -p psionic-data --example qwen_legal_corpus_bundle -- \
 The builder writes one locked bundle with:
 
 - `sft/all.jsonl`, `sft/train.jsonl`, and `sft/dev.jsonl`
+- `sft/holdout.jsonl`
 - `dpo/all.jsonl`, `dpo/train.jsonl`, and `dpo/dev.jsonl`
+- `dpo/holdout.jsonl`
 - `grpo/rollout_seeds.jsonl`, `grpo/rollout_seeds.train.jsonl`, and
   `grpo/rollout_seeds.dev.jsonl`
+- `grpo/rollout_seeds.holdout.jsonl`
+- `trace_store/all.jsonl`, `trace_store/train.jsonl`,
+  `trace_store/dev.jsonl`, and `trace_store/holdout.jsonl`
 - `eval/eval_pack.json`
 - `shards/sft_train/shard_manifest.json` plus concrete SFT shard JSONL files
 - `manifest.json`
@@ -622,22 +627,39 @@ The builder writes one locked bundle with:
 Recorded local smoke result:
 
 - corpus id: `qwen-legal-corpus-smoke`
-- SFT train records: `35`
-- DPO train pairs: `1273`
+- SFT total records: `40`
+- SFT train records: `32`
+- SFT dev records: `5`
+- SFT holdout records: `3`
+- DPO total pairs: `1408`
+- DPO train pairs: `1145`
+- DPO dev pairs: `135`
+- DPO holdout pairs: `128`
 - GRPO rollout seeds: `1408`
+- GRPO train seeds: `1109`
+- GRPO dev seeds: `139`
+- GRPO holdout seeds: `160`
+- trace-store records: `16`
+- trace-store train records: `16`
+- trace-store dev records: `0`
+- trace-store holdout records: `0`
 - Pylon SFT shard refs: `2`
 - manifest:
   `target/legal/qwen_corpus/qwen-legal-corpus-smoke/manifest.json`
 - receipt:
   `target/legal/qwen_corpus/qwen-legal-corpus-smoke/receipt.json`
 - manifest hash:
-  `sha256:fa0a2c9e0b86f569b7574739f715b691624dcf4ac485bc56fd9a0778224d81dc`
+  `sha256:061cb74d12a459b9f6756d4eb87de4141c9374aab9c9d4a3f28dad42554a1708`
+- trace store hash:
+  `235d9a92761c44a306e96233724970af762db5b81ebc079fd3c9351ba8f5f61a`
 
 Plain split meaning:
 
 - `train` contains material the model may learn from.
 - `dev` is public or synthetic material held out by stable id hash for local
   checks during training.
+- `holdout` is public or synthetic material held out by stable id hash and not
+  used for prompt, policy, SFT, DPO, or RL tuning decisions.
 - `private_eval` is a boundary only. Private eval tasks, judge-only labels,
   and private answers are not written into trainable corpus files.
 
@@ -652,6 +674,20 @@ model-written. Private, hidden, scorer-only, judge-only, harness-injected, and
 private-answer material is rejected from trainable outputs. Rejected traces
 enter DPO and GRPO only when they are explicitly marked `training_eligible`
 and carry failure-family labels.
+
+The trace store keeps full failed model responses, full public model-written
+answer text, tool calls from accepted runs, transcript events when a transcript
+file exists, stable trace ids, source hashes, split labels, required paths, and
+plain failure categories such as `missing_file`, `wrong_tool_call`,
+`unsupported_claim`, `bad_citation`, `incomplete_legal_analysis`, `too_long`,
+and `no_submit`. Private answers, scorer-only labels, judge-only labels, hidden
+benchmark answers, and runner-added answer text are not written into the trace
+store.
+
+The manifest also records replay commands for rebuilding the corpus and
+rehashing the train splits and trace store. That gives Pylon workers and
+reviewers a plain path to prove that a bundle was built from the declared
+inputs rather than from hidden benchmark answers.
 
 The Pylon handoff is also explicit. The bundle manifest includes
 `pylon_shard_refs`, each with a stable `corpus_shard_id`, source shard id,

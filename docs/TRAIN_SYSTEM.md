@@ -255,14 +255,23 @@ MoE router/gate training. The data side of the same Qwen legal lane now has a
 locked corpus bundle builder in
 `crates/psionic-data/src/qwen_legal_corpus_bundle.rs` and the example
 `cargo run -p psionic-data --example qwen_legal_corpus_bundle`. It builds SFT,
-DPO, GRPO rollout seed, eval-pack, SFT shard, manifest, and receipt artifacts
-from one source manifest, records all source and output hashes, rejects private
-or scorer-only material from trainable files, and exposes stable
-`corpus_shard_id` values for Pylon worker jobs. The recorded local smoke over
-`tasks/synthetic/legal-workflow-v1/training/dpo_run_sample` wrote 35 SFT train
-records, 1273 DPO train pairs, 1408 GRPO rollout seeds, two Pylon shard refs,
-and manifest hash
-`sha256:fa0a2c9e0b86f569b7574739f715b691624dcf4ac485bc56fd9a0778224d81dc`.
+DPO, GRPO rollout seed, trace-store, eval-pack, SFT shard, manifest, and
+receipt artifacts from one declared source root. It records all source and
+output hashes, writes separate train/dev/holdout files, rejects private or
+scorer-only material from trainable files, records replay commands in the
+manifest, and exposes stable `corpus_shard_id` values for Pylon worker jobs.
+The trace store keeps full failed model responses and full public
+model-written answer text, but blocks private answers, hidden labels,
+scorer-only labels, judge-only labels, and runner-added answer text. The
+recorded local smoke over
+`tasks/synthetic/legal-workflow-v1/training/dpo_run_sample` wrote 40 SFT
+records split into 32 train, 5 dev, and 3 holdout records; 1408 DPO pairs split
+into 1145 train, 135 dev, and 128 holdout pairs; 1408 GRPO rollout seeds split
+into 1109 train, 139 dev, and 160 holdout seeds; 16 trace-store records; two
+Pylon shard refs; trace-store hash
+`235d9a92761c44a306e96233724970af762db5b81ebc079fd3c9351ba8f5f61a`; and
+manifest hash
+`sha256:061cb74d12a459b9f6756d4eb87de4141c9374aab9c9d4a3f28dad42554a1708`.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
