@@ -437,11 +437,52 @@ checkpoint execution check, but it is still not the full transformer forward:
 Psionic does not yet run attention, MLP, linear attention, MTP, generation, or
 LoRA training through this path.
 
+The first real-weight sampled LoRA SFT command is:
+
+```bash
+cargo run -p psionic-train --example qwen36_27b_real_lora_sft -- \
+  --config configs/legal/qwen36_27b_real_lora_sft_sampled_projection.json
+```
+
+Recorded sampled LoRA SFT result:
+
+- output directory: `target/legal/qwen36_27b_real_lora_sft_sampled`
+- activation mode: `sampled_embed_lm_head_projection_v1`
+- active trainable target: `lm_head.weight`
+- declared future dense target set: `q_proj`, `k_proj`, `v_proj`, `o_proj`,
+  `gate_proj`, `up_proj`, `down_proj`
+- trainable parameter count: `1013760`
+- completed steps: `3`
+- initial loss: `1.9561191`
+- final loss: `1.9044642`
+- loss improved: `true`
+- base logits sha256:
+  `c9044ffebd281f65473f855405f18a79b5fa272e0c76aa3bbf12b7e077aae6cf`
+- hidden state sha256:
+  `c34400da3ff7eb9f11c5a88199b58948e33b396eb9cf3d0a8dca6247460992b2`
+- adapter sha256:
+  `07ce9eced89fc0b559997f3a14f3420b4613c082910e1e08f210e8a591fec24d`
+- adapter identity digest:
+  `f1f00a3041cbd2955ba516a7c7ddd14bc2ef1c282b64c06d6f970b6ee78ac1c0`
+- training receipt digest:
+  `06699af478823dbc7dfc43c04e712213c88aa25fbcba8f4d27273d5bca9343ec`
+- receipt file sha256:
+  `d341dd727349f7d629a629ef50f24ac8fe4cc253f5da5e09d8bb59d9b19bcc11`
+- Python invoked: `false`
+- frozen base weights: `true`
+
+This is a real sampled-projection LoRA update over the downloaded
+Qwen3.6-27B safetensors. The run trains only an LM-head LoRA adapter and
+exports the same `lm_head.lora_A.weight` / `lm_head.lora_B.weight`
+safetensors format used by the legal DPO and GRPO parent-adapter loaders. It
+still does not backprop through the full transformer layers.
+
 The legal SFT command now also fails closed for `real_artifact_required`
 configs. That command still trains from declared hidden-state samples. It will
 not accept real Qwen safetensors and silently fall back to synthetic hidden
-states. Full real-artifact training remains blocked on the Qwen3.6 forward and
-backward activation path.
+states. Use the sampled LoRA command above for the current real-artifact path;
+full transformer backprop remains blocked on the Qwen3.6 attention, MLP,
+linear-attention, and MTP activation path.
 
 ## Qwen3.6 Training Placement Planner
 

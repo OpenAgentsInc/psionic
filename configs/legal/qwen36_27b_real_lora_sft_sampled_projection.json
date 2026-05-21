@@ -1,0 +1,21 @@
+{
+  "schema_version": "psionic.qwen36_real_lora_sft_config.v1",
+  "run_id": "qwen36-27b-real-lora-sft-sampled-001",
+  "model_dir": "target/models/qwen/Qwen3.6-27B",
+  "train_type": "lora",
+  "adapter_id": "qwen36-27b-real-lora-sampled-001",
+  "adapter_revision": "real-sampled-projection-001",
+  "prompt": "Draft a concise legal work product checklist for reviewing a vendor services agreement.",
+  "target_token_id": 271,
+  "candidate_token_ids": [0, 1, 2, 3, 4, 5, 271],
+  "lora_rank": 4,
+  "lora_alpha": 8.0,
+  "learning_rate": 0.01,
+  "weight_decay": 0.0,
+  "beta1": 0.9,
+  "beta2": 0.999,
+  "epsilon": 0.00000001,
+  "max_steps": 3,
+  "gradient_clip_norm": 1.0,
+  "output_dir": "target/legal/qwen36_27b_real_lora_sft_sampled"
+}

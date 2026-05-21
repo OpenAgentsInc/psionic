@@ -240,9 +240,10 @@ report digest
 a Qwen3.6-27B target-path milestone. It does not claim full 27B weight loading
 or performance on private Harvey tasks. The `psionic-train sft` path now
 refuses `real_artifact_required` configs because it still consumes declared
-hidden-state samples. Real-artifact Qwen training must wait for the
-Qwen3.6-27B forward and backward activation path instead of falling back to the
-synthetic smoke trainer. The Qwen legal lane now also has a placement planner
+hidden-state samples. Real-artifact Qwen training now starts through the
+separate sampled-projection LoRA command documented below; full attention, MLP,
+linear-attention, and MTP backprop remains a later step. The Qwen legal lane
+now also has a placement planner
 in `crates/psionic-train/src/qwen_legal_training_placement.rs` and the example
 `cargo run -p psionic-train --example qwen_legal_training_placement_plan`.
 The planner admits dense `Qwen/Qwen3.6-27B` LoRA/QLoRA placements, emits
@@ -565,6 +566,47 @@ This is real checkpoint math: Psionic seeks into the downloaded BF16
 safetensors shards, reads the recorded rows, computes dot products, and hashes
 the rows and logits. It is not a full Qwen3.6 forward pass: no attention, MLP,
 linear attention, MTP, generation, or LoRA training is run by this command.
+
+The first real-weight Qwen3.6-27B LoRA training command is:
+
+```bash
+cargo run -p psionic-train --example qwen36_27b_real_lora_sft -- \
+  --config configs/legal/qwen36_27b_real_lora_sft_sampled_projection.json
+```
+
+Recorded local result:
+
+- output directory: `target/legal/qwen36_27b_real_lora_sft_sampled`
+- activation mode: `sampled_embed_lm_head_projection_v1`
+- active trainable target: `lm_head.weight`
+- declared future dense target set: `q_proj`, `k_proj`, `v_proj`, `o_proj`,
+  `gate_proj`, `up_proj`, `down_proj`
+- trainable parameter count: `1013760`
+- completed steps: `3`
+- initial loss: `1.9561191`
+- final loss: `1.9044642`
+- loss improved: `true`
+- base logits sha256:
+  `c9044ffebd281f65473f855405f18a79b5fa272e0c76aa3bbf12b7e077aae6cf`
+- hidden state sha256:
+  `c34400da3ff7eb9f11c5a88199b58948e33b396eb9cf3d0a8dca6247460992b2`
+- adapter sha256:
+  `07ce9eced89fc0b559997f3a14f3420b4613c082910e1e08f210e8a591fec24d`
+- adapter identity digest:
+  `f1f00a3041cbd2955ba516a7c7ddd14bc2ef1c282b64c06d6f970b6ee78ac1c0`
+- training receipt digest:
+  `06699af478823dbc7dfc43c04e712213c88aa25fbcba8f4d27273d5bca9343ec`
+- receipt file sha256:
+  `d341dd727349f7d629a629ef50f24ac8fe4cc253f5da5e09d8bb59d9b19bcc11`
+- Python invoked: `false`
+- frozen base weights: `true`
+
+This is a real Qwen3.6-27B sampled-projection LoRA update: the hidden vector
+and sampled base logits come from the downloaded BF16 safetensors. The
+exported adapter uses the same `lm_head.lora_A.weight` /
+`lm_head.lora_B.weight` safetensors format already consumed by the DPO and
+GRPO parent-adapter loaders. It still is not full transformer backprop through
+attention, MLP, linear attention, or MTP.
 
 The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
 serve-side command
