@@ -1,6 +1,6 @@
 //! Deterministic Qwen legal LoRA adapter aggregation for Pylon workers.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -77,6 +77,80 @@ pub struct QwenLegalLoraWorkerAdapterInput {
     pub token_count: u64,
     /// Parent adapter hash observed by this worker before training.
     pub parent_adapter_sha256: String,
+    /// Strict compatibility facts for real distributed Qwen aggregation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatibility: Option<QwenLegalLoraWorkerCompatibilityFacts>,
+    /// Optional validator replay result for this worker update.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validator_replay: Option<QwenLegalLoraValidatorReplayClaim>,
+}
+
+/// Shared compatibility contract for one distributed Qwen aggregation window.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalLoraMergeCompatibilityContract {
+    /// Base checkpoint hash all workers must train from.
+    pub base_checkpoint_sha256: String,
+    /// Tokenizer hash all workers must use.
+    pub tokenizer_sha256: String,
+    /// Config hash all workers must use.
+    pub config_sha256: String,
+    /// Global corpus manifest hash.
+    pub corpus_manifest_sha256: String,
+    /// Exact target module set.
+    pub target_modules: Vec<String>,
+    /// Optimizer config hash.
+    pub optimizer_config_sha256: String,
+    /// Precision policy, such as bf16-lora-f32-master.
+    pub precision_policy: String,
+    /// Stable training window id.
+    pub step_window_id: String,
+}
+
+/// Worker-declared compatibility facts for one update.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalLoraWorkerCompatibilityFacts {
+    /// Base checkpoint hash seen by the worker.
+    pub base_checkpoint_sha256: String,
+    /// Tokenizer hash seen by the worker.
+    pub tokenizer_sha256: String,
+    /// Config hash seen by the worker.
+    pub config_sha256: String,
+    /// Global corpus manifest hash seen by the worker.
+    pub corpus_manifest_sha256: String,
+    /// Concrete corpus shard hash trained by this worker.
+    pub corpus_shard_hash: String,
+    /// Exact target module set trained by this worker.
+    pub target_modules: Vec<String>,
+    /// Optimizer config hash used by the worker.
+    pub optimizer_config_sha256: String,
+    /// Precision policy used by the worker.
+    pub precision_policy: String,
+    /// Stable training window id used by the worker.
+    pub step_window_id: String,
+}
+
+/// Validator replay status for a distributed worker update.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QwenLegalLoraValidatorReplayStatus {
+    /// No validator replay was requested for this contribution.
+    NotRequested,
+    /// Validator replay accepted this contribution.
+    Passed,
+    /// Validator replay rejected this contribution.
+    Failed,
+}
+
+/// Worker validator replay claim.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalLoraValidatorReplayClaim {
+    /// Replay status.
+    pub status: QwenLegalLoraValidatorReplayStatus,
+    /// Replay receipt hash, when a replay ran.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replay_receipt_sha256: Option<String>,
+    /// Plain reason retained for audit.
+    pub reason: String,
 }
 
 /// Output adapter artifact declaration.
@@ -125,9 +199,60 @@ pub struct QwenLegalLoraMergeManifest {
     pub output_adapter: QwenLegalLoraMergeOutput,
     /// Worker adapters to merge.
     pub worker_adapters: Vec<QwenLegalLoraWorkerAdapterInput>,
+    /// Strict compatibility contract for real distributed Qwen aggregation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatibility: Option<QwenLegalLoraMergeCompatibilityContract>,
     /// Optional local eval gate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validation: Option<QwenLegalLoraMergeValidation>,
+}
+
+/// One worker row in the compatibility matrix.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalLoraCompatibilityMatrixRow {
+    /// Worker id.
+    pub worker_id: String,
+    /// Adapter artifact hash.
+    pub adapter_sha256: String,
+    /// Dataset shard hash.
+    pub dataset_shard_hash: String,
+    /// Whether this contribution passed all compatibility checks.
+    pub accepted: bool,
+    /// Human-readable rejection or audit reasons.
+    pub reasons: Vec<String>,
+    /// Base checkpoint compatibility.
+    pub base_checkpoint_match: bool,
+    /// Tokenizer compatibility.
+    pub tokenizer_match: bool,
+    /// Config compatibility.
+    pub config_match: bool,
+    /// Global corpus manifest compatibility.
+    pub corpus_manifest_match: bool,
+    /// Corpus shard declaration compatibility.
+    pub corpus_shard_match: bool,
+    /// Target module set compatibility.
+    pub target_modules_match: bool,
+    /// Optimizer compatibility.
+    pub optimizer_config_match: bool,
+    /// Precision compatibility.
+    pub precision_policy_match: bool,
+    /// Training window compatibility.
+    pub step_window_match: bool,
+    /// Duplicate contribution status.
+    pub duplicate_contribution: bool,
+    /// Validator replay status.
+    pub validator_replay_status: QwenLegalLoraValidatorReplayStatus,
+}
+
+/// Rejected worker contribution retained in receipts or errors.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalLoraRejectedContribution {
+    /// Worker id.
+    pub worker_id: String,
+    /// Adapter hash.
+    pub adapter_sha256: String,
+    /// Rejection reasons.
+    pub reasons: Vec<String>,
 }
 
 /// One worker's verified contribution inside the merge receipt.
@@ -230,6 +355,10 @@ pub struct QwenLegalLoraMergeReceipt {
     pub parent_adapter_sha256: String,
     /// Worker receipts.
     pub workers: Vec<QwenLegalLoraMergeWorkerReceipt>,
+    /// Strict compatibility matrix for all worker updates.
+    pub compatibility_matrix: Vec<QwenLegalLoraCompatibilityMatrixRow>,
+    /// Contributions rejected before aggregation. Successful receipts keep this empty.
+    pub rejected_contributions: Vec<QwenLegalLoraRejectedContribution>,
     /// Total token count across accepted worker adapters.
     pub total_token_count: u64,
     /// Output adapter path.
@@ -244,6 +373,8 @@ pub struct QwenLegalLoraMergeReceipt {
     /// Promotion gate receipt, when local eval was requested.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub promotion_gate: Option<QwenLegalLoraMergePromotionGateReceipt>,
+    /// Promotion candidate pointer usable by registry, eval, and settlement checks.
+    pub promotion_candidate_pointer: String,
     /// Deterministic replay command.
     pub deterministic_merge_command: Vec<String>,
     /// Stable receipt hash.
@@ -265,6 +396,11 @@ pub enum QwenLegalLoraMergeError {
     Usage,
     #[error("invalid merge manifest: {0}")]
     InvalidManifest(String),
+    #[error("distributed Qwen compatibility rejected {rejected_count} contribution(s): {reasons}")]
+    CompatibilityRejected {
+        rejected_count: usize,
+        reasons: String,
+    },
     #[error("input hash mismatch for `{path}`: expected {expected}, got {actual}")]
     InputHash {
         path: String,
@@ -309,6 +445,22 @@ pub fn run_qwen_legal_lora_merge_manifest(
     let manifest_bytes = read_file(manifest_path)?;
     let manifest = serde_json::from_slice::<QwenLegalLoraMergeManifest>(&manifest_bytes)?;
     validate_manifest(&manifest)?;
+    let (compatibility_matrix, rejected_contributions) = compatibility_preflight(&manifest);
+    if !rejected_contributions.is_empty() {
+        return Err(QwenLegalLoraMergeError::CompatibilityRejected {
+            rejected_count: rejected_contributions.len(),
+            reasons: rejected_contributions
+                .iter()
+                .flat_map(|rejection| {
+                    rejection
+                        .reasons
+                        .iter()
+                        .map(|reason| format!("{}: {reason}", rejection.worker_id))
+                })
+                .collect::<Vec<_>>()
+                .join("; "),
+        });
+    }
     let manifest_hash = stable_json_digest("psionic.qwen_legal_lora_merge_manifest.v1", &manifest);
     let loaded = load_worker_adapters(manifest_path, &manifest)?;
     let (output_bytes, output_identity, worker_receipts, total_token_count) =
@@ -369,12 +521,20 @@ pub fn run_qwen_legal_lora_merge_manifest(
         manifest_hash,
         parent_adapter_sha256: manifest.parent_adapter_sha256.clone(),
         workers: worker_receipts,
+        compatibility_matrix,
+        rejected_contributions,
         total_token_count,
         output_adapter_path: output_path.display().to_string(),
-        output_adapter_sha256,
+        output_adapter_sha256: output_adapter_sha256.clone(),
         output_adapter_identity_digest: output_identity.stable_digest(),
         validation,
         promotion_gate,
+        promotion_candidate_pointer: format!(
+            "adapter://{}@{}#{}",
+            manifest.output_adapter.adapter_id,
+            manifest.output_adapter.adapter_revision,
+            output_adapter_sha256
+        ),
         deterministic_merge_command,
         receipt_hash: String::new(),
     };
@@ -462,6 +622,31 @@ fn validate_manifest(manifest: &QwenLegalLoraMergeManifest) -> Result<(), QwenLe
                 worker.worker_id
             )));
         }
+        if let Some(replay) = &worker.validator_replay {
+            if replay.status != QwenLegalLoraValidatorReplayStatus::NotRequested
+                && replay
+                    .replay_receipt_sha256
+                    .as_deref()
+                    .is_some_and(|hash| !is_complete_sha256(hash))
+            {
+                return Err(QwenLegalLoraMergeError::InvalidManifest(format!(
+                    "worker `{}` validator replay receipt hash must be a 64-character SHA-256 hex digest",
+                    worker.worker_id
+                )));
+            }
+        }
+    }
+    if let Some(contract) = &manifest.compatibility {
+        validate_compatibility_contract(contract)?;
+        for worker in &manifest.worker_adapters {
+            let Some(facts) = &worker.compatibility else {
+                return Err(QwenLegalLoraMergeError::InvalidManifest(format!(
+                    "worker `{}` is missing compatibility facts",
+                    worker.worker_id
+                )));
+            };
+            validate_worker_compatibility_facts(worker.worker_id.as_str(), facts)?;
+        }
     }
     match manifest.mode {
         QwenLegalLoraMergeMode::DeltaAveraging => {
@@ -488,6 +673,204 @@ fn validate_manifest(manifest: &QwenLegalLoraMergeManifest) -> Result<(), QwenLe
         }
     }
     Ok(())
+}
+
+fn validate_compatibility_contract(
+    contract: &QwenLegalLoraMergeCompatibilityContract,
+) -> Result<(), QwenLegalLoraMergeError> {
+    for (field, value) in [
+        (
+            "base_checkpoint_sha256",
+            contract.base_checkpoint_sha256.as_str(),
+        ),
+        ("tokenizer_sha256", contract.tokenizer_sha256.as_str()),
+        ("config_sha256", contract.config_sha256.as_str()),
+        (
+            "corpus_manifest_sha256",
+            contract.corpus_manifest_sha256.as_str(),
+        ),
+        (
+            "optimizer_config_sha256",
+            contract.optimizer_config_sha256.as_str(),
+        ),
+    ] {
+        if !is_complete_sha256(value) {
+            return Err(QwenLegalLoraMergeError::InvalidManifest(format!(
+                "compatibility.{field} must be a 64-character SHA-256 hex digest"
+            )));
+        }
+    }
+    if contract.target_modules.is_empty()
+        || contract.precision_policy.trim().is_empty()
+        || contract.step_window_id.trim().is_empty()
+    {
+        return Err(QwenLegalLoraMergeError::InvalidManifest(String::from(
+            "compatibility target_modules, precision_policy, and step_window_id must be present",
+        )));
+    }
+    Ok(())
+}
+
+fn validate_worker_compatibility_facts(
+    worker_id: &str,
+    facts: &QwenLegalLoraWorkerCompatibilityFacts,
+) -> Result<(), QwenLegalLoraMergeError> {
+    for (field, value) in [
+        (
+            "base_checkpoint_sha256",
+            facts.base_checkpoint_sha256.as_str(),
+        ),
+        ("tokenizer_sha256", facts.tokenizer_sha256.as_str()),
+        ("config_sha256", facts.config_sha256.as_str()),
+        (
+            "corpus_manifest_sha256",
+            facts.corpus_manifest_sha256.as_str(),
+        ),
+        (
+            "optimizer_config_sha256",
+            facts.optimizer_config_sha256.as_str(),
+        ),
+    ] {
+        if !is_complete_sha256(value) {
+            return Err(QwenLegalLoraMergeError::InvalidManifest(format!(
+                "worker `{worker_id}` compatibility.{field} must be a 64-character SHA-256 hex digest"
+            )));
+        }
+    }
+    if facts.corpus_shard_hash.trim().is_empty()
+        || facts.target_modules.is_empty()
+        || facts.precision_policy.trim().is_empty()
+        || facts.step_window_id.trim().is_empty()
+    {
+        return Err(QwenLegalLoraMergeError::InvalidManifest(format!(
+            "worker `{worker_id}` compatibility corpus_shard_hash, target_modules, precision_policy, and step_window_id must be present"
+        )));
+    }
+    Ok(())
+}
+
+fn compatibility_preflight(
+    manifest: &QwenLegalLoraMergeManifest,
+) -> (
+    Vec<QwenLegalLoraCompatibilityMatrixRow>,
+    Vec<QwenLegalLoraRejectedContribution>,
+) {
+    let mut seen_worker_ids = BTreeSet::new();
+    let mut seen_adapter_hashes = BTreeSet::new();
+    let mut seen_dataset_shards = BTreeSet::new();
+    let mut rows = Vec::with_capacity(manifest.worker_adapters.len());
+    let mut rejected = Vec::new();
+
+    for worker in &manifest.worker_adapters {
+        let duplicate_contribution = !seen_worker_ids.insert(worker.worker_id.clone())
+            || !seen_adapter_hashes.insert(worker.sha256.clone())
+            || !seen_dataset_shards.insert(worker.dataset_shard_hash.clone());
+        let replay_status = worker
+            .validator_replay
+            .as_ref()
+            .map(|replay| replay.status)
+            .unwrap_or(QwenLegalLoraValidatorReplayStatus::NotRequested);
+        let mut reasons = Vec::new();
+        if duplicate_contribution {
+            reasons.push(String::from(
+                "duplicate worker id, adapter hash, or dataset shard hash",
+            ));
+        }
+        if replay_status == QwenLegalLoraValidatorReplayStatus::Failed {
+            reasons.push(String::from("validator replay rejected contribution"));
+        }
+
+        let mut base_checkpoint_match = true;
+        let mut tokenizer_match = true;
+        let mut config_match = true;
+        let mut corpus_manifest_match = true;
+        let mut corpus_shard_match = true;
+        let mut target_modules_match = true;
+        let mut optimizer_config_match = true;
+        let mut precision_policy_match = true;
+        let mut step_window_match = true;
+
+        if let Some(contract) = &manifest.compatibility {
+            if let Some(facts) = &worker.compatibility {
+                base_checkpoint_match =
+                    facts.base_checkpoint_sha256 == contract.base_checkpoint_sha256;
+                tokenizer_match = facts.tokenizer_sha256 == contract.tokenizer_sha256;
+                config_match = facts.config_sha256 == contract.config_sha256;
+                corpus_manifest_match =
+                    facts.corpus_manifest_sha256 == contract.corpus_manifest_sha256;
+                corpus_shard_match = facts.corpus_shard_hash == worker.dataset_shard_hash;
+                target_modules_match = sorted_strings(&facts.target_modules)
+                    == sorted_strings(&contract.target_modules);
+                optimizer_config_match =
+                    facts.optimizer_config_sha256 == contract.optimizer_config_sha256;
+                precision_policy_match = facts.precision_policy == contract.precision_policy;
+                step_window_match = facts.step_window_id == contract.step_window_id;
+            } else {
+                base_checkpoint_match = false;
+                tokenizer_match = false;
+                config_match = false;
+                corpus_manifest_match = false;
+                corpus_shard_match = false;
+                target_modules_match = false;
+                optimizer_config_match = false;
+                precision_policy_match = false;
+                step_window_match = false;
+                reasons.push(String::from("missing worker compatibility facts"));
+            }
+        }
+
+        for (matched, reason) in [
+            (base_checkpoint_match, "base checkpoint mismatch"),
+            (tokenizer_match, "tokenizer mismatch"),
+            (config_match, "config mismatch"),
+            (corpus_manifest_match, "corpus manifest mismatch"),
+            (corpus_shard_match, "corpus shard mismatch"),
+            (target_modules_match, "target module set mismatch"),
+            (optimizer_config_match, "optimizer config mismatch"),
+            (precision_policy_match, "precision policy mismatch"),
+            (step_window_match, "step window mismatch"),
+        ] {
+            if !matched {
+                reasons.push(String::from(reason));
+            }
+        }
+
+        let accepted = reasons.is_empty();
+        let row = QwenLegalLoraCompatibilityMatrixRow {
+            worker_id: worker.worker_id.clone(),
+            adapter_sha256: worker.sha256.clone(),
+            dataset_shard_hash: worker.dataset_shard_hash.clone(),
+            accepted,
+            reasons: reasons.clone(),
+            base_checkpoint_match,
+            tokenizer_match,
+            config_match,
+            corpus_manifest_match,
+            corpus_shard_match,
+            target_modules_match,
+            optimizer_config_match,
+            precision_policy_match,
+            step_window_match,
+            duplicate_contribution,
+            validator_replay_status: replay_status,
+        };
+        if !accepted {
+            rejected.push(QwenLegalLoraRejectedContribution {
+                worker_id: worker.worker_id.clone(),
+                adapter_sha256: worker.sha256.clone(),
+                reasons,
+            });
+        }
+        rows.push(row);
+    }
+
+    (rows, rejected)
+}
+
+fn sorted_strings(values: &[String]) -> Vec<String> {
+    let mut values = values.to_vec();
+    values.sort();
+    values
 }
 
 fn load_worker_adapters(
@@ -852,6 +1235,13 @@ mod tests {
     const CUDA_SHA: &str = "5298c62de7f6b318f8889957433fe401ba693911997c1c606ce5099e73ca41cb";
     const METAL_SHA: &str = "6e8b6da6083606cbd36105a65d532e48e067094809f9db552ca9a9d13105af9b";
     const AGGREGATE_SHA: &str = "8e8dea3bc639ed2c147d6901f6ceda9b5f1a176034dc7bb65219daf7dd33116d";
+    const BASE_CHECKPOINT_SHA: &str =
+        "8b0a0f5dbe6f8167f92943da022510cda118f64b8dd84c8f0db0d6acef934c67";
+    const TOKENIZER_SHA: &str = "0c451f3bcf463f0e614b62e7816948c2122813e51d88f0e3e0e4fe58fdf2d7c0";
+    const CONFIG_SHA: &str = "23a420499cc74ad251c80de0dff8a1af3f872f99d435828ac52161e5505e90b9";
+    const CORPUS_MANIFEST_SHA: &str =
+        "ea6cd51dbf44853c2215c73b56e49b9f71052b646af77ceaa7653cc880b5659d";
+    const OPTIMIZER_SHA: &str = "35e41a47cfbaf3211bd9234f6517920100e8e1178f85827b2a4534978be577b7";
 
     #[test]
     fn merge_lora_delta_averaging_is_deterministic() -> Result<(), Box<dyn std::error::Error>> {
@@ -871,6 +1261,10 @@ mod tests {
         assert_eq!(first.output_adapter_sha256, second.output_adapter_sha256);
         assert_eq!(first.workers.len(), 2);
         assert_eq!(first.total_token_count, 272);
+        assert_eq!(first.compatibility_matrix.len(), 2);
+        assert!(first.compatibility_matrix.iter().all(|row| row.accepted));
+        assert!(first.rejected_contributions.is_empty());
+        assert!(first.promotion_candidate_pointer.contains(AGGREGATE_SHA));
         Ok(())
     }
 
@@ -885,6 +1279,98 @@ mod tests {
         let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
             .expect_err("bad worker hash must fail");
         assert!(error.to_string().contains("input hash mismatch"));
+        Ok(())
+    }
+
+    #[test]
+    fn merge_lora_rejects_base_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let manifest_path = temp.path().join("merge.json");
+        let mut manifest = fixture_manifest(temp.path());
+        manifest.worker_adapters[0]
+            .compatibility
+            .as_mut()
+            .expect("compatibility")
+            .base_checkpoint_sha256 =
+            "0000000000000000000000000000000000000000000000000000000000000000".into();
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
+        let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
+            .expect_err("base mismatch must fail");
+        assert!(error.to_string().contains("base checkpoint mismatch"));
+        Ok(())
+    }
+
+    #[test]
+    fn merge_lora_rejects_corpus_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let manifest_path = temp.path().join("merge.json");
+        let mut manifest = fixture_manifest(temp.path());
+        manifest.worker_adapters[0]
+            .compatibility
+            .as_mut()
+            .expect("compatibility")
+            .corpus_manifest_sha256 =
+            "1111111111111111111111111111111111111111111111111111111111111111".into();
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
+        let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
+            .expect_err("corpus mismatch must fail");
+        assert!(error.to_string().contains("corpus manifest mismatch"));
+        Ok(())
+    }
+
+    #[test]
+    fn merge_lora_rejects_target_module_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let manifest_path = temp.path().join("merge.json");
+        let mut manifest = fixture_manifest(temp.path());
+        manifest.worker_adapters[0]
+            .compatibility
+            .as_mut()
+            .expect("compatibility")
+            .target_modules
+            .push(String::from("lm_head.extra"));
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
+        let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
+            .expect_err("target mismatch must fail");
+        assert!(error.to_string().contains("target module set mismatch"));
+        Ok(())
+    }
+
+    #[test]
+    fn merge_lora_rejects_duplicate_contribution() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let manifest_path = temp.path().join("merge.json");
+        let mut manifest = fixture_manifest(temp.path());
+        manifest.worker_adapters[1].dataset_shard_hash =
+            manifest.worker_adapters[0].dataset_shard_hash.clone();
+        manifest.worker_adapters[1]
+            .compatibility
+            .as_mut()
+            .expect("compatibility")
+            .corpus_shard_hash = manifest.worker_adapters[0].dataset_shard_hash.clone();
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
+        let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
+            .expect_err("duplicate contribution must fail");
+        assert!(error.to_string().contains("duplicate worker id"));
+        Ok(())
+    }
+
+    #[test]
+    fn merge_lora_rejects_failed_validator_replay() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let manifest_path = temp.path().join("merge.json");
+        let mut manifest = fixture_manifest(temp.path());
+        manifest.worker_adapters[0].validator_replay = Some(QwenLegalLoraValidatorReplayClaim {
+            status: QwenLegalLoraValidatorReplayStatus::Failed,
+            replay_receipt_sha256: Some(
+                "2222222222222222222222222222222222222222222222222222222222222222".into(),
+            ),
+            reason: String::from("validator replay loss diverged"),
+        });
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
+        let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
+            .expect_err("failed replay must fail");
+        assert!(error.to_string().contains("validator replay rejected"));
         Ok(())
     }
 
@@ -964,6 +1450,15 @@ mod tests {
                     dataset_shard_hash: String::from("shard://harvey-legal-smoke/train/even"),
                     token_count: 140,
                     parent_adapter_sha256: String::from(ZERO_PARENT),
+                    compatibility: Some(worker_compat("shard://harvey-legal-smoke/train/even")),
+                    validator_replay: Some(QwenLegalLoraValidatorReplayClaim {
+                        status: QwenLegalLoraValidatorReplayStatus::Passed,
+                        replay_receipt_sha256: Some(
+                            "9af4ddf49df707f8d6df8bad92fb2610f8f5fe1f1b9ca18d21f685064fd82620"
+                                .into(),
+                        ),
+                        reason: String::from("deterministic replay accepted"),
+                    }),
                 },
                 QwenLegalLoraWorkerAdapterInput {
                     worker_id: String::from("worker.qwen-legal.metal.01"),
@@ -974,10 +1469,54 @@ mod tests {
                     dataset_shard_hash: String::from("shard://harvey-legal-smoke/train/odd"),
                     token_count: 132,
                     parent_adapter_sha256: String::from(ZERO_PARENT),
+                    compatibility: Some(worker_compat("shard://harvey-legal-smoke/train/odd")),
+                    validator_replay: Some(QwenLegalLoraValidatorReplayClaim {
+                        status: QwenLegalLoraValidatorReplayStatus::Passed,
+                        replay_receipt_sha256: Some(
+                            "4bef1d9d4b8827f4dd3a03aa921a098f384da0d21b9383cc9b4eb7bbab5c5c02"
+                                .into(),
+                        ),
+                        reason: String::from("deterministic replay accepted"),
+                    }),
                 },
             ],
+            compatibility: Some(compatibility_contract()),
             validation: None,
         }
+    }
+
+    fn compatibility_contract() -> QwenLegalLoraMergeCompatibilityContract {
+        QwenLegalLoraMergeCompatibilityContract {
+            base_checkpoint_sha256: String::from(BASE_CHECKPOINT_SHA),
+            tokenizer_sha256: String::from(TOKENIZER_SHA),
+            config_sha256: String::from(CONFIG_SHA),
+            corpus_manifest_sha256: String::from(CORPUS_MANIFEST_SHA),
+            target_modules: target_modules(),
+            optimizer_config_sha256: String::from(OPTIMIZER_SHA),
+            precision_policy: String::from("bf16-lora-f32-master"),
+            step_window_id: String::from("qwen-legal-window-000001"),
+        }
+    }
+
+    fn worker_compat(corpus_shard_hash: &str) -> QwenLegalLoraWorkerCompatibilityFacts {
+        QwenLegalLoraWorkerCompatibilityFacts {
+            base_checkpoint_sha256: String::from(BASE_CHECKPOINT_SHA),
+            tokenizer_sha256: String::from(TOKENIZER_SHA),
+            config_sha256: String::from(CONFIG_SHA),
+            corpus_manifest_sha256: String::from(CORPUS_MANIFEST_SHA),
+            corpus_shard_hash: String::from(corpus_shard_hash),
+            target_modules: target_modules(),
+            optimizer_config_sha256: String::from(OPTIMIZER_SHA),
+            precision_policy: String::from("bf16-lora-f32-master"),
+            step_window_id: String::from("qwen-legal-window-000001"),
+        }
+    }
+
+    fn target_modules() -> Vec<String> {
+        vec![
+            String::from("lm_head.lora_A.weight"),
+            String::from("lm_head.lora_B.weight"),
+        ]
     }
 
     fn fixture_path(file: &str) -> String {

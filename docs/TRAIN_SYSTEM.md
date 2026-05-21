@@ -352,11 +352,17 @@ declared worker hash, supports both token-weighted delta averaging and
 sequential shard handoff, writes an aggregate adapter, and emits a merge
 receipt with the parent adapter hash, worker adapter hashes, dataset shard
 hashes, token counts, merge weights, output adapter hash, local validation
-metrics, and deterministic replay command. The committed smoke manifest merges
-the two Pylon-network worker adapters and runs the local Harvey public-three
-Rust eval. Promotion is still guarded: a merged adapter is only promotable when
-it beats the declared champion score on the same suite and has no hard eval
-failures.
+metrics, deterministic replay command, compatibility matrix, rejected update
+list, and promotion-candidate pointer. The committed smoke manifest now binds
+both worker updates to the same base checkpoint, tokenizer, config, corpus
+manifest, target module set, optimizer config, precision policy, and step
+window; it also requires successful validator replay before aggregation. The
+current smoke accepts both Pylon-network updates, rejects zero updates, emits
+receipt hash
+`b8dedbb01823cb94d1a017b969eea99f3af4ade49ed7194fcfac572fb77185da`, and
+runs the local Harvey public-three Rust eval. Promotion is still guarded: a
+merged adapter is only promotable when it beats the declared champion score on
+the same suite and has no hard eval failures.
 The legal lane now also owns the first Pylon worker job protocol in
 `crates/psionic-train/src/qwen_legal_pylon_training_job.rs`. It defines the
 job envelope for dataset shard builds, SFT/DPO/GRPO shard work, eval shards,

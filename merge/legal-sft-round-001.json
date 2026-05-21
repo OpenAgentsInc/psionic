@@ -23,7 +23,26 @@
       "sha256": "5298c62de7f6b318f8889957433fe401ba693911997c1c606ce5099e73ca41cb",
       "dataset_shard_hash": "shard://harvey-legal-smoke/train/even",
       "token_count": 140,
-      "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d"
+      "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d",
+      "compatibility": {
+        "base_checkpoint_sha256": "8b0a0f5dbe6f8167f92943da022510cda118f64b8dd84c8f0db0d6acef934c67",
+        "tokenizer_sha256": "0c451f3bcf463f0e614b62e7816948c2122813e51d88f0e3e0e4fe58fdf2d7c0",
+        "config_sha256": "23a420499cc74ad251c80de0dff8a1af3f872f99d435828ac52161e5505e90b9",
+        "corpus_manifest_sha256": "ea6cd51dbf44853c2215c73b56e49b9f71052b646af77ceaa7653cc880b5659d",
+        "corpus_shard_hash": "shard://harvey-legal-smoke/train/even",
+        "target_modules": [
+          "lm_head.lora_A.weight",
+          "lm_head.lora_B.weight"
+        ],
+        "optimizer_config_sha256": "35e41a47cfbaf3211bd9234f6517920100e8e1178f85827b2a4534978be577b7",
+        "precision_policy": "bf16-lora-f32-master",
+        "step_window_id": "qwen-legal-window-000001"
+      },
+      "validator_replay": {
+        "status": "passed",
+        "replay_receipt_sha256": "9af4ddf49df707f8d6df8bad92fb2610f8f5fe1f1b9ca18d21f685064fd82620",
+        "reason": "deterministic replay accepted"
+      }
     },
     {
       "worker_id": "worker.qwen-legal.metal.01",
@@ -33,9 +52,41 @@
       "sha256": "6e8b6da6083606cbd36105a65d532e48e067094809f9db552ca9a9d13105af9b",
       "dataset_shard_hash": "shard://harvey-legal-smoke/train/odd",
       "token_count": 132,
-      "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d"
+      "parent_adapter_sha256": "821e206ee5e1b9bd158faf1ff8dc2faa0cbafa3cc7767eef77eaffd44d9a009d",
+      "compatibility": {
+        "base_checkpoint_sha256": "8b0a0f5dbe6f8167f92943da022510cda118f64b8dd84c8f0db0d6acef934c67",
+        "tokenizer_sha256": "0c451f3bcf463f0e614b62e7816948c2122813e51d88f0e3e0e4fe58fdf2d7c0",
+        "config_sha256": "23a420499cc74ad251c80de0dff8a1af3f872f99d435828ac52161e5505e90b9",
+        "corpus_manifest_sha256": "ea6cd51dbf44853c2215c73b56e49b9f71052b646af77ceaa7653cc880b5659d",
+        "corpus_shard_hash": "shard://harvey-legal-smoke/train/odd",
+        "target_modules": [
+          "lm_head.lora_A.weight",
+          "lm_head.lora_B.weight"
+        ],
+        "optimizer_config_sha256": "35e41a47cfbaf3211bd9234f6517920100e8e1178f85827b2a4534978be577b7",
+        "precision_policy": "bf16-lora-f32-master",
+        "step_window_id": "qwen-legal-window-000001"
+      },
+      "validator_replay": {
+        "status": "passed",
+        "replay_receipt_sha256": "4bef1d9d4b8827f4dd3a03aa921a098f384da0d21b9383cc9b4eb7bbab5c5c02",
+        "reason": "deterministic replay accepted"
+      }
     }
   ],
+  "compatibility": {
+    "base_checkpoint_sha256": "8b0a0f5dbe6f8167f92943da022510cda118f64b8dd84c8f0db0d6acef934c67",
+    "tokenizer_sha256": "0c451f3bcf463f0e614b62e7816948c2122813e51d88f0e3e0e4fe58fdf2d7c0",
+    "config_sha256": "23a420499cc74ad251c80de0dff8a1af3f872f99d435828ac52161e5505e90b9",
+    "corpus_manifest_sha256": "ea6cd51dbf44853c2215c73b56e49b9f71052b646af77ceaa7653cc880b5659d",
+    "target_modules": [
+      "lm_head.lora_A.weight",
+      "lm_head.lora_B.weight"
+    ],
+    "optimizer_config_sha256": "35e41a47cfbaf3211bd9234f6517920100e8e1178f85827b2a4534978be577b7",
+    "precision_policy": "bf16-lora-f32-master",
+    "step_window_id": "qwen-legal-window-000001"
+  },
   "validation": {
     "suite_path": "suites/harvey_public_three.json",
     "base_model": "Qwen/Qwen3.6-27B",

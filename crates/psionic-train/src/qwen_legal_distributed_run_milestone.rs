@@ -11,28 +11,28 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use psionic_eval::{
-    stable_json_digest, LegalBenchmarkEvalMode, LegalBenchmarkEvalReplayOutcome,
-    LegalBenchmarkEvalSuiteManifest,
+    LegalBenchmarkEvalMode, LegalBenchmarkEvalReplayOutcome, LegalBenchmarkEvalSuiteManifest,
+    stable_json_digest,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    PsionicLegalSftBaseArtifactMode, PsionicLegalSftConfig, PsionicLegalSftError,
+    PsionicLegalSftRunArtifacts, PsionicLegalSftSample, PylonLocalWorkerRunOptions,
+    PylonTrainingArtifactRef, PylonTrainingExpectedOutputArtifact,
+    PylonTrainingHardwareRequirements, PylonTrainingJobKind, PylonTrainingJobSpec,
+    PylonTrainingPaymentBudget, PylonTrainingPaymentDecisionReceipt, PylonTrainingPaymentStatus,
+    PylonTrainingReceiptRequirements, PylonTrainingShardAssignment, PylonTrainingWorkerJobStatus,
+    PylonTrainingWorkerReceipt, PylonTrainingWorkerReceiptVerification,
+    QWEN_LEGAL_LORA_MERGE_MANIFEST_SCHEMA_VERSION, QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION,
+    QwenLegalLoraMergeBaseModel, QwenLegalLoraMergeError, QwenLegalLoraMergeManifest,
+    QwenLegalLoraMergeMode, QwenLegalLoraMergeOutput, QwenLegalLoraMergePromotionDecision,
+    QwenLegalLoraMergeValidation, QwenLegalLoraWorkerAdapterInput, QwenLegalPylonTrainingJobError,
     run_psionic_legal_sft_config, run_qwen_legal_lora_merge_manifest,
     run_qwen_legal_pylon_worker_job, settle_qwen_legal_pylon_training_job_spec,
-    verify_qwen_legal_pylon_worker_receipt_path, PsionicLegalSftBaseArtifactMode,
-    PsionicLegalSftConfig, PsionicLegalSftError, PsionicLegalSftRunArtifacts,
-    PsionicLegalSftSample, PylonLocalWorkerRunOptions, PylonTrainingArtifactRef,
-    PylonTrainingExpectedOutputArtifact, PylonTrainingHardwareRequirements, PylonTrainingJobKind,
-    PylonTrainingJobSpec, PylonTrainingPaymentBudget, PylonTrainingPaymentDecisionReceipt,
-    PylonTrainingPaymentStatus, PylonTrainingReceiptRequirements, PylonTrainingShardAssignment,
-    PylonTrainingWorkerJobStatus, PylonTrainingWorkerReceipt,
-    PylonTrainingWorkerReceiptVerification, QwenLegalLoraMergeBaseModel, QwenLegalLoraMergeError,
-    QwenLegalLoraMergeManifest, QwenLegalLoraMergeMode, QwenLegalLoraMergeOutput,
-    QwenLegalLoraMergePromotionDecision, QwenLegalLoraMergeValidation,
-    QwenLegalLoraWorkerAdapterInput, QwenLegalPylonTrainingJobError,
-    QWEN_LEGAL_LORA_MERGE_MANIFEST_SCHEMA_VERSION, QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION,
+    verify_qwen_legal_pylon_worker_receipt_path,
 };
 
 pub const QWEN_LEGAL_DISTRIBUTED_RUN_SCHEMA_VERSION: &str =
@@ -851,8 +851,11 @@ fn merge_manifest(
                 dataset_shard_hash: shard.shard_manifest_sha256.clone(),
                 token_count: shard.source_token_count,
                 parent_adapter_sha256: parent_adapter_sha256.clone(),
+                compatibility: None,
+                validator_replay: None,
             })
             .collect(),
+        compatibility: None,
         validation: Some(QwenLegalLoraMergeValidation {
             suite_path: config.suite_path.to_string_lossy().to_string(),
             base_model: config.champion_model_id.clone(),

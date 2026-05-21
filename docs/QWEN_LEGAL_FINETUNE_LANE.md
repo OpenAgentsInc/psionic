@@ -1899,13 +1899,23 @@ cargo run -p psionic-train -- merge-lora \
   --manifest merge/legal-sft-round-001.json
 ```
 
-The manifest is intentionally small and explicit. It names the parent adapter
-hash, the base model binding, each worker adapter artifact, each worker's
-dataset shard hash, each worker's token count, and the output adapter path.
+The manifest is intentionally explicit. It names the parent adapter hash, the
+base model binding, each worker adapter artifact, each worker's dataset shard
+hash, each worker's token count, and the output adapter path. For real
+distributed runs it also carries a compatibility contract: base checkpoint
+hash, tokenizer hash, config hash, global corpus manifest hash, exact target
+modules, optimizer config hash, precision policy, and training-window id. Each
+worker contribution declares the same compatibility facts and its validator
+replay status.
+
 The command verifies every worker artifact hash before loading it, refuses
-shape drift, merges real LoRA safetensors factors, writes the aggregate
-adapter, runs the local Rust eval suite when requested, and writes a
-machine-readable merge receipt next to the output adapter.
+base/corpus/target/optimizer/precision/window mismatches, refuses duplicate
+contributions, refuses failed validator replays, refuses shape drift, merges
+real LoRA safetensors factors, writes the aggregate adapter, runs the local
+Rust eval suite when requested, and writes a machine-readable merge receipt
+next to the output adapter. The receipt includes a compatibility matrix,
+rejected-contribution list, local validation metrics, deterministic replay
+command, and promotion-candidate pointer for the registry path.
 
 Two merge modes are supported:
 
@@ -1921,10 +1931,15 @@ The smoke manifest uses the two retained Pylon worker adapters from
 against the retained digest
 `8e8dea3bc639ed2c147d6901f6ceda9b5f1a176034dc7bb65219daf7dd33116d`.
 It then runs `suites/harvey_public_three.json` locally and records a promotion
-gate. The gate is simple: the merged adapter is only promotable if it beats
-the declared champion score on the same local suite and has no integrity,
-tool, or timeout failures. The command does not mutate the adapter registry;
-registry promotion remains a separate operator action.
+gate. The current recorded smoke accepts both worker updates, rejects zero
+updates, writes receipt hash
+`b8dedbb01823cb94d1a017b969eea99f3af4ade49ed7194fcfac572fb77185da`, and
+emits promotion pointer
+`adapter://qwen35-4b-legal-pylon-network-smoke@r1-trusted-aggregate#8e8dea3bc639ed2c147d6901f6ceda9b5f1a176034dc7bb65219daf7dd33116d`.
+The gate is simple: the merged adapter is only promotable if it beats the
+declared champion score on the same local suite and has no integrity, tool, or
+timeout failures. The command does not mutate the adapter registry; registry
+promotion remains a separate operator action.
 
 ## Runtime Admission
 
