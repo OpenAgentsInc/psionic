@@ -395,7 +395,7 @@ pub fn run_qwen36_27b_legal_ft_milestone(
         all_receipts_present,
         no_python_invoked,
         claim_boundary: String::from(
-            "This is a Qwen3.6-27B target-path legal fine-tuning milestone over public training-allowed Harvey fixtures. It loads the Qwen3.6-27B smoke target artifacts, runs Rust SFT, DPO, and GRPO adapter updates, evaluates the candidate ladder, and records receipts. It does not claim full 27B weight loading, hidden Harvey performance, or production leaderboard standing.",
+            "This is a Qwen3.6-27B target-path legal fine-tuning milestone over public training-allowed Harvey fixtures. It loads the Qwen3.6-27B smoke target artifacts, runs Rust SFT, DPO, and GRPO adapter updates, evaluates the candidate ladder, and records receipts. It does not load the full 27B checkpoint, measure private Harvey tasks, or prove production leaderboard standing.",
         ),
         report_path: config.report_path.to_string_lossy().to_string(),
         report_digest: String::new(),
@@ -814,7 +814,7 @@ fn write_markdown_report(
     markdown.push_str("# Qwen3.6-27B Legal Fine-Tuning Milestone 001\n\n");
     markdown.push_str("## Status\n\n");
     markdown.push_str(&format!(
-        "- model: `{}`\n- model load verified: `{}`\n- base score: `{}` bps\n- promoted candidate: `{}`\n- promoted score: `{}` bps\n- score delta: `{}` bps\n- decision: `{:?}`\n- no Python invoked: `{}`\n- hidden benchmark training: `{}`\n- all receipts present: `{}`\n\n",
+        "- model: `{}`\n- model load verified: `{}`\n- base score: `{}` bps\n- promoted candidate: `{}`\n- promoted score: `{}` bps\n- score delta: `{}` bps\n- decision: `{:?}`\n- no Python invoked: `{}`\n- private benchmark tasks used for training: `{}`\n- all receipts present: `{}`\n\n",
         report.model_id,
         report.model_load_verified,
         report.promotion_receipt.champion_score_bps,

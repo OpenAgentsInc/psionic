@@ -100,7 +100,7 @@ That run loaded the config/tokenizer artifacts, improved smoke loss from
 `target/legal/qwen36_27b_sft_smoke/adapter.safetensors`, recorded
 `python_invoked: false`, and evaluated through the deterministic Harvey
 public-three fixture at `10000` adapter bps. This is still public-fixture
-proof, not retained Harvey performance.
+proof, not performance on private Harvey tasks.
 
 `Qwen3.6-35B-A3B` now has a MoE-safe target-path smoke:
 
@@ -124,8 +124,8 @@ and after the adapter update. The recorded smoke improved loss from
 `5.5602503` to `1.5024384`, wrote
 `target/legal/qwen36_35b_a3b_sft_smoke/adapter.safetensors`, and scored
 `10000` adapter bps on the deterministic Harvey public-three fixture. This is
-still a small Rust smoke, not full 35B-A3B weight inference or retained Harvey
-performance.
+still a small Rust smoke, not full 35B-A3B weight inference or performance on
+private Harvey tasks.
 
 ## Operator Guidance
 

@@ -61,8 +61,8 @@ adapter path. Do not use a synthetic alias as the request model id unless an
 aliasing wrapper is added; MLX resolves unknown model ids through Hugging Face.
 
 Claim boundary: this is a locally trained Qwen-family LoRA adapter suitable for
-smoke benchmark routing. It is not the retained `Qwen/Qwen3.6-35B-A3B` target,
-not RL, and not a retained Harvey score claim.
+smoke benchmark routing. It is not the final `Qwen/Qwen3.6-35B-A3B` target,
+not RL, and not a score claim on private Harvey tasks.
 
 ## Rust Harvey Agent Smoke
 
@@ -101,7 +101,7 @@ This run is useful as an RL trajectory seed because the adapter wrote a
 deliverable through the Rust `write` tool, produced a receipt-backed output
 artifact, submitted through the legal benchmark agent loop, and exported one
 canonical legal benchmark training record. It is still a no-source smoke task,
-not a retained Harvey benchmark score.
+not a score on private Harvey benchmark tasks.
 
 ## RL-Seed Adapter Smoke
 
@@ -150,8 +150,8 @@ The recorded Rust agent smoke against this adapter has:
   `e8efbbedfaba5d4af1de3250c05ab912550e5ff83e1d9ffdfb0d6dcba8b52ede`
 
 This is now the strongest local Qwen candidate for the Harvey smoke route. It
-is a resumed LoRA policy refresh from accepted benchmark behavior, not a
-retained Harvey score claim or full RL run.
+is a resumed LoRA policy refresh from accepted benchmark behavior, not a score
+claim on private Harvey tasks or a full RL run.
 
 ## Harvey MFN Training-Slice Adapter
 
@@ -214,7 +214,7 @@ Recorded result:
 
 This is the first local Qwen LoRA candidate that both trains from prior
 accepted benchmark behavior and runs a real Harvey task through the Rust agent
-loop. It is still a public training-slice score, not a retained Harvey
+loop. It is still a public training-slice score, not a private Harvey
 leaderboard score.
 
 ## Harvey MFN Reward-Refresh Adapter
@@ -278,7 +278,7 @@ Recorded result:
 
 This candidate is an actual local MLX LoRA fine-tune resumed from the 004
 Harvey MFN adapter. It is the current local serving target for public
-Harvey-slice hillclimb work. It is still not a retained Harvey judge score and
+Harvey-slice hillclimb work. It is still not a private Harvey judge score and
 not full distributed RL.
 
 Run 015 is retired as an invalid score. It used the same 005 adapter, but the

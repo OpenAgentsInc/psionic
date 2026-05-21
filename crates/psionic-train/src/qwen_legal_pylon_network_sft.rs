@@ -348,7 +348,7 @@ pub fn run_canonical_qwen_legal_pylon_network_sft()
         dataset_digest: dataset_binding.dataset_digest,
         eval_pack_digest: eval_pack_binding.eval_pack_digest,
         claim_boundary: String::from(
-            "This is a real multi-contributor LM-head LoRA adapter-SFT artifact over synthetic Qwen legal hidden-state smoke samples. It proves the Pylon-network training and aggregation shape. It does not claim Qwen3.6 full-weight fine-tuning or retained Harvey benchmark score lift.",
+            "This is a real multi-contributor LM-head LoRA adapter-SFT artifact over synthetic Qwen legal hidden-state smoke samples. It proves the Pylon-network training and aggregation shape. It does not claim Qwen3.6 full-weight fine-tuning or a score lift on private Harvey benchmark tasks.",
         ),
         contributions: contribution_reports,
         aggregate,

@@ -293,7 +293,7 @@ pub fn build_qwen_legal_ft_report(
         worker_contribution_payment_table,
         artifact_index,
         claim_boundary: String::from(
-            "The legal ft command surface reports local command readiness and receipt integrity. It does not claim hidden Harvey benchmark performance.",
+            "The legal ft command surface reports local command readiness and receipt integrity. It does not claim performance on private Harvey benchmark tasks.",
         ),
         report_digest: String::new(),
     })

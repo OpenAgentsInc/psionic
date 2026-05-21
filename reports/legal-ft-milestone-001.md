@@ -20,7 +20,7 @@
 
 ## What Did Not Improve
 
-- This does not prove hidden Harvey performance.
+- This does not prove performance on private Harvey tasks.
 - This does not prove live Qwen legal reasoning quality; the eval is a deterministic public replay fixture.
 - This does not yet replace the larger Pylon-distributed fine-tuning run.
 
@@ -54,7 +54,7 @@ Candidate failures:
 - The SFT adapter is produced by the Rust Psionic trainer; the training receipt says python_invoked=false.
 - The answer writer no longer appends suite, model, or prompt metadata to answer files.
 - Promotion happens through the Qwen legal adapter registry only after the candidate beats the champion on the same suite hash.
-- The report is explicit that this is a public local milestone, not hidden benchmark proof.
+- The report is explicit that this is a public local milestone, not proof on private benchmark tasks.
 
 ## Receipts
 

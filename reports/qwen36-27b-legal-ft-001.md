@@ -10,7 +10,7 @@
 - score delta: `6667` bps
 - decision: `Promote`
 - no Python invoked: `true`
-- hidden benchmark training: `false`
+- private benchmark tasks used for training: `false`
 - all receipts present: `true`
 
 ## Candidate Ladder
@@ -25,8 +25,8 @@
 ## Target Artifacts
 
 - target load report: `target/legal/qwen36-27b-legal-ft-001/qwen36_27b_target_load_report.json`
-- target load report sha256: `4fe429f16d9cd4e91fffdd46564e9ea794cae47e28d03dc2169bebeed911eda7`
-- base eval report hash: `876bea7dd9fbeedafc4a2b0e01b36485665250764c7f11ce4952dd373a213552`
+- target load report sha256: `e18e586d11dd27d214814227382d91899e22f1dadfe9e5a25621f03c1045d2fc`
+- base eval report hash: `f4f318d8d7ee3779748f3fdfa1f6f4329ef2bab30d2666e3ae6e3de6db972944`
 
 | role | path | sha256 | bytes |
 | --- | --- | --- | ---: |
@@ -53,8 +53,8 @@
 
 ## Boundary
 
-This is a Qwen3.6-27B target-path legal fine-tuning milestone over public training-allowed Harvey fixtures. It loads the Qwen3.6-27B smoke target artifacts, runs Rust SFT, DPO, and GRPO adapter updates, evaluates the candidate ladder, and records receipts. It does not claim full 27B weight loading, hidden Harvey performance, or production leaderboard standing.
+This is a Qwen3.6-27B target-path legal fine-tuning milestone over public training-allowed Harvey fixtures. It loads the Qwen3.6-27B smoke target artifacts, runs Rust SFT, DPO, and GRPO adapter updates, evaluates the candidate ladder, and records receipts. It does not load the full 27B checkpoint, measure private Harvey tasks, or prove production leaderboard standing.
 
 ## Report Receipt
 
-- report digest: `1e1d9d203b3a3c7c33ddf1abeace28484318372c73355ee2f903d6951bcd8ce7`
+- report digest: `8f645a37f5d4e64b234488d842ee5fad51ab40a68ccfc982c1ea8dd5ba243be9`

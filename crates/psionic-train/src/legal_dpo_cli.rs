@@ -649,7 +649,7 @@ pub fn run_psionic_legal_dpo_config(
         checkpoint_summary_path: checkpoint_path.display().to_string(),
         python_invoked: false,
         claim_boundary: String::from(
-            "This is a Rust-only adapter DPO smoke over synthetic Qwen3.6 hidden states derived from legal DPO pairs. It proves parent SFT adapter loading, Qwen3.6 prompt rendering, chosen/rejected weighted updates, checkpoint receipts, and adapter export. It does not claim full dense Qwen3.6 training or hidden Harvey benchmark improvement.",
+            "This is a Rust-only adapter DPO smoke over synthetic Qwen3.6 hidden states derived from legal DPO pairs. It proves parent SFT adapter loading, Qwen3.6 prompt rendering, chosen/rejected weighted updates, checkpoint receipts, and adapter export. It does not claim full dense Qwen3.6 training or improvement on private Harvey benchmark tasks.",
         ),
         receipt_digest: String::new(),
     };

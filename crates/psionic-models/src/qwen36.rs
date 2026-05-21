@@ -5,6 +5,7 @@ use std::{
 
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokenizers::Tokenizer;
@@ -20,6 +21,7 @@ pub const QWEN36_27B_SMOKE_CONFIG_PATH: &str = "fixtures/qwen36_27b_smoke/config
 pub const QWEN36_27B_SMOKE_TOKENIZER_PATH: &str = "fixtures/qwen36_27b_smoke/tokenizer.json";
 pub const QWEN36_27B_SMOKE_SHARD_PATH: &str =
     "target/legal/qwen36_27b_prompt_smoke/model-00001-of-00001.safetensors";
+pub const QWEN36_27B_REAL_MODEL_DIR: &str = "target/models/qwen/Qwen3.6-27B";
 pub const QWEN36_35B_A3B_MODEL_ID: &str = "Qwen/Qwen3.6-35B-A3B";
 pub const QWEN36_35B_A3B_SHORT_MODEL_ID: &str = "Qwen3.6-35B-A3B";
 pub const QWEN36_35B_A3B_SERVED_MODEL_ID: &str = "qwen3.6-35b-a3b";
@@ -240,9 +242,86 @@ pub fn load_qwen36_model_config(
         path: path.to_path_buf(),
         source,
     })?;
-    let config = serde_json::from_slice::<Qwen36ModelConfig>(bytes.as_slice())?;
+    let value = serde_json::from_slice::<Value>(bytes.as_slice())?;
+    let config = if value.get("model_id").is_some() {
+        serde_json::from_value::<Qwen36ModelConfig>(value)?
+    } else {
+        qwen36_model_config_from_hf_value(path, value)?
+    };
     validate_qwen36_model_config(&config)?;
     Ok(config)
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct Qwen36HfRootConfig {
+    model_type: String,
+    #[serde(default)]
+    architectures: Vec<String>,
+    #[serde(default)]
+    text_config: Option<Qwen36HfTextConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct Qwen36HfTextConfig {
+    model_type: String,
+    hidden_size: usize,
+    intermediate_size: usize,
+    num_hidden_layers: usize,
+    num_attention_heads: usize,
+    num_key_value_heads: usize,
+    vocab_size: usize,
+    max_position_embeddings: usize,
+    #[serde(default)]
+    dtype: Option<String>,
+    #[serde(default)]
+    torch_dtype: Option<String>,
+}
+
+fn qwen36_model_config_from_hf_value(
+    path: &Path,
+    value: Value,
+) -> Result<Qwen36ModelConfig, Qwen36TargetPathError> {
+    let root = serde_json::from_value::<Qwen36HfRootConfig>(value)?;
+    let Some(text) = root.text_config else {
+        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+            "Hugging Face Qwen3.6 config must contain text_config",
+        )));
+    };
+    if root.model_type != "qwen3_5" || text.model_type != "qwen3_5_text" {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "unsupported Hugging Face Qwen3.6 config model_type `{}` / `{}`",
+            root.model_type, text.model_type
+        )));
+    }
+    let tokenizer_path = path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("tokenizer.json")
+        .display()
+        .to_string();
+    Ok(Qwen36ModelConfig {
+        model_id: String::from(QWEN36_27B_MODEL_ID),
+        served_model_id: String::from(QWEN36_27B_SERVED_MODEL_ID),
+        model_type: text.model_type,
+        architectures: root.architectures,
+        hidden_size: text.hidden_size,
+        intermediate_size: text.intermediate_size,
+        num_hidden_layers: text.num_hidden_layers,
+        num_attention_heads: text.num_attention_heads,
+        num_key_value_heads: text.num_key_value_heads,
+        vocab_size: text.vocab_size,
+        max_position_embeddings: text.max_position_embeddings,
+        torch_dtype: text
+            .torch_dtype
+            .or(text.dtype)
+            .unwrap_or_else(|| String::from("unknown")),
+        tokenizer_path,
+        chat_template_id: String::from(QWEN36_TEMPLATE_ID),
+        memory_strategy: Qwen36TargetMemoryStrategy::SingleHighMemoryGpu,
+        num_experts: None,
+        num_experts_per_tok: None,
+        moe_intermediate_size: None,
+    })
 }
 
 pub fn validate_qwen36_model_config(
@@ -261,19 +340,20 @@ pub fn validate_qwen36_model_config(
             "served_model_id must be qwen3.6-35b-a3b",
         )));
     }
-    if config.model_type != "qwen3" {
+    if !matches!(config.model_type.as_str(), "qwen3" | "qwen3_5_text") {
         return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-            "model_type must be qwen3",
+            "model_type must be qwen3 or qwen3_5_text",
         )));
     }
     if model_id == QWEN36_27B_MODEL_ID {
-        if !config
-            .architectures
-            .iter()
-            .any(|architecture| architecture == "Qwen3ForCausalLM")
-        {
+        if !config.architectures.iter().any(|architecture| {
+            matches!(
+                architecture.as_str(),
+                "Qwen3ForCausalLM" | "Qwen3_5ForCausalLM" | "Qwen3_5ForConditionalGeneration"
+            )
+        }) {
             return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-                "27B architectures must include Qwen3ForCausalLM",
+                "27B architectures must include a Qwen3/Qwen3.5 causal or conditional generation architecture",
             )));
         }
     } else if !config
@@ -525,11 +605,11 @@ pub fn run_qwen36_legal_prompt_smoke(
     let rendered_prompt = rendered.text;
     let claim_boundary = if model_id == QWEN36_35B_A3B_MODEL_ID {
         String::from(
-            "This is a Rust Qwen3.6-35B-A3B MoE target-path smoke. It loads config, tokenizer, and expert safetensors shards, renders the Qwen3.6 direct-answer chat template, and emits deterministic local output. It does not claim full 35B-A3B weight inference, router training, or retained Harvey benchmark improvement.",
+            "This Rust run loads the Qwen3.6-35B-A3B MoE config, tokenizer, and expert safetensors shards, then renders the Qwen3.6 direct-answer chat template. It does not run a full 35B-A3B forward pass, train the router, or measure private Harvey tasks.",
         )
     } else {
         String::from(
-            "This is a Rust Qwen3.6-27B target-path smoke. It loads config, tokenizer, and safetensors shards, renders the Qwen3.6 direct-answer chat template, and emits deterministic local output. It does not claim full 27B weight inference.",
+            "This Rust run loads the Qwen3.6-27B config, tokenizer, and safetensors shards, then renders the Qwen3.6 direct-answer chat template. It does not run a full 27B forward pass yet.",
         )
     };
     Ok(Qwen36LegalPromptSmokeReport {
@@ -562,7 +642,7 @@ fn deterministic_qwen36_legal_smoke_output(
         .map(|shard| shard.sha256.as_str())
         .unwrap_or("missing");
     format!(
-        "{model_id} legal smoke loaded {} shard(s), rendered prompt {}, and is ready for adapter evaluation. First shard hash: {}.",
+        "{model_id} legal target path loaded {} shard(s), rendered prompt {}, and is ready for adapter evaluation. First shard hash: {}.",
         loaded_shards.len(),
         &prompt_hash[..12.min(prompt_hash.len())],
         &shard_hash[..12.min(shard_hash.len())]
@@ -855,6 +935,46 @@ mod tests {
     }
 
     #[test]
+    fn qwen36_27b_target_config_loads_real_huggingface_shape() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let hf_config = serde_json::json!({
+            "architectures": ["Qwen3_5ForConditionalGeneration"],
+            "model_type": "qwen3_5",
+            "tie_word_embeddings": false,
+            "text_config": {
+                "dtype": "bfloat16",
+                "hidden_size": 5120,
+                "intermediate_size": 17408,
+                "max_position_embeddings": 262144,
+                "model_type": "qwen3_5_text",
+                "num_attention_heads": 24,
+                "num_hidden_layers": 64,
+                "num_key_value_heads": 4,
+                "vocab_size": 248320
+            }
+        });
+        fs::write(
+            &config_path,
+            serde_json::to_vec_pretty(&hf_config).expect("config json"),
+        )
+        .expect("write config");
+
+        let config = load_qwen36_model_config(&config_path).expect("load real HF config");
+
+        assert_eq!(config.model_id, QWEN36_27B_MODEL_ID);
+        assert_eq!(config.served_model_id, QWEN36_27B_SERVED_MODEL_ID);
+        assert_eq!(config.model_type, "qwen3_5_text");
+        assert_eq!(config.hidden_size, 5120);
+        assert_eq!(config.intermediate_size, 17408);
+        assert_eq!(config.num_attention_heads, 24);
+        assert_eq!(config.num_key_value_heads, 4);
+        assert_eq!(config.vocab_size, 248320);
+        assert_eq!(config.torch_dtype, "bfloat16");
+        assert!(config.tokenizer_path.ends_with("tokenizer.json"));
+    }
+
+    #[test]
     fn qwen36_35b_a3b_target_config_requires_moe_facts() {
         let config = Qwen36ModelConfig {
             model_id: String::from(QWEN36_35B_A3B_MODEL_ID),
@@ -963,8 +1083,10 @@ mod tests {
         assert!(report.prompt_receipt.token_count > 0);
         assert!(report
             .deterministic_output
-            .contains("Qwen3.6-27B legal smoke"));
-        assert!(report.claim_boundary.contains("does not claim full 27B"));
+            .contains("Qwen3.6-27B legal target path"));
+        assert!(report
+            .claim_boundary
+            .contains("does not run a full 27B forward pass"));
     }
 
     fn minimal_qwen36_tokenizer_json() -> &'static str {

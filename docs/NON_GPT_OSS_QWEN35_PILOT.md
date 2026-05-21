@@ -70,7 +70,7 @@ The separate legal benchmark training smoke is documented in
 `docs/QWEN_LEGAL_FINETUNE_LANE.md`. That lane starts from `Qwen/Qwen3.5-4B`,
 uses the same `qwen35` family acceptance label, and proves legal training
 records -> adapter checkpoint/export -> eval import metadata without claiming
-full adapter serving or a retained Harvey score lift.
+full adapter serving or a score lift on private Harvey tasks.
 
 The base-plus-adapter legal evaluation path is documented in
 `docs/QWEN_TUNED_ADAPTER_SERVING.md`. It keeps the legal benchmark provider on

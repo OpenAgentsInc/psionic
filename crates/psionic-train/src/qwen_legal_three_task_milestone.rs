@@ -717,7 +717,7 @@ fn improvement_notes(eval_report: &LegalBenchmarkEvalSuiteReport) -> Vec<String>
 
 fn did_not_improve_notes() -> Vec<String> {
     vec![
-        String::from("This does not prove hidden Harvey performance."),
+        String::from("This does not prove performance on private Harvey tasks."),
         String::from("This does not prove live Qwen legal reasoning quality; the eval is a deterministic public replay fixture."),
         String::from("This does not yet replace the larger Pylon-distributed fine-tuning run."),
     ]
@@ -729,7 +729,7 @@ fn honesty_notes() -> Vec<String> {
         String::from("The SFT adapter is produced by the Rust Psionic trainer; the training receipt says python_invoked=false."),
         String::from("The answer writer no longer appends suite, model, or prompt metadata to answer files."),
         String::from("Promotion happens through the Qwen legal adapter registry only after the candidate beats the champion on the same suite hash."),
-        String::from("The report is explicit that this is a public local milestone, not hidden benchmark proof."),
+        String::from("The report is explicit that this is a public local milestone, not proof on private benchmark tasks."),
     ]
 }
 

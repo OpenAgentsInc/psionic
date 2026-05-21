@@ -149,7 +149,7 @@ cargo run -q -p psionic-eval --example legal_benchmark_sweep -- \
 ```
 
 Result: 4 jobs, 4 succeeded, 0 failed, 0 blocked. This is a deterministic mock
-sweep, not a retained Harvey score.
+sweep, not a score on private Harvey tasks.
 
 Focused validation:
 

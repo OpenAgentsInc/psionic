@@ -4,7 +4,7 @@
 
 The coverage tracker lives in
 `crates/psionic-eval/src/legal_benchmark_coverage.rs`. It records
-criterion-adjacent state during a run without exposing hidden Harvey
+criterion-adjacent state during a run without exposing private Harvey
 `match_criteria` text to the model in integrity mode.
 
 ## Modes

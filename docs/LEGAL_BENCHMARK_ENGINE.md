@@ -198,8 +198,8 @@ Recorded eval result:
 
 This proves the Rust GRPO training path, reward traces, adapter export, and
 eval compatibility on a synthetic local smoke. It is not proof of full dense
-Qwen3.6 RL, distributed Pylon sampling, or hidden Harvey benchmark
-performance.
+Qwen3.6 RL, distributed Pylon sampling, or performance on private Harvey
+benchmark tasks.
 
 ## Pylon Worker Job Protocol
 
@@ -398,8 +398,8 @@ command run completed 6 Rust-only steps over 22 pairs, moved the synthetic
 preference accuracy from `0.59090906` to `0.95454544`, and moved the average
 chosen-minus-rejected logprob margin from `0.3191057` to `4.2714095`. This is
 evidence that the adapter-only DPO path can train toward file-writing
-preference behavior on the synthetic smoke surface. It is not a hidden Harvey
-score claim.
+preference behavior on the synthetic smoke surface. It is not a score claim on
+private Harvey tasks.
 
 The same DPO adapter path was accepted by the deterministic replay eval suite:
 `harvey_public_three_deterministic_replay_v1` reported base `3333` bps,

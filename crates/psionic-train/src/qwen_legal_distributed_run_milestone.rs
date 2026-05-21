@@ -372,7 +372,7 @@ pub fn run_qwen_legal_distributed_run_milestone(
         no_python_in_worker_path,
         all_artifacts_have_receipts,
         claim_boundary: String::from(
-            "This is a local two-worker Pylon/Psionic legal fine-tuning milestone over the public training-allowed Harvey three-task fixture. It proves Rust sharding, local worker SFT, signed receipts, payment decisions, adapter merge, and replay eval. It does not prove hidden Harvey benchmark performance or remote tailnet worker execution.",
+            "This is a local two-worker Pylon/Psionic legal fine-tuning milestone over the public training-allowed Harvey three-task fixture. It proves Rust sharding, local worker SFT, signed receipts, payment decisions, adapter merge, and replay eval. It does not prove performance on private Harvey benchmark tasks or remote tailnet worker execution.",
         ),
         report_path: config.report_path.to_string_lossy().to_string(),
         report_digest: String::new(),
@@ -923,7 +923,7 @@ fn write_markdown_report(
     markdown.push_str("# Legal Distributed Fine-Tuning Run 001\n\n");
     markdown.push_str("## Status\n\n");
     markdown.push_str(&format!(
-        "- workers: `{}`\n- all worker receipts signed: `{}`\n- all worker outputs hash verified: `{}`\n- all worker payments payable: `{}`\n- champion score: `{}` bps\n- candidate score: `{}` bps\n- delta: `{}` bps\n- promotion decision: `{:?}`\n- no Python in worker path: `{}`\n- hidden benchmark training: `{}`\n\n",
+        "- workers: `{}`\n- all worker receipts signed: `{}`\n- all worker outputs hash verified: `{}`\n- all worker payments payable: `{}`\n- champion score: `{}` bps\n- candidate score: `{}` bps\n- delta: `{}` bps\n- promotion decision: `{:?}`\n- no Python in worker path: `{}`\n- private benchmark tasks used for training: `{}`\n\n",
         report.worker_count,
         report.all_workers_signed_receipts,
         report.all_worker_outputs_hash_verified,

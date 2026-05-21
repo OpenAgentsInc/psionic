@@ -235,7 +235,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "claim_boundary": [
             "This run uses a real Harvey task and a real local Qwen LoRA adapter.",
             "The runner does not add text to the model output.",
-            "The score is a local no-cheat work-product check, not a retained Harvey judge score.",
+            "The score is a local no-cheat work-product check, not a private Harvey judge score.",
             "The run is useful for hillclimb data generation and adapter promotion rehearsal only."
         ]
     });

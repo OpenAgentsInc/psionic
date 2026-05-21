@@ -443,7 +443,7 @@ pub fn run_legal_benchmark_eval_suite(
             generated_artifacts: Vec::new(),
         },
         report_boundary: String::from(
-            "This is a deterministic local replay report. It compares declared base and adapter outputs through the Rust scorer; it is not proof of hidden benchmark performance.",
+            "This is a deterministic local replay report. It compares declared base and adapter outputs through the Rust scorer; it is not proof of performance on private benchmark tasks.",
         ),
     };
     let report_hash = stable_json_digest("psionic.legal_benchmark.eval_suite_report.v1", &report)?;
@@ -1116,7 +1116,7 @@ fn score_by_task_type(
 
 fn score_confidence_notes(task_reports: &[LegalBenchmarkEvalTaskReport]) -> Vec<String> {
     let mut notes = vec![String::from(
-        "Deterministic replay fixture: scores measure harness behavior for declared outcomes, not live model legal quality or hidden Harvey performance.",
+        "Deterministic replay fixture: scores measure harness behavior for declared outcomes, not live model legal quality or performance on private Harvey tasks.",
     )];
     if task_reports.len() < 10 {
         notes.push(format!(

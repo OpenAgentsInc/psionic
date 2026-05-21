@@ -11,7 +11,7 @@
 - delta: `6667` bps
 - promotion decision: `Promote`
 - no Python in worker path: `true`
-- hidden benchmark training: `false`
+- private benchmark tasks used for training: `false`
 
 ## What Ran
 
@@ -69,7 +69,7 @@ This run trained two local Pylon worker shards with the Rust Psionic legal SFT t
 
 ## Boundary
 
-This is a local two-worker Pylon/Psionic legal fine-tuning milestone over the public training-allowed Harvey three-task fixture. It proves Rust sharding, local worker SFT, signed receipts, payment decisions, adapter merge, and replay eval. It does not prove hidden Harvey benchmark performance or remote tailnet worker execution.
+This is a local two-worker Pylon/Psionic legal fine-tuning milestone over the public training-allowed Harvey three-task fixture. It proves Rust sharding, local worker SFT, signed receipts, payment decisions, adapter merge, and replay eval. It does not prove performance on private Harvey benchmark tasks or remote tailnet worker execution.
 
 ## Report Receipt
 

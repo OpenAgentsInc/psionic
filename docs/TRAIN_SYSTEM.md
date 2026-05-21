@@ -172,7 +172,7 @@ in `docs/QWEN_LEGAL_FINETUNE_LANE.md`. The lane admits
 `qwen_legal_adapter_sft_v1` through the machine-runtime contract as a CUDA
 adapter-training smoke, binds #1018 legal training records, exports a typed
 LM-head LoRA artifact and exact checkpoint, and emits score-import metadata
-for Autopilot4 without claiming a retained Harvey score improvement. The same
+for Autopilot4 without claiming improvement on private Harvey tasks. The same
 lane now exposes a single operator command surface through
 `psionic-train legal ft <command>` and the report example
 `crates/psionic-train/examples/qwen_legal_ft_report.rs`. It covers `init-run`,
@@ -204,7 +204,8 @@ the adapters through `merge-lora`, evaluates the merged adapter, and writes
 `reports/legal-ft-distributed-run-001.md`. The recorded local result is two
 workers, all worker outputs hash verified, both payments payable, champion
 `3333` bps, candidate `10000` bps, delta `6667` bps, promotion decision
-`Promote`, no Python in the worker path, no hidden benchmark training, merged
+`Promote`, no Python in the worker path, no private benchmark tasks used for
+training, merged
 adapter digest
 `a66f97b6c69e5ac2d4022bc3405949cbc5fdc7f76c432b7aa7a6f4a63b2c90c7`, and
 report digest
@@ -219,13 +220,14 @@ SFT, DPO, and GRPO adapters in Rust, evaluates the full candidate ladder, and
 writes `reports/qwen36-27b-legal-ft-001.md`. The recorded local result is base
 `3333` bps, SFT `10000` bps, DPO `10000` bps, GRPO `10000` bps, promoted
 candidate `qwen36_27b_sft_grpo_round_001`, delta `6667` bps, Python invoked
-`false`, hidden benchmark training `false`, all receipts present, promotion
+`false`, private benchmark tasks used for training `false`, all receipts
+present, promotion
 receipt digest
 `1968ea399ff5a7be941568dbdb64092b973256f60e62a804358f1a1a2798e4fd`, and
 report digest
-`1e1d9d203b3a3c7c33ddf1abeace28484318372c73355ee2f903d6951bcd8ce7`. This is
+`8f645a37f5d4e64b234488d842ee5fad51ab40a68ccfc982c1ea8dd5ba243be9`. This is
 a Qwen3.6-27B target-path milestone. It does not claim full 27B weight loading
-or hidden Harvey performance.
+or performance on private Harvey tasks.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
@@ -249,7 +251,7 @@ training-receipt artifacts without invoking Python. The current local smoke
 run improves file-write preference accuracy from `0.5` to `1.0` and evaluates
 through the same Rust legal suite path at `10000` adapter bps on
 `suites/harvey_public_three.json`. This is a synthetic smoke, not a claim
-about retained Harvey performance or distributed Pylon sampling. The same run
+about performance on private Harvey tasks or distributed Pylon sampling. The same run
 now also emits a typed RL hillclimb plan that points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation
@@ -368,7 +370,7 @@ document coverage, citation evidence, and validation gaps before Qwen or
 blueprint hill-climb runs reach the Harvey judge. The same prompt path now
 adds a compact practice-area issue checklist from public task metadata so
 adapter SFT traces and blueprint module selection can reinforce legal
-issue-spotting without leaking hidden Harvey criteria.
+issue-spotting without leaking private Harvey criteria.
 
 The legal lane now also has an exact `Qwen3.6-27B` target-path smoke. The
 serve-side command
@@ -384,7 +386,20 @@ loss from `5.5182295` to `2.2927308`, and records `python_invoked: false`.
 That adapter evaluates through
 `cargo run -p psionic-eval --example legal_benchmark_eval_suite` at `10000`
 adapter bps on the deterministic public-three fixture. This is still a smoke
-and does not claim full 27B weight inference or retained Harvey performance.
+and does not claim full 27B weight inference or performance on private Harvey
+tasks.
+The real BF16 `Qwen/Qwen3.6-27B` weights are now downloaded locally under
+`target/models/qwen/Qwen3.6-27B`, and the same Rust example can load that
+directory with `--model-dir target/models/qwen/Qwen3.6-27B`. The recorded
+real-weight load reads all 15 safetensors shards, `55563006400` bytes total,
+with tokenizer digest
+`5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42`, config
+digest `69db4eb7196bc8190813231b3018ca05d8c2e3abc7b1af19d55c157af44a9d9c`,
+index digest `a8ad2c26fb707ff8c245806315b03e3b4b74595528492423af5dae0ce39b4d9b`,
+and report digest
+`efa51f06cf0d7d4e182e06ae20b669789107c9684c3d9000bba3063eddb3a8a7`.
+This is a real checkpoint load. It still does not run a full Qwen3.6-27B
+forward pass or train LoRA from live 27B activations.
 
 The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
 serve-side command
@@ -401,7 +416,7 @@ improves loss from `5.5602503` to `1.5024384`, emits adapter digest
 evaluates at `10000` adapter bps on the deterministic public-three fixture,
 matching the local dense 27B smoke there. This is still a small Rust smoke: it
 does not claim full 35B-A3B weight inference, router training, full MoE
-fine-tuning, or retained Harvey performance.
+fine-tuning, or performance on private Harvey tasks.
 
 The repo now also owns the first contract for the A1-derived minimal
 distributed LM lane in

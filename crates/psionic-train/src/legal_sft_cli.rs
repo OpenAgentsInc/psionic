@@ -1084,11 +1084,11 @@ fn active_parameter_path(
 fn claim_boundary(config: &PsionicLegalSftConfig) -> String {
     if config.moe_safety.is_some() {
         String::from(
-            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples for the Qwen3.6-35B-A3B MoE target path. It loads a MoE config, tokenizer, and expert safetensors shard, freezes router/gating state, trains only explicit adapter targets, and emits safety receipts. It does not claim full 35B-A3B weight inference, full MoE fine-tuning, or retained Harvey benchmark improvement.",
+            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples for the Qwen3.6-35B-A3B MoE target path. It loads a MoE config, tokenizer, and expert safetensors shard, freezes router/gating state, trains only explicit adapter targets, and emits safety receipts. It does not claim full 35B-A3B weight inference, full MoE fine-tuning, or improvement on private Harvey benchmark tasks.",
         )
     } else {
         String::from(
-            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples. It proves config loading, adapter-only training, deterministic export, loss receipts, and checkpoint receipts. It does not claim full Qwen3.6 dense-weight training or retained Harvey benchmark improvement.",
+            "This smoke run is a real Rust-only adapter update over tiny legal hidden-state samples. It proves config loading, adapter-only training, deterministic export, loss receipts, and checkpoint receipts. It does not claim full Qwen3.6 dense-weight training or improvement on private Harvey benchmark tasks.",
         )
     }
 }

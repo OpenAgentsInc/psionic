@@ -141,9 +141,10 @@ The champion failures were exact and limited to two tasks:
 
 The candidate failures were `none`.
 
-This is still a public deterministic local milestone, not hidden Harvey proof
-and not proof of live legal reasoning quality. Its value is that the complete
-Psionic path can now build data, train an adapter, evaluate the same frozen
+This is still a public deterministic local milestone, not proof of performance
+on private Harvey tasks, and not proof of live legal reasoning quality. Its
+value is that the complete Psionic path can now build data, train an adapter,
+evaluate the same frozen
 suite, avoid answer injection, record receipts, and promote only on a win.
 
 ## Distributed Public Harvey SFT Milestone
@@ -179,7 +180,7 @@ Recorded local result:
 - delta: `6667` bps
 - promotion decision: `Promote`
 - no Python in worker path: `true`
-- hidden benchmark training: `false`
+- private benchmark tasks used for training: `false`
 - merged adapter sha256:
   `a66f97b6c69e5ac2d4022bc3405949cbc5fdc7f76c432b7aa7a6f4a63b2c90c7`
 - eval report hash:
@@ -189,9 +190,9 @@ Recorded local result:
 
 The two local workers were `pylon.local.harvey-legal.01` and
 `pylon.local.harvey-legal.02`. This is still local worker simulation, not a
-remote tailnet Pylon run and not hidden Harvey proof. Its value is that the
-repo now has the full Rust path for sharding, worker SFT, worker receipts,
-payments, adapter merge, eval, and promotion gating.
+remote tailnet Pylon run and not proof of performance on private Harvey tasks.
+Its value is that the repo now has the full Rust path for sharding, worker SFT,
+worker receipts, payments, adapter merge, eval, and promotion gating.
 
 ## Qwen3.6-27B Legal Fine-Tuning Milestone 001
 
@@ -224,10 +225,10 @@ Recorded local result:
 - promoted candidate: `qwen36_27b_sft_grpo_round_001`
 - score delta versus base: `6667` bps
 - no Python invoked: `true`
-- hidden benchmark training: `false`
+- private benchmark tasks used for training: `false`
 - all receipts present: `true`
 - target load report sha256:
-  `4fe429f16d9cd4e91fffdd46564e9ea794cae47e28d03dc2169bebeed911eda7`
+  `e18e586d11dd27d214814227382d91899e22f1dadfe9e5a25621f03c1045d2fc`
 - SFT adapter sha256:
   `5e029be91ab5470d6abd63ad460f4d05f4b982f9be8276a97b88f542b872ba6d`
 - DPO adapter sha256:
@@ -237,7 +238,7 @@ Recorded local result:
 - promotion receipt digest:
   `1968ea399ff5a7be941568dbdb64092b973256f60e62a804358f1a1a2798e4fd`
 - milestone report digest:
-  `1e1d9d203b3a3c7c33ddf1abeace28484318372c73355ee2f903d6951bcd8ce7`
+  `8f645a37f5d4e64b234488d842ee5fad51ab40a68ccfc982c1ea8dd5ba243be9`
 
 This is still a target-path milestone, not full 27B weight training. It proves
 the Qwen3.6-27B legal path can load the declared artifacts, train SFT, DPO, and
@@ -279,6 +280,44 @@ Recorded smoke result:
 This is not full 27B inference. It is the smallest honest operator path that
 loads Qwen3.6-27B metadata, tokenizer, and safetensors in Rust before the real
 large-artifact path is wired in.
+
+The real BF16 weight path is now downloaded and loadable locally:
+
+```bash
+hf download Qwen/Qwen3.6-27B \
+  config.json generation_config.json tokenizer.json tokenizer_config.json \
+  model.safetensors.index.json '*.safetensors' \
+  --local-dir target/models/qwen/Qwen3.6-27B \
+  --max-workers 4
+
+mkdir -p target/legal/qwen36_27b_real_weight_load
+cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- \
+  --model Qwen/Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt \
+  --model-dir target/models/qwen/Qwen3.6-27B \
+  > target/legal/qwen36_27b_real_weight_load/report.json
+```
+
+Recorded real-weight load result:
+
+- local directory: `target/models/qwen/Qwen3.6-27B`
+- shards loaded: `15`
+- safetensors bytes read: `55563006400`
+- index tensor-data bytes: `55562855904`
+- tokenizer sha256:
+  `5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42`
+- config sha256:
+  `69db4eb7196bc8190813231b3018ca05d8c2e3abc7b1af19d55c157af44a9d9c`
+- index sha256:
+  `a8ad2c26fb707ff8c245806315b03e3b4b74595528492423af5dae0ce39b4d9b`
+- report sha256:
+  `efa51f06cf0d7d4e182e06ae20b669789107c9684c3d9000bba3063eddb3a8a7`
+
+This proves real config, tokenizer, index, and shard loading. It does not run a
+full Qwen3.6-27B forward pass yet. The real checkpoint uses the Hugging Face
+`Qwen3_5ForConditionalGeneration` wrapper with a `qwen3_5_text` language model,
+linear-attention layers, and MTP weights, so the next implementation step is a
+real Psionic forward path for that architecture.
 
 The exact SFT smoke for this target is:
 
@@ -413,7 +452,7 @@ Recorded eval result:
 
 The MoE smoke ties the dense 27B adapter on the deterministic public-three
 fixture. It is not proof that the full 35B-A3B model has been loaded, that the
-router was trained, or that hidden Harvey performance improved. It proves the
+router was trained, or that performance on private Harvey tasks improved. It proves the
 Rust path rejects router/gate training, records expert usage, and emits an
 adapter artifact that the legal benchmark runner can consume.
 
@@ -473,7 +512,7 @@ Recorded local result:
 
 These are deterministic local replay suites. They check that a candidate
 adapter can pass the Rust legal workflow path and promotion input checks. They
-do not show hidden Harvey benchmark performance.
+do not show performance on private Harvey benchmark tasks.
 
 ## Current Synthetic Legal Workflow Corpus
 
@@ -564,8 +603,8 @@ Recorded eval result:
 
 This is a local synthetic trainer smoke. It proves group sampling, reward
 traces, group-normalized adapter updates, bad-completion preservation, and
-adapter eval compatibility. It does not prove a retained Harvey score, full
-dense Qwen3.6 RL, or distributed Pylon sampling.
+adapter eval compatibility. It does not prove a score on private Harvey tasks,
+full dense Qwen3.6 RL, or distributed Pylon sampling.
 
 ## Pylon Training Job Protocol
 
@@ -722,8 +761,9 @@ parameters and peak observed memory of `4.251 GB`. The adapter loaded through
 `POST /v1/chat/completions`.
 
 This is the first real Qwen-family adapter artifact for the Harvey legal lane,
-but it is still not the retained model target. It is single local-worker SFT,
-not RL, not live Nexus settlement, and not a retained Harvey score claim.
+but it is still not the final model target. It is single local-worker SFT,
+not RL, not live Nexus settlement, and not a score claim on private Harvey
+tasks.
 
 Serve it locally for Harvey smoke work with:
 
@@ -769,10 +809,10 @@ This is now a real local Qwen LoRA plus a receipt-backed Rust benchmark-agent
 trajectory. The fixture shares the workspace and output roots only for this
 local smoke because the small Qwen adapter selects the `workspace` root even
 when instructed to use `output`. Production Harvey tasks should keep separate
-workspace and output roots and tune the tool-use policy on retained slices.
+workspace and output roots and tune the tool-use policy on private eval slices.
 The result exports one canonical legal benchmark training record and is usable
 as a seed trajectory for legal RL ingestion, but it is not itself an RL-trained
-model update or a retained Harvey score claim.
+model update or a score claim on private Harvey tasks.
 
 ## Current RL-Seed Adapter Result
 
@@ -938,7 +978,7 @@ Tailnet status for this run: `archlinux` was online but required interactive
 Tailscale SSH reauthentication, and `imac-pro-bertha` denied SSH auth. The
 artifact therefore used one local logical Pylon. That is a real fine-tuned
 Qwen LoRA artifact and a real Harvey task run, but it is still not live
-multi-Pylon RL, not a retained Harvey score, and not Qwen3.6.
+multi-Pylon RL, not a score on private Harvey tasks, and not Qwen3.6.
 
 ## Current Harvey MFN Reward-Refresh Adapter Result
 
@@ -1034,7 +1074,7 @@ reauthentication and `imac-pro-bertha` denied noninteractive SSH auth.
 MLX Pylon. This is an actual fine-tuned Qwen-family LoRA adapter that can be
 served for Harvey legal benchmark runs, but it is still supervised
 reward-refresh over public criteria, not full GRPO/PPO, not Qwen3.6, and not a
-retained Harvey leaderboard score.
+private Harvey leaderboard score.
 
 ## Failed Follow-On Hillclimb Attempts
 
@@ -1355,7 +1395,7 @@ checked smoke pairs. Synthetic preference accuracy moved from `0.59090906` to
 `0.95454544`; average chosen-minus-rejected logprob margin moved from
 `0.3191057` to `4.2714095`. This proves the DPO smoke trainer can push the
 adapter toward file-writing answers over chat-only answers on the synthetic
-surface. It is not a retained Harvey score claim.
+surface. It is not a score claim on private Harvey tasks.
 
 The DPO adapter was also accepted by the deterministic replay harness:
 `harvey_public_three_deterministic_replay_v1` reported base `3333` bps,
@@ -1389,8 +1429,8 @@ included:
 - `cargo test -p psionic-train legal_qwen36_dpo`: 1 passed
 - `cargo test -p psionic-train live_rl_update`: 2 passed
 
-Those are still local training/RL substrate tests. They are not retained Harvey
-score claims.
+Those are still local training/RL substrate tests. They are not score claims on
+private Harvey tasks.
 
 ## RL Hillclimb Plan
 
@@ -1654,7 +1694,7 @@ two contributors train different legal smoke shards and produce different
 adapter digests before trusted aggregation. That gives the legal lane a real
 multi-contributor trained artifact while keeping the claim boundary explicit:
 it proves Pylon-network training shape and aggregation, not real Qwen3.6
-full-weight fine-tuning or retained Harvey score lift.
+full-weight fine-tuning or a score lift on private Harvey tasks.
 
 Run it locally with:
 

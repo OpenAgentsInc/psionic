@@ -801,7 +801,7 @@ pub struct QwenLegalRlRolloutPolicy {
     pub validator_policy_ref: String,
     /// Maximum age for off-policy rollouts.
     pub off_policy_max_age_ms: u64,
-    /// Whether retained Harvey slices are mandatory.
+    /// Whether private Harvey evaluation slices are mandatory.
     pub retained_slice_required: bool,
     /// Reward model or reward program bundle reference.
     pub reward_program_ref: String,
@@ -904,7 +904,7 @@ impl QwenLegalRlHillclimbPlan {
         )?;
         if !self.rollout_policy.retained_slice_required {
             return Err(QwenLegalAdapterSftError::InvalidConfig {
-                detail: String::from("legal RL hillclimb requires retained Harvey slices"),
+                detail: String::from("legal RL hillclimb requires private Harvey slices"),
             });
         }
         if self.rollout_policy.min_accepted_rollouts <= self.rollout_policy.max_quarantined_rollouts
@@ -1263,7 +1263,7 @@ pub struct QwenLegalRlRetainedRehearsalTarget {
     pub receipt_ref: String,
 }
 
-/// Phase-five offline RL/adjudication report for retained Harvey rehearsal.
+/// Phase-five offline RL/adjudication report for private Harvey rehearsal.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QwenLegalRlRetainedRehearsalReport {
     /// Stable schema version.

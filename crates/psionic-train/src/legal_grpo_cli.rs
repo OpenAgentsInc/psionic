@@ -923,7 +923,7 @@ pub fn run_psionic_legal_grpo_config(
         sampling_backend: String::from("deterministic_local_group_sampler"),
         distributed_sampling_supported_later: true,
         claim_boundary: String::from(
-            "This is a Rust-only adapter GRPO smoke over deterministic local completion groups and synthetic Qwen3.6 hidden states. It proves group sampling, verifier-style reward traces, group-normalized reward updates, bad-completion preservation, checkpoint receipts, and adapter export. It does not claim full dense Qwen3.6 RL, distributed Pylon sampling, or hidden Harvey benchmark improvement.",
+            "This is a Rust-only adapter GRPO smoke over deterministic local completion groups and synthetic Qwen3.6 hidden states. It proves group sampling, verifier-style reward traces, group-normalized reward updates, bad-completion preservation, checkpoint receipts, and adapter export. It does not claim full dense Qwen3.6 RL, distributed Pylon sampling, or improvement on private Harvey benchmark tasks.",
         ),
         receipt_digest: String::new(),
     };
