@@ -211,6 +211,21 @@ report digest
 `3ae5e9f5660af0a048971556014521ac0072eca430fb7926a287cd0b8d1dd9c2`.
 This is local Pylon simulation; remote tailnet worker dispatch remains a
 separate Nexus/Pylon step.
+The Qwen3.6-27B legal fine-tuning milestone command is
+`cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads
+the Qwen3.6-27B smoke target artifacts, runs the base model through the public
+Harvey three-task eval, builds a public training-allowed SFT dataset, trains
+SFT, DPO, and GRPO adapters in Rust, evaluates the full candidate ladder, and
+writes `reports/qwen36-27b-legal-ft-001.md`. The recorded local result is base
+`3333` bps, SFT `10000` bps, DPO `10000` bps, GRPO `10000` bps, promoted
+candidate `qwen36_27b_sft_grpo_round_001`, delta `6667` bps, Python invoked
+`false`, hidden benchmark training `false`, all receipts present, promotion
+receipt digest
+`1968ea399ff5a7be941568dbdb64092b973256f60e62a804358f1a1a2798e4fd`, and
+report digest
+`1e1d9d203b3a3c7c33ddf1abeace28484318372c73355ee2f903d6951bcd8ce7`. This is
+a Qwen3.6-27B target-path milestone. It does not claim full 27B weight loading
+or hidden Harvey performance.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
