@@ -875,6 +875,70 @@ a gate, but the Autopilot4 summary feed only exports public aggregate status
 and redacts private score/task details. This is the registry shape for real
 Pylon-produced Qwen artifacts; it is not itself a new model-training run.
 
+## Promoted Psionic Provider Route
+
+The Rust benchmark provider layer now has a first-class Psionic route for a
+promoted Qwen legal model. The smoke registration lives in
+`crates/psionic-eval/src/legal_benchmark_provider.rs` as
+`qwen_legal_promoted_smoke_route_spec()`.
+
+Stable served model id:
+
+- `qwen36-legal-grpo-001`
+
+Provider route:
+
+- route id: `psionic.qwen36_legal.promoted.grpo_001`
+- provider family: `psionic_compatible`
+- endpoint path: `/v1/chat/completions`
+- backend: `psionic-compatible`
+
+The route metadata includes:
+
+- base model id
+- served model id
+- base model hash
+- adapter artifact hash
+- checkpoint artifact hash
+- corpus manifest hash
+- promotion id
+- eval gate id
+- serving backend
+
+The serving receipt is checked against those same hashes. A route refuses
+before generation if the adapter is missing, the checkpoint is missing, the
+loaded base hash does not match the promoted registry base hash, the backend
+cannot serve the model, promotion metadata is incomplete, or a fallback route
+is not marked explicit-fallback-only.
+
+Canary and rollback commands are recorded in typed receipts:
+
+- canary:
+  `psionic-route canary qwen36-legal-grpo-001 500bps ...`
+- rollback:
+  `psionic-route rollback qwen36-legal-grpo-001 qwen36-legal-prior-champion-000`
+
+Retired OpenAI-compatible routes remain representable only as explicit
+fallback paths. They are not the default benchmark route.
+
+Focused verification:
+
+```bash
+cargo test -p psionic-eval qwen_promoted_route --lib
+```
+
+Recorded local result:
+
+- tests passed: `6 / 6`
+- missing adapter refused before generation: `true`
+- base hash mismatch refused before generation: `true`
+- fallback-only enforcement: `true`
+
+Plain boundary: this wires the provider route contract the Rust Harvey runner
+can request by stable served model id. It does not itself load a real 35B
+checkpoint into a live serving process; that live process still depends on the
+real Qwen forward/backward and artifact-serving work tracked separately.
+
 ## Pylon Training Job Protocol
 
 The lane now has a typed local Pylon job protocol for legal fine-tuning work in

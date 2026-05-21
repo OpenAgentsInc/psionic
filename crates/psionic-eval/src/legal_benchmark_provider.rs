@@ -11,6 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::Digest;
 
 use crate::{
     LegalBenchmarkToolName, Metadata, ScoreReport, score_report_digest, stable_json_digest,
@@ -18,6 +19,7 @@ use crate::{
 
 pub const LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION: u16 = 1;
 pub const QWEN_LEGAL_CANDIDATE_SCHEMA_VERSION: u16 = 1;
+pub const QWEN_LEGAL_PROMOTED_PROVIDER_ROUTE_SCHEMA_VERSION: u16 = 1;
 pub const QWEN_LEGAL_BASE_MODEL_ID: &str = "Qwen/Qwen3.5-4B";
 pub const QWEN_LEGAL_SERVED_MODEL_ID: &str = "qwen3.5-4b";
 pub const QWEN_LEGAL_MODEL_FAMILY_ACCEPTANCE_LABEL: &str = "qwen35";
@@ -700,6 +702,37 @@ impl ModelProviderRoute {
         }
     }
 
+    pub fn psionic_compatible(
+        route_id: impl Into<String>,
+        base_url: impl Into<String>,
+        model_id: impl Into<String>,
+        secret_reference_id: Option<String>,
+    ) -> Self {
+        let secret_reference_id = secret_reference_id.filter(|value| !value.trim().is_empty());
+        let mut redacted_headers = BTreeMap::new();
+        redacted_headers.insert(
+            String::from("content-type"),
+            String::from("application/json"),
+        );
+        if let Some(secret_ref) = &secret_reference_id {
+            redacted_headers.insert(
+                String::from("authorization"),
+                format!("Bearer <secret_ref:{secret_ref}>"),
+            );
+        }
+        Self {
+            schema_version: LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
+            route_id: route_id.into(),
+            family: ModelProviderFamily::PsionicCompatible,
+            base_url: trim_url(base_url.into()),
+            model_id: model_id.into(),
+            endpoint_path: Some(String::from("/v1/chat/completions")),
+            secret_reference_id,
+            redacted_headers,
+            metadata: Metadata::new(),
+        }
+    }
+
     pub fn mock(route_id: impl Into<String>, model_id: impl Into<String>) -> Self {
         Self {
             schema_version: LEGAL_BENCHMARK_PROVIDER_SCHEMA_VERSION,
@@ -730,6 +763,435 @@ impl ModelProviderRoute {
             )
         })
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QwenLegalPromotedRouteRefusalKind {
+    MissingAdapterArtifact,
+    MissingCheckpointArtifact,
+    BaseHashMismatch,
+    BackendUnavailable,
+    MissingPromotionMetadata,
+    FallbackNotExplicit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QwenLegalPromotedRouteTrafficMode {
+    Primary,
+    Canary,
+    Rollback,
+    ExplicitFallbackOnly,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedRouteArtifactMetadata {
+    pub base_model_id: String,
+    pub served_model_id: String,
+    pub base_model_hash: String,
+    pub loaded_base_model_hash: String,
+    pub adapter_artifact_hash: String,
+    pub checkpoint_artifact_hash: String,
+    pub corpus_manifest_hash: String,
+    pub promotion_id: String,
+    pub eval_gate_id: String,
+    pub serving_backend: String,
+    pub adapter_artifact_present: bool,
+    pub checkpoint_artifact_present: bool,
+    pub backend_available: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedRouteCanaryPolicy {
+    pub traffic_mode: QwenLegalPromotedRouteTrafficMode,
+    pub canary_traffic_bps: u32,
+    pub rollback_served_model_id: String,
+    pub operator_command: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedRouteFallback {
+    pub route: ModelProviderRoute,
+    pub explicit_fallback_only: bool,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedRouteSpec {
+    pub schema_version: u16,
+    pub route_id: String,
+    pub base_url: String,
+    pub secret_reference_id: Option<String>,
+    pub artifacts: QwenLegalPromotedRouteArtifactMetadata,
+    pub canary_policy: QwenLegalPromotedRouteCanaryPolicy,
+    pub fallback_routes: Vec<QwenLegalPromotedRouteFallback>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedRouteReceipt {
+    pub schema_version: u16,
+    pub route_id: String,
+    pub served_model_id: String,
+    pub route_config_hash: String,
+    pub base_model_hash: String,
+    pub adapter_artifact_hash: String,
+    pub checkpoint_artifact_hash: String,
+    pub corpus_manifest_hash: String,
+    pub promotion_id: String,
+    pub eval_gate_id: String,
+    pub serving_backend: String,
+    pub traffic_mode: QwenLegalPromotedRouteTrafficMode,
+    pub receipt_hash: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedRouteCommandReceipt {
+    pub schema_version: u16,
+    pub command_kind: QwenLegalPromotedRouteTrafficMode,
+    pub served_model_id: String,
+    pub command: Vec<String>,
+    pub target_route_id: String,
+    pub rollback_served_model_id: Option<String>,
+    pub traffic_bps: u32,
+    pub receipt_hash: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalPromotedProviderRouteRegistration {
+    pub schema_version: u16,
+    pub served_model_id: String,
+    pub route: ModelProviderRoute,
+    pub serving_receipt: QwenLegalPromotedRouteReceipt,
+    pub canary_receipt: QwenLegalPromotedRouteCommandReceipt,
+    pub rollback_receipt: QwenLegalPromotedRouteCommandReceipt,
+    pub fallback_routes: Vec<QwenLegalPromotedRouteFallback>,
+    pub blueprint_route_metadata: Metadata,
+}
+
+pub fn register_qwen_legal_promoted_provider_route(
+    spec: QwenLegalPromotedRouteSpec,
+) -> ModelAdapterResult<QwenLegalPromotedProviderRouteRegistration> {
+    validate_qwen_legal_promoted_route_spec(&spec)?;
+    let artifacts = &spec.artifacts;
+    let mut route = ModelProviderRoute::psionic_compatible(
+        spec.route_id.clone(),
+        spec.base_url.clone(),
+        artifacts.served_model_id.clone(),
+        spec.secret_reference_id.clone(),
+    );
+    route.metadata = qwen_legal_promoted_route_metadata(artifacts);
+    route.redacted_headers.insert(
+        String::from("x-psionic-qwen-base-model-hash"),
+        artifacts.base_model_hash.clone(),
+    );
+    route.redacted_headers.insert(
+        String::from("x-psionic-qwen-adapter-hash"),
+        artifacts.adapter_artifact_hash.clone(),
+    );
+    route.redacted_headers.insert(
+        String::from("x-psionic-qwen-checkpoint-hash"),
+        artifacts.checkpoint_artifact_hash.clone(),
+    );
+    route.redacted_headers.insert(
+        String::from("x-psionic-qwen-promotion-id"),
+        artifacts.promotion_id.clone(),
+    );
+    let mut serving_receipt = QwenLegalPromotedRouteReceipt {
+        schema_version: QWEN_LEGAL_PROMOTED_PROVIDER_ROUTE_SCHEMA_VERSION,
+        route_id: route.route_id.clone(),
+        served_model_id: route.model_id.clone(),
+        route_config_hash: route.config_hash()?,
+        base_model_hash: artifacts.base_model_hash.clone(),
+        adapter_artifact_hash: artifacts.adapter_artifact_hash.clone(),
+        checkpoint_artifact_hash: artifacts.checkpoint_artifact_hash.clone(),
+        corpus_manifest_hash: artifacts.corpus_manifest_hash.clone(),
+        promotion_id: artifacts.promotion_id.clone(),
+        eval_gate_id: artifacts.eval_gate_id.clone(),
+        serving_backend: artifacts.serving_backend.clone(),
+        traffic_mode: spec.canary_policy.traffic_mode,
+        receipt_hash: String::new(),
+    };
+    serving_receipt.receipt_hash = stable_json_digest(
+        "psionic.legal_benchmark.qwen_promoted_route_receipt.v1",
+        &serving_receipt,
+    )
+    .map_err(|err| {
+        ModelAdapterError::new(
+            ModelAdapterFailureKind::InternalError,
+            format!("failed to hash promoted route receipt: {err}"),
+        )
+    })?;
+    let canary_receipt =
+        qwen_legal_promoted_route_command_receipt(&spec, QwenLegalPromotedRouteTrafficMode::Canary)?;
+    let rollback_receipt = qwen_legal_promoted_route_command_receipt(
+        &spec,
+        QwenLegalPromotedRouteTrafficMode::Rollback,
+    )?;
+    Ok(QwenLegalPromotedProviderRouteRegistration {
+        schema_version: QWEN_LEGAL_PROMOTED_PROVIDER_ROUTE_SCHEMA_VERSION,
+        served_model_id: artifacts.served_model_id.clone(),
+        route,
+        serving_receipt,
+        canary_receipt,
+        rollback_receipt,
+        fallback_routes: spec.fallback_routes,
+        blueprint_route_metadata: qwen_legal_promoted_route_metadata(artifacts),
+    })
+}
+
+pub fn qwen_legal_promoted_smoke_route_spec() -> QwenLegalPromotedRouteSpec {
+    QwenLegalPromotedRouteSpec {
+        schema_version: QWEN_LEGAL_PROMOTED_PROVIDER_ROUTE_SCHEMA_VERSION,
+        route_id: String::from("psionic.qwen36_legal.promoted.grpo_001"),
+        base_url: String::from("https://psionic.local"),
+        secret_reference_id: Some(String::from("secret.psionic.local.benchmark")),
+        artifacts: QwenLegalPromotedRouteArtifactMetadata {
+            base_model_id: String::from("Qwen/Qwen3.6-35B-A3B"),
+            served_model_id: String::from("qwen36-legal-grpo-001"),
+            base_model_hash: digest("qwen36-35b-a3b-base"),
+            loaded_base_model_hash: digest("qwen36-35b-a3b-base"),
+            adapter_artifact_hash: digest("qwen36-legal-grpo-001-adapter"),
+            checkpoint_artifact_hash: digest("qwen36-legal-grpo-001-checkpoint"),
+            corpus_manifest_hash: digest("harvey-legal-corpus-locked-v1"),
+            promotion_id: String::from("qwen.legal.full_artifact_promotion.001"),
+            eval_gate_id: String::from("qwen.legal.full_artifact_gate.001"),
+            serving_backend: String::from("psionic-compatible"),
+            adapter_artifact_present: true,
+            checkpoint_artifact_present: true,
+            backend_available: true,
+        },
+        canary_policy: QwenLegalPromotedRouteCanaryPolicy {
+            traffic_mode: QwenLegalPromotedRouteTrafficMode::Canary,
+            canary_traffic_bps: 500,
+            rollback_served_model_id: String::from("qwen36-legal-prior-champion-000"),
+            operator_command: vec![
+                String::from("psionic-train"),
+                String::from("qwen-legal-artifact-promotion"),
+                String::from("--out"),
+                String::from("target/legal/qwen_promotion_gate/full-artifact-001"),
+            ],
+        },
+        fallback_routes: vec![QwenLegalPromotedRouteFallback {
+            route: ModelProviderRoute::openai_compatible(
+                "fallback.retired.openai.compat",
+                "https://retired-openai-compatible.invalid",
+                "retired-non-production-legal-fallback",
+                Some(String::from("secret.retired.openai.compat")),
+            ),
+            explicit_fallback_only: true,
+            reason: String::from(
+                "retired provider path kept for explicit emergency comparison only",
+            ),
+        }],
+    }
+}
+
+fn validate_qwen_legal_promoted_route_spec(
+    spec: &QwenLegalPromotedRouteSpec,
+) -> ModelAdapterResult<()> {
+    if spec.schema_version != QWEN_LEGAL_PROMOTED_PROVIDER_ROUTE_SCHEMA_VERSION {
+        return Err(candidate_error("promoted route schema version drifted"));
+    }
+    require_candidate_field(spec.route_id.as_str(), "route_id")?;
+    require_candidate_field(spec.base_url.as_str(), "base_url")?;
+    let artifacts = &spec.artifacts;
+    for (field, value) in [
+        ("base_model_id", artifacts.base_model_id.as_str()),
+        ("served_model_id", artifacts.served_model_id.as_str()),
+        ("promotion_id", artifacts.promotion_id.as_str()),
+        ("eval_gate_id", artifacts.eval_gate_id.as_str()),
+        ("serving_backend", artifacts.serving_backend.as_str()),
+    ] {
+        require_candidate_field(value, field)?;
+    }
+    for (field, value) in [
+        ("base_model_hash", artifacts.base_model_hash.as_str()),
+        (
+            "loaded_base_model_hash",
+            artifacts.loaded_base_model_hash.as_str(),
+        ),
+        (
+            "adapter_artifact_hash",
+            artifacts.adapter_artifact_hash.as_str(),
+        ),
+        (
+            "checkpoint_artifact_hash",
+            artifacts.checkpoint_artifact_hash.as_str(),
+        ),
+        (
+            "corpus_manifest_hash",
+            artifacts.corpus_manifest_hash.as_str(),
+        ),
+    ] {
+        if !digest_is_complete(value) {
+            return Err(qwen_promoted_route_refusal(
+                QwenLegalPromotedRouteRefusalKind::MissingPromotionMetadata,
+                format!("missing or invalid {field}"),
+            ));
+        }
+    }
+    if !artifacts.adapter_artifact_present {
+        return Err(qwen_promoted_route_refusal(
+            QwenLegalPromotedRouteRefusalKind::MissingAdapterArtifact,
+            "promoted Qwen route is missing the adapter artifact",
+        ));
+    }
+    if !artifacts.checkpoint_artifact_present {
+        return Err(qwen_promoted_route_refusal(
+            QwenLegalPromotedRouteRefusalKind::MissingCheckpointArtifact,
+            "promoted Qwen route is missing the checkpoint artifact",
+        ));
+    }
+    if artifacts.loaded_base_model_hash != artifacts.base_model_hash {
+        return Err(qwen_promoted_route_refusal(
+            QwenLegalPromotedRouteRefusalKind::BaseHashMismatch,
+            "loaded base model hash does not match the promoted registry hash",
+        ));
+    }
+    if !artifacts.backend_available {
+        return Err(qwen_promoted_route_refusal(
+            QwenLegalPromotedRouteRefusalKind::BackendUnavailable,
+            "Psionic backend cannot serve the promoted model",
+        ));
+    }
+    if spec
+        .fallback_routes
+        .iter()
+        .any(|fallback| !fallback.explicit_fallback_only)
+    {
+        return Err(qwen_promoted_route_refusal(
+            QwenLegalPromotedRouteRefusalKind::FallbackNotExplicit,
+            "non-production fallback routes must be explicit fallback only",
+        ));
+    }
+    if spec.canary_policy.canary_traffic_bps > 10_000 {
+        return Err(candidate_error("canary traffic must be <= 10000 bps"));
+    }
+    require_candidate_field(
+        spec.canary_policy.rollback_served_model_id.as_str(),
+        "rollback_served_model_id",
+    )?;
+    Ok(())
+}
+
+fn qwen_legal_promoted_route_metadata(
+    artifacts: &QwenLegalPromotedRouteArtifactMetadata,
+) -> Metadata {
+    let mut metadata = Metadata::new();
+    metadata.insert(
+        String::from("served_model_id"),
+        Value::String(artifacts.served_model_id.clone()),
+    );
+    metadata.insert(
+        String::from("base_model_id"),
+        Value::String(artifacts.base_model_id.clone()),
+    );
+    metadata.insert(
+        String::from("base_model_hash"),
+        Value::String(artifacts.base_model_hash.clone()),
+    );
+    metadata.insert(
+        String::from("adapter_artifact_hash"),
+        Value::String(artifacts.adapter_artifact_hash.clone()),
+    );
+    metadata.insert(
+        String::from("checkpoint_artifact_hash"),
+        Value::String(artifacts.checkpoint_artifact_hash.clone()),
+    );
+    metadata.insert(
+        String::from("corpus_manifest_hash"),
+        Value::String(artifacts.corpus_manifest_hash.clone()),
+    );
+    metadata.insert(
+        String::from("promotion_id"),
+        Value::String(artifacts.promotion_id.clone()),
+    );
+    metadata.insert(
+        String::from("eval_gate_id"),
+        Value::String(artifacts.eval_gate_id.clone()),
+    );
+    metadata.insert(
+        String::from("serving_backend"),
+        Value::String(artifacts.serving_backend.clone()),
+    );
+    metadata.insert(
+        String::from("provider_route_owner"),
+        Value::String(String::from("psionic")),
+    );
+    metadata
+}
+
+fn qwen_legal_promoted_route_command_receipt(
+    spec: &QwenLegalPromotedRouteSpec,
+    command_kind: QwenLegalPromotedRouteTrafficMode,
+) -> ModelAdapterResult<QwenLegalPromotedRouteCommandReceipt> {
+    let traffic_bps = match command_kind {
+        QwenLegalPromotedRouteTrafficMode::Canary => spec.canary_policy.canary_traffic_bps,
+        QwenLegalPromotedRouteTrafficMode::Rollback => 10_000,
+        QwenLegalPromotedRouteTrafficMode::Primary
+        | QwenLegalPromotedRouteTrafficMode::ExplicitFallbackOnly => 0,
+    };
+    let mut command = match command_kind {
+        QwenLegalPromotedRouteTrafficMode::Canary => vec![
+            String::from("psionic-route"),
+            String::from("canary"),
+            spec.artifacts.served_model_id.clone(),
+            format!("{traffic_bps}bps"),
+        ],
+        QwenLegalPromotedRouteTrafficMode::Rollback => vec![
+            String::from("psionic-route"),
+            String::from("rollback"),
+            spec.artifacts.served_model_id.clone(),
+            spec.canary_policy.rollback_served_model_id.clone(),
+        ],
+        QwenLegalPromotedRouteTrafficMode::Primary
+        | QwenLegalPromotedRouteTrafficMode::ExplicitFallbackOnly => Vec::new(),
+    };
+    if command_kind == QwenLegalPromotedRouteTrafficMode::Canary {
+        command.extend(spec.canary_policy.operator_command.clone());
+    }
+    let mut receipt = QwenLegalPromotedRouteCommandReceipt {
+        schema_version: QWEN_LEGAL_PROMOTED_PROVIDER_ROUTE_SCHEMA_VERSION,
+        command_kind,
+        served_model_id: spec.artifacts.served_model_id.clone(),
+        command,
+        target_route_id: spec.route_id.clone(),
+        rollback_served_model_id: (command_kind == QwenLegalPromotedRouteTrafficMode::Rollback)
+            .then(|| spec.canary_policy.rollback_served_model_id.clone()),
+        traffic_bps,
+        receipt_hash: String::new(),
+    };
+    receipt.receipt_hash = stable_json_digest(
+        "psionic.legal_benchmark.qwen_promoted_route_command_receipt.v1",
+        &receipt,
+    )
+    .map_err(|err| {
+        ModelAdapterError::new(
+            ModelAdapterFailureKind::InternalError,
+            format!("failed to hash promoted route command receipt: {err}"),
+        )
+    })?;
+    Ok(receipt)
+}
+
+fn qwen_promoted_route_refusal(
+    refusal: QwenLegalPromotedRouteRefusalKind,
+    detail: impl Into<String>,
+) -> ModelAdapterError {
+    let mut error = candidate_error(format!("{refusal:?}: {}", detail.into()));
+    error.retryable = refusal == QwenLegalPromotedRouteRefusalKind::BackendUnavailable;
+    error
+}
+
+fn digest(seed: impl AsRef<[u8]>) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(seed.as_ref());
+    hex::encode(hasher.finalize())
+}
+
+fn digest_is_complete(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -2845,6 +3307,125 @@ mod tests {
         assert_eq!(err.status_code, Some(400));
         assert!(!err.retryable);
         assert!(err.raw_response_hash.is_some());
+    }
+
+    #[test]
+    fn qwen_promoted_route_registers_stable_psionic_model_id() {
+        let registration =
+            register_qwen_legal_promoted_provider_route(qwen_legal_promoted_smoke_route_spec())
+                .expect("registration");
+        assert_eq!(registration.served_model_id, "qwen36-legal-grpo-001");
+        assert_eq!(registration.route.model_id, "qwen36-legal-grpo-001");
+        assert_eq!(registration.route.family, ModelProviderFamily::PsionicCompatible);
+        assert_eq!(
+            registration.route.endpoint_url(),
+            "https://psionic.local/v1/chat/completions"
+        );
+        assert_eq!(
+            registration
+                .blueprint_route_metadata
+                .get("promotion_id")
+                .and_then(Value::as_str),
+            Some("qwen.legal.full_artifact_promotion.001")
+        );
+    }
+
+    #[test]
+    fn qwen_promoted_route_receipt_matches_promoted_hashes() {
+        let spec = qwen_legal_promoted_smoke_route_spec();
+        let registration =
+            register_qwen_legal_promoted_provider_route(spec.clone()).expect("registration");
+        assert_eq!(
+            registration.serving_receipt.base_model_hash,
+            spec.artifacts.base_model_hash
+        );
+        assert_eq!(
+            registration.serving_receipt.adapter_artifact_hash,
+            spec.artifacts.adapter_artifact_hash
+        );
+        assert_eq!(
+            registration.serving_receipt.checkpoint_artifact_hash,
+            spec.artifacts.checkpoint_artifact_hash
+        );
+        assert_eq!(
+            registration.serving_receipt.corpus_manifest_hash,
+            spec.artifacts.corpus_manifest_hash
+        );
+        assert!(digest_is_complete(
+            registration.serving_receipt.receipt_hash.as_str()
+        ));
+        assert_eq!(
+            registration.route.redacted_headers.get("x-psionic-qwen-adapter-hash"),
+            Some(&spec.artifacts.adapter_artifact_hash)
+        );
+    }
+
+    #[test]
+    fn qwen_promoted_route_documents_canary_and_rollback_commands() {
+        let registration =
+            register_qwen_legal_promoted_provider_route(qwen_legal_promoted_smoke_route_spec())
+                .expect("registration");
+        assert_eq!(
+            registration.canary_receipt.command_kind,
+            QwenLegalPromotedRouteTrafficMode::Canary
+        );
+        assert_eq!(registration.canary_receipt.traffic_bps, 500);
+        assert!(
+            registration
+                .canary_receipt
+                .command
+                .contains(&String::from("qwen36-legal-grpo-001"))
+        );
+        assert_eq!(
+            registration.rollback_receipt.command_kind,
+            QwenLegalPromotedRouteTrafficMode::Rollback
+        );
+        assert_eq!(
+            registration
+                .rollback_receipt
+                .rollback_served_model_id
+                .as_deref(),
+            Some("qwen36-legal-prior-champion-000")
+        );
+    }
+
+    #[test]
+    fn qwen_promoted_route_refuses_missing_adapter_before_generation() {
+        let mut spec = qwen_legal_promoted_smoke_route_spec();
+        spec.artifacts.adapter_artifact_present = false;
+        let error = register_qwen_legal_promoted_provider_route(spec)
+            .expect_err("missing adapter should refuse");
+        assert_eq!(error.kind, ModelAdapterFailureKind::InvalidRequest);
+        assert!(error.detail.contains("MissingAdapterArtifact"));
+    }
+
+    #[test]
+    fn qwen_promoted_route_refuses_base_hash_mismatch_before_generation() {
+        let mut spec = qwen_legal_promoted_smoke_route_spec();
+        spec.artifacts.loaded_base_model_hash = digest("different-base");
+        let error = register_qwen_legal_promoted_provider_route(spec)
+            .expect_err("base hash mismatch should refuse");
+        assert_eq!(error.kind, ModelAdapterFailureKind::InvalidRequest);
+        assert!(error.detail.contains("BaseHashMismatch"));
+    }
+
+    #[test]
+    fn qwen_promoted_route_keeps_retired_provider_as_explicit_fallback_only() {
+        let registration =
+            register_qwen_legal_promoted_provider_route(qwen_legal_promoted_smoke_route_spec())
+                .expect("registration");
+        assert_eq!(registration.fallback_routes.len(), 1);
+        assert!(registration.fallback_routes[0].explicit_fallback_only);
+        assert_eq!(
+            registration.fallback_routes[0].route.family,
+            ModelProviderFamily::OpenAiCompatible
+        );
+
+        let mut spec = qwen_legal_promoted_smoke_route_spec();
+        spec.fallback_routes[0].explicit_fallback_only = false;
+        let error = register_qwen_legal_promoted_provider_route(spec)
+            .expect_err("fallback must be explicit");
+        assert!(error.detail.contains("FallbackNotExplicit"));
     }
 
     #[test]

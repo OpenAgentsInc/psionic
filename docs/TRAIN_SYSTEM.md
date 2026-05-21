@@ -313,7 +313,17 @@ writes `target/legal/qwen_promotion_gate/full-artifact-001`, promotes
 Autopilot4-safe summary feed that redacts private eval score and private task
 content. Report digest:
 `621254f37962355cd7fa4e5717a45c4b5c8e6fee4e08a1caa9fcac7773806b7a`. The same
-run now also emits a typed RL hillclimb plan that points Pylon/Nexus at
+lane now has a first-class Psionic provider route for promoted Qwen legal
+models in `crates/psionic-eval/src/legal_benchmark_provider.rs`. The smoke
+served model id is `qwen36-legal-grpo-001`; route metadata includes the base
+model hash, adapter hash, checkpoint hash, corpus manifest hash, promotion id,
+eval gate id, and serving backend. The route refuses before generation on a
+missing adapter, missing checkpoint, loaded-base hash mismatch, backend
+unavailability, incomplete promotion metadata, or fallback paths that are not
+explicit-fallback-only. Canary and rollback receipts are typed, and retired
+OpenAI-compatible routes are kept only as explicit fallback paths, not default
+benchmark routes. The same run now also emits a typed RL hillclimb plan that
+points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and
