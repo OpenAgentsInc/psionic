@@ -272,6 +272,21 @@ Pylon shard refs; trace-store hash
 `235d9a92761c44a306e96233724970af762db5b81ebc079fd3c9351ba8f5f61a`; and
 manifest hash
 `sha256:061cb74d12a459b9f6756d4eb87de4141c9374aab9c9d4a3f28dad42554a1708`.
+The same Harvey lane now has a no-cheat measurement ladder in
+`crates/psionic-eval/examples/qwen35_legal_mlx_lora_harvey_no_cheat_suite.rs`.
+One command runs baseline, candidate model-only, and candidate
+Blueprint-assisted runs over the same task set, saves the run directories,
+score reports, run-record hashes, transcript hashes, output hashes, model ids,
+adapter ids, Blueprint program id, scoring policy id, split id, and replay
+commands, and records a promotion decision. The runner may ask the model,
+execute model-written tools, validate files, score, and record. It may not add
+answer text. The regression test
+`cargo test -p psionic-eval runner_does_not_materialize_answer_text_from_final_response --lib`
+proves that final-response answer text is not materialized into an output file
+unless the model wrote it through the tool path. Trainable splits can measure
+progress but cannot promote a candidate by themselves; a candidate must at
+least match baseline on a non-trainable split before the report marks
+promotion allowed.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6

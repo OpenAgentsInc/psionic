@@ -34,6 +34,7 @@ const MODEL_REVISION: &str = "2fc06364715b967f1860aea9cf38778875588b17";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SuiteMode {
+    Baseline,
     ModelOnly,
     BlueprintScaffold,
 }
@@ -41,6 +42,7 @@ enum SuiteMode {
 impl SuiteMode {
     fn id(self) -> &'static str {
         match self {
+            Self::Baseline => "baseline",
             Self::ModelOnly => "model_only",
             Self::BlueprintScaffold => "blueprint_scaffold",
         }
@@ -48,8 +50,16 @@ impl SuiteMode {
 
     fn display(self) -> &'static str {
         match self {
+            Self::Baseline => "Baseline",
             Self::ModelOnly => "Model-only",
             Self::BlueprintScaffold => "Blueprint scaffold",
+        }
+    }
+
+    fn blueprint_program_id(self) -> Option<&'static str> {
+        match self {
+            Self::BlueprintScaffold => Some("autopilot.blueprint.legal_work_product_scaffold.v1"),
+            _ => None,
         }
     }
 }
@@ -57,8 +67,16 @@ impl SuiteMode {
 #[derive(Clone, Debug)]
 struct SuiteRunSummary {
     task_id: String,
+    task_set_id: String,
+    data_split_id: String,
+    split_role: String,
+    trainable_split: bool,
     title: String,
     mode: SuiteMode,
+    model_id: String,
+    adapter_id: String,
+    blueprint_program_id: Option<String>,
+    scoring_policy_id: String,
     terminal_state: RunTerminalState,
     score_report_digest: String,
     run_record_hash: String,
@@ -82,8 +100,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let tasks_root = PathBuf::from(env_string("HARVEY_TASKS_ROOT", DEFAULT_TASKS_ROOT));
     let upstream_commit = env_string("HARVEY_UPSTREAM_COMMIT", DEFAULT_UPSTREAM_COMMIT);
     let task_ids = env_list("HARVEY_NO_CHEAT_TASK_IDS", DEFAULT_TASK_IDS);
-    let base_url = env_string("QWEN_LEGAL_MLX_BASE_URL", DEFAULT_BASE_URL);
-    let model = env_string("QWEN_LEGAL_MLX_MODEL", DEFAULT_MODEL);
+    let candidate_base_url = env_string("QWEN_LEGAL_MLX_BASE_URL", DEFAULT_BASE_URL);
+    let candidate_model = env_string("QWEN_LEGAL_MLX_MODEL", DEFAULT_MODEL);
+    let baseline_base_url = env_string("QWEN_LEGAL_BASELINE_BASE_URL", &candidate_base_url);
+    let baseline_model = env_string("QWEN_LEGAL_BASELINE_MODEL", &candidate_model);
     let adapter_path = env_string("QWEN_LEGAL_ADAPTER_PATH", DEFAULT_ADAPTER_PATH);
     let adapter_digest = env_string("QWEN_LEGAL_ADAPTER_DIGEST", DEFAULT_ADAPTER_DIGEST);
     let adapter_report_digest = env_string(
@@ -91,6 +111,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         DEFAULT_ADAPTER_REPORT_DIGEST,
     );
     let max_output_tokens = env_u64("QWEN_LEGAL_MAX_OUTPUT_TOKENS", 2048);
+    let data_split_id = env_string("HARVEY_MEASURE_SPLIT", "public_training_fixture");
+    let split_role = split_role(data_split_id.as_str());
+    let trainable_split = split_is_trainable(split_role.as_str());
+    let task_set_id = format!(
+        "harvey.no_cheat.{}.{}",
+        split_role,
+        stable_path_part(task_ids.join("_").as_str())
+    );
 
     let scan = scan_harvey_corpus(&tasks_root, upstream_commit.clone())?;
     let mut summaries = Vec::new();
@@ -101,17 +129,43 @@ fn main() -> Result<(), Box<dyn Error>> {
             .find(|task| task.task_id == task_id)
             .cloned()
             .ok_or_else(|| io::Error::other(format!("missing Harvey task `{task_id}`")))?;
-        for mode in [SuiteMode::ModelOnly, SuiteMode::BlueprintScaffold] {
+        for mode in [
+            SuiteMode::Baseline,
+            SuiteMode::ModelOnly,
+            SuiteMode::BlueprintScaffold,
+        ] {
+            let (base_url, model, adapter_path, adapter_digest, adapter_report_digest) =
+                if mode == SuiteMode::Baseline {
+                    (
+                        baseline_base_url.as_str(),
+                        baseline_model.as_str(),
+                        "",
+                        "none",
+                        "none",
+                    )
+                } else {
+                    (
+                        candidate_base_url.as_str(),
+                        candidate_model.as_str(),
+                        adapter_path.as_str(),
+                        adapter_digest.as_str(),
+                        adapter_report_digest.as_str(),
+                    )
+                };
             let summary = run_one_mode(
                 &output_dir,
                 &tasks_root,
                 source_task.clone(),
                 mode,
-                &base_url,
-                &model,
-                &adapter_path,
-                &adapter_digest,
-                &adapter_report_digest,
+                &task_set_id,
+                &data_split_id,
+                &split_role,
+                trainable_split,
+                base_url,
+                model,
+                adapter_path,
+                adapter_digest,
+                adapter_report_digest,
                 max_output_tokens,
             )?;
             summaries.push(summary);
@@ -123,8 +177,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         &output_dir,
         &tasks_root,
         &upstream_commit,
-        &base_url,
-        &model,
+        &task_set_id,
+        &data_split_id,
+        &split_role,
+        trainable_split,
+        &baseline_base_url,
+        &baseline_model,
+        &candidate_base_url,
+        &candidate_model,
         &adapter_path,
         &adapter_digest,
         &adapter_report_digest,
@@ -143,6 +203,10 @@ fn run_one_mode(
     tasks_root: &Path,
     source_task: BenchmarkTaskSpec,
     mode: SuiteMode,
+    task_set_id: &str,
+    data_split_id: &str,
+    split_role: &str,
+    trainable_split: bool,
     base_url: &str,
     model: &str,
     adapter_path: &str,
@@ -166,6 +230,10 @@ fn run_one_mode(
     let run_config = suite_run_config(
         &task,
         mode,
+        task_set_id,
+        data_split_id,
+        split_role,
+        trainable_split,
         model,
         adapter_path,
         adapter_digest,
@@ -200,6 +268,24 @@ fn run_one_mode(
         String::from("runner_content_mutation_allowed"),
         Value::Bool(false),
     );
+    route.metadata.insert(
+        String::from("data_split_id"),
+        Value::String(data_split_id.to_owned()),
+    );
+    route.metadata.insert(
+        String::from("split_role"),
+        Value::String(split_role.to_owned()),
+    );
+    route.metadata.insert(
+        String::from("trainable_split"),
+        Value::Bool(trainable_split),
+    );
+    if let Some(program_id) = mode.blueprint_program_id() {
+        route.metadata.insert(
+            String::from("blueprint_program_id"),
+            Value::String(program_id.to_owned()),
+        );
+    }
 
     let retry_policy = ModelRetryPolicy {
         max_retries: 0,
@@ -224,7 +310,7 @@ fn run_one_mode(
                 &output_root,
             ),
             run_root,
-            module_instructions: module_instructions(&source_task, mode),
+            module_instructions: module_instructions(&source_task, mode, split_role),
             extraction_receipt_refs: Vec::new(),
             run_nonce: Some(format!(
                 "qwen35-08b-mlx-lora-harvey-no-cheat-suite-{}-{}",
@@ -256,8 +342,20 @@ fn run_one_mode(
         .count();
     Ok(SuiteRunSummary {
         task_id: source_task.task_id,
+        task_set_id: task_set_id.to_owned(),
+        data_split_id: data_split_id.to_owned(),
+        split_role: split_role.to_owned(),
+        trainable_split,
         title: source_task.title,
         mode,
+        model_id: model.to_owned(),
+        adapter_id: if mode == SuiteMode::Baseline {
+            String::from("none")
+        } else {
+            adapter_digest.to_owned()
+        },
+        blueprint_program_id: mode.blueprint_program_id().map(String::from),
+        scoring_policy_id: String::from("judge.harvey.no_cheat_suite.v1"),
         terminal_state: result.terminal_state,
         score_report_digest: score_digest,
         run_record_hash,
@@ -311,6 +409,10 @@ fn suite_task(mut task: BenchmarkTaskSpec, mode: SuiteMode) -> BenchmarkTaskSpec
 fn suite_run_config(
     task: &BenchmarkTaskSpec,
     mode: SuiteMode,
+    task_set_id: &str,
+    data_split_id: &str,
+    split_role: &str,
+    trainable_split: bool,
     model: &str,
     adapter_path: &str,
     adapter_digest: &str,
@@ -326,6 +428,22 @@ fn suite_run_config(
         Value::String(String::from("rubric_free_protocol_and_work_product")),
     );
     metadata.insert(String::from("mode"), Value::String(mode.id().to_owned()));
+    metadata.insert(
+        String::from("task_set_id"),
+        Value::String(task_set_id.to_owned()),
+    );
+    metadata.insert(
+        String::from("data_split_id"),
+        Value::String(data_split_id.to_owned()),
+    );
+    metadata.insert(
+        String::from("split_role"),
+        Value::String(split_role.to_owned()),
+    );
+    metadata.insert(
+        String::from("trainable_split"),
+        Value::Bool(trainable_split),
+    );
     metadata.insert(
         String::from("adapter_path"),
         Value::String(String::from(adapter_path)),
@@ -352,12 +470,21 @@ fn suite_run_config(
             String::from("force_validate_after_write"),
             Value::Bool(true),
         );
+        metadata.insert(
+            String::from("blueprint_program_id"),
+            Value::String(
+                mode.blueprint_program_id()
+                    .unwrap_or("unknown_blueprint_program")
+                    .to_owned(),
+            ),
+        );
     }
     RunConfig {
         schema_version: psionic_eval::LEGAL_BENCHMARK_SCHEMA_VERSION,
         run_config_id: format!(
-            "run_config.qwen35_08b_mlx_lora.harvey_no_cheat_suite.{}",
-            mode.id()
+            "run_config.harvey_no_cheat_measurement.{}.{}",
+            mode.id(),
+            split_role
         ),
         provider: String::from("openai_compatible.local_mlx"),
         model: String::from(model),
@@ -369,10 +496,10 @@ fn suite_run_config(
     }
 }
 
-fn module_instructions(task: &BenchmarkTaskSpec, mode: SuiteMode) -> Vec<String> {
+fn module_instructions(task: &BenchmarkTaskSpec, mode: SuiteMode, split_role: &str) -> Vec<String> {
     let mut instructions = vec![
-        String::from(
-            "This is a public Harvey training-slice run. It is not a retained benchmark score.",
+        format!(
+            "This Harvey measurement run uses the `{split_role}` split. It is not an official retained benchmark score."
         ),
         String::from(
             "The runner must not and will not add text to your output. Any score comes only from what the model writes.",
@@ -594,8 +721,14 @@ fn suite_report(
     output_dir: &Path,
     tasks_root: &Path,
     upstream_commit: &str,
-    base_url: &str,
-    model: &str,
+    task_set_id: &str,
+    data_split_id: &str,
+    split_role: &str,
+    trainable_split: bool,
+    baseline_base_url: &str,
+    baseline_model: &str,
+    candidate_base_url: &str,
+    candidate_model: &str,
     adapter_path: &str,
     adapter_digest: &str,
     adapter_report_digest: &str,
@@ -606,9 +739,17 @@ fn suite_report(
         .map(|summary| {
             json!({
                 "task_id": summary.task_id,
+                "task_set_id": summary.task_set_id,
+                "data_split_id": summary.data_split_id,
+                "split_role": summary.split_role,
+                "trainable_split": summary.trainable_split,
                 "title": summary.title,
                 "mode": summary.mode.id(),
                 "mode_label": summary.mode.display(),
+                "model_id": summary.model_id,
+                "adapter_id": summary.adapter_id,
+                "blueprint_program_id": summary.blueprint_program_id,
+                "scoring_policy_id": summary.scoring_policy_id,
                 "terminal_state": summary.terminal_state,
                 "score": {
                     "pass_count": summary.pass_count,
@@ -625,8 +766,13 @@ fn suite_report(
             })
         })
         .collect::<Vec<_>>();
+    let baseline_avg = average_bps(summaries, SuiteMode::Baseline);
     let model_only_avg = average_bps(summaries, SuiteMode::ModelOnly);
     let scaffold_avg = average_bps(summaries, SuiteMode::BlueprintScaffold);
+    let best_candidate_avg = model_only_avg.max(scaffold_avg);
+    let candidate_delta_bps = i64::from(best_candidate_avg) - i64::from(baseline_avg);
+    let promotion_allowed = !trainable_split && best_candidate_avg >= baseline_avg;
+    let promotion_blockers = promotion_blockers(trainable_split, best_candidate_avg, baseline_avg);
     let suite_id = output_dir
         .file_name()
         .and_then(|name| name.to_str())
@@ -634,26 +780,60 @@ fn suite_report(
     let mut report = json!({
         "schema": "psionic.harvey_no_cheat_suite.v1",
         "suite_id": suite_id,
+        "task_set_id": task_set_id,
+        "data_split": {
+            "data_split_id": data_split_id,
+            "split_role": split_role,
+            "trainable": trainable_split,
+            "private_gate": split_role == "private_gate"
+        },
         "tasks_root": tasks_root,
         "upstream_commit": upstream_commit,
-        "training_slice": true,
+        "training_slice": trainable_split,
         "retained_score_claim": false,
         "runner_content_mutation_allowed": false,
-        "base_url": base_url,
-        "model": model,
+        "baseline": {
+            "base_url": baseline_base_url,
+            "model": baseline_model,
+            "adapter_id": "none"
+        },
+        "candidate": {
+            "base_url": candidate_base_url,
+            "model": candidate_model,
+            "adapter_path": adapter_path,
+            "adapter_artifact_digest": adapter_digest,
+            "adapter_report_digest": adapter_report_digest,
+            "blueprint_program_id": "autopilot.blueprint.legal_work_product_scaffold.v1"
+        },
         "adapter_path": adapter_path,
         "adapter_artifact_digest": adapter_digest,
         "adapter_report_digest": adapter_report_digest,
         "base_model_revision": MODEL_REVISION,
         "max_output_tokens": max_output_tokens,
+        "scoring_policy_id": "judge.harvey.no_cheat_suite.v1",
         "mode_average_pass_rate_bps": {
+            "baseline": baseline_avg,
             "model_only": model_only_avg,
             "blueprint_scaffold": scaffold_avg,
-            "delta_scaffold_minus_model_only": i64::from(scaffold_avg) - i64::from(model_only_avg)
+            "delta_model_only_minus_baseline": i64::from(model_only_avg) - i64::from(baseline_avg),
+            "delta_blueprint_scaffold_minus_baseline": i64::from(scaffold_avg) - i64::from(baseline_avg),
+            "delta_scaffold_minus_model_only": i64::from(scaffold_avg) - i64::from(model_only_avg),
+            "best_candidate_minus_baseline": candidate_delta_bps
+        },
+        "promotion_decision": {
+            "promotion_allowed": promotion_allowed,
+            "candidate_beats_or_matches_baseline": best_candidate_avg >= baseline_avg,
+            "blocked_from_trainable_split_alone": trainable_split,
+            "blockers": promotion_blockers
         },
         "runs": by_task,
+        "replay_commands": [
+            "cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_no_cheat_suite -- <output-dir>",
+            "jq '.mode_average_pass_rate_bps,.promotion_decision' <output-dir>/harvey_no_cheat_suite_report.json"
+        ],
         "claim_boundary": [
-            "These are local public Harvey training-slice runs through the Rust legal agent loop.",
+            "These are local Harvey measurement-ladder runs through the Rust legal agent loop.",
+            "The split name says whether the run was trainable, public holdout, or a later private gate.",
             "No runner path adds or rewrites model output.",
             "Scaffold-assisted means prompt/module requirements only; it does not inject answer text.",
             "Scores are local protocol and work-product checks, not official Harvey retained scores."
@@ -662,6 +842,34 @@ fn suite_report(
     let digest = stable_json_digest("psionic.harvey_no_cheat_suite.v1", &report)?;
     report["suite_report_digest"] = Value::String(digest);
     Ok(report)
+}
+
+fn split_role(data_split_id: &str) -> String {
+    let lower = data_split_id.to_ascii_lowercase();
+    if lower.contains("private") {
+        String::from("private_gate")
+    } else if lower.contains("holdout") {
+        String::from("public_holdout")
+    } else {
+        String::from("public_training")
+    }
+}
+
+fn split_is_trainable(split_role: &str) -> bool {
+    split_role == "public_training"
+}
+
+fn promotion_blockers(trainable_split: bool, candidate: u32, baseline: u32) -> Vec<String> {
+    let mut blockers = Vec::new();
+    if trainable_split {
+        blockers.push(String::from(
+            "trainable split can measure progress but cannot promote a candidate by itself",
+        ));
+    }
+    if candidate < baseline {
+        blockers.push(String::from("best candidate score is below baseline"));
+    }
+    blockers
 }
 
 fn average_bps(summaries: &[SuiteRunSummary], mode: SuiteMode) -> u32 {
@@ -781,7 +989,7 @@ fn env_list(name: &str, fallback: &str) -> Vec<String> {
 
 fn reset_suite_dir(output_dir: &Path) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(output_dir)?;
-    for child in ["model_only", "blueprint_scaffold"] {
+    for child in ["baseline", "model_only", "blueprint_scaffold"] {
         let path = output_dir.join(child);
         if path.exists() {
             fs::remove_dir_all(path)?;

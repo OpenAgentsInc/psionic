@@ -1816,8 +1816,8 @@ mod tests {
     use super::*;
     use crate::{
         ArtifactManifestRole, CriterionKind, DeliverableKind, JudgeMode, JudgePolicy,
-        MockModelAdapter, ModelProviderRoute, ModelUsage, ToolPolicy,
-        RunActor, build_input_artifact_manifest,
+        MockModelAdapter, ModelProviderRoute, ModelUsage, RunActor, ToolPolicy,
+        build_input_artifact_manifest,
     };
 
     fn task_spec() -> BenchmarkTaskSpec {
@@ -2308,6 +2308,52 @@ mod tests {
         let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
         assert_eq!(result.terminal_state, RunTerminalState::NoToolCalls);
         assert_eq!(result.run_record.metrics.model_turns, 1);
+    }
+
+    #[test]
+    fn runner_does_not_materialize_answer_text_from_final_response() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.keep();
+        let documents_root = root.join("documents");
+        let workspace_root = root.join("workspace");
+        let output_root = root.join("output");
+        fs::create_dir_all(&documents_root).expect("documents");
+        fs::create_dir_all(&workspace_root).expect("workspace");
+        fs::create_dir_all(&output_root).expect("output");
+        let task = task_spec();
+        let input_manifest = build_input_artifact_manifest(&task);
+        let config = run_config(&task);
+        let route = ModelProviderRoute::mock("mock.no_injection", "deterministic-legal-mock");
+        let mut response = response_submit(&route);
+        response.final_text = Some(
+            json!({
+                "action": "submit",
+                "deliverables": ["memo.md"],
+                "answer_text": "# Memo\n\nThis text must not be written by the runner."
+            })
+            .to_string(),
+        );
+        let mut adapter = MockModelAdapter::new(route, vec![Ok(response)]);
+        let request = LegalBenchmarkAgentRunRequest {
+            task_spec: task,
+            input_artifact_manifest: input_manifest,
+            run_config: config,
+            tool_workspace: LegalBenchmarkToolWorkspace::new(
+                &documents_root,
+                &workspace_root,
+                &output_root,
+            ),
+            run_root: root.join("run"),
+            module_instructions: Vec::new(),
+            extraction_receipt_refs: Vec::new(),
+            run_nonce: Some(String::from("no-runner-answer-injection")),
+        };
+        let result = run_legal_benchmark_agent(request, &mut adapter).expect("agent run");
+
+        assert_eq!(result.terminal_state, RunTerminalState::Submitted);
+        assert!(!output_root.join("memo.md").exists());
+        assert!(result.output_artifact_manifest.artifacts.is_empty());
+        assert_eq!(result.run_record.metrics.tool_call_count, 0);
     }
 
     #[test]

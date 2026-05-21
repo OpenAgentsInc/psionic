@@ -714,6 +714,49 @@ Recorded SFT result:
 - final loss: `2.2927308`
 - adapter:
   `target/legal/qwen36_27b_sft_smoke/adapter.safetensors`
+
+## Harvey Measurement Ladder
+
+The no-cheat Harvey measurement command now runs three lanes on the same task
+set:
+
+```bash
+cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_no_cheat_suite -- \
+  target/legal/harvey_measurement_ladder/local-smoke
+```
+
+The three lanes are:
+
+- `baseline`: the baseline model route with no candidate adapter id.
+- `model_only`: the candidate model and adapter without a Blueprint scaffold.
+- `blueprint_scaffold`: the same candidate model and adapter with the
+  Autopilot legal work-product Blueprint scaffold added to the prompt.
+
+The runner is allowed to ask the model, execute model-written tools, validate
+created files, score outputs, and record hashes. The runner is not allowed to
+write answer text for the model. The focused regression test is:
+
+```bash
+cargo test -p psionic-eval runner_does_not_materialize_answer_text_from_final_response --lib
+```
+
+The report records the task set id, data split id, split role, whether the
+split is trainable, model ids, adapter ids, Blueprint program id, scoring
+policy id, score report hashes, run record hashes, transcript hashes, output
+file hashes, and replay commands.
+
+Set `HARVEY_MEASURE_SPLIT` to name the split:
+
+- `public_training_fixture`: useful for iteration, but cannot promote a
+  candidate by itself.
+- `public_holdout_fixture`: public held-out measurement.
+- `private_gate`: later private retained gate; this command records the split
+  name but still does not materialize private answers.
+
+Promotion is blocked when the split is trainable, even if the candidate beats
+the baseline. A candidate must at least match the baseline on a non-trainable
+split before the report can mark promotion allowed. This is a local measurement
+ladder, not an official Harvey leaderboard result.
 - adapter digest:
   `fb49c3fc9bb801c081ca6d4f6ad5349df920ec42a156312d57c3d329b7914c40`
 - receipt digest:
