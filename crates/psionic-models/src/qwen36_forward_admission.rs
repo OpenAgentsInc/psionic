@@ -11,9 +11,9 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    load_qwen36_model_config, normalize_qwen36_target_model_id, PromptMessage, PromptMessageRole,
+    PromptMessage, PromptMessageRole, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
     Qwen36PromptOptions, Qwen36PromptReceipt, Qwen36PromptRenderer, Qwen36ReasoningMode,
-    Qwen36TargetPathError, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
+    Qwen36TargetPathError, load_qwen36_model_config, normalize_qwen36_target_model_id,
 };
 
 pub const QWEN36_FORWARD_ADMISSION_SCHEMA_VERSION: &str = "psionic.qwen36_27b_forward_admission.v1";
@@ -189,6 +189,23 @@ pub struct Qwen36SampledProjectionTrainingSurface {
     pub base_sampled_logits: Vec<Qwen36SampledLogit>,
     pub logits_sha256: String,
     pub tensor_reads: Vec<Qwen36TensorRowReadReceipt>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Qwen36FullForwardTrainingSurface {
+    pub prompt_receipt: Qwen36PromptReceipt,
+    pub input_token_id: u32,
+    pub input_token_label: String,
+    pub candidate_token_ids: Vec<u32>,
+    pub hidden_state: Vec<f32>,
+    pub hidden_state_sha256: String,
+    pub base_sampled_logits: Vec<Qwen36SampledLogit>,
+    pub logits_sha256: String,
+    pub tensor_reads: Vec<Qwen36TensorRowReadReceipt>,
+    pub layer_receipts: Vec<Qwen36FullForwardLayerReceipt>,
+    pub activation_mode: String,
+    pub exact_full_width_logits: bool,
+    pub claim_boundary: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -888,6 +905,61 @@ pub fn qwen36_sampled_projection_training_surface(
     )
 }
 
+pub fn qwen36_full_forward_training_surface(
+    model_dir: impl AsRef<Path>,
+    prompt_text: &str,
+    candidate_token_ids: &[u32],
+) -> Result<Qwen36FullForwardTrainingSurface, Qwen36TargetPathError> {
+    let model_dir = model_dir.as_ref();
+    let config_path = model_dir.join("config.json");
+    let tokenizer_path = model_dir.join("tokenizer.json");
+    let index_path = model_dir.join("model.safetensors.index.json");
+    let config = load_qwen36_model_config(&config_path)?;
+    let model_id = normalize_qwen36_target_model_id(config.model_id.as_str())?;
+    if model_id != QWEN36_27B_MODEL_ID {
+        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+            "full-layer Qwen3.6 training surface currently supports the dense 27B text checkpoint only",
+        )));
+    }
+    let config_bytes = read_bytes(&config_path)?;
+    let tokenizer_bytes = read_bytes(&tokenizer_path)?;
+    let index_bytes = read_bytes(&index_path)?;
+    let architecture = qwen36_forward_architecture_report(config_bytes.as_slice())?;
+    let weight_map = qwen36_weight_index_from_bytes(index_bytes.as_slice())?;
+    let shard_paths = qwen36_shard_paths_from_weight_map(model_dir, &weight_map)?;
+    let observed_tensors = qwen36_observed_tensors_from_shards(&shard_paths)?;
+    let expected_tensors = qwen36_expected_text_tensor_specs(&architecture)?;
+    let tensor_admission =
+        qwen36_tensor_admission_report(expected_tensors, weight_map.clone(), observed_tensors);
+    if !tensor_admission.text_tensor_admission_passed {
+        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+            "full-layer Qwen3.6 training surface requires text tensor admission to pass first",
+        )));
+    }
+    let renderer = Qwen36PromptRenderer::from_tokenizer_json_bytes(tokenizer_bytes.as_slice())?;
+    let rendered = renderer.render(
+        &[
+            PromptMessage::new(
+                PromptMessageRole::System,
+                "You are Autopilot's legal benchmark agent. Answer directly and write usable legal work product.",
+            ),
+            PromptMessage::new(PromptMessageRole::User, prompt_text),
+        ],
+        &Qwen36PromptOptions {
+            reasoning_mode: Qwen36ReasoningMode::DirectAnswer,
+            add_generation_prompt: true,
+            emit_empty_think_block: true,
+        },
+    )?;
+    qwen36_full_forward_training_surface_from_rendered(
+        model_dir,
+        &weight_map,
+        &architecture,
+        &rendered,
+        candidate_token_ids,
+    )
+}
+
 fn should_run_sampled_projection(backend: &str) -> bool {
     backend == QWEN36_SAMPLED_PROJECTION_BACKEND || backend == "local-real-sampled-projection"
 }
@@ -935,13 +1007,58 @@ fn qwen36_full_forward_receipt(
     architecture: &Qwen36ForwardArchitectureReport,
     rendered: &crate::Qwen36RenderedPrompt,
 ) -> Result<Qwen36FullForwardReceipt, Qwen36TargetPathError> {
+    let surface = qwen36_full_forward_training_surface_from_rendered(
+        model_dir,
+        weight_map,
+        architecture,
+        rendered,
+        &[],
+    )?;
+    Ok(Qwen36FullForwardReceipt {
+        mode: surface.activation_mode,
+        input_token_id: surface.input_token_id,
+        input_token_label: surface.input_token_label,
+        candidate_token_ids: surface.candidate_token_ids,
+        sampled_logits: surface.base_sampled_logits,
+        logits_sha256: surface.logits_sha256,
+        tensor_reads: surface.tensor_reads,
+        layer_receipts: surface.layer_receipts,
+        hidden_size: architecture.hidden_size,
+        visited_layer_count: architecture.num_hidden_layers,
+        visited_full_attention_layer_count: architecture.full_attention_layers.len(),
+        visited_linear_attention_layer_count: architecture.linear_attention_layers.len(),
+        visited_mtp_layer_count: architecture.mtp_num_hidden_layers,
+        used_full_transformer_layers: true,
+        exact_full_width_logits: surface.exact_full_width_logits,
+        claim_boundary: surface.claim_boundary,
+    })
+}
+
+fn qwen36_full_forward_training_surface_from_rendered(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    rendered: &crate::Qwen36RenderedPrompt,
+    candidate_token_ids: &[u32],
+) -> Result<Qwen36FullForwardTrainingSurface, Qwen36TargetPathError> {
     let input_token_id = rendered.token_ids.last().copied().ok_or_else(|| {
         Qwen36TargetPathError::InvalidConfig(String::from(
             "full Qwen3.6 forward smoke requires tokenizer token ids",
         ))
     })?;
-    let candidate_token_ids =
-        qwen36_sampled_candidate_token_ids(input_token_id, architecture.vocab_size);
+    let mut candidate_token_ids = if candidate_token_ids.is_empty() {
+        qwen36_sampled_candidate_token_ids(input_token_id, architecture.vocab_size)
+    } else {
+        candidate_token_ids.to_vec()
+    };
+    candidate_token_ids.retain(|id| {
+        usize::try_from(*id)
+            .ok()
+            .is_some_and(|id| id < architecture.vocab_size)
+    });
+    candidate_token_ids.push(input_token_id);
+    candidate_token_ids.sort_unstable();
+    candidate_token_ids.dedup();
     let embed_row = qwen36_read_indexed_tensor_row(
         model_dir,
         weight_map,
@@ -1021,6 +1138,7 @@ fn qwen36_full_forward_receipt(
     )?;
     qwen36_apply_rms_norm_in_place(&mut hidden, final_norm.values.as_slice(), architecture)?;
     tensor_reads.push(final_norm.receipt);
+    let hidden_state_sha256 = sha256_f32_values(hidden.as_slice());
 
     let mut sampled_logits = Vec::with_capacity(candidate_token_ids.len());
     for token_id in &candidate_token_ids {
@@ -1045,21 +1163,18 @@ fn qwen36_full_forward_receipt(
         });
     }
     let logits_sha256 = sha256_json(&sampled_logits)?;
-    Ok(Qwen36FullForwardReceipt {
-        mode: String::from("bounded_full_layer_row_sparse_forward_v1"),
+    Ok(Qwen36FullForwardTrainingSurface {
+        prompt_receipt: Qwen36PromptReceipt::from(rendered),
         input_token_id,
         input_token_label: token_label(input_token_id),
         candidate_token_ids,
-        sampled_logits,
+        hidden_state: hidden,
+        hidden_state_sha256,
+        base_sampled_logits: sampled_logits,
         logits_sha256,
         tensor_reads,
         layer_receipts,
-        hidden_size: architecture.hidden_size,
-        visited_layer_count: architecture.num_hidden_layers,
-        visited_full_attention_layer_count: architecture.full_attention_layers.len(),
-        visited_linear_attention_layer_count: architecture.linear_attention_layers.len(),
-        visited_mtp_layer_count: architecture.mtp_num_hidden_layers,
-        used_full_transformer_layers: true,
+        activation_mode: String::from("bounded_full_layer_row_sparse_forward_v1"),
         exact_full_width_logits: false,
         claim_boundary: String::from(
             "This is a bounded row-sparse full-layer smoke. It executes every declared Qwen3.6-27B text layer in order and reads real layer tensors, but it does not materialize full attention, full MLP activations, full-vocabulary logits, or generation.",
@@ -1483,11 +1598,7 @@ fn silu(value: f64) -> f64 {
 }
 
 fn row_for(seed: usize, rows: usize) -> usize {
-    if rows == 0 {
-        0
-    } else {
-        seed % rows
-    }
+    if rows == 0 { 0 } else { seed % rows }
 }
 
 fn l1_delta(before: &[f32], after: &[f32]) -> f64 {
@@ -2071,7 +2182,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
+    use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
 
     #[test]
     fn qwen36_forward_architecture_parses_real_text_fields() {
@@ -2227,11 +2338,13 @@ mod tests {
         assert_eq!(receipt.visited_full_attention_layer_count, 1);
         assert_eq!(receipt.layer_receipts.len(), 1);
         assert_eq!(receipt.layer_receipts[0].layer_type, "full_attention");
-        assert!(receipt.layer_receipts[0]
-            .tensor_names
-            .contains(&String::from(
-                "model.language_model.layers.0.self_attn.q_proj.weight"
-            )));
+        assert!(
+            receipt.layer_receipts[0]
+                .tensor_names
+                .contains(&String::from(
+                    "model.language_model.layers.0.self_attn.q_proj.weight"
+                ))
+        );
         assert_eq!(receipt.candidate_token_ids, vec![0, 1, 2, 3, 4, 5, 6]);
         assert_eq!(
             receipt.logits_sha256,
@@ -2258,9 +2371,11 @@ mod tests {
         let error = qwen36_full_forward_receipt(temp.path(), &weight_map, &architecture, &rendered)
             .expect_err("missing q_proj should refuse");
 
-        assert!(error
-            .to_string()
-            .contains("model index does not contain required tensor"));
+        assert!(
+            error
+                .to_string()
+                .contains("model index does not contain required tensor")
+        );
     }
 
     fn write_test_safetensors(path: &Path) -> Result<(), Qwen36TargetPathError> {

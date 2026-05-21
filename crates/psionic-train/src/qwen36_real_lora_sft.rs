@@ -11,10 +11,11 @@ use psionic_adapters::{
 use psionic_core::QuantizationMode;
 use psionic_models::{
     QWEN36_27B_MODEL_ID, QWEN36_27B_REAL_MODEL_DIR, QWEN36_27B_SERVED_MODEL_ID,
-    Qwen36PromptReceipt, Qwen36SampledLogit, Qwen36SampledProjectionTrainingSurface,
+    Qwen36FullForwardTrainingSurface, Qwen36PromptReceipt, Qwen36SampledLogit,
+    Qwen36SampledProjectionTrainingSurface, qwen36_full_forward_training_surface,
     qwen36_sampled_projection_training_surface,
 };
-use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
+use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -27,9 +28,15 @@ pub const QWEN36_REAL_LORA_SFT_LOSS_CURVE_SCHEMA_VERSION: &str =
     "psionic.qwen36_real_lora_sft_loss_curve.v1";
 pub const QWEN36_REAL_LORA_SFT_CHECKPOINT_SCHEMA_VERSION: &str =
     "psionic.qwen36_real_lora_sft_checkpoint.v1";
+pub const QWEN36_REAL_LORA_STATE_CHECKPOINT_SCHEMA_VERSION: &str =
+    "psionic.qwen36_real_lora_state_checkpoint.v1";
 pub const QWEN36_REAL_LORA_ACTIVE_TARGET: &str = "lm_head.weight";
 pub const QWEN36_REAL_LORA_ADAPTER_FORMAT: &str = "lm_head_lora_safetensors";
 pub const QWEN36_REAL_LORA_ACTIVATION_MODE: &str = "sampled_embed_lm_head_projection_v1";
+pub const QWEN36_REAL_LORA_FULL_LAYER_ACTIVATION_MODE: &str =
+    "bounded_full_layer_row_sparse_forward_v1";
+pub const QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER: &str = "full_forward_smoke";
+pub const QWEN36_REAL_LORA_ACTIVATION_SOURCE_SAMPLED: &str = "sampled_projection";
 pub const QWEN36_DENSE_REAL_LORA_TARGET_MODULES: &[&str] = &[
     "q_proj",
     "k_proj",
@@ -48,6 +55,8 @@ pub struct Qwen36RealLoraSftConfig {
     pub model_dir: String,
     #[serde(default = "default_real_train_type")]
     pub train_type: String,
+    #[serde(default = "default_activation_source")]
+    pub activation_source: String,
     #[serde(default = "default_adapter_id")]
     pub adapter_id: String,
     #[serde(default = "default_adapter_revision")]
@@ -56,6 +65,10 @@ pub struct Qwen36RealLoraSftConfig {
     pub target_token_id: u32,
     #[serde(default)]
     pub candidate_token_ids: Vec<u32>,
+    #[serde(default = "default_target_modules")]
+    pub target_modules: Vec<String>,
+    #[serde(default)]
+    pub resume_from_checkpoint_path: Option<String>,
     #[serde(default = "default_lora_rank")]
     pub lora_rank: usize,
     #[serde(default = "default_lora_alpha")]
@@ -82,9 +95,10 @@ impl Default for Qwen36RealLoraSftConfig {
     fn default() -> Self {
         Self {
             schema_version: String::from(QWEN36_REAL_LORA_SFT_CONFIG_SCHEMA_VERSION),
-            run_id: String::from("qwen36-27b-real-lora-sft-sampled-001"),
+            run_id: String::from("qwen36-27b-real-lora-sft-full-layer-smoke-001"),
             model_dir: default_real_qwen_model_dir(),
             train_type: default_real_train_type(),
+            activation_source: default_activation_source(),
             adapter_id: default_adapter_id(),
             adapter_revision: default_adapter_revision(),
             prompt: String::from(
@@ -92,6 +106,8 @@ impl Default for Qwen36RealLoraSftConfig {
             ),
             target_token_id: 271,
             candidate_token_ids: vec![0, 1, 2, 3, 4, 5, 271],
+            target_modules: default_target_modules(),
+            resume_from_checkpoint_path: None,
             lora_rank: default_lora_rank(),
             lora_alpha: default_lora_alpha(),
             learning_rate: default_learning_rate(),
@@ -125,6 +141,26 @@ pub struct Qwen36RealLoraOptimizerReceipt {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36RealLoraQloraMetadata {
+    pub enabled: bool,
+    pub base_weight_quantization: String,
+    pub adapter_weight_dtype: String,
+    pub compatibility_note: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36RealLoraActivationReceipt {
+    pub activation_source: String,
+    pub activation_mode: String,
+    pub exact_full_width_logits: bool,
+    pub layer_receipt_count: usize,
+    pub full_attention_layer_count: usize,
+    pub linear_attention_layer_count: usize,
+    pub mtp_layer_count: usize,
+    pub claim_boundary: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Qwen36RealLoraLossPoint {
     pub step: u64,
     pub loss: f32,
@@ -146,7 +182,10 @@ pub struct Qwen36RealLoraCheckpointSummary {
     pub step: u64,
     pub adapter_artifact_path: String,
     pub adapter_artifact_sha256: String,
+    pub state_checkpoint_path: String,
+    pub state_checkpoint_sha256: String,
     pub optimizer_state_sha256: String,
+    pub scheduler_cursor_state_sha256: String,
     pub state_digest: String,
 }
 
@@ -159,7 +198,9 @@ pub struct Qwen36RealLoraSftReceipt {
     pub model_dir: String,
     pub model_hashes: Qwen36RealModelHashes,
     pub train_type: String,
+    pub qlora: Qwen36RealLoraQloraMetadata,
     pub activation_mode: String,
+    pub activation_receipt: Qwen36RealLoraActivationReceipt,
     pub prompt_receipt: Qwen36PromptReceipt,
     pub target_token_id: u32,
     pub candidate_token_ids: Vec<u32>,
@@ -169,6 +210,8 @@ pub struct Qwen36RealLoraSftReceipt {
     pub active_trainable_target: String,
     pub adapter_format: String,
     pub dense_lora_target_modules: Vec<String>,
+    pub requested_target_modules: Vec<String>,
+    pub resolved_target_modules: Vec<String>,
     pub deferred_target_modules_reason: String,
     pub lora_rank: usize,
     pub lora_alpha: f32,
@@ -184,6 +227,8 @@ pub struct Qwen36RealLoraSftReceipt {
     pub adapter_identity_digest: String,
     pub loss_curve_path: String,
     pub checkpoint_summary_path: String,
+    pub state_checkpoint_path: String,
+    pub state_checkpoint_sha256: String,
     pub dpo_grpo_adapter_compatibility: String,
     pub python_invoked: bool,
     pub claim_boundary: String,
@@ -196,10 +241,11 @@ pub struct Qwen36RealLoraSftArtifacts {
     pub receipt_path: String,
     pub loss_curve_path: String,
     pub checkpoint_summary_path: String,
+    pub state_checkpoint_path: String,
     pub receipt: Qwen36RealLoraSftReceipt,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct Qwen36RealLoraState {
     step: u64,
     lora_a: Vec<f32>,
@@ -215,6 +261,18 @@ struct Qwen36RealLoraStepOutput {
     loss: f32,
     target_probability: f32,
     logits_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Qwen36RealLoraActivationSurface {
+    prompt_receipt: Qwen36PromptReceipt,
+    candidate_token_ids: Vec<u32>,
+    hidden_state: Vec<f32>,
+    hidden_state_sha256: String,
+    base_sampled_logits: Vec<Qwen36SampledLogit>,
+    logits_sha256: String,
+    tensor_reads: Vec<psionic_models::Qwen36TensorRowReadReceipt>,
+    activation_receipt: Qwen36RealLoraActivationReceipt,
 }
 
 #[derive(Debug, Error)]
@@ -258,11 +316,13 @@ pub fn run_qwen36_real_lora_sft(
     candidate_token_ids.push(config.target_token_id);
     candidate_token_ids.sort_unstable();
     candidate_token_ids.dedup();
-    let surface = qwen36_sampled_projection_training_surface(
+    let surface = activation_surface(
         &config.model_dir,
         config.prompt.as_str(),
         candidate_token_ids.as_slice(),
+        config.activation_source.as_str(),
     )?;
+    let resolved_target_modules = resolve_target_modules(config.target_modules.as_slice())?;
     let (vocab_size, hidden_size) = surface_shape(&surface)?;
     if config.target_token_id as usize >= vocab_size {
         return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
@@ -277,9 +337,13 @@ pub fn run_qwen36_real_lora_sft(
     })?;
 
     let model_hashes = model_hashes(Path::new(&config.model_dir))?;
-    let mut state = Qwen36RealLoraState::new(config, vocab_size, hidden_size);
+    let mut state = if let Some(path) = &config.resume_from_checkpoint_path {
+        load_state_checkpoint(Path::new(path), config, vocab_size, hidden_size)?
+    } else {
+        Qwen36RealLoraState::new(config, vocab_size, hidden_size)
+    };
     let mut loss_points = Vec::new();
-    for _ in 0..config.max_steps {
+    for _ in state.step..config.max_steps {
         let point = train_one_step(config, &surface, vocab_size, hidden_size, &mut state)?;
         loss_points.push(Qwen36RealLoraLossPoint {
             step: state.step,
@@ -319,11 +383,23 @@ pub fn run_qwen36_real_lora_sft(
     };
     let loss_curve_path = output_dir.join("loss_curve.json");
     write_json(&loss_curve_path, &loss_curve)?;
+    let state_checkpoint_path = output_dir.join("state_checkpoint.safetensors");
+    let state_checkpoint_bytes =
+        export_state_checkpoint_safetensors(config, hidden_size, vocab_size, &state)?;
+    fs::write(&state_checkpoint_path, state_checkpoint_bytes.as_slice()).map_err(|error| {
+        Qwen36RealLoraSftError::Io {
+            path: state_checkpoint_path.display().to_string(),
+            message: error.to_string(),
+        }
+    })?;
+    let state_checkpoint_sha256 = sha256_hex(state_checkpoint_bytes.as_slice());
     let checkpoint = checkpoint_summary(
         config,
         &state,
         adapter_path.as_path(),
         adapter_artifact_sha256.as_str(),
+        state_checkpoint_path.as_path(),
+        state_checkpoint_sha256.as_str(),
     );
     let checkpoint_summary_path = output_dir.join("checkpoint_summary.json");
     write_json(&checkpoint_summary_path, &checkpoint)?;
@@ -346,7 +422,9 @@ pub fn run_qwen36_real_lora_sft(
         model_dir: config.model_dir.clone(),
         model_hashes,
         train_type: config.train_type.clone(),
-        activation_mode: String::from(QWEN36_REAL_LORA_ACTIVATION_MODE),
+        qlora: qlora_metadata(config),
+        activation_mode: surface.activation_receipt.activation_mode.clone(),
+        activation_receipt: surface.activation_receipt.clone(),
         prompt_receipt: surface.prompt_receipt.clone(),
         target_token_id: config.target_token_id,
         candidate_token_ids: surface.candidate_token_ids.clone(),
@@ -359,8 +437,10 @@ pub fn run_qwen36_real_lora_sft(
             .iter()
             .map(|value| String::from(*value))
             .collect(),
+        requested_target_modules: config.target_modules.clone(),
+        resolved_target_modules,
         deferred_target_modules_reason: String::from(
-            "The dense attention/MLP LoRA target set is declared here, but this first real run trains only lm_head.weight because QWEN-FT-01 exposes sampled embedding/lm_head activations, not full layer activations yet.",
+            "The dense attention/MLP target set is now validated and the SFT surface comes from the bounded Rust full-layer activation path. The exported adapter remains LM-head LoRA because serving, DPO, and GRPO currently load that artifact shape; exact per-q_proj/k_proj/v_proj/o_proj/gate/up/down backward kernels remain the next implementation step.",
         ),
         lora_rank: config.lora_rank,
         lora_alpha: config.lora_alpha,
@@ -380,12 +460,14 @@ pub fn run_qwen36_real_lora_sft(
         adapter_identity_digest,
         loss_curve_path: loss_curve_path.display().to_string(),
         checkpoint_summary_path: checkpoint_summary_path.display().to_string(),
+        state_checkpoint_path: state_checkpoint_path.display().to_string(),
+        state_checkpoint_sha256,
         dpo_grpo_adapter_compatibility: String::from(
             "The artifact exports lm_head.lora_A.weight and lm_head.lora_B.weight in the same safetensors shape consumed by the existing legal DPO and GRPO parent-adapter paths.",
         ),
         python_invoked: false,
         claim_boundary: String::from(
-            "This is a real Qwen3.6-27B sampled-projection LoRA update: the hidden vector and sampled base logits come from the downloaded BF16 safetensors. It keeps all base weights frozen and trains only an LM-head LoRA adapter. It is not full transformer backprop through attention, MLP, linear attention, or MTP.",
+            "This is a real Qwen3.6-27B bounded full-layer LoRA update: the hidden vector comes from the downloaded BF16 safetensors after the Rust row-sparse layer-stack smoke. It keeps all base weights frozen and trains a loadable LM-head LoRA adapter. It is not exact full-width transformer backprop through q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, or down_proj yet.",
         ),
         receipt_digest: String::new(),
     };
@@ -398,6 +480,7 @@ pub fn run_qwen36_real_lora_sft(
         receipt_path: receipt_path.display().to_string(),
         loss_curve_path: loss_curve_path.display().to_string(),
         checkpoint_summary_path: checkpoint_summary_path.display().to_string(),
+        state_checkpoint_path: state_checkpoint_path.display().to_string(),
         receipt,
     })
 }
@@ -428,9 +511,97 @@ impl Qwen36RealLoraState {
     }
 }
 
+fn activation_surface(
+    model_dir: &str,
+    prompt: &str,
+    candidate_token_ids: &[u32],
+    activation_source: &str,
+) -> Result<Qwen36RealLoraActivationSurface, Qwen36RealLoraSftError> {
+    match activation_source {
+        QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER => {
+            let surface =
+                qwen36_full_forward_training_surface(model_dir, prompt, candidate_token_ids)?;
+            Ok(Qwen36RealLoraActivationSurface::from(surface))
+        }
+        QWEN36_REAL_LORA_ACTIVATION_SOURCE_SAMPLED => {
+            let surface =
+                qwen36_sampled_projection_training_surface(model_dir, prompt, candidate_token_ids)?;
+            Ok(Qwen36RealLoraActivationSurface::from(surface))
+        }
+        other => Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+            "unsupported activation_source `{other}`"
+        ))),
+    }
+}
+
+impl From<Qwen36FullForwardTrainingSurface> for Qwen36RealLoraActivationSurface {
+    fn from(surface: Qwen36FullForwardTrainingSurface) -> Self {
+        let full_attention_layer_count = surface
+            .layer_receipts
+            .iter()
+            .filter(|receipt| receipt.layer_type == "full_attention")
+            .count();
+        let linear_attention_layer_count = surface
+            .layer_receipts
+            .iter()
+            .filter(|receipt| receipt.layer_type == "linear_attention")
+            .count();
+        let mtp_layer_count = surface
+            .layer_receipts
+            .iter()
+            .filter(|receipt| receipt.layer_type == "mtp_full_attention")
+            .count();
+        Self {
+            prompt_receipt: surface.prompt_receipt,
+            candidate_token_ids: surface.candidate_token_ids,
+            hidden_state: surface.hidden_state,
+            hidden_state_sha256: surface.hidden_state_sha256,
+            base_sampled_logits: surface.base_sampled_logits,
+            logits_sha256: surface.logits_sha256,
+            tensor_reads: surface.tensor_reads,
+            activation_receipt: Qwen36RealLoraActivationReceipt {
+                activation_source: String::from(QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER),
+                activation_mode: surface.activation_mode,
+                exact_full_width_logits: surface.exact_full_width_logits,
+                layer_receipt_count: surface.layer_receipts.len(),
+                full_attention_layer_count,
+                linear_attention_layer_count,
+                mtp_layer_count,
+                claim_boundary: surface.claim_boundary,
+            },
+        }
+    }
+}
+
+impl From<Qwen36SampledProjectionTrainingSurface> for Qwen36RealLoraActivationSurface {
+    fn from(surface: Qwen36SampledProjectionTrainingSurface) -> Self {
+        Self {
+            prompt_receipt: surface.prompt_receipt,
+            candidate_token_ids: surface.candidate_token_ids,
+            hidden_state: surface.hidden_state,
+            hidden_state_sha256: surface.hidden_state_sha256,
+            base_sampled_logits: surface.base_sampled_logits,
+            logits_sha256: surface.logits_sha256,
+            tensor_reads: surface.tensor_reads,
+            activation_receipt: Qwen36RealLoraActivationReceipt {
+                activation_source: String::from(QWEN36_REAL_LORA_ACTIVATION_SOURCE_SAMPLED),
+                activation_mode: String::from(QWEN36_REAL_LORA_ACTIVATION_MODE),
+                exact_full_width_logits: false,
+                layer_receipt_count: 0,
+                full_attention_layer_count: 0,
+                linear_attention_layer_count: 0,
+                mtp_layer_count: 0,
+                claim_boundary: String::from(
+                    "This fallback activation surface uses the embedding row directly and does not execute the Qwen3.6 layer stack.",
+                ),
+            },
+        }
+    }
+}
+
 fn train_one_step(
     config: &Qwen36RealLoraSftConfig,
-    surface: &Qwen36SampledProjectionTrainingSurface,
+    surface: &Qwen36RealLoraActivationSurface,
     vocab_size: usize,
     hidden_size: usize,
     state: &mut Qwen36RealLoraState,
@@ -533,6 +704,15 @@ fn validate_config(config: &Qwen36RealLoraSftConfig) -> Result<(), Qwen36RealLor
             "train_type must be `lora` or `qlora`",
         )));
     }
+    if !matches!(
+        config.activation_source.as_str(),
+        QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER | QWEN36_REAL_LORA_ACTIVATION_SOURCE_SAMPLED
+    ) {
+        return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+            "activation_source must be `{QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER}` or `{QWEN36_REAL_LORA_ACTIVATION_SOURCE_SAMPLED}`",
+        )));
+    }
+    resolve_target_modules(config.target_modules.as_slice())?;
     if config.lora_rank == 0
         || !config.lora_alpha.is_finite()
         || config.lora_alpha <= 0.0
@@ -561,8 +741,36 @@ fn validate_config(config: &Qwen36RealLoraSftConfig) -> Result<(), Qwen36RealLor
     Ok(())
 }
 
+fn resolve_target_modules(
+    target_modules: &[String],
+) -> Result<Vec<String>, Qwen36RealLoraSftError> {
+    if target_modules.is_empty() || target_modules.iter().any(|value| value == "all-linear") {
+        return Ok(QWEN36_DENSE_REAL_LORA_TARGET_MODULES
+            .iter()
+            .map(|value| String::from(*value))
+            .collect());
+    }
+    let mut resolved = Vec::new();
+    for module in target_modules {
+        if module == "router" || module == "experts" || module.contains("moe") {
+            return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+                "Qwen3.6-27B legal SFT refuses router/MoE target `{module}`; the dense 27B path supports attention and MLP linear modules only",
+            )));
+        }
+        if !QWEN36_DENSE_REAL_LORA_TARGET_MODULES.contains(&module.as_str()) {
+            return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+                "unsupported Qwen3.6 dense LoRA target `{module}`"
+            )));
+        }
+        if !resolved.contains(module) {
+            resolved.push(module.clone());
+        }
+    }
+    Ok(resolved)
+}
+
 fn surface_shape(
-    surface: &Qwen36SampledProjectionTrainingSurface,
+    surface: &Qwen36RealLoraActivationSurface,
 ) -> Result<(usize, usize), Qwen36RealLoraSftError> {
     let read = surface.tensor_reads.first().ok_or_else(|| {
         Qwen36RealLoraSftError::InvalidConfig(String::from("missing tensor reads"))
@@ -665,8 +873,10 @@ fn export_lm_head_lora_safetensors(
             "base_model": QWEN36_27B_MODEL_ID,
             "served_model_id": QWEN36_27B_SERVED_MODEL_ID,
             "train_type": config.train_type,
-            "activation_mode": QWEN36_REAL_LORA_ACTIVATION_MODE,
+            "activation_source": config.activation_source,
             "active_trainable_target": QWEN36_REAL_LORA_ACTIVE_TARGET,
+            "requested_target_modules": config.target_modules,
+            "qlora": qlora_metadata(config),
             "frozen_base_weights": true,
         })
         .to_string(),
@@ -695,11 +905,173 @@ fn export_lm_head_lora_safetensors(
     .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))
 }
 
+fn export_state_checkpoint_safetensors(
+    config: &Qwen36RealLoraSftConfig,
+    hidden_size: usize,
+    vocab_size: usize,
+    state: &Qwen36RealLoraState,
+) -> Result<Vec<u8>, Qwen36RealLoraSftError> {
+    let mut metadata = HashMap::new();
+    metadata.insert(
+        String::from("psionic.qwen36_real_lora_state_checkpoint"),
+        serde_json::json!({
+            "schema_version": QWEN36_REAL_LORA_STATE_CHECKPOINT_SCHEMA_VERSION,
+            "run_id": config.run_id,
+            "step": state.step,
+            "lora_rank": config.lora_rank,
+            "hidden_size": hidden_size,
+            "vocab_size": vocab_size,
+            "activation_source": config.activation_source,
+            "train_type": config.train_type,
+            "frozen_base_weights": true,
+        })
+        .to_string(),
+    );
+    let lora_a = encode_f32_bytes(&state.lora_a);
+    let lora_b = encode_f32_bytes(&state.lora_b);
+    let adam_m_a = encode_f32_bytes(&state.adam_m_a);
+    let adam_v_a = encode_f32_bytes(&state.adam_v_a);
+    let adam_m_b = encode_f32_bytes(&state.adam_m_b);
+    let adam_v_b = encode_f32_bytes(&state.adam_v_b);
+    let view_lora_a = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![config.lora_rank, hidden_size],
+        lora_a.as_slice(),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    let view_lora_b = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![vocab_size, config.lora_rank],
+        lora_b.as_slice(),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    let view_adam_m_a = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![config.lora_rank, hidden_size],
+        adam_m_a.as_slice(),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    let view_adam_v_a = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![config.lora_rank, hidden_size],
+        adam_v_a.as_slice(),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    let view_adam_m_b = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![vocab_size, config.lora_rank],
+        adam_m_b.as_slice(),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    let view_adam_v_b = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![vocab_size, config.lora_rank],
+        adam_v_b.as_slice(),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    serialize(
+        [
+            ("lora_A.weight", view_lora_a),
+            ("lora_B.weight", view_lora_b),
+            ("adam_m_A", view_adam_m_a),
+            ("adam_v_A", view_adam_v_a),
+            ("adam_m_B", view_adam_m_b),
+            ("adam_v_B", view_adam_v_b),
+        ],
+        Some(metadata),
+    )
+    .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))
+}
+
+fn load_state_checkpoint(
+    path: &Path,
+    config: &Qwen36RealLoraSftConfig,
+    vocab_size: usize,
+    hidden_size: usize,
+) -> Result<Qwen36RealLoraState, Qwen36RealLoraSftError> {
+    let bytes = fs::read(path).map_err(|error| Qwen36RealLoraSftError::Io {
+        path: path.display().to_string(),
+        message: error.to_string(),
+    })?;
+    let tensors = SafeTensors::deserialize(bytes.as_slice())
+        .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    let metadata = read_state_checkpoint_metadata(bytes.as_slice())?;
+    let step = metadata
+        .get("step")
+        .and_then(|value| value.as_u64())
+        .ok_or_else(|| {
+            Qwen36RealLoraSftError::InvalidConfig(String::from(
+                "state checkpoint metadata is missing step",
+            ))
+        })?;
+    let checkpoint_rank = metadata
+        .get("lora_rank")
+        .and_then(|value| value.as_u64())
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or_else(|| {
+            Qwen36RealLoraSftError::InvalidConfig(String::from(
+                "state checkpoint metadata is missing lora_rank",
+            ))
+        })?;
+    if checkpoint_rank != config.lora_rank {
+        return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+            "state checkpoint rank {checkpoint_rank} does not match config rank {}",
+            config.lora_rank
+        )));
+    }
+    Ok(Qwen36RealLoraState {
+        step,
+        lora_a: decode_state_tensor(&tensors, "lora_A.weight", &[config.lora_rank, hidden_size])?,
+        lora_b: decode_state_tensor(&tensors, "lora_B.weight", &[vocab_size, config.lora_rank])?,
+        adam_m_a: decode_state_tensor(&tensors, "adam_m_A", &[config.lora_rank, hidden_size])?,
+        adam_v_a: decode_state_tensor(&tensors, "adam_v_A", &[config.lora_rank, hidden_size])?,
+        adam_m_b: decode_state_tensor(&tensors, "adam_m_B", &[vocab_size, config.lora_rank])?,
+        adam_v_b: decode_state_tensor(&tensors, "adam_v_B", &[vocab_size, config.lora_rank])?,
+    })
+}
+
+fn read_state_checkpoint_metadata(
+    bytes: &[u8],
+) -> Result<serde_json::Value, Qwen36RealLoraSftError> {
+    let header_len_bytes: [u8; 8] = bytes
+        .get(..8)
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| {
+            Qwen36RealLoraSftError::InvalidConfig(String::from(
+                "state checkpoint safetensors header is missing length prefix",
+            ))
+        })?;
+    let header_len = usize::try_from(u64::from_le_bytes(header_len_bytes)).map_err(|_| {
+        Qwen36RealLoraSftError::InvalidConfig(String::from(
+            "state checkpoint safetensors header length is too large",
+        ))
+    })?;
+    let header = bytes.get(8..8 + header_len).ok_or_else(|| {
+        Qwen36RealLoraSftError::InvalidConfig(String::from(
+            "state checkpoint safetensors header is truncated",
+        ))
+    })?;
+    let header = serde_json::from_slice::<serde_json::Value>(header)?;
+    let metadata = header
+        .get("__metadata__")
+        .and_then(|value| value.as_object())
+        .and_then(|metadata| metadata.get("psionic.qwen36_real_lora_state_checkpoint"))
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| {
+            Qwen36RealLoraSftError::InvalidConfig(String::from(
+                "state checkpoint is missing psionic.qwen36_real_lora_state_checkpoint metadata",
+            ))
+        })?;
+    Ok(serde_json::from_str::<serde_json::Value>(metadata)?)
+}
+
 fn checkpoint_summary(
     config: &Qwen36RealLoraSftConfig,
     state: &Qwen36RealLoraState,
     adapter_path: &Path,
     adapter_artifact_sha256: &str,
+    state_checkpoint_path: &Path,
+    state_checkpoint_sha256: &str,
 ) -> Qwen36RealLoraCheckpointSummary {
     let optimizer_state_sha256 = stable_json_digest(
         b"qwen36_real_lora_optimizer_state|",
@@ -717,7 +1089,18 @@ fn checkpoint_summary(
         step: state.step,
         adapter_artifact_path: adapter_path.display().to_string(),
         adapter_artifact_sha256: String::from(adapter_artifact_sha256),
+        state_checkpoint_path: state_checkpoint_path.display().to_string(),
+        state_checkpoint_sha256: String::from(state_checkpoint_sha256),
         optimizer_state_sha256,
+        scheduler_cursor_state_sha256: stable_json_digest(
+            b"qwen36_real_lora_scheduler_cursor|",
+            &serde_json::json!({
+                "run_id": config.run_id,
+                "completed_step": state.step,
+                "resume_next_step": state.step.saturating_add(1),
+                "max_steps": config.max_steps,
+            }),
+        ),
         state_digest: String::new(),
     };
     checkpoint.state_digest = stable_json_digest(b"qwen36_real_lora_checkpoint|", &checkpoint);
@@ -761,12 +1144,67 @@ fn optimizer_receipt(config: &Qwen36RealLoraSftConfig) -> Qwen36RealLoraOptimize
     }
 }
 
+fn qlora_metadata(config: &Qwen36RealLoraSftConfig) -> Qwen36RealLoraQloraMetadata {
+    if config.train_type == "qlora" {
+        Qwen36RealLoraQloraMetadata {
+            enabled: true,
+            base_weight_quantization: String::from("ggml_q4_k_compatible_control_plane"),
+            adapter_weight_dtype: String::from("f32"),
+            compatibility_note: String::from(
+                "QLoRA jobs keep the base checkpoint frozen and record q4_k compatibility for lower-memory Pylon placement. The current Rust trainer still writes F32 adapter deltas; exact 4-bit base matmul kernels are not part of this SFT command.",
+            ),
+        }
+    } else {
+        Qwen36RealLoraQloraMetadata {
+            enabled: false,
+            base_weight_quantization: String::from("none"),
+            adapter_weight_dtype: String::from("f32"),
+            compatibility_note: String::from(
+                "LoRA jobs train F32 adapter deltas over frozen BF16 Qwen3.6 base weights.",
+            ),
+        }
+    }
+}
+
 fn model_hashes(model_dir: &Path) -> Result<Qwen36RealModelHashes, Qwen36RealLoraSftError> {
     Ok(Qwen36RealModelHashes {
         config_sha256: sha256_file(&model_dir.join("config.json"))?,
         tokenizer_sha256: sha256_file(&model_dir.join("tokenizer.json"))?,
         index_sha256: sha256_file(&model_dir.join("model.safetensors.index.json"))?,
     })
+}
+
+fn decode_state_tensor(
+    tensors: &SafeTensors<'_>,
+    name: &str,
+    expected_shape: &[usize],
+) -> Result<Vec<f32>, Qwen36RealLoraSftError> {
+    let tensor = tensors
+        .tensor(name)
+        .map_err(|error| Qwen36RealLoraSftError::Safetensors(error.to_string()))?;
+    if tensor.dtype() != SafeTensorsDType::F32 {
+        return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+            "state checkpoint tensor `{name}` must be F32, found {:?}",
+            tensor.dtype()
+        )));
+    }
+    if tensor.shape() != expected_shape {
+        return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+            "state checkpoint tensor `{name}` shape {:?} did not match {:?}",
+            tensor.shape(),
+            expected_shape
+        )));
+    }
+    let data = tensor.data();
+    if data.len() % 4 != 0 {
+        return Err(Qwen36RealLoraSftError::InvalidConfig(format!(
+            "state checkpoint tensor `{name}` byte length is not divisible by 4"
+        )));
+    }
+    Ok(data
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect())
 }
 
 fn trainable_parameter_count(rank: usize, hidden_size: usize, vocab_size: usize) -> u64 {
@@ -842,12 +1280,20 @@ fn default_real_train_type() -> String {
     String::from("lora")
 }
 
+fn default_activation_source() -> String {
+    String::from(QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER)
+}
+
 fn default_adapter_id() -> String {
-    String::from("qwen36-27b-real-lora-sampled-001")
+    String::from("qwen36-27b-real-lora-full-layer-smoke-001")
 }
 
 fn default_adapter_revision() -> String {
-    String::from("real-sampled-projection-001")
+    String::from("real-full-layer-smoke-001")
+}
+
+fn default_target_modules() -> Vec<String> {
+    vec![String::from("all-linear")]
 }
 
 fn default_lora_rank() -> usize {
@@ -879,23 +1325,21 @@ fn default_max_steps() -> u64 {
 }
 
 fn default_output_dir() -> String {
-    String::from("target/legal/qwen36_27b_real_lora_sft_sampled")
+    String::from("target/legal/qwen36_27b_real_lora_sft_full_layer")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn tiny_surface() -> Qwen36SampledProjectionTrainingSurface {
-        Qwen36SampledProjectionTrainingSurface {
+    fn tiny_surface() -> Qwen36RealLoraActivationSurface {
+        Qwen36RealLoraActivationSurface {
             prompt_receipt: Qwen36PromptReceipt {
                 template_id: String::from("test"),
                 reasoning_mode: psionic_models::Qwen36ReasoningMode::DirectAnswer,
                 prompt_hash: String::from("hash"),
                 token_count: 1,
             },
-            input_token_id: 2,
-            input_token_label: String::from("token:2"),
             candidate_token_ids: vec![0, 1, 2],
             hidden_state: vec![0.5, -0.25, 0.75, 0.1],
             hidden_state_sha256: String::from("hidden"),
@@ -926,6 +1370,16 @@ mod tests {
                 shape: vec![3, 4],
                 row_sha256: String::from("row"),
             }],
+            activation_receipt: Qwen36RealLoraActivationReceipt {
+                activation_source: String::from(QWEN36_REAL_LORA_ACTIVATION_SOURCE_FULL_LAYER),
+                activation_mode: String::from(QWEN36_REAL_LORA_FULL_LAYER_ACTIVATION_MODE),
+                exact_full_width_logits: false,
+                layer_receipt_count: 1,
+                full_attention_layer_count: 1,
+                linear_attention_layer_count: 0,
+                mtp_layer_count: 0,
+                claim_boundary: String::from("test surface"),
+            },
         }
     }
 
@@ -976,6 +1430,66 @@ mod tests {
         train_one_step(&config, &surface, 3, 4, &mut resumed).expect("step 2");
 
         assert_eq!(uninterrupted, resumed);
+    }
+
+    #[test]
+    fn qwen36_real_lora_state_checkpoint_roundtrips_resume_state() {
+        let config = Qwen36RealLoraSftConfig {
+            lora_rank: 2,
+            lora_alpha: 4.0,
+            learning_rate: 0.01,
+            max_steps: 2,
+            target_token_id: 2,
+            candidate_token_ids: vec![0, 1, 2],
+            ..Qwen36RealLoraSftConfig::default()
+        };
+        let surface = tiny_surface();
+        let mut uninterrupted = Qwen36RealLoraState::new(&config, 3, 4);
+        train_one_step(&config, &surface, 3, 4, &mut uninterrupted).expect("step 1");
+        let checkpoint_bytes =
+            export_state_checkpoint_safetensors(&config, 4, 3, &uninterrupted).expect("checkpoint");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let checkpoint_path = temp.path().join("state_checkpoint.safetensors");
+        fs::write(&checkpoint_path, checkpoint_bytes).expect("write checkpoint");
+
+        let mut resumed =
+            load_state_checkpoint(&checkpoint_path, &config, 3, 4).expect("load checkpoint");
+        train_one_step(&config, &surface, 3, 4, &mut uninterrupted).expect("step 2");
+        train_one_step(&config, &surface, 3, 4, &mut resumed).expect("resumed step 2");
+
+        assert_eq!(uninterrupted, resumed);
+    }
+
+    #[test]
+    fn qwen36_real_lora_target_module_checks_refuse_router_and_resolve_all_linear() {
+        let all = resolve_target_modules(&[String::from("all-linear")]).expect("all-linear");
+        assert_eq!(
+            all,
+            QWEN36_DENSE_REAL_LORA_TARGET_MODULES
+                .iter()
+                .map(|value| String::from(*value))
+                .collect::<Vec<_>>()
+        );
+
+        let error = resolve_target_modules(&[String::from("router")]).expect_err("router refused");
+        assert!(error.to_string().contains("refuses router/MoE"));
+    }
+
+    #[test]
+    fn qwen36_real_lora_qlora_mode_records_lower_memory_metadata() {
+        let config = Qwen36RealLoraSftConfig {
+            train_type: String::from("qlora"),
+            ..Qwen36RealLoraSftConfig::default()
+        };
+        validate_config(&config).expect("qlora config");
+        let metadata = qlora_metadata(&config);
+
+        assert!(metadata.enabled);
+        assert_eq!(
+            metadata.base_weight_quantization,
+            "ggml_q4_k_compatible_control_plane"
+        );
+        assert_eq!(metadata.adapter_weight_dtype, "f32");
     }
 
     #[test]

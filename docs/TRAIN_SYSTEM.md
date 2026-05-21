@@ -241,7 +241,7 @@ a Qwen3.6-27B target-path milestone. It does not claim full 27B weight loading
 or performance on private Harvey tasks. The `psionic-train sft` path now
 refuses `real_artifact_required` configs because it still consumes declared
 hidden-state samples. Real-artifact Qwen training now starts through the
-separate sampled-projection LoRA command documented below; full attention, MLP,
+separate full-layer-smoke LoRA command documented below; exact attention, MLP,
 linear-attention, and MTP backprop remains a later step. The Qwen legal lane
 now also has a placement planner
 in `crates/psionic-train/src/qwen_legal_training_placement.rs` and the example
@@ -590,46 +590,58 @@ full-vocabulary logits, multi-token generation, or training gradients.
 Unsupported model families, missing tensors, failed text tensor admission, and
 MoE/router paths still refuse plainly.
 
-The first real-weight Qwen3.6-27B LoRA training command is:
+The first real-weight Qwen3.6-27B full-layer-smoke LoRA training command is:
 
 ```bash
 cargo run -p psionic-train --example qwen36_27b_real_lora_sft -- \
-  --config configs/legal/qwen36_27b_real_lora_sft_sampled_projection.json
+  --model-dir target/models/qwen/Qwen3.6-27B \
+  --output-dir target/legal/qwen36_27b_real_lora_sft_full_layer_1076
 ```
 
 Recorded local result:
 
-- output directory: `target/legal/qwen36_27b_real_lora_sft_sampled`
-- activation mode: `sampled_embed_lm_head_projection_v1`
+- output directory: `target/legal/qwen36_27b_real_lora_sft_full_layer_1076`
+- activation mode: `bounded_full_layer_row_sparse_forward_v1`
+- activation layer receipts: `65`
 - active trainable target: `lm_head.weight`
-- declared future dense target set: `q_proj`, `k_proj`, `v_proj`, `o_proj`,
+- resolved dense target set: `q_proj`, `k_proj`, `v_proj`, `o_proj`,
   `gate_proj`, `up_proj`, `down_proj`
 - trainable parameter count: `1013760`
 - completed steps: `3`
-- initial loss: `1.9561191`
-- final loss: `1.9044642`
+- initial loss: `2.6618745`
+- final loss: `1.9467509`
 - loss improved: `true`
 - base logits sha256:
-  `c9044ffebd281f65473f855405f18a79b5fa272e0c76aa3bbf12b7e077aae6cf`
+  `bed623e2a8d992086b0ab346cc8216553a67884eefaefa110ba14e15dfc7144a`
 - hidden state sha256:
-  `c34400da3ff7eb9f11c5a88199b58948e33b396eb9cf3d0a8dca6247460992b2`
+  `80d36968a6ec661313d1091cffea73b9fdeb50fe7aa63270f45ce65578c9b97f`
 - adapter sha256:
-  `07ce9eced89fc0b559997f3a14f3420b4613c082910e1e08f210e8a591fec24d`
+  `7753611f0873897ed5e058d1b867288f986965e58d9c8b6a4d157849d86ad046`
 - adapter identity digest:
-  `f1f00a3041cbd2955ba516a7c7ddd14bc2ef1c282b64c06d6f970b6ee78ac1c0`
+  `852cb8ed66663ad3153e3a81017404777ead0ac68902b1e2bd0b585594a39939`
+- state checkpoint sha256:
+  `bfdd8a621128fbd87402e948a628f7ea8de9fbb137c2e1e103740f78976f2466`
 - training receipt digest:
-  `06699af478823dbc7dfc43c04e712213c88aa25fbcba8f4d27273d5bca9343ec`
-- receipt file sha256:
-  `d341dd727349f7d629a629ef50f24ac8fe4cc253f5da5e09d8bb59d9b19bcc11`
+  `37c0852e10fea7a16fe99249bff6b62c7d113b436f8430cf501e9ed9ba107954`
 - Python invoked: `false`
 - frozen base weights: `true`
 
-This is a real Qwen3.6-27B sampled-projection LoRA update: the hidden vector
-and sampled base logits come from the downloaded BF16 safetensors. The
-exported adapter uses the same `lm_head.lora_A.weight` /
-`lm_head.lora_B.weight` safetensors format already consumed by the DPO and
-GRPO parent-adapter loaders. It still is not full transformer backprop through
-attention, MLP, linear attention, or MTP.
+This is a real Qwen3.6-27B LoRA update over the downloaded BF16 safetensors.
+The training input now comes from the Rust bounded full-layer activation path
+instead of the old embedding-row sampled projection. The trainer validates
+the dense target module list, records QLoRA compatibility metadata when
+requested, keeps the base model frozen, and writes a resumable optimizer state
+checkpoint. The exported adapter still uses the same `lm_head.lora_A.weight`
+/ `lm_head.lora_B.weight` safetensors format already consumed by the DPO and
+GRPO parent-adapter loaders. Exact backward kernels for `q_proj`, `k_proj`,
+`v_proj`, `o_proj`, `gate_proj`, `up_proj`, and `down_proj` remain open work.
+
+Use `train_type: "lora"` when the Pylon can keep the BF16 base checkpoint
+available and train F32 adapter deltas. Use `train_type: "qlora"` for
+lower-memory Pylon placement; this records q4-k compatibility metadata and
+still emits F32 adapter deltas, while exact 4-bit base matmul kernels remain
+separate runtime work. Router and MoE target names still refuse in this dense
+27B SFT command.
 
 The first two-worker real-Qwen Pylon rehearsal command is:
 
@@ -656,8 +668,10 @@ Recorded local result:
 This rehearsal uses two local loopback Pylon identities, not remote tailnet
 workers. It proves signed worker receipts, adapter merge, public Rust Harvey
 eval, adapter load for serving, and deferred Bitcoin/Lightning payment
-closeout over the sampled real-Qwen LoRA path. It still does not prove private
-Harvey performance, remote Pylon execution, or full transformer backprop.
+closeout over the real-Qwen LoRA path. The trainer now uses the bounded
+full-layer-smoke activation surface by default. It still does not prove
+private Harvey performance, remote Pylon execution, or exact full-width
+transformer backprop.
 
 The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
 serve-side command

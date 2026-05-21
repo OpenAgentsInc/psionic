@@ -362,7 +362,7 @@ pub fn run_qwen36_real_pylon_rehearsal(
         payment_closeout_path: payment_closeout_path.display().to_string(),
         payment_closeout,
         claim_boundary: String::from(
-            "This is a local loopback two-Pylon rehearsal over real downloaded Qwen3.6-27B safetensor rows through the sampled-projection LoRA path. It proves two signed worker contributions, adapter merge, public Rust Harvey eval, serve-adapter admission, and deferred Bitcoin/Lightning payment closeout. It does not prove private Harvey benchmark performance, remote tailnet execution, or full transformer backprop.",
+            "This is a local loopback two-Pylon rehearsal over real downloaded Qwen3.6-27B safetensor rows through the bounded full-layer-smoke LoRA path. It proves two signed worker contributions, adapter merge, public Rust Harvey eval, serve-adapter admission, and deferred Bitcoin/Lightning payment closeout. It does not prove private Harvey benchmark performance, remote tailnet execution, or exact full-width transformer backprop.",
         ),
         report_json_path: report_json_path.display().to_string(),
         report_path: config.report_path.clone(),
@@ -485,7 +485,7 @@ fn worker_train_config(
         run_id: format!("{}-worker-{}", config.run_id, index + 1),
         model_dir: config.model_dir.clone(),
         adapter_id: format!("qwen36-27b-real-pylon-worker-{}", index + 1),
-        adapter_revision: String::from("sampled-lora-rehearsal-001"),
+        adapter_revision: String::from("full-layer-smoke-lora-rehearsal-001"),
         prompt: worker.prompt.clone(),
         target_token_id: worker.target_token_id,
         candidate_token_ids: worker.candidate_token_ids.clone(),
@@ -626,12 +626,12 @@ fn merge_manifest(
         parent_adapter_sha256: parent_adapter_sha256.clone(),
         base_model: QwenLegalLoraMergeBaseModel {
             base_model_id: String::from(QWEN36_27B_MODEL_ID),
-            base_model_revision: String::from("qwen3.6-27b-real-sampled-projection"),
+            base_model_revision: String::from("qwen3.6-27b-real-full-layer-smoke"),
             base_served_artifact_digest: model_hashes.index_sha256.clone(),
         },
         output_adapter: QwenLegalLoraMergeOutput {
             adapter_id: String::from("qwen36-27b-real-pylon-rehearsal-aggregate"),
-            adapter_revision: String::from("sampled-lora-001"),
+            adapter_revision: String::from("full-layer-smoke-lora-001"),
             path: merge_dir
                 .join("qwen36-27b-real-pylon-aggregate.safetensors")
                 .display()
@@ -643,7 +643,7 @@ fn merge_manifest(
             .map(|worker| QwenLegalLoraWorkerAdapterInput {
                 worker_id: worker.worker_id.clone(),
                 adapter_id: format!("adapter.{}", worker.worker_id),
-                adapter_revision: String::from("sampled-lora-rehearsal-001"),
+                adapter_revision: String::from("full-layer-smoke-lora-rehearsal-001"),
                 path: worker.adapter_artifact_path.clone(),
                 sha256: worker.adapter_artifact_sha256.clone(),
                 dataset_shard_hash: stable_json_digest(
@@ -673,7 +673,7 @@ fn merge_manifest(
                     ),
                     target_modules: target_modules.clone(),
                     optimizer_config_sha256: optimizer_config_sha256.clone(),
-                    precision_policy: String::from("bf16-base-f32-lora-sampled-projection"),
+                    precision_policy: String::from("bf16-base-f32-lora-full-layer-smoke"),
                     step_window_id: format!("{}.window.001", config.run_id),
                 }),
                 validator_replay: Some(QwenLegalLoraValidatorReplayClaim {
@@ -692,7 +692,7 @@ fn merge_manifest(
             corpus_manifest_sha256: suite_sha256.to_owned(),
             target_modules,
             optimizer_config_sha256,
-            precision_policy: String::from("bf16-base-f32-lora-sampled-projection"),
+            precision_policy: String::from("bf16-base-f32-lora-full-layer-smoke"),
             step_window_id: format!("{}.window.001", config.run_id),
         }),
         validation: Some(QwenLegalLoraMergeValidation {
@@ -725,11 +725,11 @@ fn serve_admission(
         .unwrap_or_default();
     let identity = AdapterArtifactIdentity::new(
         "qwen36-27b-real-pylon-rehearsal-aggregate",
-        "sampled-lora-001",
+        "full-layer-smoke-lora-001",
         AdapterArtifactKind::Lora,
         AdapterArtifactFormat::Safetensors,
         QWEN36_27B_MODEL_ID,
-        "qwen3.6-27b-real-sampled-projection",
+        "qwen3.6-27b-real-full-layer-smoke",
         merge_receipt.parent_adapter_sha256.clone(),
         merge_receipt.output_adapter_sha256.clone(),
         QuantizationMode::None,
@@ -867,7 +867,7 @@ fn write_markdown_report(
         report.payment_closeout.promotion_payment_gate_status,
     ));
     markdown.push_str("## What Ran\n\n");
-    markdown.push_str("Two local loopback Pylon identities each ran the Rust Qwen3.6 sampled-projection LoRA trainer against downloaded Qwen3.6-27B safetensor rows. Each worker produced a signed Pylon receipt, a payable decision, and an adapter. The adapters were merged, evaluated with the Rust public Harvey suite, loaded through the serving adapter path, and closed with an explicit deferred-payment proof.\n\n");
+    markdown.push_str("Two local loopback Pylon identities each ran the Rust Qwen3.6 bounded full-layer-smoke LoRA trainer against downloaded Qwen3.6-27B safetensor rows. Each worker produced a signed Pylon receipt, a payable decision, and an adapter. The adapters were merged, evaluated with the Rust public Harvey suite, loaded through the serving adapter path, and closed with an explicit deferred-payment proof.\n\n");
     markdown.push_str("## Workers\n\n");
     markdown.push_str("| worker | shard | loss | adapter sha256 | receipt | payment |\n");
     markdown.push_str("| --- | --- | ---: | --- | --- | --- |\n");
