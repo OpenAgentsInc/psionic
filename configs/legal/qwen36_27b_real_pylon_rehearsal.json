@@ -1,0 +1,7 @@
+{
+  "run_id": "qwen36-27b-real-pylon-rehearsal-001",
+  "model_dir": "target/models/qwen/Qwen3.6-27B",
+  "suite_path": "suites/harvey_public_three.json",
+  "output_dir": "target/legal/qwen36_27b_real_pylon_rehearsal_001",
+  "report_path": "reports/qwen36-27b-real-pylon-rehearsal-001.md"
+}

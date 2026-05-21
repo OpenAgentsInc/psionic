@@ -608,6 +608,34 @@ exported adapter uses the same `lm_head.lora_A.weight` /
 GRPO parent-adapter loaders. It still is not full transformer backprop through
 attention, MLP, linear attention, or MTP.
 
+The first two-worker real-Qwen Pylon rehearsal command is:
+
+```bash
+cargo run -p psionic-train --example qwen36_27b_real_pylon_rehearsal -- \
+  --config configs/legal/qwen36_27b_real_pylon_rehearsal.json
+```
+
+Recorded local result:
+
+- report: `reports/qwen36-27b-real-pylon-rehearsal-001.md`
+- workers accepted: `2 / 2`
+- worker 1 loss: `2.090468 -> 2.072220`
+- worker 2 loss: `2.090466 -> 2.054379`
+- merged adapter sha256:
+  `1b4828c2780a9f5352ce12e63e22015493b8de91ef6aedb41eed3de9780fa692`
+- public Harvey fixture candidate score: `10000` bps
+- public Harvey fixture delta: `6667` bps
+- promotion decision: `Promote`
+- payment gate: `DeferredByOperator`
+- report digest:
+  `38c17902de61f78f54cb5b3f6216a93b5283700f1d2b1ccd2f0ec4e15d64f993`
+
+This rehearsal uses two local loopback Pylon identities, not remote tailnet
+workers. It proves signed worker receipts, adapter merge, public Rust Harvey
+eval, adapter load for serving, and deferred Bitcoin/Lightning payment
+closeout over the sampled real-Qwen LoRA path. It still does not prove private
+Harvey performance, remote Pylon execution, or full transformer backprop.
+
 The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
 serve-side command
 `cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- --model Qwen3.6-35B-A3B --prompt fixtures/legal/smoke.prompt`

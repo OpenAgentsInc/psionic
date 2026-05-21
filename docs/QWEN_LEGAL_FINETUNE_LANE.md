@@ -477,6 +477,35 @@ exports the same `lm_head.lora_A.weight` / `lm_head.lora_B.weight`
 safetensors format used by the legal DPO and GRPO parent-adapter loaders. It
 still does not backprop through the full transformer layers.
 
+The first two-worker real-Qwen Pylon rehearsal command is:
+
+```bash
+cargo run -p psionic-train --example qwen36_27b_real_pylon_rehearsal -- \
+  --config configs/legal/qwen36_27b_real_pylon_rehearsal.json
+```
+
+Recorded local result:
+
+- report: `reports/qwen36-27b-real-pylon-rehearsal-001.md`
+- workers accepted: `2 / 2`
+- worker 1 loss: `2.090468 -> 2.072220`
+- worker 2 loss: `2.090466 -> 2.054379`
+- merged adapter sha256:
+  `1b4828c2780a9f5352ce12e63e22015493b8de91ef6aedb41eed3de9780fa692`
+- public Harvey fixture candidate score: `10000` bps
+- public Harvey fixture delta: `6667` bps
+- promotion decision: `Promote`
+- payment gate: `DeferredByOperator`
+- report digest:
+  `38c17902de61f78f54cb5b3f6216a93b5283700f1d2b1ccd2f0ec4e15d64f993`
+
+This is the first end-to-end rehearsal that combines the sampled real-Qwen
+LoRA trainer with two signed Pylon worker receipts, adapter merge, public Rust
+Harvey eval, serving-adapter admission, and deferred Bitcoin/Lightning
+payment closeout. It uses local loopback Pylon identities. It does not claim
+remote tailnet worker execution, private Harvey performance, or full
+transformer backprop.
+
 The legal SFT command now also fails closed for `real_artifact_required`
 configs. That command still trains from declared hidden-state samples. It will
 not accept real Qwen safetensors and silently fall back to synthetic hidden
