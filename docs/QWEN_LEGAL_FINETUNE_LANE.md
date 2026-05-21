@@ -12,7 +12,8 @@
 > command surface and Pylon payment settlement receipts added on 2026-05-20;
 > Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20;
 > real Qwen3.6-27B text tensor admission added on 2026-05-21; Qwen3.6
-> training placement planner added on 2026-05-21.
+> training placement planner and locked corpus bundle builder added on
+> 2026-05-21.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -408,6 +409,69 @@ MoE router/gate training, and the planner can prove where the frozen base,
 adapter, optimizer state, and activation checkpoints fit before dispatch.
 `Qwen/Qwen3.6-35B-A3B` stays in the target set, but the router and gate stay
 frozen until a separate issue opens real MoE-router training.
+
+## Locked Qwen Legal Corpus Bundle
+
+The lane now has one Rust command that builds the full training corpus bundle
+for Qwen legal fine-tuning:
+
+```bash
+cargo run -p psionic-data --example qwen_legal_corpus_bundle -- \
+  --runs tasks/synthetic/legal-workflow-v1/training/dpo_run_sample \
+  --out target/legal/qwen_corpus/qwen-legal-corpus-smoke \
+  --corpus-id qwen-legal-corpus-smoke \
+  --sft-shards 2
+```
+
+The builder writes one locked bundle with:
+
+- `sft/all.jsonl`, `sft/train.jsonl`, and `sft/dev.jsonl`
+- `dpo/all.jsonl`, `dpo/train.jsonl`, and `dpo/dev.jsonl`
+- `grpo/rollout_seeds.jsonl`, `grpo/rollout_seeds.train.jsonl`, and
+  `grpo/rollout_seeds.dev.jsonl`
+- `eval/eval_pack.json`
+- `shards/sft_train/shard_manifest.json` plus concrete SFT shard JSONL files
+- `manifest.json`
+- `receipt.json`
+
+Recorded local smoke result:
+
+- corpus id: `qwen-legal-corpus-smoke`
+- SFT train records: `35`
+- DPO train pairs: `1273`
+- GRPO rollout seeds: `1408`
+- Pylon SFT shard refs: `2`
+- manifest:
+  `target/legal/qwen_corpus/qwen-legal-corpus-smoke/manifest.json`
+- receipt:
+  `target/legal/qwen_corpus/qwen-legal-corpus-smoke/receipt.json`
+- manifest hash:
+  `sha256:fa0a2c9e0b86f569b7574739f715b691624dcf4ac485bc56fd9a0778224d81dc`
+
+Plain split meaning:
+
+- `train` contains material the model may learn from.
+- `dev` is public or synthetic material held out by stable id hash for local
+  checks during training.
+- `private_eval` is a boundary only. Private eval tasks, judge-only labels,
+  and private answers are not written into trainable corpus files.
+
+The manifest records every source input file hash and every generated output
+hash. It also records the split rule version:
+`psionic.qwen_legal.corpus_split_rules.v1`, so train/dev boundaries do not move
+between runs unless that rule version changes.
+
+Leakage handling is explicit. Public and synthetic training records can enter
+trainable files if answer integrity is valid and the answer file was
+model-written. Private, hidden, scorer-only, judge-only, harness-injected, and
+private-answer material is rejected from trainable outputs. Rejected traces
+enter DPO and GRPO only when they are explicitly marked `training_eligible`
+and carry failure-family labels.
+
+The Pylon handoff is also explicit. The bundle manifest includes
+`pylon_shard_refs`, each with a stable `corpus_shard_id`, source shard id,
+manifest hash, dataset hash, artifact hash, and shard path. Pylon jobs can use
+those ids directly instead of guessing which JSONL file belongs to a worker.
 
 The exact SFT smoke for this target is:
 
