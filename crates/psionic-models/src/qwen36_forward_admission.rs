@@ -1,22 +1,26 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File},
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
+use half::{bf16, f16};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    PromptMessage, PromptMessageRole, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
+    load_qwen36_model_config, normalize_qwen36_target_model_id, PromptMessage, PromptMessageRole,
     Qwen36PromptOptions, Qwen36PromptReceipt, Qwen36PromptRenderer, Qwen36ReasoningMode,
-    Qwen36TargetPathError, load_qwen36_model_config, normalize_qwen36_target_model_id,
+    Qwen36TargetPathError, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
 };
 
 pub const QWEN36_FORWARD_ADMISSION_SCHEMA_VERSION: &str = "psionic.qwen36_27b_forward_admission.v1";
 pub const QWEN36_FORWARD_REFUSAL_CODE: &str = "qwen3_5_text_forward_not_implemented";
+pub const QWEN36_SAMPLED_PROJECTION_BACKEND: &str = "local-sampled-projection";
+const QWEN36_EMBED_TOKENS_WEIGHT: &str = "model.language_model.embed_tokens.weight";
+const QWEN36_LM_HEAD_WEIGHT: &str = "lm_head.weight";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Qwen36ForwardArchitectureReport {
@@ -108,6 +112,38 @@ pub struct Qwen36TensorAdmissionReport {
 #[serde(rename_all = "snake_case")]
 pub enum Qwen36ForwardExecutionStatus {
     Refused,
+    SampledProjection,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36TensorRowReadReceipt {
+    pub tensor_name: String,
+    pub shard_name: String,
+    pub shard_path: String,
+    pub row_index: usize,
+    pub dtype: String,
+    pub shape: Vec<usize>,
+    pub row_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36SampledLogit {
+    pub token_id: u32,
+    pub token_label: String,
+    pub logit: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen36ForwardProjectionReceipt {
+    pub mode: String,
+    pub input_token_id: u32,
+    pub input_token_label: String,
+    pub candidate_token_ids: Vec<u32>,
+    pub sampled_logits: Vec<Qwen36SampledLogit>,
+    pub logits_sha256: String,
+    pub tensor_reads: Vec<Qwen36TensorRowReadReceipt>,
+    pub hidden_size: usize,
+    pub used_full_transformer_layers: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -129,6 +165,8 @@ pub struct Qwen36ForwardAdmissionRunReport {
     pub backend: String,
     pub precision: String,
     pub forward_execution_status: Qwen36ForwardExecutionStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection_receipt: Option<Qwen36ForwardProjectionReceipt>,
     pub refusal_code: String,
     pub refusal_detail: String,
     pub claim_boundary: String,
@@ -167,7 +205,7 @@ pub fn run_qwen36_forward_admission(
     let observed_tensors = qwen36_observed_tensors_from_shards(&shard_paths)?;
     let expected_tensors = qwen36_expected_text_tensor_specs(&architecture)?;
     let tensor_admission =
-        qwen36_tensor_admission_report(expected_tensors, weight_map, observed_tensors);
+        qwen36_tensor_admission_report(expected_tensors, weight_map.clone(), observed_tensors);
     let tensor_admission_sha256 = sha256_json(&tensor_admission)?;
 
     let prompt = fs::read_to_string(prompt_path).map_err(|source| Qwen36TargetPathError::Io {
@@ -189,6 +227,50 @@ pub fn run_qwen36_forward_admission(
             emit_empty_think_block: true,
         },
     )?;
+    let prompt_receipt = Qwen36PromptReceipt::from(&rendered);
+    let projection_receipt = if should_run_sampled_projection(backend) {
+        if !tensor_admission.text_tensor_admission_passed {
+            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
+                "sampled Qwen3.6 projection requires text tensor admission to pass first",
+            )));
+        }
+        Some(qwen36_sampled_projection_receipt(
+            model_dir,
+            &weight_map,
+            &architecture,
+            &rendered,
+        )?)
+    } else {
+        None
+    };
+    let forward_execution_status = if projection_receipt.is_some() {
+        Qwen36ForwardExecutionStatus::SampledProjection
+    } else {
+        Qwen36ForwardExecutionStatus::Refused
+    };
+    let refusal_code = if projection_receipt.is_some() {
+        String::from("qwen3_5_text_full_transformer_forward_not_implemented")
+    } else {
+        String::from(QWEN36_FORWARD_REFUSAL_CODE)
+    };
+    let refusal_detail = if projection_receipt.is_some() {
+        String::from(
+            "Psionic read real Qwen3.6-27B embed_tokens and lm_head rows from safetensors and computed deterministic sampled projection logits. It still does not run the qwen3_5_text transformer stack, so this is not a full model forward pass.",
+        )
+    } else {
+        String::from(
+            "Psionic can now verify the real Qwen3.6-27B text tensor table from safetensors headers. It still lacks the qwen3_5_text mixed linear-attention/full-attention/MTP forward kernels, so it refuses logits instead of pretending to run inference.",
+        )
+    };
+    let claim_boundary = if projection_receipt.is_some() {
+        String::from(
+            "This report reads the real Qwen/Qwen3.6-27B config, tokenizer, index, safetensors headers, one real embedding row, and sampled real lm_head rows; it computes sampled projection logits and hashes the rows and logits. It does not run attention, MLP, linear attention, MTP, generation, or LoRA training.",
+        )
+    } else {
+        String::from(
+            "This report reads the real Qwen/Qwen3.6-27B config, tokenizer, index, and safetensors headers; validates the required text tensor names, dtypes, and shapes; and records a typed refusal for forward execution. It does not produce logits or train from live Qwen3.6 activations.",
+        )
+    };
 
     Ok(Qwen36ForwardAdmissionRunReport {
         schema_version: String::from(QWEN36_FORWARD_ADMISSION_SCHEMA_VERSION),
@@ -202,19 +284,16 @@ pub fn run_qwen36_forward_admission(
         index_path: index_path.display().to_string(),
         index_sha256: sha256_hex(index_bytes.as_slice()),
         architecture,
-        prompt_receipt: Qwen36PromptReceipt::from(&rendered),
+        prompt_receipt,
         tensor_admission,
         tensor_admission_sha256,
         backend: String::from(backend),
         precision: config.torch_dtype,
-        forward_execution_status: Qwen36ForwardExecutionStatus::Refused,
-        refusal_code: String::from(QWEN36_FORWARD_REFUSAL_CODE),
-        refusal_detail: String::from(
-            "Psionic can now verify the real Qwen3.6-27B text tensor table from safetensors headers. It still lacks the qwen3_5_text mixed linear-attention/full-attention/MTP forward kernels, so it refuses logits instead of pretending to run inference.",
-        ),
-        claim_boundary: String::from(
-            "This report reads the real Qwen/Qwen3.6-27B config, tokenizer, index, and safetensors headers; validates the required text tensor names, dtypes, and shapes; and records a typed refusal for forward execution. It does not produce logits or train from live Qwen3.6 activations.",
-        ),
+        forward_execution_status,
+        projection_receipt,
+        refusal_code,
+        refusal_detail,
+        claim_boundary,
     })
 }
 
@@ -662,6 +741,324 @@ fn qwen36_safetensors_header(
     Ok((shard, tensors))
 }
 
+fn should_run_sampled_projection(backend: &str) -> bool {
+    backend == QWEN36_SAMPLED_PROJECTION_BACKEND || backend == "local-real-sampled-projection"
+}
+
+fn qwen36_sampled_projection_receipt(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    architecture: &Qwen36ForwardArchitectureReport,
+    rendered: &crate::Qwen36RenderedPrompt,
+) -> Result<Qwen36ForwardProjectionReceipt, Qwen36TargetPathError> {
+    let input_token_id = rendered.token_ids.last().copied().ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(String::from(
+            "sampled Qwen3.6 projection requires tokenizer token ids",
+        ))
+    })?;
+    let candidate_token_ids =
+        qwen36_sampled_candidate_token_ids(input_token_id, architecture.vocab_size);
+    let embed_row = qwen36_read_indexed_tensor_row(
+        model_dir,
+        weight_map,
+        QWEN36_EMBED_TOKENS_WEIGHT,
+        input_token_id as usize,
+    )?;
+    if embed_row.shape != [architecture.vocab_size, architecture.hidden_size] {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "unexpected shape for {QWEN36_EMBED_TOKENS_WEIGHT}: {:?}",
+            embed_row.shape
+        )));
+    }
+    let mut tensor_reads = vec![embed_row.receipt.clone()];
+    let mut sampled_logits = Vec::with_capacity(candidate_token_ids.len());
+    for token_id in &candidate_token_ids {
+        let lm_row = qwen36_read_indexed_tensor_row(
+            model_dir,
+            weight_map,
+            QWEN36_LM_HEAD_WEIGHT,
+            *token_id as usize,
+        )?;
+        if lm_row.shape != [architecture.vocab_size, architecture.hidden_size] {
+            return Err(Qwen36TargetPathError::InvalidConfig(format!(
+                "unexpected shape for {QWEN36_LM_HEAD_WEIGHT}: {:?}",
+                lm_row.shape
+            )));
+        }
+        if lm_row.values.len() != embed_row.values.len() {
+            return Err(Qwen36TargetPathError::InvalidConfig(format!(
+                "Qwen3.6 sampled projection width mismatch: embed {} versus lm_head {}",
+                embed_row.values.len(),
+                lm_row.values.len()
+            )));
+        }
+        let logit = embed_row
+            .values
+            .iter()
+            .zip(lm_row.values.iter())
+            .map(|(left, right)| f64::from(*left) * f64::from(*right))
+            .sum::<f64>();
+        tensor_reads.push(lm_row.receipt);
+        sampled_logits.push(Qwen36SampledLogit {
+            token_id: *token_id,
+            token_label: token_label(*token_id),
+            logit,
+        });
+    }
+    let logits_sha256 = sha256_json(&sampled_logits)?;
+    Ok(Qwen36ForwardProjectionReceipt {
+        mode: String::from("sampled_embed_lm_head_projection_v1"),
+        input_token_id,
+        input_token_label: token_label(input_token_id),
+        candidate_token_ids,
+        sampled_logits,
+        logits_sha256,
+        tensor_reads,
+        hidden_size: architecture.hidden_size,
+        used_full_transformer_layers: false,
+    })
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Qwen36TensorRow {
+    values: Vec<f32>,
+    shape: Vec<usize>,
+    receipt: Qwen36TensorRowReadReceipt,
+}
+
+fn qwen36_read_indexed_tensor_row(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    tensor_name: &str,
+    row_index: usize,
+) -> Result<Qwen36TensorRow, Qwen36TargetPathError> {
+    let shard_name = weight_map.get(tensor_name).ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "model index does not contain required tensor `{tensor_name}`"
+        ))
+    })?;
+    let shard_path = model_dir.join(shard_name);
+    let mut file = File::open(&shard_path).map_err(|source| Qwen36TargetPathError::Io {
+        path: shard_path.clone(),
+        source,
+    })?;
+    let mut len_bytes = [0u8; 8];
+    file.read_exact(&mut len_bytes)
+        .map_err(|source| Qwen36TargetPathError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let header_len = u64::from_le_bytes(len_bytes);
+    let header_len_usize = usize::try_from(header_len).map_err(|_| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "safetensors header is too large in `{}`",
+            shard_path.display()
+        ))
+    })?;
+    let mut header_bytes = vec![0u8; header_len_usize];
+    file.read_exact(&mut header_bytes)
+        .map_err(|source| Qwen36TargetPathError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let header = serde_json::from_slice::<Value>(header_bytes.as_slice())?;
+    let tensor_value = header.get(tensor_name).ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "safetensors shard `{}` does not contain tensor `{tensor_name}`",
+            shard_path.display()
+        ))
+    })?;
+    let dtype = required_string(tensor_value, "dtype")?;
+    let shape = tensor_value
+        .get("shape")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            Qwen36TargetPathError::InvalidConfig(format!(
+                "tensor `{tensor_name}` in `{}` is missing shape",
+                shard_path.display()
+            ))
+        })?
+        .iter()
+        .map(|value| {
+            value
+                .as_u64()
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(|| {
+                    Qwen36TargetPathError::InvalidConfig(format!(
+                        "tensor `{tensor_name}` in `{}` has a non-usize shape entry",
+                        shard_path.display()
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if shape.len() != 2 {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "sampled projection can only read 2D tensor rows; `{tensor_name}` has shape {shape:?}"
+        )));
+    }
+    if row_index >= shape[0] {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "row {row_index} is outside tensor `{tensor_name}` with {} rows",
+            shape[0]
+        )));
+    }
+    let offsets = tensor_value
+        .get("data_offsets")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            Qwen36TargetPathError::InvalidConfig(format!(
+                "tensor `{tensor_name}` in `{}` is missing data_offsets",
+                shard_path.display()
+            ))
+        })?;
+    if offsets.len() != 2 {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "tensor `{tensor_name}` in `{}` must have two data_offsets",
+            shard_path.display()
+        )));
+    }
+    let data_offset_start = offsets[0].as_u64().ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "tensor `{tensor_name}` in `{}` has invalid data_offsets",
+            shard_path.display()
+        ))
+    })?;
+    let data_offset_end = offsets[1].as_u64().ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "tensor `{tensor_name}` in `{}` has invalid data_offsets",
+            shard_path.display()
+        ))
+    })?;
+    let element_bytes = safetensors_element_size(dtype.as_str())?;
+    let row_bytes_len = shape[1].checked_mul(element_bytes).ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "tensor `{tensor_name}` row byte length overflow"
+        ))
+    })?;
+    let tensor_bytes_len = data_offset_end
+        .checked_sub(data_offset_start)
+        .ok_or_else(|| {
+            Qwen36TargetPathError::InvalidConfig(format!(
+                "tensor `{tensor_name}` has reversed data_offsets"
+            ))
+        })?;
+    let expected_tensor_bytes = (shape[0] as u64)
+        .checked_mul(row_bytes_len as u64)
+        .ok_or_else(|| {
+            Qwen36TargetPathError::InvalidConfig(format!(
+                "tensor `{tensor_name}` data byte length overflow"
+            ))
+        })?;
+    if tensor_bytes_len != expected_tensor_bytes {
+        return Err(Qwen36TargetPathError::InvalidConfig(format!(
+            "tensor `{tensor_name}` data_offsets describe {tensor_bytes_len} bytes, expected {expected_tensor_bytes}"
+        )));
+    }
+    let data_start = 8u64.checked_add(header_len).ok_or_else(|| {
+        Qwen36TargetPathError::InvalidConfig(format!(
+            "safetensors data start overflow in `{}`",
+            shard_path.display()
+        ))
+    })?;
+    let row_offset = data_start
+        .checked_add(data_offset_start)
+        .and_then(|value| value.checked_add((row_index as u64).checked_mul(row_bytes_len as u64)?))
+        .ok_or_else(|| {
+            Qwen36TargetPathError::InvalidConfig(format!(
+                "tensor `{tensor_name}` row offset overflow"
+            ))
+        })?;
+    file.seek(SeekFrom::Start(row_offset))
+        .map_err(|source| Qwen36TargetPathError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let mut row_bytes = vec![0u8; row_bytes_len];
+    file.read_exact(row_bytes.as_mut_slice())
+        .map_err(|source| Qwen36TargetPathError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let values = decode_safetensors_row(dtype.as_str(), row_bytes.as_slice())?;
+    let receipt = Qwen36TensorRowReadReceipt {
+        tensor_name: String::from(tensor_name),
+        shard_name: shard_name.clone(),
+        shard_path: shard_path.display().to_string(),
+        row_index,
+        dtype,
+        shape: shape.clone(),
+        row_sha256: sha256_hex(row_bytes.as_slice()),
+    };
+    Ok(Qwen36TensorRow {
+        values,
+        shape,
+        receipt,
+    })
+}
+
+fn qwen36_sampled_candidate_token_ids(input_token_id: u32, vocab_size: usize) -> Vec<u32> {
+    let mut ids = vec![input_token_id, 0, 1, 2, 3, 4, 5];
+    ids.retain(|id| usize::try_from(*id).is_ok_and(|id| id < vocab_size));
+    ids.sort_unstable();
+    ids.dedup();
+    ids
+}
+
+fn safetensors_element_size(dtype: &str) -> Result<usize, Qwen36TargetPathError> {
+    match dtype {
+        "BF16" | "F16" => Ok(2),
+        "F32" => Ok(4),
+        other => Err(Qwen36TargetPathError::SafeTensors(format!(
+            "unsupported sampled projection dtype `{other}`"
+        ))),
+    }
+}
+
+fn decode_safetensors_row(dtype: &str, bytes: &[u8]) -> Result<Vec<f32>, Qwen36TargetPathError> {
+    match dtype {
+        "BF16" => {
+            if bytes.len() % 2 != 0 {
+                return Err(Qwen36TargetPathError::SafeTensors(String::from(
+                    "BF16 row byte length is not divisible by 2",
+                )));
+            }
+            Ok(bytes
+                .chunks_exact(2)
+                .map(|bytes| bf16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32())
+                .collect())
+        }
+        "F16" => {
+            if bytes.len() % 2 != 0 {
+                return Err(Qwen36TargetPathError::SafeTensors(String::from(
+                    "F16 row byte length is not divisible by 2",
+                )));
+            }
+            Ok(bytes
+                .chunks_exact(2)
+                .map(|bytes| f16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32())
+                .collect())
+        }
+        "F32" => {
+            if bytes.len() % 4 != 0 {
+                return Err(Qwen36TargetPathError::SafeTensors(String::from(
+                    "F32 row byte length is not divisible by 4",
+                )));
+            }
+            Ok(bytes
+                .chunks_exact(4)
+                .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                .collect())
+        }
+        other => Err(Qwen36TargetPathError::SafeTensors(format!(
+            "unsupported sampled projection dtype `{other}`"
+        ))),
+    }
+}
+
+fn token_label(token_id: u32) -> String {
+    format!("token:{token_id}")
+}
+
 fn push_common_decoder_layer_specs(
     specs: &mut Vec<Qwen36TensorSpec>,
     prefix: &str,
@@ -969,6 +1366,49 @@ mod tests {
         assert!(!report.text_tensor_admission_passed);
     }
 
+    #[test]
+    fn qwen36_sampled_projection_reads_real_rows_and_hashes_logits() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let shard_path = temp.path().join("model-00001-of-00001.safetensors");
+        write_projection_safetensors(&shard_path).expect("write projection shard");
+        let mut weight_map = BTreeMap::new();
+        weight_map.insert(
+            String::from(QWEN36_EMBED_TOKENS_WEIGHT),
+            String::from("model-00001-of-00001.safetensors"),
+        );
+        weight_map.insert(
+            String::from(QWEN36_LM_HEAD_WEIGHT),
+            String::from("model-00001-of-00001.safetensors"),
+        );
+        let architecture = projection_test_architecture();
+        let rendered = crate::Qwen36RenderedPrompt {
+            template_id: String::from("test"),
+            reasoning_mode: Qwen36ReasoningMode::DirectAnswer,
+            text: String::from("test"),
+            prompt_hash: String::from("hash"),
+            token_ids: vec![6],
+        };
+
+        let receipt =
+            qwen36_sampled_projection_receipt(temp.path(), &weight_map, &architecture, &rendered)
+                .expect("projection");
+
+        assert_eq!(receipt.input_token_id, 6);
+        assert_eq!(receipt.candidate_token_ids, vec![0, 1, 2, 3, 4, 5, 6]);
+        assert!(!receipt.used_full_transformer_layers);
+        assert_eq!(receipt.tensor_reads.len(), 8);
+        let token6 = receipt
+            .sampled_logits
+            .iter()
+            .find(|logit| logit.token_id == 6)
+            .expect("token 6 logit");
+        assert_eq!(token6.logit, 30.0);
+        assert_eq!(
+            receipt.logits_sha256,
+            sha256_json(&receipt.sampled_logits).expect("logits hash")
+        );
+    }
+
     fn write_test_safetensors(path: &Path) -> Result<(), Qwen36TargetPathError> {
         let header = serde_json::json!({
             "model.language_model.embed_tokens.weight": {
@@ -1000,6 +1440,86 @@ mod tests {
             path: path.to_path_buf(),
             source,
         })
+    }
+
+    fn write_projection_safetensors(path: &Path) -> Result<(), Qwen36TargetPathError> {
+        let vocab_size = 8usize;
+        let hidden_size = 4usize;
+        let tensor_bytes = vocab_size * hidden_size * 2;
+        let header = serde_json::json!({
+            QWEN36_EMBED_TOKENS_WEIGHT: {
+                "dtype": "BF16",
+                "shape": [vocab_size, hidden_size],
+                "data_offsets": [0, tensor_bytes]
+            },
+            QWEN36_LM_HEAD_WEIGHT: {
+                "dtype": "BF16",
+                "shape": [vocab_size, hidden_size],
+                "data_offsets": [tensor_bytes, tensor_bytes * 2]
+            }
+        });
+        let mut data = Vec::new();
+        for row in 0..vocab_size {
+            for col in 0..hidden_size {
+                let value = if row == 6 {
+                    (col + 1) as f32
+                } else {
+                    row as f32
+                };
+                data.extend_from_slice(&half::bf16::from_f32(value).to_bits().to_le_bytes());
+            }
+        }
+        for row in 0..vocab_size {
+            for col in 0..hidden_size {
+                let value = if row == 6 {
+                    (col + 1) as f32
+                } else {
+                    (row + col) as f32
+                };
+                data.extend_from_slice(&half::bf16::from_f32(value).to_bits().to_le_bytes());
+            }
+        }
+        let header_bytes = serde_json::to_vec(&header)?;
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&(header_bytes.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(header_bytes.as_slice());
+        bytes.extend_from_slice(data.as_slice());
+        fs::write(path, bytes).map_err(|source| Qwen36TargetPathError::Io {
+            path: path.to_path_buf(),
+            source,
+        })
+    }
+
+    fn projection_test_architecture() -> Qwen36ForwardArchitectureReport {
+        Qwen36ForwardArchitectureReport {
+            root_model_type: String::from("qwen3_5"),
+            text_model_type: String::from("qwen3_5_text"),
+            architectures: vec![String::from("Qwen3_5ForConditionalGeneration")],
+            hidden_size: 4,
+            intermediate_size: 8,
+            num_hidden_layers: 1,
+            num_attention_heads: 1,
+            num_key_value_heads: 1,
+            head_dim: 4,
+            vocab_size: 8,
+            max_position_embeddings: 16,
+            torch_dtype: String::from("bfloat16"),
+            rms_norm_eps: Some(0.000001),
+            hidden_act: Some(String::from("silu")),
+            layer_types: vec![String::from("full_attention")],
+            full_attention_layers: vec![0],
+            linear_attention_layers: Vec::new(),
+            linear_key_head_dim: None,
+            linear_value_head_dim: None,
+            linear_num_key_heads: None,
+            linear_num_value_heads: None,
+            linear_conv_kernel_dim: None,
+            attn_output_gate: None,
+            output_gate_type: None,
+            mtp_num_hidden_layers: 0,
+            mtp_use_dedicated_embeddings: None,
+            rope_parameters_hash: None,
+        }
     }
 
     fn real_shape_config_json() -> &'static str {

@@ -1,6 +1,6 @@
 use std::{env, error::Error, fs, io, path::PathBuf};
 
-use psionic_models::{QWEN36_27B_REAL_MODEL_DIR, run_qwen36_forward_admission};
+use psionic_models::{run_qwen36_forward_admission, QWEN36_27B_REAL_MODEL_DIR};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = env::args().collect::<Vec<_>>();
@@ -27,7 +27,7 @@ fn required_flag(args: &[String], flag: &str) -> Result<String, io::Error> {
     optional_flag(args, flag).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: qwen36_forward_admission --prompt fixtures/legal/smoke.prompt [--model-dir target/models/qwen/Qwen3.6-27B] [--backend local] [--out path]",
+            "usage: qwen36_forward_admission --prompt fixtures/legal/smoke.prompt [--model-dir target/models/qwen/Qwen3.6-27B] [--backend local-header-admission|local-sampled-projection] [--out path]",
         )
     })
 }

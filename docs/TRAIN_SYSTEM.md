@@ -536,6 +536,36 @@ The command still returns a typed forward refusal,
 the mixed linear-attention/full-attention/MTP forward kernels for this
 checkpoint.
 
+For a slightly stronger real-weight check, use the sampled projection backend:
+
+```bash
+cargo run -p psionic-serve --example qwen36_forward_admission -- \
+  --model-dir target/models/qwen/Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt \
+  --backend local-sampled-projection \
+  --out target/legal/qwen36_27b_forward_admission/projection_report.json
+```
+
+Recorded local sampled-projection result:
+
+- forward execution status: `sampled_projection`
+- prompt tokens: `70`
+- required text tensors admitted: `866 / 866`
+- non-text tensors reported: `333`
+- rows read from real weights: one `model.language_model.embed_tokens.weight`
+  row and seven `lm_head.weight` rows
+- input token row: `271`
+- sampled candidate token rows: `0`, `1`, `2`, `3`, `4`, `5`, `271`
+- sampled logits sha256:
+  `c9044ffebd281f65473f855405f18a79b5fa272e0c76aa3bbf12b7e077aae6cf`
+- report sha256:
+  `bee2953ae48bab335cc2447d0e0bb9ba991659ee3c2a23ec60c70b4a00131bc4`
+
+This is real checkpoint math: Psionic seeks into the downloaded BF16
+safetensors shards, reads the recorded rows, computes dot products, and hashes
+the rows and logits. It is not a full Qwen3.6 forward pass: no attention, MLP,
+linear attention, MTP, generation, or LoRA training is run by this command.
+
 The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
 serve-side command
 `cargo run -p psionic-serve --example qwen36_legal_prompt_smoke -- --model Qwen3.6-35B-A3B --prompt fixtures/legal/smoke.prompt`
