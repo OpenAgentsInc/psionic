@@ -382,6 +382,28 @@ shard status, and failed-eval payment policy before marking the job
 contribution/payment table, so a training run can show which worker did the
 work, what artifact it produced, why it is payable or withheld, and the
 decision digest for audit.
+The Qwen legal Pylon path now also owns a checkpoint recovery contract in
+`crates/psionic-train/src/qwen_legal_checkpoint_recovery.rs` with the runnable
+rehearsal:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_checkpoint_recovery_rehearsal -- \
+  --out target/legal/qwen_checkpoint_recovery/rehearsal-001
+```
+
+That rehearsal defines base-model cache pointer, adapter checkpoint, optimizer
+state, scheduler/cursor state, aggregate candidate, and eval candidate artifact
+families. It writes chunked transfer receipts with byte ranges, per-chunk
+hashes, full artifact hashes, and retry counters; verifies those receipts;
+rejects truncated, reordered, or hash-drifted uploads; proves that a killed
+step-2 run resumes to the same final adapter state as the uninterrupted
+four-step run; accepts a late-join worker from the latest verified checkpoint
+and corpus shard lock; and keeps payment withheld until both checkpoint
+verification and worker receipt verification pass. The current rehearsal
+records `exact_resume_match: true`, `bootstrap_accepted: true`,
+pre-receipt settlement status `withheld_worker_receipt_unverified`, final
+settlement status `payable`, and report digest
+`4286fa83fc61f1088fbdde487faacc38d3de946aabecfb0e4db1bf8fbb9b174c`.
 The data side of that handoff now lives in
 `crates/psionic-data/src/legal_benchmark_dataset_sharding.rs`. It sorts legal
 SFT examples by `example_id`, computes one canonical global dataset hash,

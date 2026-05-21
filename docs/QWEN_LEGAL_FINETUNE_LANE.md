@@ -851,6 +851,62 @@ The resulting `dispatch_report.json` includes every assignment, retry or
 blocked-mode decision, blocked node, signed envelope, worker receipt, artifact
 hash, payment decision, duplicate-shard guard entry, and report digest.
 
+## Checkpoint Recovery And Late Join
+
+The Qwen legal lane now has a recovery rehearsal in
+`crates/psionic-train/src/qwen_legal_checkpoint_recovery.rs` and a runnable
+operator example:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_checkpoint_recovery_rehearsal -- \
+  --out target/legal/qwen_checkpoint_recovery/rehearsal-001
+```
+
+The rehearsal defines the checkpoint artifact families needed for real remote
+Pylon work:
+
+- base model cache pointer
+- adapter checkpoint
+- optimizer state
+- scheduler/cursor state
+- aggregate candidate
+- eval candidate
+
+It writes an interrupted step-2 checkpoint, resumes that checkpoint through
+step 4, and compares the resumed final adapter state against an uninterrupted
+four-step run. The current local rehearsal records exact resume equality:
+`exact_resume_match: true`.
+
+It also writes chunked transfer receipts for the adapter, optimizer, and
+scheduler artifacts. Each receipt records byte ranges, chunk hashes, total
+artifact hash, retry count, and destination path. The verifier rejects
+truncated uploads, reordered chunks, and hash drift before a checkpoint can be
+used for late join or payment.
+
+Late-join bootstrap starts from the latest accepted checkpoint, preserves the
+corpus shard lock, checks that required adapter/optimizer/scheduler artifacts
+exist, checks that no credential or wallet markers are present in checkpoint
+artifacts, and records the next training step for the joining worker. The
+current rehearsal accepts the late join:
+`bootstrap_accepted: true`.
+
+Settlement remains blocked until checkpoint transfer verification and worker
+receipt verification have both passed. The recorded recovery rehearsal keeps
+payment at `withheld_worker_receipt_unverified` before worker receipt
+verification and moves it to `payable` only after checkpoint, transfer, and
+worker receipt checks all pass. The current report digest is
+`4286fa83fc61f1088fbdde487faacc38d3de946aabecfb0e4db1bf8fbb9b174c`.
+
+Recovery failure classes are deliberately narrow:
+
+- `checkpoint_not_verified`
+- `checkpoint_artifact_secret_scan_failed`
+- `required_checkpoint_family_missing`
+- truncated chunk upload
+- reordered chunk upload
+- chunk hash drift
+- full artifact hash drift
+
 Recorded local payment-settlement smoke:
 
 - worker receipt digest:
