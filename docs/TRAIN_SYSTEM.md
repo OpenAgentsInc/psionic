@@ -299,8 +299,21 @@ rejected, 0 quarantined, 3 DPO pairs, 3 GRPO groups, and 0 runner-added answer
 text detections, with report digest
 `0dc07ad7219f0d1f05bf9b7eaa13978cba07815af51fecd1d459ef14eb55516a`. This is
 real local Qwen run-artifact RL data, not a hidden or retained Harvey score
-claim and not yet live served-Qwen3.6 sampling. The same run now also emits a
-typed RL hillclimb plan that points Pylon/Nexus at
+claim and not yet live served-Qwen3.6 sampling. Psionic now also owns a
+full-artifact promotion gate in
+`crates/psionic-train/src/qwen_legal_full_artifact_promotion.rs`, exposed as
+`psionic-train qwen-legal-artifact-promotion`. It refuses candidates without
+complete lineage, worker receipts, aggregate receipts, Bitcoin settlement
+evidence, all six promotion stages, and comparisons against base, SFT, DPO,
+GRPO, and the prior champion. The hard refusal classes are leakage, answer
+injection, missing artifact, private-eval train contamination, invalid worker
+receipt, unpaid accepted work, and serving mismatch. The local rehearsal
+writes `target/legal/qwen_promotion_gate/full-artifact-001`, promotes
+`qwen36-legal-grpo-001` over the rehearsal baselines, and emits an
+Autopilot4-safe summary feed that redacts private eval score and private task
+content. Report digest:
+`621254f37962355cd7fa4e5717a45c4b5c8e6fee4e08a1caa9fcac7773806b7a`. The same
+run now also emits a typed RL hillclimb plan that points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and

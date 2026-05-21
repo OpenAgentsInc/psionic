@@ -13,7 +13,9 @@
 > Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20;
 > real Qwen3.6-27B text tensor admission added on 2026-05-21; Qwen3.6
 > training placement planner and locked corpus bundle builder added on
-> 2026-05-21; signed two-node Pylon dispatch smoke added on 2026-05-21.
+> 2026-05-21; signed two-node Pylon dispatch smoke added on 2026-05-21;
+> full-artifact promotion gates and Autopilot4-safe summary feed added on
+> 2026-05-21.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -804,6 +806,74 @@ not a hidden or retained Harvey score claim. The command exists to bridge
 model-written local Qwen rollouts into DPO/GRPO builders while preserving
 rejected runs as negative data and quarantining any run with hidden leakage or
 runner-added answer text.
+
+## Full-Artifact Promotion Gate
+
+The lane now has a Rust full-artifact promotion gate for real Qwen legal
+fine-tuning candidates:
+
+```bash
+cargo run -p psionic-train -- qwen-legal-artifact-promotion \
+  --out target/legal/qwen_promotion_gate/full-artifact-001
+```
+
+This is separate from the older small-adapter registry. The new gate models a
+whole Qwen candidate and refuses promotion unless the packet carries:
+
+- corpus manifest hash
+- base model hash
+- checkpoint hash
+- adapter hash for tuned candidates
+- tokenizer hash
+- prompt template hash
+- training config hash
+- run receipts
+- worker receipts
+- aggregate receipt
+- Bitcoin settlement evidence for accepted Pylon work
+- eval reports for every promotion stage
+
+The required stages are:
+
+- local smoke
+- public training-slice eval
+- public held-out eval
+- private eval
+- adversarial holdout
+- serving canary
+
+Hard refusal classes are explicit:
+
+- leakage
+- answer injection
+- missing artifact
+- private-eval train contamination
+- invalid worker receipt
+- unpaid accepted work
+- serving mismatch
+
+The generated files are:
+
+- `qwen_legal_full_artifact_promotion_report.json`
+- `qwen_legal_full_artifact_promotion_registry.json`
+- `autopilot4_qwen_legal_promotion_summary_feed.json`
+
+Recorded local rehearsal result:
+
+- candidate: `qwen36-legal-grpo-001`
+- decision: `promote`
+- hard failures: `0`
+- stages present: `6 / 6`
+- comparison kinds present: base, SFT, DPO, GRPO, prior champion
+- private task content exported: `false`
+- Autopilot4 private score exported: `false`
+- report digest:
+  `621254f37962355cd7fa4e5717a45c4b5c8e6fee4e08a1caa9fcac7773806b7a`
+
+Plain boundary: the internal promotion report can use private eval evidence as
+a gate, but the Autopilot4 summary feed only exports public aggregate status
+and redacts private score/task details. This is the registry shape for real
+Pylon-produced Qwen artifacts; it is not itself a new model-training run.
 
 ## Pylon Training Job Protocol
 
