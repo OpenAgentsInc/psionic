@@ -11,14 +11,17 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use psionic_eval::{
-    LegalBenchmarkEvalMode, LegalBenchmarkEvalReplayOutcome, LegalBenchmarkEvalSuiteManifest,
-    stable_json_digest,
+    stable_json_digest, LegalBenchmarkEvalMode, LegalBenchmarkEvalReplayOutcome,
+    LegalBenchmarkEvalSuiteManifest,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    pylon_bitcoin_payout_target_for_job, run_psionic_legal_sft_config,
+    run_qwen_legal_lora_merge_manifest, run_qwen_legal_pylon_worker_job,
+    settle_qwen_legal_pylon_training_job_spec, verify_qwen_legal_pylon_worker_receipt_path,
     PsionicLegalSftBaseArtifactMode, PsionicLegalSftConfig, PsionicLegalSftError,
     PsionicLegalSftRunArtifacts, PsionicLegalSftSample, PylonLocalWorkerRunOptions,
     PylonTrainingArtifactRef, PylonTrainingExpectedOutputArtifact,
@@ -26,13 +29,10 @@ use crate::{
     PylonTrainingPaymentBudget, PylonTrainingPaymentDecisionReceipt, PylonTrainingPaymentStatus,
     PylonTrainingReceiptRequirements, PylonTrainingShardAssignment, PylonTrainingWorkerJobStatus,
     PylonTrainingWorkerReceipt, PylonTrainingWorkerReceiptVerification,
-    QWEN_LEGAL_LORA_MERGE_MANIFEST_SCHEMA_VERSION, QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION,
     QwenLegalLoraMergeBaseModel, QwenLegalLoraMergeError, QwenLegalLoraMergeManifest,
     QwenLegalLoraMergeMode, QwenLegalLoraMergeOutput, QwenLegalLoraMergePromotionDecision,
     QwenLegalLoraMergeValidation, QwenLegalLoraWorkerAdapterInput, QwenLegalPylonTrainingJobError,
-    run_psionic_legal_sft_config, run_qwen_legal_lora_merge_manifest,
-    run_qwen_legal_pylon_worker_job, settle_qwen_legal_pylon_training_job_spec,
-    verify_qwen_legal_pylon_worker_receipt_path,
+    QWEN_LEGAL_LORA_MERGE_MANIFEST_SCHEMA_VERSION, QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION,
 };
 
 pub const QWEN_LEGAL_DISTRIBUTED_RUN_SCHEMA_VERSION: &str =
@@ -736,6 +736,7 @@ fn pylon_worker_job(
             max_cost_microusd: 5_000,
             currency: String::from("USD"),
             payment_account_ref: String::from("ledger://local-smoke/qwen-legal-distributed"),
+            bitcoin_payout: pylon_bitcoin_payout_target_for_job(job_id.as_str(), 50_000),
             pay_failed_but_valid_eval_attempts: false,
         },
         receipt_requirements: PylonTrainingReceiptRequirements {

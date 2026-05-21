@@ -15,6 +15,7 @@
 > training placement planner and locked corpus bundle builder added on
 > 2026-05-21; signed two-node Pylon dispatch smoke added on 2026-05-21;
 > full-artifact promotion gates and Autopilot4-safe summary feed added on
+> 2026-05-21; Bitcoin/Lightning settlement evidence hooks added on
 > 2026-05-21.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
@@ -99,6 +100,50 @@ This surface does not replace the actual training and eval commands. It makes
 them discoverable, replayable, and auditable from one place so a three-task
 local loop, data build, local SFT smoke, Pylon job, adapter merge, promotion,
 and final report can all point at the same run id and receipt folder.
+
+## Bitcoin Settlement Evidence Hooks
+
+Psionic now records the payment evidence Treasury or Nexus needs for accepted
+Pylon legal fine-tuning work. Psionic does not hold wallet keys, node
+credentials, seed words, or channel monitor material, and it does not send the
+Bitcoin or Lightning payment itself.
+
+The current boundary is:
+
+- Psionic validates signed worker receipts and marks each job payable or
+  withheld.
+- Psionic emits a deterministic Treasury/Nexus handoff batch with the accepted
+  worker id, worker receipt digest, shard key, agreed price, payout target
+  reference, amount in millisatoshis, expiry, fee-policy reference, and payout
+  authorization id.
+- Treasury/Nexus executes the payment outside Psionic and returns a settlement
+  proof.
+- Psionic attaches the returned proof to the training closeout and blocks
+  adapter promotion unless accepted work has settled payment proof or an
+  explicit operator-approved deferred-payment policy.
+
+The settlement proof shape records operation id, payout authorization id,
+status, payment hash or method-specific proof field, fee, settlement time, and
+reconciliation digest. Proof ingestion rejects unknown payout authorizations,
+duplicate settlement proofs, bad proof digests, and any field that appears to
+contain wallet secret material.
+
+The Rust entry points are:
+
+- `build_qwen_legal_pylon_treasury_handoff_batch`
+- `attach_qwen_legal_pylon_settlement_proofs`
+- `settled_qwen_legal_pylon_bitcoin_proof_fixture`
+- `failed_qwen_legal_pylon_bitcoin_proof_fixture`
+
+Recorded local verification:
+
+```bash
+cargo test -p psionic-train qwen_legal_pylon_training_job --lib
+```
+
+This proves deterministic payable-batch construction and closeout gating in
+Psionic. It is not proof that a real Lightning payment was sent; payment
+execution remains Treasury/Nexus-owned.
 
 ## Three-Task Public Harvey Milestone
 

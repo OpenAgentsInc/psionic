@@ -419,6 +419,19 @@ shard status, and failed-eval payment policy before marking the job
 contribution/payment table, so a training run can show which worker did the
 work, what artifact it produced, why it is payable or withheld, and the
 decision digest for audit.
+The same Pylon payment surface now emits deterministic Bitcoin/Lightning
+handoff batches for Treasury/Nexus and ingests returned settlement proofs into
+the training closeout. Psionic records payout target references, amount,
+currency, expiry, fee policy, payout authorization id, worker receipt digest,
+and reconciliation digest, but does not dispatch payments or store wallet
+keys, node credentials, seed words, or channel monitor material. Adapter
+promotion is blocked unless all accepted Pylon work has settled payment proof
+or an explicit operator-approved deferred-payment policy. Duplicate worker
+outputs, missing receipts, invalid receipts, unknown payout authorizations,
+duplicate settlement proofs, failed payments, and proof fields that look like
+wallet secret material are rejected or blocked before promotion. The focused
+verification command is
+`cargo test -p psionic-train qwen_legal_pylon_training_job --lib`.
 The Qwen legal Pylon path now also owns a checkpoint recovery contract in
 `crates/psionic-train/src/qwen_legal_checkpoint_recovery.rs` with the runnable
 rehearsal:

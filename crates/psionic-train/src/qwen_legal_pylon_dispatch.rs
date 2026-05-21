@@ -10,12 +10,13 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    pylon_bitcoin_payout_target_for_job, run_qwen_legal_pylon_worker_job,
     PylonLocalWorkerRunOptions, PylonTrainingArtifactRef, PylonTrainingExpectedOutputArtifact,
     PylonTrainingHardwareRequirements, PylonTrainingJobKind, PylonTrainingJobSpec,
     PylonTrainingOutputArtifactRef, PylonTrainingPaymentBudget, PylonTrainingPaymentStatus,
     PylonTrainingReceiptRequirements, PylonTrainingShardAssignment, PylonTrainingWorkerJobStatus,
-    PylonTrainingWorkerReceipt, QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION,
-    QwenLegalPylonTrainingJobError, run_qwen_legal_pylon_worker_job,
+    PylonTrainingWorkerReceipt, QwenLegalPylonTrainingJobError,
+    QWEN_LEGAL_PYLON_TRAINING_JOB_SCHEMA_VERSION,
 };
 
 pub const QWEN_LEGAL_PYLON_DISPATCH_REPORT_SCHEMA_VERSION: &str =
@@ -630,6 +631,7 @@ fn dispatch_job(
             max_cost_microusd: 2_500,
             currency: String::from("USD"),
             payment_account_ref: String::from("bitcoin+lightning://unassigned"),
+            bitcoin_payout: pylon_bitcoin_payout_target_for_job(job_id, 25_000),
             pay_failed_but_valid_eval_attempts: false,
         },
         receipt_requirements: PylonTrainingReceiptRequirements {
