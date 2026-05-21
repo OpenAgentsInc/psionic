@@ -11,7 +11,8 @@
 > MoE-safe target-path smoke added on 2026-05-20; unified legal fine-tuning
 > command surface and Pylon payment settlement receipts added on 2026-05-20;
 > Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20;
-> real Qwen3.6-27B text tensor admission added on 2026-05-21.
+> real Qwen3.6-27B text tensor admission added on 2026-05-21; Qwen3.6
+> training placement planner added on 2026-05-21.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -362,6 +363,51 @@ configs. That command still trains from declared hidden-state samples. It will
 not accept real Qwen safetensors and silently fall back to synthetic hidden
 states. Full real-artifact training remains blocked on the Qwen3.6 forward and
 backward activation path.
+
+## Qwen3.6 Training Placement Planner
+
+The lane now has a Rust placement planner in
+`crates/psionic-train/src/qwen_legal_training_placement.rs`.
+It takes the model id, adapter mode, quantization mode, sequence length,
+micro-batch size, gradient accumulation, topology, target modules, and Pylon
+node capabilities. It returns either an admitted plan with concrete node
+assignments or a typed refusal.
+
+Generate example plans with:
+
+```bash
+cargo run -p psionic-train --example qwen_legal_training_placement_plan -- \
+  --topology single-node \
+  --out target/legal/qwen_placement/single_node.json
+
+cargo run -p psionic-train --example qwen_legal_training_placement_plan -- \
+  --topology multi-pylon \
+  --out target/legal/qwen_placement/multi_pylon.json
+```
+
+Current planner behavior:
+
+- admits a concrete local `Qwen/Qwen3.6-27B` int8 LoRA plan on one 96 GiB
+  training node
+- admits a two-Pylon `Qwen/Qwen3.6-27B` Q4K QLoRA plan and assigns layer
+  ranges, adapter state, optimizer state, required bytes, backend labels, and
+  payment target references to each node
+- refuses under-memory requests with `insufficient_memory`
+- refuses unsupported adapter/quantization pairs with
+  `unsupported_quantization`
+- refuses missing trusted training nodes with `topology_mismatch`
+- refuses `Qwen/Qwen3.6-35B-A3B` router or gate training with
+  `router_training_refused`
+- emits scheduler-facing placement facts with `qwen_legal_train` job type,
+  plan digest, assigned layer range, byte requirements, and payment reference
+
+The recommended first full-model experiment remains dense
+`Qwen/Qwen3.6-27B`, starting with int8 LoRA or Q4K QLoRA. It is the cleanest
+next target because the checkpoint is already downloaded locally, it avoids
+MoE router/gate training, and the planner can prove where the frozen base,
+adapter, optimizer state, and activation checkpoints fit before dispatch.
+`Qwen/Qwen3.6-35B-A3B` stays in the target set, but the router and gate stay
+frozen until a separate issue opens real MoE-router training.
 
 The exact SFT smoke for this target is:
 

@@ -231,7 +231,15 @@ or performance on private Harvey tasks. The `psionic-train sft` path now
 refuses `real_artifact_required` configs because it still consumes declared
 hidden-state samples. Real-artifact Qwen training must wait for the
 Qwen3.6-27B forward and backward activation path instead of falling back to the
-synthetic smoke trainer.
+synthetic smoke trainer. The Qwen legal lane now also has a placement planner
+in `crates/psionic-train/src/qwen_legal_training_placement.rs` and the example
+`cargo run -p psionic-train --example qwen_legal_training_placement_plan`.
+The planner admits dense `Qwen/Qwen3.6-27B` LoRA/QLoRA placements, emits
+multi-Pylon layer assignments and scheduler facts, refuses under-memory or
+unsupported quantization requests, and keeps `Qwen/Qwen3.6-35B-A3B`
+router/gate training frozen. The first recommended real experiment is dense
+27B int8 LoRA or Q4K QLoRA because the checkpoint is already local and avoids
+MoE router/gate training.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6
