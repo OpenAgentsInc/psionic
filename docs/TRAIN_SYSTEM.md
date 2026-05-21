@@ -227,7 +227,11 @@ receipt digest
 report digest
 `8f645a37f5d4e64b234488d842ee5fad51ab40a68ccfc982c1ea8dd5ba243be9`. This is
 a Qwen3.6-27B target-path milestone. It does not claim full 27B weight loading
-or performance on private Harvey tasks.
+or performance on private Harvey tasks. The `psionic-train sft` path now
+refuses `real_artifact_required` configs because it still consumes declared
+hidden-state samples. Real-artifact Qwen training must wait for the
+Qwen3.6-27B forward and backward activation path instead of falling back to the
+synthetic smoke trainer.
 The repo now also owns the first Rust-only legal benchmark DPO smoke command in
 `crates/psionic-train/src/legal_dpo_cli.rs`; it loads the parent SFT adapter,
 loads `legal_dpo_v1` prompt/chosen/rejected pairs, renders Qwen3.6

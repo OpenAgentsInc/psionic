@@ -357,6 +357,12 @@ checkpoint layout, understand the mixed linear-attention/full-attention/MTP
 text tensor table, and refuse execution plainly until the actual forward
 kernels exist.
 
+The legal SFT command now also fails closed for `real_artifact_required`
+configs. That command still trains from declared hidden-state samples. It will
+not accept real Qwen safetensors and silently fall back to synthetic hidden
+states. Full real-artifact training remains blocked on the Qwen3.6 forward and
+backward activation path.
+
 The exact SFT smoke for this target is:
 
 ```bash

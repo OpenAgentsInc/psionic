@@ -5,21 +5,21 @@ use std::{
 
 use psionic_data::{TokenizerDigest, TokenizerFamily};
 use psionic_models::{
-    load_qwen36_safetensors_shard, normalize_qwen36_35b_a3b_model_id,
-    write_qwen36_35b_a3b_moe_smoke_safetensors, QWEN36_35B_A3B_MODEL_ID,
+    QWEN36_35B_A3B_MODEL_ID, load_qwen36_safetensors_shard, normalize_qwen36_35b_a3b_model_id,
+    write_qwen36_35b_a3b_moe_smoke_safetensors,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    run_open_adapter_sft_export, ModelIoArtifactReceipt, OpenAdapterAdmissibleModelFamily,
-    OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample, OpenAdapterLmHeadTarget,
-    OpenAdapterPrecisionPolicy, OpenAdapterReferenceModel, OpenAdapterSftError,
-    OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend,
+    ModelIoArtifactReceipt, OPEN_ADAPTER_QWEN36_LEGAL_CUDA_BACKEND_LABEL,
+    OpenAdapterAdmissibleModelFamily, OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample,
+    OpenAdapterLmHeadTarget, OpenAdapterPrecisionPolicy, OpenAdapterReferenceModel,
+    OpenAdapterSftError, OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend,
     OpenAdapterTrainingExecutionError, TrainingCoreError, TrainingLoopBudget,
     TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy, TrainingRunSummary,
-    TrainingStepReceipt, OPEN_ADAPTER_QWEN36_LEGAL_CUDA_BACKEND_LABEL,
+    TrainingStepReceipt, run_open_adapter_sft_export,
 };
 
 /// Config schema accepted by `psionic-train sft --config`.
@@ -215,6 +215,13 @@ impl PsionicLegalSftConfig {
             return Err(PsionicLegalSftError::InvalidConfig {
                 detail: String::from(
                     "real artifact mode requires at least one base_safetensors_paths entry",
+                ),
+            });
+        }
+        if self.base_artifact_mode == PsionicLegalSftBaseArtifactMode::RealArtifactRequired {
+            return Err(PsionicLegalSftError::InvalidConfig {
+                detail: String::from(
+                    "real Qwen activation SFT is not implemented yet; this command refuses instead of falling back to synthetic hidden states",
                 ),
             });
         }
@@ -1301,8 +1308,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legal_qwen36_sft_cli_smoke_writes_adapter_loss_curve_and_receipt(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn legal_qwen36_sft_cli_smoke_writes_adapter_loss_curve_and_receipt()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let config =
             default_qwen36_legal_sft_smoke_config(temp.path().join("run").display().to_string());
@@ -1340,6 +1347,24 @@ mod tests {
     }
 
     #[test]
+    fn legal_qwen36_sft_cli_refuses_real_artifact_mode_instead_of_synthetic_fallback() {
+        let mut config = default_qwen36_legal_sft_smoke_config("target/test-legal-real-sft");
+        config.base_artifact_mode = PsionicLegalSftBaseArtifactMode::RealArtifactRequired;
+        config.base_served_artifact_digest = String::from("sha256:real-qwen36-27b-test");
+        config.base_safetensors_paths.push(String::from(
+            "target/models/qwen/Qwen3.6-27B/model-00001-of-00015.safetensors",
+        ));
+
+        let error = run_psionic_legal_sft_config(&config)
+            .expect_err("real Qwen activation training must not synthetic-fallback");
+        assert!(
+            error
+                .to_string()
+                .contains("refuses instead of falling back")
+        );
+    }
+
+    #[test]
     fn legal_qwen36_35b_a3b_moe_sft_keeps_router_frozen() -> Result<(), Box<dyn std::error::Error>>
     {
         let temp = tempfile::tempdir()?;
@@ -1355,26 +1380,33 @@ mod tests {
 
         assert!(Path::new(&artifacts.adapter_artifact_path).is_file());
         assert_eq!(artifacts.receipt.base_model, QWEN36_35B_A3B_MODEL_ID);
-        assert_eq!(artifacts.receipt.active_parameter_path, "adapter_only:lm_head; frozen_router=true; lora_targets=q_proj,k_proj,v_proj,o_proj,up_proj,down_proj");
+        assert_eq!(
+            artifacts.receipt.active_parameter_path,
+            "adapter_only:lm_head; frozen_router=true; lora_targets=q_proj,k_proj,v_proj,o_proj,up_proj,down_proj"
+        );
         assert!(moe.router_frozen);
         assert!(moe.router_state_unchanged);
         assert_eq!(
             moe.router_parameter_hash_before,
             moe.router_parameter_hash_after
         );
-        assert!(moe
-            .expert_tensor_names
-            .iter()
-            .any(|name| name.contains(".experts.0.")));
-        assert!(moe
-            .observed_lora_target_modules
-            .iter()
-            .all(|module| !module.contains("gate") && !module.contains("router")));
+        assert!(
+            moe.expert_tensor_names
+                .iter()
+                .any(|name| name.contains(".experts.0."))
+        );
+        assert!(
+            moe.observed_lora_target_modules
+                .iter()
+                .all(|module| !module.contains("gate") && !module.contains("router"))
+        );
         assert!(!artifacts.receipt.python_invoked);
-        assert!(artifacts
-            .receipt
-            .claim_boundary
-            .contains("freezes router/gating"));
+        assert!(
+            artifacts
+                .receipt
+                .claim_boundary
+                .contains("freezes router/gating")
+        );
         Ok(())
     }
 
