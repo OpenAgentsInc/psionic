@@ -760,6 +760,51 @@ traces, group-normalized adapter updates, bad-completion preservation, and
 adapter eval compatibility. It does not prove a score on private Harvey tasks,
 full dense Qwen3.6 RL, or distributed Pylon sampling.
 
+## Real Qwen Run-Artifact RL Batch
+
+The lane now also has a Rust command that turns completed local Qwen legal
+rollouts into trainable RL data without adding answer text:
+
+```bash
+cargo run -p psionic-train -- qwen-legal-rl-rollouts \
+  --out target/legal/qwen_rl_rollouts/batch-001
+```
+
+The command reads preserved Qwen route run artifacts under
+`fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_025`,
+copies each run record, transcript, tool receipt, output manifest, run receipt,
+and score report into `target/legal/qwen_rl_rollouts/batch-001`, scores them
+with the legal reward-trace builder, and emits:
+
+- `rollout_records.jsonl`
+- `reward_traces.jsonl`
+- `enhanced_rewards.jsonl`
+- `dpo_pairs.jsonl`
+- `grpo_seeds.jsonl`
+- `batch_report.json`
+
+Recorded result:
+
+- rollout count: `6`
+- accepted: `5`
+- rejected: `1`
+- quarantined: `0`
+- adversarial holdout: `0`
+- DPO pairs: `3`
+- GRPO seed groups: `3`
+- bad completions preserved for negative training: `1`
+- Blueprint scaffold rollouts: `3`
+- runner-added answer text detected: `0`
+- report digest:
+  `0dc07ad7219f0d1f05bf9b7eaa13978cba07815af51fecd1d459ef14eb55516a`
+
+Plain boundary: this is real local Qwen run-artifact RL data. It is not new
+live sampling from a served Qwen3.6 route, not a full dense-Qwen RL update, and
+not a hidden or retained Harvey score claim. The command exists to bridge
+model-written local Qwen rollouts into DPO/GRPO builders while preserving
+rejected runs as negative data and quarantining any run with hidden leakage or
+runner-added answer text.
+
 ## Pylon Training Job Protocol
 
 The lane now has a typed local Pylon job protocol for legal fine-tuning work in

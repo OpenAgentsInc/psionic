@@ -285,8 +285,22 @@ training-receipt artifacts without invoking Python. The current local smoke
 run improves file-write preference accuracy from `0.5` to `1.0` and evaluates
 through the same Rust legal suite path at `10000` adapter bps on
 `suites/harvey_public_three.json`. This is a synthetic smoke, not a claim
-about performance on private Harvey tasks or distributed Pylon sampling. The same run
-now also emits a typed RL hillclimb plan that points Pylon/Nexus at
+about performance on private Harvey tasks or distributed Pylon sampling.
+Psionic now also owns a Rust Qwen legal RL rollout-batch command in
+`crates/psionic-train/src/qwen_legal_rl_rollout_batch.rs`. It ingests completed
+local Qwen run artifacts, preserves run records, transcripts, tool receipts,
+output manifests, run receipts, and score reports, scores them with the legal
+reward-trace builder, emits enhanced reward components for file discipline,
+document coverage, citation evidence, legal reasoning, spreadsheet reasoning,
+missing facts, pre-submit self-checks, and runner-output integrity, then writes
+DPO pairs and GRPO seed groups. The recorded local batch at
+`target/legal/qwen_rl_rollouts/batch-001` contains 6 rollouts, 5 accepted, 1
+rejected, 0 quarantined, 3 DPO pairs, 3 GRPO groups, and 0 runner-added answer
+text detections, with report digest
+`0dc07ad7219f0d1f05bf9b7eaa13978cba07815af51fecd1d459ef14eb55516a`. This is
+real local Qwen run-artifact RL data, not a hidden or retained Harvey score
+claim and not yet live served-Qwen3.6 sampling. The same run now also emits a
+typed RL hillclimb plan that points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and
