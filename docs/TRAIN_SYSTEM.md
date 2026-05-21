@@ -400,6 +400,29 @@ and report digest
 `efa51f06cf0d7d4e182e06ae20b669789107c9684c3d9000bba3063eddb3a8a7`.
 This is a real checkpoint load. It still does not run a full Qwen3.6-27B
 forward pass or train LoRA from live 27B activations.
+The faster real-checkpoint readiness command is now:
+
+```bash
+cargo run -p psionic-serve --example qwen36_forward_admission -- \
+  --model-dir target/models/qwen/Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt \
+  --backend local-header-admission \
+  --out target/legal/qwen36_27b_forward_admission/report.json
+```
+
+That command reads the real config, tokenizer, model index, and safetensors
+headers. It validates the `qwen3_5_text` tensor table without reading all
+tensor bytes again. The recorded local result admitted all `866 / 866`
+required text tensors, found `0` missing tensors, `0` shape mismatches, and
+`0` dtype mismatches, reported `333` visual or other non-text tensors, and
+wrote tensor admission digest
+`b59d67845d39d1e3815d5a97d2411446b9c0be6ec409aa1cd821c258603cacc0` with
+report digest
+`c7d7b6183bc736edc0859f823af54b6f7d50ccd022c934d1c77e6abaab451035`.
+The command still returns a typed forward refusal,
+`qwen3_5_text_forward_not_implemented`, because Psionic does not yet implement
+the mixed linear-attention/full-attention/MTP forward kernels for this
+checkpoint.
 
 The legal lane now also has a `Qwen3.6-35B-A3B` MoE-safe target-path smoke. The
 serve-side command

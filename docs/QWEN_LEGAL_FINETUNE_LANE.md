@@ -10,7 +10,8 @@
 > Qwen3.6-27B target-path smoke added on 2026-05-20; Qwen3.6-35B-A3B
 > MoE-safe target-path smoke added on 2026-05-20; unified legal fine-tuning
 > command surface and Pylon payment settlement receipts added on 2026-05-20;
-> Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20.
+> Qwen3.6-27B SFT/DPO/GRPO target-path milestone added on 2026-05-20;
+> real Qwen3.6-27B text tensor admission added on 2026-05-21.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -318,6 +319,43 @@ full Qwen3.6-27B forward pass yet. The real checkpoint uses the Hugging Face
 `Qwen3_5ForConditionalGeneration` wrapper with a `qwen3_5_text` language model,
 linear-attention layers, and MTP weights, so the next implementation step is a
 real Psionic forward path for that architecture.
+
+The lane now has a faster real-checkpoint admission command that reads only
+the safetensors headers and validates the required text tensors before any
+forward attempt:
+
+```bash
+cargo run -p psionic-serve --example qwen36_forward_admission -- \
+  --model-dir target/models/qwen/Qwen3.6-27B \
+  --prompt fixtures/legal/smoke.prompt \
+  --backend local-header-admission \
+  --out target/legal/qwen36_27b_forward_admission/report.json
+```
+
+Recorded admission result:
+
+- schema: `psionic.qwen36_27b_forward_admission.v1`
+- shard headers read: `15`
+- index tensors: `1199`
+- header tensors: `1199`
+- required text tensors: `866`
+- admitted text tensors: `866`
+- visual or other non-text tensors reported: `333`
+- missing required text tensors: `0`
+- shape mismatches: `0`
+- dtype mismatches: `0`
+- text tensor admission passed: `true`
+- tensor admission sha256:
+  `b59d67845d39d1e3815d5a97d2411446b9c0be6ec409aa1cd821c258603cacc0`
+- report sha256:
+  `c7d7b6183bc736edc0859f823af54b6f7d50ccd022c934d1c77e6abaab451035`
+- forward status: `refused`
+- refusal code: `qwen3_5_text_forward_not_implemented`
+
+This is not a logits run. It proves Psionic can read the real Qwen3.6-27B
+checkpoint layout, understand the mixed linear-attention/full-attention/MTP
+text tensor table, and refuse execution plainly until the actual forward
+kernels exist.
 
 The exact SFT smoke for this target is:
 
