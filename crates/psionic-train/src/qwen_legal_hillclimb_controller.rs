@@ -18,6 +18,7 @@ pub const QWEN_LEGAL_HILLCLIMB_REGISTRY_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_hillclimb_registry.v1";
 pub const QWEN_LEGAL_HILLCLIMB_PROGRESS_FEED_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_hillclimb_progress_feed.v1";
+pub const QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION: &str = "psionic.qwen_legal_model_ladder.v1";
 
 const DEFAULT_OUTPUT_DIR: &str = "target/legal/qwen_hillclimb";
 const DEFAULT_REGISTRY_PATH: &str =
@@ -33,6 +34,7 @@ pub struct QwenLegalHillclimbControllerConfig {
     pub registry_path: PathBuf,
     pub feed_path: PathBuf,
     pub output_dir: PathBuf,
+    pub selected_rung: Option<String>,
 }
 
 impl QwenLegalHillclimbControllerConfig {
@@ -42,8 +44,25 @@ impl QwenLegalHillclimbControllerConfig {
             registry_path: PathBuf::from(DEFAULT_REGISTRY_PATH),
             feed_path: PathBuf::from(DEFAULT_FEED_PATH),
             output_dir: PathBuf::from(DEFAULT_OUTPUT_DIR),
+            selected_rung: None,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalModelLadderRung {
+    pub schema_version: String,
+    pub rung_name: String,
+    pub model_id: String,
+    pub adapter_target: String,
+    pub why_it_exists: String,
+    pub proves: String,
+    pub does_not_prove: String,
+    pub expected_memory: String,
+    pub quantization_mode: String,
+    pub pylon_count: u32,
+    pub training_method: QwenLegalHillclimbTrainingMethod,
+    pub acceptance_target: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -123,6 +142,7 @@ pub struct QwenLegalHillclimbRegressionCheck {
 pub struct QwenLegalHillclimbExperimentPlan {
     pub schema_version: String,
     pub experiment_id: String,
+    pub model_ladder_rung: String,
     pub model_id: String,
     pub adapter_target: String,
     pub corpus_split: String,
@@ -153,6 +173,7 @@ pub struct QwenLegalHillclimbRunRecord {
     pub experiment_id: String,
     pub run_kind: QwenLegalHillclimbRunKind,
     pub registry_role: QwenLegalHillclimbRegistryRole,
+    pub model_ladder_rung: String,
     pub model_id: String,
     pub adapter_target: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -226,6 +247,7 @@ pub struct QwenLegalHillclimbFeedRunSummary {
     pub run_id: String,
     pub run_kind: QwenLegalHillclimbRunKind,
     pub registry_role: QwenLegalHillclimbRegistryRole,
+    pub model_ladder_rung: String,
     pub model_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adapter_id: Option<String>,
@@ -242,6 +264,7 @@ pub struct QwenLegalHillclimbScorePoint {
     pub record_index: u64,
     pub run_id: String,
     pub run_kind: QwenLegalHillclimbRunKind,
+    pub model_ladder_rung: String,
     pub score_bps: u32,
     pub delta_vs_baseline_bps: i32,
     pub evaluator_split: String,
@@ -282,6 +305,7 @@ pub struct QwenLegalHillclimbControllerOutput {
     pub registry_path: String,
     pub feed_path: String,
     pub candidate_run_id: String,
+    pub model_ladder_rung: String,
     pub promotion_decision: QwenLegalHillclimbPromotionDecision,
     pub refusal_reasons: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -313,6 +337,113 @@ pub enum QwenLegalHillclimbControllerError {
     Serialization { message: String },
 }
 
+pub fn qwen_legal_model_ladder() -> Vec<QwenLegalModelLadderRung> {
+    vec![
+        QwenLegalModelLadderRung {
+            schema_version: String::from(QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION),
+            rung_name: String::from("smoke-qwen35-08b"),
+            model_id: String::from("Qwen/Qwen3.5-0.8B"),
+            adapter_target: String::from("qwen35_08b_legal_lora"),
+            why_it_exists: String::from("fast local correctness and command-surface tests"),
+            proves: String::from("dataset, receipt, replay, scoring, and feed plumbing works"),
+            does_not_prove: String::from("strong legal reasoning or retained benchmark quality"),
+            expected_memory: String::from("2-6 GB local RAM or VRAM"),
+            quantization_mode: String::from("q4/q8 serving or tiny LoRA smoke"),
+            pylon_count: 1,
+            training_method: QwenLegalHillclimbTrainingMethod::Sft,
+            acceptance_target: String::from(
+                "all schema, receipt, replay, and public-three regression checks pass",
+            ),
+        },
+        QwenLegalModelLadderRung {
+            schema_version: String::from(QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION),
+            rung_name: String::from("plumbing-qwen35-4b"),
+            model_id: String::from("Qwen/Qwen3.5-4B"),
+            adapter_target: String::from("qwen35_legal_lora"),
+            why_it_exists: String::from("small model for cheap multi-step plumbing beyond smoke"),
+            proves: String::from("SFT, DPO, GRPO, Pylon, settlement, and promotion paths compose"),
+            does_not_prove: String::from("production legal quality or strong-model behavior"),
+            expected_memory: String::from("8-16 GB local RAM or VRAM"),
+            quantization_mode: String::from("q4/q8 serving, LoRA training smoke"),
+            pylon_count: 2,
+            training_method: QwenLegalHillclimbTrainingMethod::Grpo,
+            acceptance_target: String::from(
+                "beats local smoke baseline without public-three regression",
+            ),
+        },
+        QwenLegalModelLadderRung {
+            schema_version: String::from(QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION),
+            rung_name: String::from("dense-qwen36-27b"),
+            model_id: String::from("Qwen/Qwen3.6-27B"),
+            adapter_target: String::from("qwen36_legal_lora"),
+            why_it_exists: String::from(
+                "first serious dense legal target; checkpoint is local and avoids MoE router training",
+            ),
+            proves: String::from(
+                "dense full-weight-adjacent legal adapter training can improve heldout legal tasks",
+            ),
+            does_not_prove: String::from("MoE router safety or very-large-model economics"),
+            expected_memory: String::from("64-96 GB unified memory or accelerator memory"),
+            quantization_mode: String::from("bf16/fp16 adapter training, q4/q8 serving checks"),
+            pylon_count: 4,
+            training_method: QwenLegalHillclimbTrainingMethod::Grpo,
+            acceptance_target: String::from(
+                "meets the configured hillclimb target and has zero public-three regression",
+            ),
+        },
+        QwenLegalModelLadderRung {
+            schema_version: String::from(QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION),
+            rung_name: String::from("moe-qwen36-35b-a3b"),
+            model_id: String::from("Qwen/Qwen3.6-35B-A3B"),
+            adapter_target: String::from("qwen36_moe_legal_lora"),
+            why_it_exists: String::from(
+                "later sparse target after dense 27B training and MoE-safe serving are stable",
+            ),
+            proves: String::from(
+                "active-expert sparse training and serving can preserve legal gains",
+            ),
+            does_not_prove: String::from("very-large distributed training reliability"),
+            expected_memory: String::from("80-128 GB aggregate memory with MoE-aware serving"),
+            quantization_mode: String::from("MoE-safe adapter training, q4/q8 serving rehearsal"),
+            pylon_count: 6,
+            training_method: QwenLegalHillclimbTrainingMethod::Grpo,
+            acceptance_target: String::from(
+                "beats dense 27B champion with no router, serving, or public regression failures",
+            ),
+        },
+        QwenLegalModelLadderRung {
+            schema_version: String::from(QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION),
+            rung_name: String::from("large-serving-eval-only"),
+            model_id: String::from("Qwen large legal serving/eval target"),
+            adapter_target: String::from("qwen_large_legal_eval"),
+            why_it_exists: String::from(
+                "serving and evaluation rehearsal after distributed training gates are reliable",
+            ),
+            proves: String::from(
+                "promotion, rollback, and evaluation paths can handle large models",
+            ),
+            does_not_prove: String::from("that Psionic can train the very large model yet"),
+            expected_memory: String::from(
+                "160 GB+ aggregate memory, distributed serving preferred",
+            ),
+            quantization_mode: String::from(
+                "serving quantization only until training gates mature",
+            ),
+            pylon_count: 8,
+            training_method: QwenLegalHillclimbTrainingMethod::HybridRl,
+            acceptance_target: String::from(
+                "serving/eval parity first; training only after distributed payment and promotion gates are reliable",
+            ),
+        },
+    ]
+}
+
+pub fn qwen_legal_model_ladder_rung(name: &str) -> Option<QwenLegalModelLadderRung> {
+    qwen_legal_model_ladder()
+        .into_iter()
+        .find(|rung| rung.rung_name == name)
+}
+
 pub fn run_qwen_legal_hillclimb_cli(
     args: &[String],
 ) -> Result<QwenLegalHillclimbControllerOutput, QwenLegalHillclimbControllerError> {
@@ -320,6 +451,7 @@ pub fn run_qwen_legal_hillclimb_cli(
     let mut registry_path: Option<PathBuf> = None;
     let mut feed_path: Option<PathBuf> = None;
     let mut output_dir: Option<PathBuf> = None;
+    let mut selected_rung: Option<String> = None;
 
     let mut index = 0;
     while index < args.len() {
@@ -352,9 +484,16 @@ pub fn run_qwen_legal_hillclimb_cli(
                 output_dir = Some(PathBuf::from(value));
                 index += 2;
             }
+            "--rung" => {
+                let value = args
+                    .get(index + 1)
+                    .ok_or_else(|| invalid_plan_error("missing value for --rung".to_owned()))?;
+                selected_rung = Some(value.clone());
+                index += 2;
+            }
             "--help" | "-h" => {
                 return Err(invalid_plan_error(
-                    "usage: psionic-train qwen-legal-hillclimb --plan <plan.json> [--registry <registry.json>] [--feed <feed.json>] [--out <dir>]".to_owned(),
+                    "usage: psionic-train qwen-legal-hillclimb --plan <plan.json> [--rung <rung-name>] [--registry <registry.json>] [--feed <feed.json>] [--out <dir>]".to_owned(),
                 ));
             }
             other => {
@@ -379,6 +518,7 @@ pub fn run_qwen_legal_hillclimb_cli(
     if let Some(path) = output_dir {
         config.output_dir = path;
     }
+    config.selected_rung = selected_rung;
 
     run_qwen_legal_hillclimb_controller(&config)
 }
@@ -387,6 +527,9 @@ pub fn run_qwen_legal_hillclimb_controller(
     config: &QwenLegalHillclimbControllerConfig,
 ) -> Result<QwenLegalHillclimbControllerOutput, QwenLegalHillclimbControllerError> {
     let mut plan: QwenLegalHillclimbExperimentPlan = read_json(config.plan_path.as_path())?;
+    if let Some(rung_name) = config.selected_rung.as_deref() {
+        apply_model_ladder_rung(&mut plan, rung_name)?;
+    }
     validate_and_finalize_plan(&mut plan)?;
     fs::create_dir_all(config.output_dir.as_path()).map_err(|error| {
         QwenLegalHillclimbControllerError::Io {
@@ -421,6 +564,7 @@ pub fn run_qwen_legal_hillclimb_controller(
         registry_path: config.registry_path.display().to_string(),
         feed_path: config.feed_path.display().to_string(),
         candidate_run_id: candidate_record.run_id,
+        model_ladder_rung: plan.model_ladder_rung,
         promotion_decision: candidate_record.promotion_decision,
         refusal_reasons: candidate_record.refusal_reasons,
         champion_run_id: registry.champion_run_id,
@@ -444,6 +588,7 @@ fn build_records_for_plan(
         experiment_id: plan.experiment_id.clone(),
         run_kind: QwenLegalHillclimbRunKind::Baseline,
         registry_role: QwenLegalHillclimbRegistryRole::Baseline,
+        model_ladder_rung: plan.model_ladder_rung.clone(),
         model_id: plan.model_id.clone(),
         adapter_target: plan.adapter_target.clone(),
         adapter_id: plan.baseline.adapter_id.clone(),
@@ -483,6 +628,7 @@ fn build_records_for_plan(
         } else {
             QwenLegalHillclimbRegistryRole::RejectedCandidate
         },
+        model_ladder_rung: plan.model_ladder_rung.clone(),
         model_id: plan.model_id.clone(),
         adapter_target: plan.adapter_target.clone(),
         adapter_id: plan.candidate.adapter_id.clone(),
@@ -532,6 +678,7 @@ fn build_records_for_plan(
             experiment_id: plan.experiment_id.clone(),
             run_kind: QwenLegalHillclimbRunKind::RegressionCheck,
             registry_role: QwenLegalHillclimbRegistryRole::RegressionCheck,
+            model_ladder_rung: plan.model_ladder_rung.clone(),
             model_id: plan.model_id.clone(),
             adapter_target: plan.adapter_target.clone(),
             adapter_id: plan.candidate.adapter_id.clone(),
@@ -714,6 +861,7 @@ fn build_progress_feed(
             record_index: record.record_index,
             run_id: record.run_id.clone(),
             run_kind: record.run_kind,
+            model_ladder_rung: record.model_ladder_rung.clone(),
             score_bps: record.score_bps,
             delta_vs_baseline_bps: record.delta_vs_baseline_bps,
             evaluator_split: record.evaluator_split.clone(),
@@ -742,6 +890,7 @@ fn build_progress_feed(
                 run_id: record.run_id.clone(),
                 run_kind: record.run_kind,
                 registry_role: record.registry_role,
+                model_ladder_rung: record.model_ladder_rung.clone(),
                 model_id: record.model_id.clone(),
                 adapter_id: record.adapter_id.clone(),
                 score_bps: record.score_bps,
@@ -786,6 +935,7 @@ fn validate_and_finalize_plan(
         return Err(invalid_plan_error("plan schema_version drifted"));
     }
     require_nonempty(plan.experiment_id.as_str(), "experiment_id")?;
+    require_nonempty(plan.model_ladder_rung.as_str(), "model_ladder_rung")?;
     require_nonempty(plan.model_id.as_str(), "model_id")?;
     require_nonempty(plan.adapter_target.as_str(), "adapter_target")?;
     require_nonempty(plan.corpus_split.as_str(), "corpus_split")?;
@@ -793,6 +943,7 @@ fn validate_and_finalize_plan(
     if plan.pylon_count == 0 {
         return Err(invalid_plan_error("pylon_count must be greater than zero"));
     }
+    validate_model_ladder_selection(plan)?;
     validate_declared_run(&plan.baseline, "baseline")?;
     validate_declared_run(&plan.candidate, "candidate")?;
     for check in &plan.regression_checks {
@@ -807,6 +958,60 @@ fn validate_and_finalize_plan(
         plan.plan_digest = expected;
     } else if plan.plan_digest != expected {
         return Err(invalid_plan_error("plan digest drifted"));
+    }
+    Ok(())
+}
+
+fn apply_model_ladder_rung(
+    plan: &mut QwenLegalHillclimbExperimentPlan,
+    rung_name: &str,
+) -> Result<(), QwenLegalHillclimbControllerError> {
+    let rung = qwen_legal_model_ladder_rung(rung_name).ok_or_else(|| {
+        invalid_plan_error(format!(
+            "unknown Qwen legal model ladder rung `{rung_name}`"
+        ))
+    })?;
+    plan.model_ladder_rung = rung.rung_name;
+    plan.model_id = rung.model_id;
+    plan.adapter_target = rung.adapter_target;
+    plan.pylon_count = rung.pylon_count;
+    plan.training_method = rung.training_method;
+    plan.plan_digest.clear();
+    Ok(())
+}
+
+fn validate_model_ladder_selection(
+    plan: &QwenLegalHillclimbExperimentPlan,
+) -> Result<(), QwenLegalHillclimbControllerError> {
+    let rung = qwen_legal_model_ladder_rung(plan.model_ladder_rung.as_str()).ok_or_else(|| {
+        invalid_plan_error(format!(
+            "unknown Qwen legal model ladder rung `{}`",
+            plan.model_ladder_rung
+        ))
+    })?;
+    if plan.model_id != rung.model_id {
+        return Err(invalid_plan_error(format!(
+            "model_id `{}` does not match ladder rung `{}` model `{}`",
+            plan.model_id, rung.rung_name, rung.model_id
+        )));
+    }
+    if plan.adapter_target != rung.adapter_target {
+        return Err(invalid_plan_error(format!(
+            "adapter_target `{}` does not match ladder rung `{}` target `{}`",
+            plan.adapter_target, rung.rung_name, rung.adapter_target
+        )));
+    }
+    if plan.pylon_count != rung.pylon_count {
+        return Err(invalid_plan_error(format!(
+            "pylon_count `{}` does not match ladder rung `{}` count `{}`",
+            plan.pylon_count, rung.rung_name, rung.pylon_count
+        )));
+    }
+    if plan.training_method != rung.training_method {
+        return Err(invalid_plan_error(format!(
+            "training_method does not match ladder rung `{}`",
+            rung.rung_name
+        )));
     }
     Ok(())
 }
@@ -970,6 +1175,7 @@ mod tests {
             registry_path: dir.join("registry.json"),
             feed_path: dir.join("feed.json"),
             output_dir: dir.join("out"),
+            selected_rung: None,
         }
     }
 
@@ -977,7 +1183,8 @@ mod tests {
         QwenLegalHillclimbExperimentPlan {
             schema_version: String::from(QWEN_LEGAL_HILLCLIMB_PLAN_SCHEMA_VERSION),
             experiment_id: String::from(experiment_id),
-            model_id: String::from("Qwen/Qwen3.6-35B-A3B"),
+            model_ladder_rung: String::from("dense-qwen36-27b"),
+            model_id: String::from("Qwen/Qwen3.6-27B"),
             adapter_target: String::from("qwen36_legal_lora"),
             corpus_split: String::from("harvey_public_training_slice_v1"),
             pylon_count: 4,
@@ -1139,6 +1346,36 @@ mod tests {
         assert!(!feed.hidden_or_retained_score_claim);
         assert!(!feed.train_only_gain_exported_as_broad_benchmark);
         assert_eq!(feed.feed_digest, feed.stable_digest()?);
+        Ok(())
+    }
+
+    #[test]
+    fn hillclimb_controller_selects_ladder_rung_by_name() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempfile::tempdir()?;
+        let mut plan = canonical_plan("hillclimb.rung");
+        plan.model_ladder_rung = String::from("smoke-qwen35-08b");
+        plan.model_id = String::from("Qwen/Qwen3.5-0.8B");
+        plan.adapter_target = String::from("qwen35_08b_legal_lora");
+        plan.pylon_count = 1;
+        plan.training_method = QwenLegalHillclimbTrainingMethod::Sft;
+        plan.plan_digest.clear();
+        let plan_path = write_plan(temp.path(), &mut plan)?;
+        let mut config = controller_config(temp.path(), plan_path);
+        config.selected_rung = Some(String::from("dense-qwen36-27b"));
+
+        run_qwen_legal_hillclimb_controller(&config)?;
+
+        let registry: QwenLegalHillclimbRegistry =
+            read_json(temp.path().join("registry.json").as_path())?;
+        let candidate = registry
+            .records
+            .iter()
+            .find(|record| record.run_kind == QwenLegalHillclimbRunKind::Candidate)
+            .expect("candidate record");
+        assert_eq!(candidate.model_ladder_rung, "dense-qwen36-27b");
+        assert_eq!(candidate.model_id, "Qwen/Qwen3.6-27B");
+        assert_eq!(candidate.pylon_count, 4);
         Ok(())
     }
 }

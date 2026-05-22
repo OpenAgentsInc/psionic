@@ -2714,7 +2714,7 @@ fn current_time_ms() -> Result<u64, String> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train sft --config <path>\n  psionic-train dpo --config <path>\n  psionic-train grpo --config <path>\n  psionic-train qwen-legal-rl-rollouts [--runs-root <path>] [--out <dir>]\n  psionic-train qwen-legal-artifact-promotion [--out <dir>]\n  psionic-train qwen-legal-hillclimb --plan <plan.json> [--registry <registry.json>] [--feed <feed.json>] [--out <dir>]\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
+        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train sft --config <path>\n  psionic-train dpo --config <path>\n  psionic-train grpo --config <path>\n  psionic-train qwen-legal-rl-rollouts [--runs-root <path>] [--out <dir>]\n  psionic-train qwen-legal-artifact-promotion [--out <dir>]\n  psionic-train qwen-legal-hillclimb --plan <plan.json> [--rung <rung-name>] [--registry <registry.json>] [--feed <feed.json>] [--out <dir>]\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
         psionic_train::PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION,
         psionic_train::PSIONIC_TRAIN_STATUS_PACKET_SCHEMA_VERSION
     );

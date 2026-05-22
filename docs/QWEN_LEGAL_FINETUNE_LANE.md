@@ -2171,15 +2171,25 @@ The repeatable legal improvement loop now has a controller in
 ```bash
 cargo run -p psionic-train -- qwen-legal-hillclimb \
   --plan fixtures/qwen_legal/hillclimb/qwen_legal_hillclimb_plan_v1.json \
+  --rung dense-qwen36-27b \
   --registry target/legal/qwen_hillclimb/qwen_legal_hillclimb_registry.json \
   --feed target/legal/qwen_hillclimb/autopilot4_qwen_legal_hillclimb_progress_feed.json \
   --out target/legal/qwen_hillclimb
 ```
 
+The model sequence is fixed in `docs/QWEN_LEGAL_MODEL_LADDER.md`. Start with
+`smoke-qwen35-08b` or `plumbing-qwen35-4b` only to prove plumbing. The first
+serious legal target is `dense-qwen36-27b`; `moe-qwen36-35b-a3b` is later and
+requires stable dense training plus MoE-safe serving. Very large Qwen targets
+remain serving/evaluation rungs until distributed training, payment, and
+promotion gates are reliable.
+
 The plan schema is `psionic.qwen_legal_hillclimb_experiment_plan.v1`. Each
-plan declares model id, adapter target, corpus split, Pylon count, training
-method, evaluator split, promotion rule, baseline run, candidate run, and
-regression checks. The controller records every baseline, candidate, and
+plan declares the model ladder rung, model id, adapter target, corpus split,
+Pylon count, training method, evaluator split, promotion rule, baseline run,
+candidate run, and regression checks. The controller can select a rung by name
+with `--rung <rung-name>` and validates the model id, adapter target, Pylon
+count, and training method before it records every baseline, candidate, and
 regression check into an append-only local registry with score, delta, model,
 adapter, data split, worker set, payment status, replay command, guardrail
 decision, and refusal reasons.

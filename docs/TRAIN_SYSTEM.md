@@ -365,19 +365,24 @@ points Pylon/Nexus at
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and
 pre-submit self-check failures across GRPO, GEPA trace selection, MIPRO prompt
-search, and supervised fine-tune refresh work. The hillclimb loop is now
-controlled by `crates/psionic-train/src/qwen_legal_hillclimb_controller.rs`
-and `psionic-train qwen-legal-hillclimb --plan <plan.json>`. The plan declares
-model id, adapter target, corpus split, Pylon count, training method,
-evaluator split, promotion rule, baseline, candidate, and regression checks.
-The controller appends baseline, candidate, and regression records to a local
-registry with score, delta, model, adapter, data split, worker set, payment
-status, and replay command, then exports an Autopilot4 progress feed with
-recent runs and score history. Guardrails reject failed candidates, train-only
-improvements presented as broad benchmark gains, training-split evaluator
-claims, unsettled candidate payments, insufficient deltas, and policy-breaking
-regressions before those records can become champion claims. It now also emits
-an offline
+search, and supervised fine-tune refresh work. The model sequence is fixed in
+`docs/QWEN_LEGAL_MODEL_LADDER.md`: small Qwen rungs prove plumbing only,
+`Qwen/Qwen3.6-27B` is the first serious dense legal target, `Qwen/Qwen3.6-35B-A3B`
+is later after dense training and MoE-safe serving are stable, and very large
+models remain serving/evaluation targets until distributed training, payment,
+and promotion gates are reliable. The hillclimb loop is controlled by
+`crates/psionic-train/src/qwen_legal_hillclimb_controller.rs` and
+`psionic-train qwen-legal-hillclimb --plan <plan.json> --rung <rung-name>`.
+The plan declares model ladder rung, model id, adapter target, corpus split,
+Pylon count, training method, evaluator split, promotion rule, baseline,
+candidate, and regression checks. The controller validates the selected rung,
+appends baseline, candidate, and regression records to a local registry with
+score, delta, model, adapter, data split, worker set, payment status, and replay
+command, then exports an Autopilot4 progress feed with recent runs and score
+history. Guardrails reject failed candidates, train-only improvements presented
+as broad benchmark gains, training-split evaluator claims, unsettled candidate
+payments, insufficient deltas, and policy-breaking regressions before those
+records can become champion claims. It now also emits an offline
 RL benchmark readiness report with the retained baseline at 5260 bps, the
 phase-two target at 7000 bps, accepted/quarantined rollout budgets, and an
 Autopilot4 export ref for the public progress page. The same lane now emits a

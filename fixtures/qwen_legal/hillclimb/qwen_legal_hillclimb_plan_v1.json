@@ -1,7 +1,8 @@
 {
   "schema_version": "psionic.qwen_legal_hillclimb_experiment_plan.v1",
   "experiment_id": "qwen-legal-hillclimb-public-heldout-001",
-  "model_id": "Qwen/Qwen3.6-35B-A3B",
+  "model_ladder_rung": "dense-qwen36-27b",
+  "model_id": "Qwen/Qwen3.6-27B",
   "adapter_target": "qwen36_legal_lora",
   "corpus_split": "harvey_public_training_slice_v1",
   "pylon_count": 4,
