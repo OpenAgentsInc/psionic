@@ -365,14 +365,16 @@ points Pylon/Nexus at
 the Blueprint optimizer frontier, and assigns document coverage, citation
 evidence, legal reasoning, spreadsheet reasoning, missing facts, and
 pre-submit self-check failures across GRPO, GEPA trace selection, MIPRO prompt
-search, and supervised fine-tune refresh work. The model sequence is fixed in
+search, and supervised fine-tune refresh work. The tracker closeout is recorded
+in `docs/QWEN_LEGAL_TRACKING_CLOSEOUT.md`, the model sequence is fixed in
 `docs/QWEN_LEGAL_MODEL_LADDER.md`, and the strong-model acceptance bar is fixed
 in `docs/QWEN_LEGAL_ACCEPTANCE_TARGETS.md`: small Qwen rungs prove plumbing
 only, `Qwen/Qwen3.6-27B` is the first serious dense legal target,
 `Qwen/Qwen3.6-35B-A3B` is later after dense training and MoE-safe serving are
 stable, and very large models remain serving/evaluation targets until
-distributed training, payment, and promotion gates are reliable. The
-acceptance policy separates `plumbing_proof`, `public_fixture_win`,
+distributed training, payment, and promotion gates are reliable. The tracker
+closeout is explicitly a control-plane closeout, not a current strong-model
+claim. The acceptance policy separates `plumbing_proof`, `public_fixture_win`,
 `holdout_improvement`, and `strong_legal_model`; strong claims require holdout
 baseline improvement, replayable reports, retained scored traces, zero
 runner-added answer text, and clean model-only plus Blueprint-assisted

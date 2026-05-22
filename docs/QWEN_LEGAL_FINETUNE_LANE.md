@@ -2544,3 +2544,16 @@ minimum_machine_class: strong_cuda_trainer
 
 Pylon/Nexus dispatch should use this lane only for smoke jobs until the real
 artifact gate and retained eval import are wired into the operator path.
+
+## QWEN-LEGAL Tracker Closeout
+
+The umbrella tracker closeout lives in
+`docs/QWEN_LEGAL_TRACKING_CLOSEOUT.md`. It records the implemented control
+plane across dense target loading, adapter training, corpus/trace authority,
+honest measurement, Pylon dispatch, settlement proof, promotion/rollback,
+hillclimb reporting, model ladder, and acceptance targets.
+
+The closeout is explicit about the claim boundary: the canonical hillclimb
+candidate is a `holdout_improvement`, not a `strong_legal_model`. Future
+strong-model claims must clear `docs/QWEN_LEGAL_ACCEPTANCE_TARGETS.md` through
+the controller without refusal.
