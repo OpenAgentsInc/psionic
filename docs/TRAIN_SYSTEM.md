@@ -217,12 +217,13 @@ smoke:
 `cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- --mode loopback --out target/legal/pylon_dispatch/qwen-legal-loopback-dispatch`.
 That path consumes node capability reports, writes signed scheduler envelopes,
 assigns legal dataset/SFT/DPO/GRPO/eval/merge/verify jobs across two Pylon
-worker identities, records retry and blocked-node decisions, captures signed
-worker receipts and output artifact hashes, and withholds duplicate successful
-shard submissions so retries cannot be paid twice. Tailnet and production
-mode commands are available with `--mode tailnet` and `--mode production`;
-they currently produce typed blocked-mode reports until the real Pylon network
-transport lands.
+worker identities over a loopback TCP transport, records retry and blocked-node
+decisions, captures signed worker receipts and output artifact hashes, records
+the transport event for each job, and withholds duplicate successful shard
+submissions so retries cannot be paid twice. Tailnet and production mode
+commands are available with `--mode tailnet` and `--mode production`; they
+currently produce typed blocked-mode reports until real Pylon TLS endpoints are
+available.
 The Qwen3.6-27B legal fine-tuning milestone command is
 `cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads
 the Qwen3.6-27B smoke target artifacts, runs the base model through the public

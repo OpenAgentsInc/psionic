@@ -1,7 +1,10 @@
 use std::{
     collections::BTreeSet,
     fs,
+    io::{Read, Write},
+    net::{Shutdown, TcpListener, TcpStream},
     path::{Path, PathBuf},
+    thread,
 };
 
 use ed25519_dalek::{Signer, SigningKey};
@@ -154,6 +157,17 @@ pub struct QwenLegalPylonDispatchPaymentDecision {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalPylonTransportEvent {
+    pub job_id: String,
+    pub target_node_id: String,
+    pub transport: String,
+    pub endpoint: String,
+    pub request_digest: String,
+    pub response_digest: String,
+    pub worker_signature_present: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QwenLegalPylonBlockedNode {
     pub node_id: String,
     pub network_addr: String,
@@ -173,6 +187,7 @@ pub struct QwenLegalPylonDispatchReport {
     pub worker_receipts: Vec<PylonTrainingWorkerReceipt>,
     pub payment_decisions: Vec<QwenLegalPylonDispatchPaymentDecision>,
     pub artifact_hashes: Vec<PylonTrainingOutputArtifactRef>,
+    pub transport_events: Vec<QwenLegalPylonTransportEvent>,
     pub duplicate_successful_shards: Vec<String>,
     pub report_digest: String,
 }
@@ -226,6 +241,7 @@ pub fn dispatch_qwen_legal_pylon_jobs(
     let mut worker_receipts = Vec::new();
     let mut artifact_hashes = Vec::new();
     let mut payment_decisions = Vec::new();
+    let mut transport_events = Vec::new();
     let mut duplicate_successful_shards = Vec::new();
     let mut paid_credit_keys = BTreeSet::new();
     let mut next_node_index = 0_usize;
@@ -283,14 +299,8 @@ pub fn dispatch_qwen_legal_pylon_jobs(
                 .as_path(),
             &envelope,
         )?;
-        let receipt = run_qwen_legal_pylon_worker_job(
-            &envelope.job,
-            &PylonLocalWorkerRunOptions {
-                worker_id: selected.node_id.clone(),
-                started_at_ms: 100_000 + u64::try_from(job_index).unwrap_or(0) * 1_000,
-                emit_outputs: true,
-            },
-        )?;
+        let (receipt, transport_event) =
+            run_dispatched_worker(request.mode, selected, &envelope, job_index)?;
         artifact_hashes.extend(receipt.output_hashes.clone());
         let credit_key = shard_credit_key(&envelope.job);
         let payment = payment_decision_for_receipt(
@@ -310,6 +320,7 @@ pub fn dispatch_qwen_legal_pylon_jobs(
         });
         job_envelopes.push(envelope);
         worker_receipts.push(receipt);
+        transport_events.push(transport_event);
         payment_decisions.push(payment);
     }
 
@@ -327,6 +338,7 @@ pub fn dispatch_qwen_legal_pylon_jobs(
         worker_receipts,
         payment_decisions,
         artifact_hashes,
+        transport_events,
         duplicate_successful_shards,
         report_digest: String::new(),
     };
@@ -336,6 +348,147 @@ pub fn dispatch_qwen_legal_pylon_jobs(
         &report,
     )?;
     Ok(report)
+}
+
+fn run_dispatched_worker(
+    mode: QwenLegalPylonDispatchMode,
+    node: &QwenLegalPylonNodeDispatchCapability,
+    envelope: &QwenLegalSignedJobEnvelope,
+    job_index: usize,
+) -> Result<(PylonTrainingWorkerReceipt, QwenLegalPylonTransportEvent), QwenLegalPylonDispatchError>
+{
+    let options = PylonLocalWorkerRunOptions {
+        worker_id: node.node_id.clone(),
+        started_at_ms: 100_000 + u64::try_from(job_index).unwrap_or(0) * 1_000,
+        emit_outputs: true,
+    };
+    match mode {
+        QwenLegalPylonDispatchMode::LocalOnly => {
+            let receipt = run_qwen_legal_pylon_worker_job(&envelope.job, &options)?;
+            let event = transport_event(
+                envelope,
+                node,
+                "local_only",
+                node.network_addr.as_str(),
+                receipt.receipt_digest.as_str(),
+                !receipt.signature_hex.is_empty(),
+            );
+            Ok((receipt, event))
+        }
+        QwenLegalPylonDispatchMode::Loopback => run_loopback_tcp_worker(node, envelope, options),
+        QwenLegalPylonDispatchMode::Tailnet | QwenLegalPylonDispatchMode::Production => {
+            Err(QwenLegalPylonDispatchError::InvalidRequest {
+                detail: String::from("remote transport must be admitted before worker execution"),
+            })
+        }
+    }
+}
+
+fn run_loopback_tcp_worker(
+    node: &QwenLegalPylonNodeDispatchCapability,
+    envelope: &QwenLegalSignedJobEnvelope,
+    options: PylonLocalWorkerRunOptions,
+) -> Result<(PylonTrainingWorkerReceipt, QwenLegalPylonTransportEvent), QwenLegalPylonDispatchError>
+{
+    let listener =
+        TcpListener::bind("127.0.0.1:0").map_err(|error| QwenLegalPylonDispatchError::Io {
+            path: String::from("tcp://127.0.0.1:0"),
+            message: error.to_string(),
+        })?;
+    let endpoint = listener
+        .local_addr()
+        .map_err(|error| QwenLegalPylonDispatchError::Io {
+            path: String::from("tcp://127.0.0.1:0"),
+            message: error.to_string(),
+        })?
+        .to_string();
+    let worker = thread::spawn(move || -> Result<Vec<u8>, QwenLegalPylonDispatchError> {
+        let (mut inbound, _) =
+            listener
+                .accept()
+                .map_err(|error| QwenLegalPylonDispatchError::Io {
+                    path: String::from("loopback tcp accept"),
+                    message: error.to_string(),
+                })?;
+        let mut request_bytes = Vec::new();
+        inbound.read_to_end(&mut request_bytes).map_err(|error| {
+            QwenLegalPylonDispatchError::Io {
+                path: String::from("loopback tcp read"),
+                message: error.to_string(),
+            }
+        })?;
+        let envelope = serde_json::from_slice::<QwenLegalSignedJobEnvelope>(&request_bytes)
+            .map_err(|error| QwenLegalPylonDispatchError::Serialization {
+                message: error.to_string(),
+            })?;
+        let receipt = run_qwen_legal_pylon_worker_job(&envelope.job, &options)?;
+        serde_json::to_vec(&receipt).map_err(|error| QwenLegalPylonDispatchError::Serialization {
+            message: error.to_string(),
+        })
+    });
+
+    let mut stream =
+        TcpStream::connect(endpoint.as_str()).map_err(|error| QwenLegalPylonDispatchError::Io {
+            path: format!("tcp://{endpoint}"),
+            message: error.to_string(),
+        })?;
+    let request_bytes = serde_json::to_vec(envelope).map_err(|error| {
+        QwenLegalPylonDispatchError::Serialization {
+            message: error.to_string(),
+        }
+    })?;
+    stream
+        .write_all(request_bytes.as_slice())
+        .map_err(|error| QwenLegalPylonDispatchError::Io {
+            path: format!("tcp://{endpoint}"),
+            message: error.to_string(),
+        })?;
+    stream
+        .shutdown(Shutdown::Write)
+        .map_err(|error| QwenLegalPylonDispatchError::Io {
+            path: format!("tcp://{endpoint}"),
+            message: error.to_string(),
+        })?;
+    let response_bytes =
+        worker
+            .join()
+            .map_err(|_| QwenLegalPylonDispatchError::InvalidRequest {
+                detail: String::from("loopback tcp worker thread panicked"),
+            })??;
+    let receipt =
+        serde_json::from_slice::<PylonTrainingWorkerReceipt>(&response_bytes).map_err(|error| {
+            QwenLegalPylonDispatchError::Serialization {
+                message: error.to_string(),
+            }
+        })?;
+    let event = transport_event(
+        envelope,
+        node,
+        "loopback_tcp",
+        endpoint.as_str(),
+        sha256_hex(response_bytes.as_slice()).as_str(),
+        !receipt.signature_hex.is_empty(),
+    );
+    Ok((receipt, event))
+}
+
+fn transport_event(
+    envelope: &QwenLegalSignedJobEnvelope,
+    node: &QwenLegalPylonNodeDispatchCapability,
+    transport: &str,
+    endpoint: &str,
+    response_digest: &str,
+    worker_signature_present: bool,
+) -> QwenLegalPylonTransportEvent {
+    QwenLegalPylonTransportEvent {
+        job_id: envelope.job.job_id.clone(),
+        target_node_id: node.node_id.clone(),
+        transport: String::from(transport),
+        endpoint: String::from(endpoint),
+        request_digest: envelope.envelope_digest.clone(),
+        response_digest: String::from(response_digest),
+        worker_signature_present,
+    }
 }
 
 pub fn canonical_qwen_legal_loopback_dispatch_request(
@@ -773,12 +926,16 @@ mod tests {
                 && !envelope.scheduler_pubkey_hex.is_empty()
                 && envelope.target_network_addr.starts_with("loopback://")
         }));
-        assert!(
-            report
-                .worker_receipts
-                .iter()
-                .all(|receipt| { receipt.worker_id.starts_with("pylon.loopback.qwen-legal.") })
-        );
+        assert!(report
+            .worker_receipts
+            .iter()
+            .all(|receipt| { receipt.worker_id.starts_with("pylon.loopback.qwen-legal.") }));
+        assert_eq!(report.transport_events.len(), 2);
+        assert!(report.transport_events.iter().all(|event| {
+            event.transport == "loopback_tcp"
+                && event.endpoint.starts_with("127.0.0.1:")
+                && event.worker_signature_present
+        }));
     }
 
     #[test]
@@ -797,12 +954,10 @@ mod tests {
         );
         assert_eq!(report.assignments.len(), 2);
         assert_eq!(report.blocked_nodes.len(), 1);
-        assert!(
-            report
-                .assignments
-                .iter()
-                .all(|assignment| { assignment.node_id == "pylon.loopback.qwen-legal.02" })
-        );
+        assert!(report
+            .assignments
+            .iter()
+            .all(|assignment| { assignment.node_id == "pylon.loopback.qwen-legal.02" }));
     }
 
     #[test]

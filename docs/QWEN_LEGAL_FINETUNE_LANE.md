@@ -1267,11 +1267,11 @@ cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- \
 ```
 
 That command creates signed scheduler job envelopes, assigns jobs across two
-loopback Pylon identities, runs the worker path for dataset, SFT, DPO, GRPO,
-eval, merge, and artifact verification jobs, writes signed worker receipts,
-records output artifact hashes, and records payment decisions. Duplicate
-successful submissions for the same shard are withheld so a retry cannot be
-paid twice.
+loopback Pylon identities over a TCP-framed local transport, runs the worker
+path for dataset, SFT, DPO, GRPO, eval, merge, and artifact verification jobs,
+writes signed worker receipts, records output artifact hashes, records one
+transport event per job, and records payment decisions. Duplicate successful
+submissions for the same shard are withheld so a retry cannot be paid twice.
 
 The local-only worker path is still the single fixture command above. The
 tailnet and production dispatch command shapes are now explicit, but the
@@ -1290,7 +1290,8 @@ cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- \
 
 The resulting `dispatch_report.json` includes every assignment, retry or
 blocked-mode decision, blocked node, signed envelope, worker receipt, artifact
-hash, payment decision, duplicate-shard guard entry, and report digest.
+hash, transport event, payment decision, duplicate-shard guard entry, and
+report digest.
 
 ## Checkpoint Recovery And Late Join
 
