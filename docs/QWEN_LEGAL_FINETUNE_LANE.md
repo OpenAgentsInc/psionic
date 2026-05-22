@@ -1045,6 +1045,8 @@ with the legal reward-trace builder, and emits:
 - `enhanced_rewards.jsonl`
 - `dpo_pairs.jsonl`
 - `grpo_seeds.jsonl`
+- `task_improvements.json`
+- `failure_improvements.json`
 - `batch_report.json`
 
 Recorded result:
@@ -1056,18 +1058,25 @@ Recorded result:
 - adversarial holdout: `0`
 - DPO pairs: `3`
 - GRPO seed groups: `3`
+- task improvement rows: `3`
+- failure improvement rows: `10`
 - bad completions preserved for negative training: `1`
 - Blueprint scaffold rollouts: `3`
 - runner-added answer text detected: `0`
 - report digest:
-  `0dc07ad7219f0d1f05bf9b7eaa13978cba07815af51fecd1d459ef14eb55516a`
+  `74e5297849908bda3b85112ae1b785ade1ce91f76a9fab75694310136a2c970f`
 
 Plain boundary: this is real local Qwen run-artifact RL data. It is not new
 live sampling from a served Qwen3.6 route, not a full dense-Qwen RL update, and
 not a hidden or retained Harvey score claim. The command exists to bridge
 model-written local Qwen rollouts into DPO/GRPO builders while preserving
 rejected runs as negative data and quarantining any run with hidden leakage or
-runner-added answer text.
+runner-added answer text. Unlike the earlier prompt-only attempts, this trace
+path compares complete same-task run artifacts: the model answer, transcript
+tool sequence, created files, terminal state, submitted output, legal reward
+trace, and score report all stay bound to the chosen/rejected record. The
+improvement reports make the RL loop inspectable by task id and by failure
+label instead of hiding regressions behind one aggregate score.
 
 ## Full-Artifact Promotion Gate
 

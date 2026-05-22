@@ -319,13 +319,17 @@ output manifests, run receipts, and score reports, scores them with the legal
 reward-trace builder, emits enhanced reward components for file discipline,
 document coverage, citation evidence, legal reasoning, spreadsheet reasoning,
 missing facts, pre-submit self-checks, and runner-output integrity, then writes
-DPO pairs and GRPO seed groups. The recorded local batch at
+DPO pairs, GRPO seed groups, task improvement rows, and failure-label
+improvement rows. The recorded local batch at
 `target/legal/qwen_rl_rollouts/batch-001` contains 6 rollouts, 5 accepted, 1
-rejected, 0 quarantined, 3 DPO pairs, 3 GRPO groups, and 0 runner-added answer
-text detections, with report digest
-`0dc07ad7219f0d1f05bf9b7eaa13978cba07815af51fecd1d459ef14eb55516a`. This is
-real local Qwen run-artifact RL data, not a hidden or retained Harvey score
-claim and not yet live served-Qwen3.6 sampling. Psionic now also owns a
+rejected, 0 quarantined, 3 DPO pairs, 3 GRPO groups, 3 task rows, 10
+failure-label rows, and 0 runner-added answer text detections, with report
+digest `74e5297849908bda3b85112ae1b785ade1ce91f76a9fab75694310136a2c970f`.
+This is real local Qwen run-artifact RL data, not a hidden or retained Harvey
+score claim and not yet live served-Qwen3.6 sampling. It differs from the
+earlier prompt-only attempts by binding full same-task model answers,
+transcripts, tool/file artifacts, submit behavior, reward traces, and score
+reports into chosen/rejected training records. Psionic now also owns a
 full-artifact promotion gate in
 `crates/psionic-train/src/qwen_legal_full_artifact_promotion.rs`, exposed as
 `psionic-train qwen-legal-artifact-promotion`. It refuses candidates without

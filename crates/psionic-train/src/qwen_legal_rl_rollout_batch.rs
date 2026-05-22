@@ -5,9 +5,9 @@ use std::{
 };
 
 use psionic_eval::{
+    build_legal_reward_trace_from_run_dir, run_record_digest, score_report_digest,
     CoverageSnapshot, CriterionFailureClass, LegalRewardTraceError, LegalVerifierRewardTrace,
     Metadata, RunRecord, RunTerminalState, ScoreReport, TranscriptEventKind,
-    build_legal_reward_trace_from_run_dir, run_record_digest, score_report_digest,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,6 +22,10 @@ pub const QWEN_LEGAL_RL_REWARD_COMPONENT_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_rl_reward_components.v1";
 pub const QWEN_LEGAL_RL_DPO_PAIR_SCHEMA_VERSION: &str = "psionic.qwen_legal_rl_dpo_pair.v1";
 pub const QWEN_LEGAL_RL_GRPO_SEED_SCHEMA_VERSION: &str = "psionic.qwen_legal_rl_grpo_seed.v1";
+pub const QWEN_LEGAL_RL_TASK_IMPROVEMENT_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_task_improvement.v1";
+pub const QWEN_LEGAL_RL_FAILURE_IMPROVEMENT_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_rl_failure_improvement.v1";
 
 const DEFAULT_BATCH_ID: &str = "qwen-legal-rl-rollouts-001";
 const DEFAULT_RUNS_ROOT: &str = "fixtures/qwen_legal/real_finetune/harvey_no_cheat_suite_plain_text_shim_after_lora_2026_05_20_025";
@@ -204,6 +208,51 @@ impl QwenLegalRlGrpoSeed {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalRlTaskImprovementRow {
+    pub schema_version: String,
+    pub task_id: String,
+    pub rollout_count: usize,
+    pub accepted_count: usize,
+    pub rejected_count: usize,
+    pub quarantined_count: usize,
+    pub adversarial_holdout_count: usize,
+    pub negative_training_count: usize,
+    pub best_rollout_id: String,
+    pub best_rollout_class: QwenLegalRlRolloutClass,
+    pub best_score_bps: u32,
+    pub best_reward: f32,
+    pub worst_rollout_id: String,
+    pub worst_rollout_class: QwenLegalRlRolloutClass,
+    pub worst_score_bps: u32,
+    pub worst_reward: f32,
+    pub score_delta_bps: i64,
+    pub reward_delta: f32,
+    pub failure_labels_observed: Vec<String>,
+    pub preference_training_status: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalRlFailureImprovementRow {
+    pub schema_version: String,
+    pub failure_label: String,
+    pub affected_rollout_count: usize,
+    pub affected_task_count: usize,
+    pub negative_training_count: usize,
+    pub quarantined_count: usize,
+    pub worst_rollout_id: String,
+    pub worst_task_id: String,
+    pub worst_score_bps: u32,
+    pub worst_reward: f32,
+    pub best_counterexample_rollout_id: Option<String>,
+    pub best_counterexample_task_id: Option<String>,
+    pub best_counterexample_score_bps: Option<u32>,
+    pub best_counterexample_reward: Option<f32>,
+    pub score_gap_bps: Option<i64>,
+    pub reward_gap: Option<f32>,
+    pub training_action: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QwenLegalRlRolloutClassCounts {
     pub accepted: usize,
@@ -229,11 +278,15 @@ pub struct QwenLegalRlRolloutBatchReport {
     pub enhanced_reward_path: String,
     pub dpo_pair_path: String,
     pub grpo_seed_path: String,
+    pub task_improvement_path: String,
+    pub failure_improvement_path: String,
     pub preserved_artifacts_dir: String,
     pub rollout_count: usize,
     pub class_counts: QwenLegalRlRolloutClassCounts,
     pub dpo_pair_count: usize,
     pub grpo_seed_count: usize,
+    pub task_improvement_count: usize,
+    pub failure_improvement_count: usize,
     pub bad_completion_count: usize,
     pub quarantined_rollout_ids: Vec<String>,
     pub deterministic_rollout_ids: Vec<String>,
@@ -328,6 +381,8 @@ pub fn run_qwen_legal_rl_rollout_batch(
 
     let dpo_pairs = build_dpo_pairs(records.as_slice())?;
     let grpo_seeds = build_grpo_seeds(records.as_slice())?;
+    let task_improvements = build_task_improvement_rows(records.as_slice());
+    let failure_improvements = build_failure_improvement_rows(records.as_slice());
     let reward_traces = prepared
         .iter()
         .map(|prepared_rollout| prepared_rollout.reward_trace.clone())
@@ -342,11 +397,15 @@ pub fn run_qwen_legal_rl_rollout_batch(
     let enhanced_reward_path = config.output_dir.join("enhanced_rewards.jsonl");
     let dpo_pair_path = config.output_dir.join("dpo_pairs.jsonl");
     let grpo_seed_path = config.output_dir.join("grpo_seeds.jsonl");
+    let task_improvement_path = config.output_dir.join("task_improvements.json");
+    let failure_improvement_path = config.output_dir.join("failure_improvements.json");
     write_jsonl(rollout_record_path.as_path(), records.as_slice())?;
     write_jsonl(reward_trace_path.as_path(), reward_traces.as_slice())?;
     write_jsonl(enhanced_reward_path.as_path(), enhanced_rewards.as_slice())?;
     write_jsonl(dpo_pair_path.as_path(), dpo_pairs.as_slice())?;
     write_jsonl(grpo_seed_path.as_path(), grpo_seeds.as_slice())?;
+    write_json(task_improvement_path.as_path(), &task_improvements)?;
+    write_json(failure_improvement_path.as_path(), &failure_improvements)?;
 
     let class_counts = class_counts(records.as_slice());
     let mut report = QwenLegalRlRolloutBatchReport {
@@ -365,11 +424,15 @@ pub fn run_qwen_legal_rl_rollout_batch(
         enhanced_reward_path: enhanced_reward_path.display().to_string(),
         dpo_pair_path: dpo_pair_path.display().to_string(),
         grpo_seed_path: grpo_seed_path.display().to_string(),
+        task_improvement_path: task_improvement_path.display().to_string(),
+        failure_improvement_path: failure_improvement_path.display().to_string(),
         preserved_artifacts_dir: preserved_root(config).display().to_string(),
         rollout_count: records.len(),
         class_counts,
         dpo_pair_count: dpo_pairs.len(),
         grpo_seed_count: grpo_seeds.len(),
+        task_improvement_count: task_improvements.len(),
+        failure_improvement_count: failure_improvements.len(),
         bad_completion_count: records
             .iter()
             .filter(|record| record.negative_training_eligible)
@@ -1208,6 +1271,209 @@ fn build_grpo_seeds(
     Ok(seeds)
 }
 
+fn build_task_improvement_rows(
+    records: &[QwenLegalRlRolloutRecord],
+) -> Vec<QwenLegalRlTaskImprovementRow> {
+    let mut by_task: BTreeMap<String, Vec<&QwenLegalRlRolloutRecord>> = BTreeMap::new();
+    for record in records {
+        by_task
+            .entry(record.task_id.clone())
+            .or_default()
+            .push(record);
+    }
+
+    let mut rows = Vec::new();
+    for (task_id, task_records) in by_task {
+        if task_records.is_empty() {
+            continue;
+        }
+        let mut best_ranked = task_records.clone();
+        sort_records_best_first(best_ranked.as_mut_slice());
+        let best = best_ranked[0];
+
+        let mut worst_ranked = task_records.clone();
+        sort_records_worst_first(worst_ranked.as_mut_slice());
+        let worst = worst_ranked[0];
+
+        let failure_labels_observed = task_records
+            .iter()
+            .flat_map(|record| record.failure_labels.iter().cloned())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let accepted_count = task_records
+            .iter()
+            .filter(|record| record.rollout_class == QwenLegalRlRolloutClass::Accepted)
+            .count();
+        let rejected_count = task_records
+            .iter()
+            .filter(|record| record.rollout_class == QwenLegalRlRolloutClass::Rejected)
+            .count();
+        let quarantined_count = task_records
+            .iter()
+            .filter(|record| record.rollout_class == QwenLegalRlRolloutClass::Quarantined)
+            .count();
+        let adversarial_holdout_count = task_records
+            .iter()
+            .filter(|record| record.rollout_class == QwenLegalRlRolloutClass::AdversarialHoldout)
+            .count();
+        let negative_training_count = task_records
+            .iter()
+            .filter(|record| record.negative_training_eligible)
+            .count();
+        let preference_training_status =
+            if task_records.iter().any(|record| record.training_eligible)
+                && task_records
+                    .iter()
+                    .any(|record| record.negative_training_eligible)
+            {
+                String::from("chosen_rejected_pair_available")
+            } else if negative_training_count > 0 {
+                String::from("negative_only_replay")
+            } else {
+                String::from("positive_only_audit")
+            };
+
+        rows.push(QwenLegalRlTaskImprovementRow {
+            schema_version: String::from(QWEN_LEGAL_RL_TASK_IMPROVEMENT_SCHEMA_VERSION),
+            task_id,
+            rollout_count: task_records.len(),
+            accepted_count,
+            rejected_count,
+            quarantined_count,
+            adversarial_holdout_count,
+            negative_training_count,
+            best_rollout_id: best.rollout_id.clone(),
+            best_rollout_class: best.rollout_class,
+            best_score_bps: best.legal_content_score_bps,
+            best_reward: best.enhanced_reward.total_reward,
+            worst_rollout_id: worst.rollout_id.clone(),
+            worst_rollout_class: worst.rollout_class,
+            worst_score_bps: worst.legal_content_score_bps,
+            worst_reward: worst.enhanced_reward.total_reward,
+            score_delta_bps: best.legal_content_score_bps as i64
+                - worst.legal_content_score_bps as i64,
+            reward_delta: best.enhanced_reward.total_reward - worst.enhanced_reward.total_reward,
+            failure_labels_observed,
+            preference_training_status,
+        });
+    }
+    rows
+}
+
+fn build_failure_improvement_rows(
+    records: &[QwenLegalRlRolloutRecord],
+) -> Vec<QwenLegalRlFailureImprovementRow> {
+    let mut by_label: BTreeMap<String, Vec<&QwenLegalRlRolloutRecord>> = BTreeMap::new();
+    for record in records {
+        for label in &record.failure_labels {
+            if label == "none" {
+                continue;
+            }
+            by_label.entry(label.clone()).or_default().push(record);
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (failure_label, affected_records) in by_label {
+        if affected_records.is_empty() {
+            continue;
+        }
+        let mut worst_ranked = affected_records.clone();
+        sort_records_worst_first(worst_ranked.as_mut_slice());
+        let worst = worst_ranked[0];
+
+        let affected_task_ids = affected_records
+            .iter()
+            .map(|record| record.task_id.clone())
+            .collect::<BTreeSet<_>>();
+        let mut counterexamples = records
+            .iter()
+            .filter(|record| {
+                affected_task_ids.contains(record.task_id.as_str())
+                    && !record
+                        .failure_labels
+                        .iter()
+                        .any(|label| label == &failure_label)
+            })
+            .collect::<Vec<_>>();
+        sort_records_best_first(counterexamples.as_mut_slice());
+        let best_counterexample = counterexamples.first().copied();
+
+        let negative_training_count = affected_records
+            .iter()
+            .filter(|record| record.negative_training_eligible)
+            .count();
+        let quarantined_count = affected_records
+            .iter()
+            .filter(|record| record.rollout_class == QwenLegalRlRolloutClass::Quarantined)
+            .count();
+        let training_action = if negative_training_count > 0 && best_counterexample.is_some() {
+            String::from("dpo_negative_pair_or_grpo_contrast")
+        } else if quarantined_count > 0 {
+            String::from("quarantine_replay_required")
+        } else {
+            String::from("audit_only_until_counterexample")
+        };
+
+        rows.push(QwenLegalRlFailureImprovementRow {
+            schema_version: String::from(QWEN_LEGAL_RL_FAILURE_IMPROVEMENT_SCHEMA_VERSION),
+            failure_label,
+            affected_rollout_count: affected_records.len(),
+            affected_task_count: affected_task_ids.len(),
+            negative_training_count,
+            quarantined_count,
+            worst_rollout_id: worst.rollout_id.clone(),
+            worst_task_id: worst.task_id.clone(),
+            worst_score_bps: worst.legal_content_score_bps,
+            worst_reward: worst.enhanced_reward.total_reward,
+            best_counterexample_rollout_id: best_counterexample
+                .map(|record| record.rollout_id.clone()),
+            best_counterexample_task_id: best_counterexample.map(|record| record.task_id.clone()),
+            best_counterexample_score_bps: best_counterexample
+                .map(|record| record.legal_content_score_bps),
+            best_counterexample_reward: best_counterexample
+                .map(|record| record.enhanced_reward.total_reward),
+            score_gap_bps: best_counterexample.map(|record| {
+                record.legal_content_score_bps as i64 - worst.legal_content_score_bps as i64
+            }),
+            reward_gap: best_counterexample.map(|record| {
+                record.enhanced_reward.total_reward - worst.enhanced_reward.total_reward
+            }),
+            training_action,
+        });
+    }
+    rows
+}
+
+fn sort_records_best_first(records: &mut [&QwenLegalRlRolloutRecord]) {
+    records.sort_by(|left, right| {
+        right
+            .legal_content_score_bps
+            .cmp(&left.legal_content_score_bps)
+            .then_with(|| {
+                right
+                    .enhanced_reward
+                    .total_reward
+                    .total_cmp(&left.enhanced_reward.total_reward)
+            })
+            .then_with(|| left.rollout_id.cmp(&right.rollout_id))
+    });
+}
+
+fn sort_records_worst_first(records: &mut [&QwenLegalRlRolloutRecord]) {
+    records.sort_by(|left, right| {
+        left.legal_content_score_bps
+            .cmp(&right.legal_content_score_bps)
+            .then_with(|| {
+                left.enhanced_reward
+                    .total_reward
+                    .total_cmp(&right.enhanced_reward.total_reward)
+            })
+            .then_with(|| left.rollout_id.cmp(&right.rollout_id))
+    });
+}
+
 fn class_counts(records: &[QwenLegalRlRolloutRecord]) -> QwenLegalRlRolloutClassCounts {
     QwenLegalRlRolloutClassCounts {
         accepted: records
@@ -1545,7 +1811,11 @@ fn short_sha256(bytes: &[u8]) -> String {
 }
 
 fn bool_reward(value: bool) -> f32 {
-    if value { 1.0 } else { 0.0 }
+    if value {
+        1.0
+    } else {
+        0.0
+    }
 }
 
 fn mean<const N: usize>(values: [f32; N]) -> f32 {
@@ -1588,8 +1858,8 @@ mod tests {
     }
 
     #[test]
-    fn qwen_legal_rl_rollout_batch_preserves_negative_examples()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn qwen_legal_rl_rollout_batch_preserves_negative_examples(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let config = QwenLegalRlRolloutBatchConfig {
             runs_root: fixture_runs_root(),
@@ -1600,17 +1870,31 @@ mod tests {
         let report = run_qwen_legal_rl_rollout_batch(&config)?;
         let pairs = fs::read_to_string(&report.dpo_pair_path)?;
         let records = fs::read_to_string(&report.rollout_record_path)?;
+        let task_improvements = read_json::<Vec<QwenLegalRlTaskImprovementRow>>(Path::new(
+            &report.task_improvement_path,
+        ))?;
+        let failure_improvements = read_json::<Vec<QwenLegalRlFailureImprovementRow>>(Path::new(
+            &report.failure_improvement_path,
+        ))?;
 
         assert!(report.bad_completion_count >= 1);
         assert!(report.dpo_pair_count >= 1);
+        assert_eq!(report.task_improvement_count, task_improvements.len());
+        assert_eq!(report.failure_improvement_count, failure_improvements.len());
+        assert!(report.task_improvement_count >= 1);
+        assert!(report.failure_improvement_count >= 1);
         assert!(pairs.contains("\"trainable\":true"));
         assert!(records.contains("\"negative_training_eligible\":true"));
+        assert!(task_improvements.iter().any(|row| row.score_delta_bps > 0));
+        assert!(failure_improvements.iter().any(
+            |row| row.negative_training_count > 0 && row.score_gap_bps.unwrap_or_default() > 0
+        ));
         Ok(())
     }
 
     #[test]
-    fn qwen_legal_rl_rollout_batch_quarantines_runner_mutation()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn qwen_legal_rl_rollout_batch_quarantines_runner_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let source = fixture_runs_root()
             .join("model_only")
