@@ -532,6 +532,10 @@ Fresh actual run recorded on 2026-05-22:
   `target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z`
 - eval output directory:
   `target/legal/qwen36_27b_eval_actual_20260522T043404Z`
+- retained adapter fixture:
+  `fixtures/qwen_legal/real_finetune/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors`
+- retained state checkpoint fixture:
+  `fixtures/qwen_legal/real_finetune/qwen36_27b_real_lora_sft_actual_20260522T043404Z/state_checkpoint.safetensors`
 - completed steps: `3`
 - initial loss: `2.6618745`
 - final loss: `1.9467509`
@@ -552,9 +556,9 @@ Fresh actual run recorded on 2026-05-22:
 
 The tracked report preserves the generated training receipt, loss curve,
 checkpoint summary, eval report, promotion gate input, replay receipt, and
-base/adapter Autopilot reports. The adapter and optimizer-state checkpoint
-remain ignored `target/` artifacts and are identified by size and sha256 in
-the report.
+base/adapter Autopilot reports. The actual adapter and optimizer-state
+checkpoint were also retained as fixture safetensors and identified by size and
+sha256 in the report.
 
 The first two-worker real-Qwen Pylon rehearsal command is:
 

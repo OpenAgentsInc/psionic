@@ -56,10 +56,12 @@ Training artifact summary:
 - resolved dense target set: `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
 - trainable parameter count: `1013760`
 - adapter artifact: `target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors`
+- retained adapter fixture: `fixtures/qwen_legal/real_finetune/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors`
 - adapter size: `4055800` bytes
 - adapter sha256: `7753611f0873897ed5e058d1b867288f986965e58d9c8b6a4d157849d86ad046`
 - adapter identity digest: `852cb8ed66663ad3153e3a81017404777ead0ac68902b1e2bd0b585594a39939`
 - state checkpoint: `target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/state_checkpoint.safetensors`
+- retained state checkpoint fixture: `fixtures/qwen_legal/real_finetune/qwen36_27b_real_lora_sft_actual_20260522T043404Z/state_checkpoint.safetensors`
 - state checkpoint size: `12165960` bytes
 - state checkpoint sha256: `bfdd8a621128fbd87402e948a628f7ea8de9fbb137c2e1e103740f78976f2466`
 - optimizer state sha256: `a5fd2c295303881650063592f399717a4205c7c31a5860a641f37e822027d874`
@@ -104,10 +106,13 @@ run:
 - `base/autopilot_report.json`
 - `adapter/report.md`
 - `adapter/autopilot_report.json`
+- `../../fixtures/qwen_legal/real_finetune/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors`
+- `../../fixtures/qwen_legal/real_finetune/qwen36_27b_real_lora_sft_actual_20260522T043404Z/state_checkpoint.safetensors`
 
-The large adapter and optimizer-state checkpoint remain in the ignored
-`target/legal/...` output directory and are identified above by path, size, and
-sha256.
+The original generated copies also remain in the ignored `target/legal/...`
+output directory while this worktree exists. The committed fixture copies above
+preserve the actual trained adapter and resume checkpoint after temporary
+worktree cleanup.
 
 Tracked metadata file hashes:
 
