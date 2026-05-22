@@ -2,9 +2,9 @@
   "schema_version": "psionic.quantized_outer_sync_contract.v1",
   "contract_id": "psionic.quantized_outer_sync_contract.v1",
   "current_epoch_id": "network_epoch_00000123",
-  "elastic_device_mesh_contract_digest": "cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6",
-  "wan_overlay_route_contract_digest": "3fe65cbb07b327819e98126ac2e6f6960d07b7ddb70606f4c3c788455d5ac6f1",
-  "live_checkpoint_catchup_contract_digest": "5014483a73eb91d426b5a7d78c478d1af548976ac05a2dfed08ba4ae79f7b7a5",
+  "elastic_device_mesh_contract_digest": "ed7d5de38d617f25887c5732026d023ad0bd906c569a6e02ddac09703f9d04aa",
+  "wan_overlay_route_contract_digest": "d29a7f20ed396b3128e682f0f18cff7168265bb324365e7c6dd63f1dd2fb65f1",
+  "live_checkpoint_catchup_contract_digest": "1e03479637556bbdef02144044d9a275e45ffef69ba4d5897279fcd09e6179ef",
   "delta_policies": [
     {
       "policy_id": "policy.int8_pseudogradient_outer_sync",
@@ -116,5 +116,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first WAN-aware outer-sync surface above live catch-up: quantized delta policies, applied exchange receipts, checkpoint-authority aggregation, correctness receipts, bandwidth accounting, and one explicit refusal for full-precision dense all-reduce over WAN paths. It does not yet claim public internet fault or soak closure.",
-  "contract_digest": "b8e07d3262aea45a95ac2dd6a024f5716ede09534a0ac0e4cec4058fabebf920"
+  "contract_digest": "a59bc6815fd04d7c79d6ad54c359ed9794d34dc061ead48f038a71a789f3dd7d"
 }

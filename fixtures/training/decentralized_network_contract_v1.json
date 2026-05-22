@@ -5,7 +5,7 @@
   "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
   "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
   "run_graph_schema_version": "psionic.cross_provider_program_run_graph.v1",
-  "run_graph_digest": "aea7c24d3e2da0d6ba09dda4b67d733b10c13cf9672389b4d7344d5bd4a5055c",
+  "run_graph_digest": "eb403fb3a76558356cb32e2ae6a886fb85109c29908b79a49f52d7bd97b58e49",
   "validator_promotion_contract_id": "psionic.shared_validator_promotion_contract.v1",
   "governance_revision": {
     "governance_revision_id": "psionic.decentralized_training_governance.v1",
@@ -85,5 +85,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract closes one canonical decentralized network epoch, role, governance, settlement, and checkpoint-authority object above the retained cross-provider training-program manifest and whole-program run graph. It does not claim public node registration, public discovery, live public miner or validator runtime, reward execution, or permissionless participation.",
-  "contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20"
+  "contract_digest": "071310191273b8161bf37aba2c0771863281f2a0f1d5d9a07d2f37f1b87a329b"
 }

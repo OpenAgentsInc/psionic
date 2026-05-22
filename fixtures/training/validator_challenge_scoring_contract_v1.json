@@ -1,9 +1,9 @@
 {
   "schema_version": "psionic.validator_challenge_scoring_contract.v1",
   "contract_id": "psionic.validator_challenge_scoring_contract.v1",
-  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
-  "public_work_assignment_contract_digest": "60c63cc182d0386bb269156d68fbaa4c24820d91d13a8ef84e2520cfed4e3752",
-  "public_miner_protocol_contract_digest": "b20fb20345bd3b2c6b39c6909ef9f1eab61d2c91b7748bde12561c7c52e5999b",
+  "public_network_registry_contract_digest": "13c54dbe05c8be670629d69e6c84d8457e8ce507f075fe4b70c4569634899fd2",
+  "public_work_assignment_contract_digest": "5234ffe77a9b37c10c750dc955999c0446a6c5a19631c32f8b14879d6ff6881b",
+  "public_miner_protocol_contract_digest": "d9ea9a4d06d5de31d77dd3aed9db21720eca5fdc2e3874a8884ab4dfc85aef09",
   "shared_validator_promotion_contract_digest": "fce26138afb1719033aabd39e44e751efbc68c08e14a3c27a5bfdb4e8e70aa86",
   "scoring_policy": {
     "accepted_min_improvement_bps": 10,
@@ -77,5 +77,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first public validator challenge and scoring surface: replay rules, improvement thresholds, typed score receipts, and one stale-checkpoint refusal. It does not yet claim multi-validator consensus, checkpoint promotion, or fraud penalties.",
-  "contract_digest": "7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0"
+  "contract_digest": "ed10affc17a91cdc08c2871f07054a6b29f0063111367fc16014ff736b3249ed"
 }

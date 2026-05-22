@@ -1,10 +1,10 @@
 {
   "schema_version": "psionic.public_run_explorer_contract.v1",
   "contract_id": "psionic.public_run_explorer_contract.v1",
-  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
-  "multi_validator_consensus_contract_digest": "53f1584e194bfbafe11633198d549364a2ce948c10f5a61436e5f65c431283d7",
-  "reward_ledger_contract_digest": "6f252e036aea94f1944533a8e7716cf27c7ef749f2f5282d74be01f0b77be8ed",
-  "settlement_publication_contract_digest": "9c45bf611d920137f3fad39b49c3b62c92ccf4b4afea08b07d8efe484fa6554f",
+  "public_network_registry_contract_digest": "13c54dbe05c8be670629d69e6c84d8457e8ce507f075fe4b70c4569634899fd2",
+  "multi_validator_consensus_contract_digest": "0e12aee06be97a314a5ea22d64e6c177447e81ca5b40406b7ceb7d41646f6c98",
+  "reward_ledger_contract_digest": "df6d23ba9aaaa5186f0ba51145c48a77d470530a2eab0ab7c62e166aec0e993a",
+  "settlement_publication_contract_digest": "4cb9e8a965cff73e25c9dd85df54b91cd4387866b422aa27e2699e686d2f64f9",
   "panes": [
     {
       "pane_id": "pane.network_epoch",
@@ -160,5 +160,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first public run explorer surface: panes, one network snapshot, score rows, and stale-data policy. It does not yet claim staged public testnet graduation or public participation windows.",
-  "contract_digest": "f56844ceae1915e3f96192893efd451e69dbf388e166092e31ac101c5164f4cd"
+  "contract_digest": "8d332ce3dc97db69990ca20293a1f2681da8419393d6f60997f1e1b9ff9380c5"
 }

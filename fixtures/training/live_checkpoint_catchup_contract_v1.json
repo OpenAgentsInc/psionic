@@ -6,8 +6,8 @@
   "checkpoint_pointer_digest": "65fe61fcbc7d2fa054b316aea46fb9216678b72a98653a51c4ac0e8987e77e1b",
   "distributed_checkpoint_contract_digest": "53386fdd8fc1f9b157df000ea869260905589469468feaf2cb596b6ba8053810",
   "dense_rank_recovery_contract_digest": "1084d44b21e975950ba6b27b25eb6fe421237461258dc56f4c153454111ea7b4",
-  "elastic_device_mesh_contract_digest": "cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6",
-  "wan_overlay_route_contract_digest": "3fe65cbb07b327819e98126ac2e6f6960d07b7ddb70606f4c3c788455d5ac6f1",
+  "elastic_device_mesh_contract_digest": "ed7d5de38d617f25887c5732026d023ad0bd906c569a6e02ddac09703f9d04aa",
+  "wan_overlay_route_contract_digest": "d29a7f20ed396b3128e682f0f18cff7168265bb324365e7c6dd63f1dd2fb65f1",
   "advertisements": [
     {
       "advertisement_id": "advertisement.checkpoint_authority.runpod.primary",
@@ -124,5 +124,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first truthful live catch-up layer above the WAN route contract: checkpoint advertisements, resume windows, one successful replacement catch-up, and one explicit stale or optimizer-incomplete refusal. It does not yet claim WAN-efficient outer sync or public internet soak closure.",
-  "contract_digest": "5014483a73eb91d426b5a7d78c478d1af548976ac05a2dfed08ba4ae79f7b7a5"
+  "contract_digest": "1e03479637556bbdef02144044d9a275e45ffef69ba4d5897279fcd09e6179ef"
 }

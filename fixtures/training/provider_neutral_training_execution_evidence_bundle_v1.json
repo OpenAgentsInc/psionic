@@ -572,10 +572,9 @@
       "surface_ref": {
         "artifact_role": "xtrain_explorer_snapshot_v1",
         "artifact_path": "fixtures/training/xtrain_explorer_snapshot_v1.json",
-        "artifact_digest": "214115b3e1d3ccda9343cfd41024a432c1856ad3fbc7a8a53bc7a1e6370f4281",
         "evidence_posture": "measured",
         "authoritative": true,
-        "detail": "The decentralized XTRAIN explorer snapshot now exposes an explicit supporting-evidence set spanning registry, miner protocol, consensus, settlement, curated-run, and sibling bounded-score truth."
+        "detail": "The decentralized XTRAIN explorer snapshot is declared as downstream public-network evidence; its own contract digest remains authoritative outside this upstream evidence bundle."
       },
       "supporting_evidence_paths": [
         "fixtures/training/public_run_explorer_contract_v1.json",
@@ -586,7 +585,7 @@
         "fixtures/training/curated_decentralized_run_contract_v1.json",
         "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json"
       ],
-      "detail": "The decentralized XTRAIN explorer snapshot now exposes an explicit supporting-evidence set spanning registry, miner protocol, consensus, settlement, curated-run, and sibling bounded-score truth."
+      "detail": "The decentralized XTRAIN explorer snapshot is declared as downstream public-network evidence; its own contract digest remains authoritative outside this upstream evidence bundle."
     },
     {
       "link_id": "surface.xtrain_explorer_index_v1",
@@ -596,16 +595,15 @@
       "surface_ref": {
         "artifact_role": "xtrain_explorer_index_v1",
         "artifact_path": "fixtures/training/xtrain_explorer_index_v1.json",
-        "artifact_digest": "44500763402456fcc22f33c363d625d31a0b65eb0be8966a1a51e8b015a31758",
         "evidence_posture": "measured",
         "authoritative": true,
-        "detail": "The decentralized XTRAIN explorer index now points directly at the retained snapshot and explorer-foundation contract."
+        "detail": "The decentralized XTRAIN explorer index is declared as downstream public-network evidence; its own retained artifact digest remains authoritative outside this upstream evidence bundle."
       },
       "supporting_evidence_paths": [
         "fixtures/training/xtrain_explorer_snapshot_v1.json",
         "fixtures/training/public_run_explorer_contract_v1.json"
       ],
-      "detail": "The decentralized XTRAIN explorer index now points directly at the retained snapshot and explorer-foundation contract."
+      "detail": "The decentralized XTRAIN explorer index is declared as downstream public-network evidence; its own retained artifact digest remains authoritative outside this upstream evidence bundle."
     }
   ],
   "final_artifact_refs": [
@@ -692,50 +690,44 @@
     {
       "artifact_role": "public_run_explorer_contract",
       "artifact_path": "fixtures/training/public_run_explorer_contract_v1.json",
-      "artifact_digest": "d60645fc5ed0467cab5ee1cf671af23720b251e267c27327349138f9f81913a0",
       "evidence_posture": "measured",
       "authoritative": true,
-      "detail": "Explorer drilldown keeps the pane-foundation public run explorer contract explicit."
+      "detail": "Explorer drilldown declares the downstream public run explorer contract without hashing it into the upstream evidence bundle."
     },
     {
       "artifact_role": "public_network_registry_contract",
       "artifact_path": "fixtures/training/public_network_registry_contract_v1.json",
-      "artifact_digest": "21f173fc609a9d26de82616265fd40a3cf9c6f60bf229bb05380863d7401b6f0",
       "evidence_posture": "measured",
       "authoritative": true,
-      "detail": "Explorer drilldown keeps participant identity and role truth explicit through the registry contract."
+      "detail": "Explorer drilldown declares downstream participant identity and role truth through the registry contract without creating a digest cycle."
     },
     {
       "artifact_role": "public_miner_protocol_contract",
       "artifact_path": "fixtures/training/public_miner_protocol_contract_v1.json",
-      "artifact_digest": "43798c43db37afe0329c1d64d1f72ddfb57dff52518b0b194c81e6c26c37615a",
       "evidence_posture": "measured",
       "authoritative": true,
-      "detail": "Explorer drilldown keeps miner session and refusal truth explicit through the public miner protocol contract."
+      "detail": "Explorer drilldown declares downstream miner session and refusal truth through the public miner protocol contract without creating a digest cycle."
     },
     {
       "artifact_role": "multi_validator_consensus_contract",
       "artifact_path": "fixtures/training/multi_validator_consensus_contract_v1.json",
-      "artifact_digest": "5ebe6bc5c764febe94025f5f20873c585da875263e67f72e4e53015b71b01526",
       "evidence_posture": "measured",
       "authoritative": true,
-      "detail": "Explorer drilldown keeps held-promotion checkpoint truth explicit through multi-validator consensus."
+      "detail": "Explorer drilldown declares downstream held-promotion checkpoint truth through multi-validator consensus without creating a digest cycle."
     },
     {
       "artifact_role": "settlement_publication_contract",
       "artifact_path": "fixtures/training/settlement_publication_contract_v1.json",
-      "artifact_digest": "02c5280139eab1ba7405725f4f2589699e4c14ded0f2229cbd4242a5d7245b3c",
       "evidence_posture": "measured",
       "authoritative": true,
-      "detail": "Explorer drilldown keeps signed settlement posture explicit through the settlement publication contract."
+      "detail": "Explorer drilldown declares downstream signed settlement posture through the settlement publication contract without creating a digest cycle."
     },
     {
       "artifact_role": "curated_decentralized_run_contract",
       "artifact_path": "fixtures/training/curated_decentralized_run_contract_v1.json",
-      "artifact_digest": "31a8c72630f06c8bc5d1f912b05c79222e0122947b737cbe05bfea27eb7376f5",
       "evidence_posture": "measured",
       "authoritative": true,
-      "detail": "Explorer drilldown keeps the retained curated-run closure explicit alongside the explorer snapshot."
+      "detail": "Explorer drilldown declares downstream curated-run closure alongside the explorer snapshot without hashing the downstream contract into this upstream bundle."
     }
   ],
   "after_action_refs": [
@@ -754,5 +746,5 @@
     "detail": "The canonical bundle proves the shared schema can encode successful, degraded, and refused segments together while also linking track-aware score surfaces and decentralized explorer surfaces back into retained evidence. The current cross-provider program remains degraded overall because dense distributed live telemetry and full hybrid runtime closure are not finished."
   },
   "claim_boundary": "This bundle family proves one provider-neutral final evidence schema can represent single-node dense runs, dense distributed runs, contributor-window runs, validator-only runs, and hybrid runs without lane-specific proof JSON, while also linking track-aware score surfaces and decentralized explorer surfaces back into retained evidence. It does not claim that every segment shown here has already been executed together in one real production run.",
-  "bundle_digest": "c5d961050d93a96e6c66314291227cc100d60731c4d3e8afc6f24cc6ad9d7404"
+  "bundle_digest": "e28c9e632060bcb5835213a78862d46781169025ecfd2df8ce924fc1eee42027"
 }

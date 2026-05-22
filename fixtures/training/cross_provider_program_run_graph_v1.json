@@ -2,11 +2,11 @@
   "schema_version": "psionic.cross_provider_program_run_graph.v1",
   "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
   "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
-  "admission_plan_digest": "b1dee80398b538648478188ac12dcecf68d3c08edf28a592dd5681bd159f0b12",
+  "admission_plan_digest": "822d0b52a4010d6a733719e7d5aa0658df3d52c8947286a4de18b0b1752220c8",
   "contributor_lineage_digest": "7c5c23684ae1277cef8e892dfdc6824ca628a13b93820aabe902b74bc6e7a902",
   "validator_promotion_contract_id": "psionic.shared_validator_promotion_contract.v1",
   "evidence_bundle_id": "psionic-cross-provider-training-execution-evidence-v1",
-  "evidence_bundle_digest": "4e79457bafaa9f856897b040a46060396fc5e54c4abff0d276681d88d24e86e6",
+  "evidence_bundle_digest": "e28c9e632060bcb5835213a78862d46781169025ecfd2df8ce924fc1eee42027",
   "run_id": "psion-xprovider-pretrain-whole-program-001",
   "stage_id": "psion_pretrain",
   "orchestrator": {
@@ -1867,5 +1867,5 @@
     }
   ],
   "claim_boundary": "This artifact proves one provider-neutral run graph can carry dense ranks, contributor windows, validators, checkpoint writers, eval workers, and data builders under one shared run id. It does not yet claim dense recovery, elastic world-size closure, or a retained multi-provider dense proof run.",
-  "contract_digest": "d323bce8c1b324e9d4ab12e50f17678624d48272ae3aaaa913bb8ad61be751be"
+  "contract_digest": "eb403fb3a76558356cb32e2ae6a886fb85109c29908b79a49f52d7bd97b58e49"
 }

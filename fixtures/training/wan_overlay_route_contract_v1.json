@@ -4,9 +4,9 @@
   "network_id": "psionic.decentralized_training.testnet.v1",
   "governance_revision_id": "psionic.decentralized_training_governance.v1",
   "current_epoch_id": "network_epoch_00000123",
-  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
-  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
-  "elastic_device_mesh_contract_digest": "cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6",
+  "decentralized_network_contract_digest": "071310191273b8161bf37aba2c0771863281f2a0f1d5d9a07d2f37f1b87a329b",
+  "public_network_registry_contract_digest": "13c54dbe05c8be670629d69e6c84d8457e8ce507f075fe4b70c4569634899fd2",
+  "elastic_device_mesh_contract_digest": "ed7d5de38d617f25887c5732026d023ad0bd906c569a6e02ddac09703f9d04aa",
   "nat_postures": [
     {
       "registry_record_id": "google_l4_validator_node.registry",
@@ -137,5 +137,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first internet-native route truth above the elastic device mesh: peer NAT posture, route-quality evidence, direct-vs-relayed-vs-overlay selection, and explicit transport failover receipts. It does not yet claim live checkpoint catch-up, compressed outer sync, or public internet soak closure.",
-  "contract_digest": "3fe65cbb07b327819e98126ac2e6f6960d07b7ddb70606f4c3c788455d5ac6f1"
+  "contract_digest": "d29a7f20ed396b3128e682f0f18cff7168265bb324365e7c6dd63f1dd2fb65f1"
 }

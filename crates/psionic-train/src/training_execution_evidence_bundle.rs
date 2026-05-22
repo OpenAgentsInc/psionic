@@ -1059,7 +1059,7 @@ pub fn canonical_training_execution_evidence_bundle(
                 ],
                 "The bounded XTRAIN v2 score lane now maps directly back to the retained quick-eval report, track law, audit, and shared v2 discovery surface.",
             )?,
-            visualization_surface_link(
+            declared_visualization_surface_link(
                 "surface.xtrain_explorer_snapshot_v1",
                 TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot,
                 XTRAIN_EXPLORER_SNAPSHOT_SCHEMA_VERSION,
@@ -1078,9 +1078,9 @@ pub fn canonical_training_execution_evidence_bundle(
                     "fixtures/training/curated_decentralized_run_contract_v1.json",
                     "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json",
                 ],
-                "The decentralized XTRAIN explorer snapshot now exposes an explicit supporting-evidence set spanning registry, miner protocol, consensus, settlement, curated-run, and sibling bounded-score truth.",
-            )?,
-            visualization_surface_link(
+                "The decentralized XTRAIN explorer snapshot is declared as downstream public-network evidence; its own contract digest remains authoritative outside this upstream evidence bundle.",
+            ),
+            declared_visualization_surface_link(
                 "surface.xtrain_explorer_index_v1",
                 TrainingExecutionVisualizationSurfaceKind::ExplorerIndex,
                 XTRAIN_EXPLORER_INDEX_SCHEMA_VERSION,
@@ -1094,8 +1094,8 @@ pub fn canonical_training_execution_evidence_bundle(
                     "fixtures/training/xtrain_explorer_snapshot_v1.json",
                     "fixtures/training/public_run_explorer_contract_v1.json",
                 ],
-                "The decentralized XTRAIN explorer index now points directly at the retained snapshot and explorer-foundation contract.",
-            )?,
+                "The decentralized XTRAIN explorer index is declared as downstream public-network evidence; its own retained artifact digest remains authoritative outside this upstream evidence bundle.",
+            ),
         ],
         final_artifact_refs: vec![
             repo_artifact_ref(
@@ -1168,48 +1168,48 @@ pub fn canonical_training_execution_evidence_bundle(
                 true,
                 "Bounded XTRAIN evidence closure keeps the retained audit explicit for operator drilldown.",
             )?,
-            repo_artifact_ref(
+            declared_artifact_ref(
                 "public_run_explorer_contract",
                 "fixtures/training/public_run_explorer_contract_v1.json",
                 TrainingExecutionEvidencePosture::Measured,
                 true,
-                "Explorer drilldown keeps the pane-foundation public run explorer contract explicit.",
-            )?,
-            repo_artifact_ref(
+                "Explorer drilldown declares the downstream public run explorer contract without hashing it into the upstream evidence bundle.",
+            ),
+            declared_artifact_ref(
                 "public_network_registry_contract",
                 "fixtures/training/public_network_registry_contract_v1.json",
                 TrainingExecutionEvidencePosture::Measured,
                 true,
-                "Explorer drilldown keeps participant identity and role truth explicit through the registry contract.",
-            )?,
-            repo_artifact_ref(
+                "Explorer drilldown declares downstream participant identity and role truth through the registry contract without creating a digest cycle.",
+            ),
+            declared_artifact_ref(
                 "public_miner_protocol_contract",
                 "fixtures/training/public_miner_protocol_contract_v1.json",
                 TrainingExecutionEvidencePosture::Measured,
                 true,
-                "Explorer drilldown keeps miner session and refusal truth explicit through the public miner protocol contract.",
-            )?,
-            repo_artifact_ref(
+                "Explorer drilldown declares downstream miner session and refusal truth through the public miner protocol contract without creating a digest cycle.",
+            ),
+            declared_artifact_ref(
                 "multi_validator_consensus_contract",
                 "fixtures/training/multi_validator_consensus_contract_v1.json",
                 TrainingExecutionEvidencePosture::Measured,
                 true,
-                "Explorer drilldown keeps held-promotion checkpoint truth explicit through multi-validator consensus.",
-            )?,
-            repo_artifact_ref(
+                "Explorer drilldown declares downstream held-promotion checkpoint truth through multi-validator consensus without creating a digest cycle.",
+            ),
+            declared_artifact_ref(
                 "settlement_publication_contract",
                 "fixtures/training/settlement_publication_contract_v1.json",
                 TrainingExecutionEvidencePosture::Measured,
                 true,
-                "Explorer drilldown keeps signed settlement posture explicit through the settlement publication contract.",
-            )?,
-            repo_artifact_ref(
+                "Explorer drilldown declares downstream signed settlement posture through the settlement publication contract without creating a digest cycle.",
+            ),
+            declared_artifact_ref(
                 "curated_decentralized_run_contract",
                 "fixtures/training/curated_decentralized_run_contract_v1.json",
                 TrainingExecutionEvidencePosture::Measured,
                 true,
-                "Explorer drilldown keeps the retained curated-run closure explicit alongside the explorer snapshot.",
-            )?,
+                "Explorer drilldown declares downstream curated-run closure alongside the explorer snapshot without hashing the downstream contract into this upstream bundle.",
+            ),
         ],
         after_action_refs: vec![repo_artifact_ref(
             "after_action_audit",
@@ -1359,6 +1359,23 @@ fn repo_artifact_ref(
     })
 }
 
+fn declared_artifact_ref(
+    artifact_role: &str,
+    artifact_path: &str,
+    evidence_posture: TrainingExecutionEvidencePosture,
+    authoritative: bool,
+    detail: &str,
+) -> TrainingExecutionEvidenceRef {
+    TrainingExecutionEvidenceRef {
+        artifact_role: String::from(artifact_role),
+        artifact_path: String::from(artifact_path),
+        artifact_digest: None,
+        evidence_posture,
+        authoritative,
+        detail: String::from(detail),
+    }
+}
+
 fn visualization_surface_link(
     link_id: &str,
     surface_kind: TrainingExecutionVisualizationSurfaceKind,
@@ -1391,6 +1408,40 @@ fn visualization_surface_link(
             .collect(),
         detail: String::from(detail),
     })
+}
+
+fn declared_visualization_surface_link(
+    link_id: &str,
+    surface_kind: TrainingExecutionVisualizationSurfaceKind,
+    surface_schema_version: &str,
+    track_family: Option<RemoteTrainingTrackFamilyV2>,
+    track_id: Option<String>,
+    artifact_role: &str,
+    artifact_path: &str,
+    evidence_posture: TrainingExecutionEvidencePosture,
+    authoritative: bool,
+    supporting_evidence_paths: Vec<&str>,
+    detail: &str,
+) -> TrainingExecutionVisualizationSurfaceLink {
+    TrainingExecutionVisualizationSurfaceLink {
+        link_id: String::from(link_id),
+        surface_kind,
+        surface_schema_version: String::from(surface_schema_version),
+        track_family,
+        track_id,
+        surface_ref: declared_artifact_ref(
+            artifact_role,
+            artifact_path,
+            evidence_posture,
+            authoritative,
+            detail,
+        ),
+        supporting_evidence_paths: supporting_evidence_paths
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        detail: String::from(detail),
+    }
 }
 
 fn sha256_file(path: &str) -> Result<String, TrainingExecutionEvidenceBundleError> {

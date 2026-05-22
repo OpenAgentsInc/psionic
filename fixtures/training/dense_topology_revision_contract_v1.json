@@ -2,7 +2,7 @@
   "schema_version": "psionic.dense_topology_revision_contract.v1",
   "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
   "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
-  "whole_program_run_graph_digest": "d323bce8c1b324e9d4ab12e50f17678624d48272ae3aaaa913bb8ad61be751be",
+  "whole_program_run_graph_digest": "eb403fb3a76558356cb32e2ae6a886fb85109c29908b79a49f52d7bd97b58e49",
   "dense_recovery_contract_digest": "1084d44b21e975950ba6b27b25eb6fe421237461258dc56f4c153454111ea7b4",
   "distributed_checkpoint_contract_digest": "53386fdd8fc1f9b157df000ea869260905589469468feaf2cb596b6ba8053810",
   "revisions": [
@@ -114,5 +114,5 @@
     }
   ],
   "claim_boundary": "This contract closes controlled replace, grow, and shrink topology revisions for the current dense cluster only under explicit hot-repair or checkpoint-barrier policy. It does not claim generic live elasticity, public-swarm membership, or hidden world-size changes.",
-  "contract_digest": "6fcd1c8872e888d34159ed10fe85b5d7a48c80fba478d2ec71a4d75ca7907cb6"
+  "contract_digest": "54f6312a8343ad91a946cd3414086129b7f2a700d5380852c6e3d9c6c40cecf9"
 }

@@ -945,6 +945,49 @@ pub fn run_qwen_legal_pylon_worker_job(
         String::from("runtime_ms"),
         ended_at_ms.saturating_sub(options.started_at_ms) as f64,
     );
+    metrics.insert(
+        String::from("required_output_artifact_count"),
+        job.expected_output_artifacts.len() as f64,
+    );
+    metrics.insert(
+        String::from("output_bytes_total"),
+        output_hashes
+            .iter()
+            .map(|artifact| artifact.byte_len)
+            .sum::<u64>() as f64,
+    );
+    metrics.insert(
+        String::from("shard_index"),
+        f64::from(job.shard_assignment.shard_index),
+    );
+    metrics.insert(
+        String::from("shard_count"),
+        f64::from(job.shard_assignment.shard_count),
+    );
+    metrics.insert(
+        String::from("shard_start_index"),
+        job.shard_assignment.start_index.unwrap_or_default() as f64,
+    );
+    metrics.insert(
+        String::from("shard_end_index"),
+        job.shard_assignment.end_index.unwrap_or_default() as f64,
+    );
+    metrics.insert(
+        String::from("agreed_price_microusd"),
+        job.payment_budget.agreed_price_microusd as f64,
+    );
+    metrics.insert(
+        String::from("max_cost_microusd"),
+        job.payment_budget.max_cost_microusd as f64,
+    );
+    metrics.insert(
+        String::from("succeeded"),
+        if status == PylonTrainingWorkerJobStatus::Succeeded {
+            1.0
+        } else {
+            0.0
+        },
+    );
     let mut receipt = PylonTrainingWorkerReceipt {
         schema_version: String::from(QWEN_LEGAL_PYLON_WORKER_RECEIPT_SCHEMA_VERSION),
         worker_impl_id: String::from(QWEN_LEGAL_PYLON_LOCAL_WORKER_IMPL_ID),

@@ -30,6 +30,36 @@ The current strong-claim boundary is:
 | Model ladder | `docs/QWEN_LEGAL_MODEL_LADDER.md`. |
 | Acceptance targets | `docs/QWEN_LEGAL_ACCEPTANCE_TARGETS.md`. |
 
+## v0.2 Pylon Release Boundary
+
+The v0.2 release gate is `scripts/check-v0.2-pylon-release.sh`.
+
+For Qwen legal Pylons, v0.2 now includes:
+
+- signed job envelopes for local, loopback, Tailnet, and production TCP
+  dispatch modes
+- a worker-side TCP server entrypoint:
+  `qwen_legal_pylon_worker_server`
+- scheduler-side verification of signed envelopes before dispatch
+- worker-side verification of scheduler signatures before execution
+- scheduler-side verification of returned worker receipt signatures before
+  marking work payable
+- transport telemetry for request and response byte counts, response digest,
+  worker receipt digest, and signature-verification flags
+- worker receipt telemetry for input/output counts, required output count,
+  output bytes, runtime, shard coordinates, budget, and success state
+- payment closeout logic that accepts live-small-value operator-approved
+  Bitcoin/Lightning proofs when they carry a settlement time and payment hash
+  or transaction proof, rejects duplicate or secret-bearing proofs, and closes
+  the promotion gate only when all accepted payable work is settled or covered
+  by an explicit deferred policy
+
+The production boundary remains split by service ownership: Psionic owns signed
+Pylon job execution, receipt verification, payment decision receipts, Treasury
+handoff batches, settlement proof validation, and release checks. Treasury or
+Nexus owns the actual wallet operation that returns live payment hashes,
+transaction proofs, or operator-approved deferrals.
+
 ## Done-Criteria Mapping
 
 The tracker's done criteria now map to enforceable repo surfaces:

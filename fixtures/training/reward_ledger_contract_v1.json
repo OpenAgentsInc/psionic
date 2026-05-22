@@ -1,11 +1,11 @@
 {
   "schema_version": "psionic.reward_ledger_contract.v1",
   "contract_id": "psionic.reward_ledger_contract.v1",
-  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
-  "signed_node_identity_contract_set_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e",
-  "validator_challenge_scoring_contract_digest": "7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0",
-  "multi_validator_consensus_contract_digest": "53f1584e194bfbafe11633198d549364a2ce948c10f5a61436e5f65c431283d7",
-  "fraud_quarantine_slashing_contract_digest": "0af11dde321433b27ad765916858b48ce74e0f7c6f019bc81704243aa1e2e20f",
+  "decentralized_network_contract_digest": "071310191273b8161bf37aba2c0771863281f2a0f1d5d9a07d2f37f1b87a329b",
+  "signed_node_identity_contract_set_digest": "918033f64d4b8b4fb3cf8f2f24b3c0dfee5325ab0cf483d3e55bb6c4dc5ff834",
+  "validator_challenge_scoring_contract_digest": "ed10affc17a91cdc08c2871f07054a6b29f0063111367fc16014ff736b3249ed",
+  "multi_validator_consensus_contract_digest": "0e12aee06be97a314a5ea22d64e6c177447e81ca5b40406b7ceb7d41646f6c98",
+  "fraud_quarantine_slashing_contract_digest": "3993dea1e578fae5d5b6a777884c89ee1546c4320c0c51da680fc71ec2b3da1d",
   "accounting_period": {
     "accounting_period_id": "ledger.window1231",
     "opens_epoch_id": "window1231",
@@ -102,5 +102,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first tamper-evident contribution ledger: one accounting period, retained gross work entries, retained penalty entries, and payout-ready net allocations. It does not yet publish those outcomes outside the local accounting surface.",
-  "contract_digest": "6f252e036aea94f1944533a8e7716cf27c7ef749f2f5282d74be01f0b77be8ed"
+  "contract_digest": "df6d23ba9aaaa5186f0ba51145c48a77d470530a2eab0ab7c62e166aec0e993a"
 }

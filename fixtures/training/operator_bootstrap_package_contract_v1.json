@@ -1,10 +1,10 @@
 {
   "schema_version": "psionic.operator_bootstrap_package_contract.v1",
   "contract_id": "psionic.operator_bootstrap_package_contract.v1",
-  "signed_node_identity_contract_set_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e",
-  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
-  "public_miner_protocol_contract_digest": "b20fb20345bd3b2c6b39c6909ef9f1eab61d2c91b7748bde12561c7c52e5999b",
-  "validator_challenge_scoring_contract_digest": "7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0",
+  "signed_node_identity_contract_set_digest": "918033f64d4b8b4fb3cf8f2f24b3c0dfee5325ab0cf483d3e55bb6c4dc5ff834",
+  "public_network_registry_contract_digest": "13c54dbe05c8be670629d69e6c84d8457e8ce507f075fe4b70c4569634899fd2",
+  "public_miner_protocol_contract_digest": "d9ea9a4d06d5de31d77dd3aed9db21720eca5fdc2e3874a8884ab4dfc85aef09",
+  "validator_challenge_scoring_contract_digest": "ed10affc17a91cdc08c2871f07054a6b29f0063111367fc16014ff736b3249ed",
   "packages": [
     {
       "package_id": "package.public_miner.bootstrap.v1",
@@ -86,5 +86,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first public miner and validator operator packages: reproducible images, env manifests, registration commands, dry-run commands, and preflight checks. It does not yet claim the public explorer or graduated public testnet gates.",
-  "contract_digest": "483f656d08732e582494b7a2e9fdde007e45de8700a178a1430ac5074a4d5bc4"
+  "contract_digest": "7e17e49db21b49aa4152e2e51a68c78c8d53d5b9b6df11f2513bde4ae5ab80dc"
 }

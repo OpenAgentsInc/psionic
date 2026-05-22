@@ -57,6 +57,14 @@ The canonical bundle now carries explicit links for:
 - the bounded XTRAIN `v2` score lane
 - the decentralized XTRAIN explorer snapshot and explorer index
 
+The decentralized explorer snapshot, explorer index, and downstream public
+network contracts are declared as path references in the upstream provider
+neutral evidence bundle instead of being hashed into that bundle. This avoids a
+cyclic digest dependency: the public-network contracts depend on the run graph,
+and the run graph depends on the provider-neutral evidence bundle. Each
+downstream public-network fixture still carries its own authoritative
+`contract_digest` and checker.
+
 ## Current Honest Boundary
 
 This issue closes the schema family, not the entire runtime stack.

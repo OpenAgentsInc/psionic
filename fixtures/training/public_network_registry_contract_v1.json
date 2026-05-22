@@ -6,8 +6,8 @@
   "current_epoch_id": "network_epoch_00000123",
   "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
   "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
-  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
-  "signed_node_identity_contract_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e",
+  "decentralized_network_contract_digest": "071310191273b8161bf37aba2c0771863281f2a0f1d5d9a07d2f37f1b87a329b",
+  "signed_node_identity_contract_digest": "918033f64d4b8b4fb3cf8f2f24b3c0dfee5325ab0cf483d3e55bb6c4dc5ff834",
   "compatibility_policy": {
     "required_release_id": "psionic.decentralized_training_identity_release.v1",
     "required_environment_ref": "psion.pretrain.reference_runtime",
@@ -429,5 +429,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract closes one permissioned-testnet registry, discovery, and matchmaking surface above the signed node identity layer. It proves that nodes, roles, execution classes, trust tiers, relay posture, compatibility policy, and selected session offers can be discovered from one machine-legible contract instead of operator-only host lists. It does not claim permissionless gossip, public internet admission, or live elastic runtime yet.",
-  "contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515"
+  "contract_digest": "13c54dbe05c8be670629d69e6c84d8457e8ce507f075fe4b70c4569634899fd2"
 }

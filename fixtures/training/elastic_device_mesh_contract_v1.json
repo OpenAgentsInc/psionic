@@ -4,9 +4,9 @@
   "network_id": "psionic.decentralized_training.testnet.v1",
   "governance_revision_id": "psionic.decentralized_training_governance.v1",
   "current_epoch_id": "network_epoch_00000123",
-  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
-  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
-  "dense_topology_revision_contract_digest": "15bee6fb664537c4124f13fdbb866c7b00dcb3fd844fdbecff88b8ab36e5d3de",
+  "decentralized_network_contract_digest": "071310191273b8161bf37aba2c0771863281f2a0f1d5d9a07d2f37f1b87a329b",
+  "public_network_registry_contract_digest": "13c54dbe05c8be670629d69e6c84d8457e8ce507f075fe4b70c4569634899fd2",
+  "dense_topology_revision_contract_digest": "54f6312a8343ad91a946cd3414086129b7f2a700d5380852c6e3d9c6c40cecf9",
   "dense_rank_recovery_contract_digest": "1084d44b21e975950ba6b27b25eb6fe421237461258dc56f4c153454111ea7b4",
   "role_lease_policies": [
     {
@@ -337,5 +337,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract closes the first runtime-managed public mesh object above the registry: role-specific lease policy, current leases, current heartbeat samples, deathrattle notices, and typed membership revision receipts. It proves graceful public-role replacement and explicit dense-world live-change refusal. It does not yet claim full dense live elasticity, NAT traversal, or WAN-grade transport policy.",
-  "contract_digest": "cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6"
+  "contract_digest": "ed7d5de38d617f25887c5732026d023ad0bd906c569a6e02ddac09703f9d04aa"
 }

@@ -4671,7 +4671,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-adapters"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-core",
@@ -4686,7 +4686,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-apple-fm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "futures-util",
  "psionic-runtime",
@@ -4703,7 +4703,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-array"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-backend-cuda",
  "psionic-backend-metal",
@@ -4720,7 +4720,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-array-io"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "half",
  "hex",
@@ -4736,7 +4736,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-backend-amd-kfd"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-backend-cpu",
  "psionic-core",
@@ -4745,7 +4745,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-backend-amd-userspace"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-backend-cpu",
  "psionic-core",
@@ -4754,7 +4754,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-backend-cpu"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-backend-tests",
  "psionic-compiler",
@@ -4765,7 +4765,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-backend-cuda"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cc",
  "half",
@@ -4781,7 +4781,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-backend-metal"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "metal 0.33.0",
  "psionic-backend-cpu",
@@ -4794,7 +4794,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-backend-tests"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-core",
@@ -4806,7 +4806,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-catalog"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "libc",
@@ -4821,7 +4821,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-cluster"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -4839,7 +4839,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-collectives"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-runtime",
@@ -4850,7 +4850,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-compat"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-compiler",
@@ -4867,7 +4867,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-compiler"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-core",
@@ -4885,7 +4885,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "serde",
@@ -4894,7 +4894,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-csm-speech"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -4919,7 +4919,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-data"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "fancy-regex 0.16.2",
  "hex",
@@ -4935,7 +4935,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-datastream"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-runtime",
@@ -4946,7 +4946,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-distributed"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-array",
@@ -4964,7 +4964,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-environments"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-data",
@@ -4977,7 +4977,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-eval"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-adapters",
@@ -5009,7 +5009,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-function-io"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-compiler",
@@ -5024,7 +5024,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-ir"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-core",
@@ -5038,7 +5038,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-audio"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -5049,7 +5049,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-bench"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-data",
  "psionic-environments",
@@ -5066,7 +5066,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-capi"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-core",
  "psionic-mlx-compat",
@@ -5076,7 +5076,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-catalog"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-catalog",
@@ -5091,7 +5091,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-compat"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-array",
  "psionic-backend-tests",
@@ -5107,7 +5107,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-lm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-catalog",
  "psionic-models",
@@ -5121,7 +5121,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-recipes"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-environments",
  "psionic-train",
@@ -5133,7 +5133,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-serve"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "psionic-mlx-catalog",
@@ -5151,7 +5151,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-vlm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-models",
  "serde",
@@ -5163,7 +5163,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-mlx-workflows"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-cluster",
  "psionic-core",
@@ -5182,7 +5182,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-models"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -5209,7 +5209,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-net"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -5227,7 +5227,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-nn"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-core",
@@ -5238,7 +5238,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-nn-optimizers"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-core",
@@ -5251,7 +5251,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-observe"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "dial9-tokio-telemetry",
  "serde",
@@ -5262,7 +5262,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-optimize"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "serde",
@@ -5274,7 +5274,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-provider"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -5297,7 +5297,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-research"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "burn-core",
  "burn-ndarray",
@@ -5324,7 +5324,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-router"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-compiler",
@@ -5342,7 +5342,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-runtime"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -5368,7 +5368,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-sandbox"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "psionic-compiler",
@@ -5384,7 +5384,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-serve"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -5429,7 +5429,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-train"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "ed25519-dalek",
  "flate2",
@@ -5466,7 +5466,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-transformer"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "psionic-array",
  "psionic-core",
@@ -5477,7 +5477,7 @@ dependencies = [
 
 [[package]]
 name = "psionic-vad"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "serde",
