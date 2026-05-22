@@ -2163,6 +2163,37 @@ Harvey score, but it gives Pylon/Nexus a concrete plan for the next phase:
 - assign failure families to GRPO, GEPA trace selection, MIPRO prompt search,
   and supervised fine-tune refresh work
 
+## Hillclimb Controller Runbook
+
+The repeatable legal improvement loop now has a controller in
+`crates/psionic-train/src/qwen_legal_hillclimb_controller.rs`, exposed as:
+
+```bash
+cargo run -p psionic-train -- qwen-legal-hillclimb \
+  --plan fixtures/qwen_legal/hillclimb/qwen_legal_hillclimb_plan_v1.json \
+  --registry target/legal/qwen_hillclimb/qwen_legal_hillclimb_registry.json \
+  --feed target/legal/qwen_hillclimb/autopilot4_qwen_legal_hillclimb_progress_feed.json \
+  --out target/legal/qwen_hillclimb
+```
+
+The plan schema is `psionic.qwen_legal_hillclimb_experiment_plan.v1`. Each
+plan declares model id, adapter target, corpus split, Pylon count, training
+method, evaluator split, promotion rule, baseline run, candidate run, and
+regression checks. The controller records every baseline, candidate, and
+regression check into an append-only local registry with score, delta, model,
+adapter, data split, worker set, payment status, replay command, guardrail
+decision, and refusal reasons.
+
+To continue the hillclimb, keep the same registry path and submit a new plan
+with a new experiment id. The registry exposes the current champion, latest
+candidate, best guardrail-passing candidate, and rejected candidates. The
+Autopilot4 feed at
+`autopilot4_qwen_legal_hillclimb_progress_feed.json` carries recent run
+summaries plus score history for the public progress page. Failed runs,
+train-only improvements presented as broad benchmark gains, training-split
+evaluator claims, unsettled candidate payments, insufficient deltas, and
+regression losses beyond policy are rejected instead of promoted.
+
 The current target families are:
 
 | Failure family | Method | Blueprint module |

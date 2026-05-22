@@ -34,7 +34,7 @@ use psionic_train::{
     run_psion_cs336_a1_demo_cli, run_psion_cs336_a1_demo_manifest, run_psionic_legal_dpo_cli,
     run_psionic_legal_ft_cli, run_psionic_legal_grpo_cli, run_psionic_legal_merge_lora_cli,
     run_psionic_legal_sft_cli, run_qwen_legal_full_artifact_promotion_cli,
-    run_qwen_legal_rl_rollout_cli, runtime_build_digest,
+    run_qwen_legal_hillclimb_cli, run_qwen_legal_rl_rollout_cli, runtime_build_digest,
     validate_psionic_train_grouped_stage_input_transport,
 };
 
@@ -82,13 +82,14 @@ fn main() -> ExitCode {
         "qwen-legal-artifact-promotion" => {
             run_qwen_legal_artifact_promotion_passthrough(&args[1..])
         }
+        "qwen-legal-hillclimb" => run_qwen_legal_hillclimb_passthrough(&args[1..]),
         "merge-lora" => run_merge_lora_passthrough(&args[1..]),
         "legal" => run_legal_ft_passthrough(&args[1..]),
         "actual-pretraining" => run_actual_pretraining_passthrough(&args[1..]),
         "cs336-a1-demo" => run_cs336_a1_demo_passthrough(&args[1..]),
         other => {
             eprintln!(
-                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, sft, dpo, grpo, qwen-legal-rl-rollouts, qwen-legal-artifact-promotion, merge-lora, legal, actual-pretraining, cs336-a1-demo"
+                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, sft, dpo, grpo, qwen-legal-rl-rollouts, qwen-legal-artifact-promotion, qwen-legal-hillclimb, merge-lora, legal, actual-pretraining, cs336-a1-demo"
             );
             ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
         }
@@ -206,6 +207,25 @@ fn run_qwen_legal_artifact_promotion_passthrough(args: &[String]) -> ExitCode {
                 eprintln!(
                     "error: failed to serialize Qwen legal artifact promotion report: {error}"
                 );
+                ExitCode::from(PsionicTrainRefusalClass::InternalError.exit_code())
+            }
+        },
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
+        }
+    }
+}
+
+fn run_qwen_legal_hillclimb_passthrough(args: &[String]) -> ExitCode {
+    match run_qwen_legal_hillclimb_cli(args) {
+        Ok(output) => match serde_json::to_string_pretty(&output) {
+            Ok(json) => {
+                println!("{json}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: failed to serialize Qwen legal hillclimb output: {error}");
                 ExitCode::from(PsionicTrainRefusalClass::InternalError.exit_code())
             }
         },
@@ -2694,7 +2714,7 @@ fn current_time_ms() -> Result<u64, String> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train sft --config <path>\n  psionic-train dpo --config <path>\n  psionic-train grpo --config <path>\n  psionic-train qwen-legal-rl-rollouts [--runs-root <path>] [--out <dir>]\n  psionic-train qwen-legal-artifact-promotion [--out <dir>]\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
+        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train sft --config <path>\n  psionic-train dpo --config <path>\n  psionic-train grpo --config <path>\n  psionic-train qwen-legal-rl-rollouts [--runs-root <path>] [--out <dir>]\n  psionic-train qwen-legal-artifact-promotion [--out <dir>]\n  psionic-train qwen-legal-hillclimb --plan <plan.json> [--registry <registry.json>] [--feed <feed.json>] [--out <dir>]\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
         psionic_train::PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION,
         psionic_train::PSIONIC_TRAIN_STATUS_PACKET_SCHEMA_VERSION
     );

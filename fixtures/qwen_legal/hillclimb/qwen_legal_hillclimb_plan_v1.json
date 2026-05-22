@@ -1,0 +1,48 @@
+{
+  "schema_version": "psionic.qwen_legal_hillclimb_experiment_plan.v1",
+  "experiment_id": "qwen-legal-hillclimb-public-heldout-001",
+  "model_id": "Qwen/Qwen3.6-35B-A3B",
+  "adapter_target": "qwen36_legal_lora",
+  "corpus_split": "harvey_public_training_slice_v1",
+  "pylon_count": 4,
+  "training_method": "grpo",
+  "evaluator_split": "public_heldout",
+  "promotion_rule": "public_heldout_no_regression",
+  "min_candidate_delta_bps": 50,
+  "max_regression_bps": 25,
+  "baseline": {
+    "run_id": "qwen-legal-hillclimb-public-heldout-001.baseline",
+    "adapter_id": "qwen36-legal-prior-champion",
+    "score_bps": 5260,
+    "data_split": "public_heldout",
+    "worker_set": ["pylon.legal.baseline.01"],
+    "payment_status": "settled",
+    "replay_command": "cargo run -p psionic-train -- qwen-legal-artifact-promotion --out target/legal/qwen_promotion_gate/full-artifact-001",
+    "failed": false,
+    "train_only_improvement": false,
+    "broad_benchmark_claim": false
+  },
+  "candidate": {
+    "run_id": "qwen-legal-hillclimb-public-heldout-001.candidate",
+    "adapter_id": "qwen36-legal-grpo-candidate-001",
+    "score_bps": 5380,
+    "data_split": "public_heldout",
+    "worker_set": ["pylon.legal.candidate.01", "pylon.legal.candidate.02"],
+    "payment_status": "settled",
+    "replay_command": "cargo run -p psionic-train -- qwen-legal-rl-rollouts --out target/legal/qwen_rl_rollouts/batch-001",
+    "failed": false,
+    "train_only_improvement": false,
+    "broad_benchmark_claim": true
+  },
+  "regression_checks": [
+    {
+      "check_id": "qwen-legal-hillclimb-public-heldout-001.regression.public_three",
+      "evaluator_split": "public_three_regression",
+      "baseline_score_bps": 10000,
+      "candidate_score_bps": 10000,
+      "max_allowed_regression_bps": 0,
+      "replay_command": "cargo run -p psionic-train --example qwen_legal_three_task_milestone -- --out target/legal/legal-ft-milestone-001"
+    }
+  ],
+  "plan_digest": ""
+}
