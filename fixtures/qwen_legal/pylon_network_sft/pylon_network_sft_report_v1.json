@@ -12,7 +12,7 @@
   "checkpoint_family": "psionic.qwen35_4b.legal_adapter_sft",
   "dataset_digest": "sha256:legal-training-record-bundle-smoke",
   "eval_pack_digest": "sha256:legal-retained-smoke-eval-pack",
-  "claim_boundary": "This is a real multi-contributor LM-head LoRA adapter-SFT artifact over synthetic Qwen legal hidden-state smoke samples. It proves the Pylon-network training and aggregation shape. It does not claim Qwen3.6 full-weight fine-tuning or retained Harvey benchmark score lift.",
+  "claim_boundary": "This is a real multi-contributor LM-head LoRA adapter-SFT artifact over synthetic Qwen legal hidden-state smoke samples. It proves the Pylon-network training and aggregation shape. It does not claim Qwen3.6 full-weight fine-tuning or a score lift on private Harvey benchmark tasks.",
   "contributions": [
     {
       "contributor": {
@@ -92,5 +92,5 @@
     "aggregate_adapter_identity_digest": "e650127cfb4f3ea73bb85dd693cc8384181ebaf6d3793016099d6224dec074fc",
     "aggregate_receipt_digest": "987f68964fe0c8a1d725d0dfe3f3280194972e13908386ab90799dde6b40e131"
   },
-  "report_digest": "51f1abcddcf11a06499c14bd60be3642b6ba2c88ec554402e19bca6dc71cc214"
+  "report_digest": "da6af1e071cfe1dd6242841db2afc9bc6b46c6aeaaf93e7d2bd319e4b6665cab"
 }
