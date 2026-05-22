@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -5,14 +6,17 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use psionic_eval::{
-    BenchmarkTaskSpec, CriterionResult, CriterionVerdict, DeliverableKind, DeliverableSpec,
-    JudgeMode, JudgePolicy, LegalBenchmarkAgentRunRequest, LegalBenchmarkToolWorkspace, Metadata,
-    ModelProviderRoute, ModelRetryPolicy, OpenAiCompatibleAdapter, ReqwestBlockingHttpTransport,
-    RunConfig, RunTerminalState, ScoreReport, ToolPolicy, artifact_manifest_digest,
-    build_input_artifact_manifest, run_legal_benchmark_agent, run_record_digest,
-    scan_harvey_corpus, score_report_digest, stable_json_digest, task_spec_digest,
+    artifact_manifest_digest, build_input_artifact_manifest, run_legal_benchmark_agent,
+    run_record_digest, scan_harvey_corpus, score_report_digest, stable_json_digest,
+    task_spec_digest, BenchmarkTaskSpec, CriterionResult, CriterionVerdict, DeliverableKind,
+    DeliverableSpec, JudgeMode, JudgePolicy, LegalBenchmarkAgentRunRequest,
+    LegalBenchmarkToolWorkspace, Metadata, ModelProviderRoute, ModelRetryPolicy,
+    OpenAiCompatibleAdapter, ReqwestBlockingHttpTransport, RunConfig, RunTerminalState,
+    ScoreReport, ToolPolicy,
 };
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:18090/v1";
 const DEFAULT_MODEL: &str = "Qwen/Qwen3.5-0.8B";
@@ -30,7 +34,75 @@ const DEFAULT_ADAPTER_DIGEST: &str =
     "b509c69b7b26c647dc150bf003bdfef11b9c4714c2ac1767768f6d26857ff9ed";
 const DEFAULT_ADAPTER_REPORT_DIGEST: &str =
     "550b599fa222b78d75d03ce30f9e532893de0e450e6753dea6bec294c17229c1";
+const DEFAULT_ADAPTER_MANIFEST: &str =
+    "fixtures/legal_benchmark/adapter_registry/qwen_legal_candidate_adapter_manifest.json";
 const MODEL_REVISION: &str = "2fc06364715b967f1860aea9cf38778875588b17";
+const PROVIDER_BOUNDARY_ID: &str = "autopilot.provider.model_adapter.v1";
+const BENCHMARK_AUTHORITY_ID: &str = "autopilot.blueprint.harvey_legal_workflow.v1";
+
+#[derive(Clone, Debug)]
+struct CliArgs {
+    output_dir: PathBuf,
+    adapter_manifest_path: PathBuf,
+    expected_adapter_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct RegistryDigestRef {
+    value: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct NamedAdapterManifest {
+    adapter_id: String,
+    base_model_id: String,
+    base_model_hash: RegistryDigestRef,
+    #[serde(default)]
+    adapter_artifact_hash: Option<RegistryDigestRef>,
+    training_dataset_id: String,
+    training_dataset_hash: RegistryDigestRef,
+    eval_suite_id: String,
+    #[serde(default)]
+    eval_result_hash: Option<RegistryDigestRef>,
+    #[serde(default)]
+    parent_adapter_id: Option<String>,
+    #[serde(default)]
+    rollback_adapter_id: Option<String>,
+    #[serde(default)]
+    score_report_hashes: BTreeMap<String, RegistryDigestRef>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct NamedAdapterIdentity {
+    adapter_id: String,
+    base_model_id: String,
+    base_model_hash: String,
+    adapter_artifact_hash: String,
+    corpus_id: String,
+    corpus_hash: String,
+    eval_suite_id: String,
+    score_report_hashes: BTreeMap<String, String>,
+    parent_adapter_id: Option<String>,
+    rollback_adapter_id: Option<String>,
+    manifest_path: String,
+    manifest_sha256: String,
+}
+
+impl NamedAdapterIdentity {
+    fn identity_digest(&self) -> Result<String, Box<dyn Error>> {
+        Ok(stable_json_digest(
+            "psionic.harvey_no_cheat_suite.named_adapter_identity.v1",
+            self,
+        )?)
+    }
+
+    fn score_report_digest_for_suite(&self, fallback: &str) -> String {
+        self.score_report_hashes
+            .get(self.eval_suite_id.as_str())
+            .cloned()
+            .unwrap_or_else(|| String::from(fallback))
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SuiteMode {
@@ -75,7 +147,10 @@ struct SuiteRunSummary {
     mode: SuiteMode,
     model_id: String,
     adapter_id: String,
+    adapter_identity_digest: Option<String>,
     blueprint_program_id: Option<String>,
+    provider_boundary_id: String,
+    provider_route_hash: String,
     scoring_policy_id: String,
     terminal_state: RunTerminalState,
     score_report_digest: String,
@@ -91,10 +166,8 @@ struct SuiteRunSummary {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let output_dir = env::args()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_OUTPUT_DIR));
+    let cli = parse_cli_args()?;
+    let output_dir = cli.output_dir;
     reset_suite_dir(&output_dir)?;
 
     let tasks_root = PathBuf::from(env_string("HARVEY_TASKS_ROOT", DEFAULT_TASKS_ROOT));
@@ -105,11 +178,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let baseline_base_url = env_string("QWEN_LEGAL_BASELINE_BASE_URL", &candidate_base_url);
     let baseline_model = env_string("QWEN_LEGAL_BASELINE_MODEL", &candidate_model);
     let adapter_path = env_string("QWEN_LEGAL_ADAPTER_PATH", DEFAULT_ADAPTER_PATH);
-    let adapter_digest = env_string("QWEN_LEGAL_ADAPTER_DIGEST", DEFAULT_ADAPTER_DIGEST);
-    let adapter_report_digest = env_string(
+    let adapter_digest_fallback = env_string("QWEN_LEGAL_ADAPTER_DIGEST", DEFAULT_ADAPTER_DIGEST);
+    let adapter_report_digest_fallback = env_string(
         "QWEN_LEGAL_ADAPTER_REPORT_DIGEST",
         DEFAULT_ADAPTER_REPORT_DIGEST,
     );
+    let adapter_identity = load_named_adapter_identity(
+        cli.adapter_manifest_path.as_path(),
+        cli.expected_adapter_id.as_deref(),
+        adapter_digest_fallback.as_str(),
+        adapter_report_digest_fallback.as_str(),
+    )?;
+    let adapter_identity_digest = adapter_identity.identity_digest()?;
+    let adapter_digest = adapter_identity.adapter_artifact_hash.clone();
+    let adapter_report_digest =
+        adapter_identity.score_report_digest_for_suite(adapter_report_digest_fallback.as_str());
     let max_output_tokens = env_u64("QWEN_LEGAL_MAX_OUTPUT_TOKENS", 2048);
     let data_split_id = env_string("HARVEY_MEASURE_SPLIT", "public_training_fixture");
     let split_role = split_role(data_split_id.as_str());
@@ -166,6 +249,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 adapter_path,
                 adapter_digest,
                 adapter_report_digest,
+                &adapter_identity,
+                adapter_identity_digest.as_str(),
                 max_output_tokens,
             )?;
             summaries.push(summary);
@@ -188,6 +273,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         &adapter_path,
         &adapter_digest,
         &adapter_report_digest,
+        &adapter_identity,
+        adapter_identity_digest.as_str(),
         max_output_tokens,
     )?;
     fs::write(
@@ -212,6 +299,8 @@ fn run_one_mode(
     adapter_path: &str,
     adapter_digest: &str,
     adapter_report_digest: &str,
+    adapter_identity: &NamedAdapterIdentity,
+    adapter_identity_digest: &str,
     max_output_tokens: u64,
 ) -> Result<SuiteRunSummary, Box<dyn Error>> {
     let task = suite_task(source_task.clone(), mode);
@@ -237,6 +326,8 @@ fn run_one_mode(
         model,
         adapter_path,
         adapter_digest,
+        adapter_identity,
+        adapter_identity_digest,
         max_output_tokens,
     );
     let mut route = ModelProviderRoute::openai_compatible(
@@ -259,6 +350,30 @@ fn run_one_mode(
     route.metadata.insert(
         String::from("adapter_report_digest"),
         Value::String(adapter_report_digest.to_owned()),
+    );
+    route.metadata.insert(
+        String::from("adapter_id"),
+        Value::String(if mode == SuiteMode::Baseline {
+            String::from("none")
+        } else {
+            adapter_identity.adapter_id.clone()
+        }),
+    );
+    route.metadata.insert(
+        String::from("adapter_identity_digest"),
+        Value::String(if mode == SuiteMode::Baseline {
+            String::from("none")
+        } else {
+            adapter_identity_digest.to_owned()
+        }),
+    );
+    route.metadata.insert(
+        String::from("provider_boundary_id"),
+        Value::String(String::from(PROVIDER_BOUNDARY_ID)),
+    );
+    route.metadata.insert(
+        String::from("benchmark_authority_id"),
+        Value::String(String::from(BENCHMARK_AUTHORITY_ID)),
     );
     route.metadata.insert(
         String::from("base_model_revision"),
@@ -286,6 +401,9 @@ fn run_one_mode(
             Value::String(program_id.to_owned()),
         );
     }
+    let provider_route_hash = route
+        .config_hash()
+        .map_err(|error| io::Error::other(format!("failed to hash provider route: {error:?}")))?;
 
     let retry_policy = ModelRetryPolicy {
         max_retries: 0,
@@ -352,9 +470,13 @@ fn run_one_mode(
         adapter_id: if mode == SuiteMode::Baseline {
             String::from("none")
         } else {
-            adapter_digest.to_owned()
+            adapter_identity.adapter_id.clone()
         },
+        adapter_identity_digest: (mode != SuiteMode::Baseline)
+            .then(|| adapter_identity_digest.to_owned()),
         blueprint_program_id: mode.blueprint_program_id().map(String::from),
+        provider_boundary_id: String::from(PROVIDER_BOUNDARY_ID),
+        provider_route_hash,
         scoring_policy_id: String::from("judge.harvey.no_cheat_suite.v1"),
         terminal_state: result.terminal_state,
         score_report_digest: score_digest,
@@ -416,6 +538,8 @@ fn suite_run_config(
     model: &str,
     adapter_path: &str,
     adapter_digest: &str,
+    adapter_identity: &NamedAdapterIdentity,
+    adapter_identity_digest: &str,
     max_output_tokens: u64,
 ) -> RunConfig {
     let mut metadata = Metadata::new();
@@ -451,6 +575,30 @@ fn suite_run_config(
     metadata.insert(
         String::from("adapter_artifact_digest"),
         Value::String(String::from(adapter_digest)),
+    );
+    metadata.insert(
+        String::from("adapter_id"),
+        Value::String(if mode == SuiteMode::Baseline {
+            String::from("none")
+        } else {
+            adapter_identity.adapter_id.clone()
+        }),
+    );
+    metadata.insert(
+        String::from("adapter_identity_digest"),
+        Value::String(if mode == SuiteMode::Baseline {
+            String::from("none")
+        } else {
+            adapter_identity_digest.to_owned()
+        }),
+    );
+    metadata.insert(
+        String::from("provider_boundary_id"),
+        Value::String(String::from(PROVIDER_BOUNDARY_ID)),
+    );
+    metadata.insert(
+        String::from("benchmark_authority_id"),
+        Value::String(String::from(BENCHMARK_AUTHORITY_ID)),
     );
     metadata.insert(
         String::from("runner_content_mutation_allowed"),
@@ -732,11 +880,21 @@ fn suite_report(
     adapter_path: &str,
     adapter_digest: &str,
     adapter_report_digest: &str,
+    adapter_identity: &NamedAdapterIdentity,
+    adapter_identity_digest: &str,
     max_output_tokens: u64,
 ) -> Result<Value, Box<dyn Error>> {
+    let baseline_by_task = summaries
+        .iter()
+        .filter(|summary| summary.mode == SuiteMode::Baseline)
+        .map(|summary| (summary.task_id.clone(), summary.pass_rate_bps))
+        .collect::<BTreeMap<_, _>>();
     let by_task = summaries
         .iter()
         .map(|summary| {
+            let score_delta_vs_baseline_bps = baseline_by_task
+                .get(summary.task_id.as_str())
+                .map(|baseline| i64::from(summary.pass_rate_bps) - i64::from(*baseline));
             json!({
                 "task_id": summary.task_id,
                 "task_set_id": summary.task_set_id,
@@ -748,13 +906,17 @@ fn suite_report(
                 "mode_label": summary.mode.display(),
                 "model_id": summary.model_id,
                 "adapter_id": summary.adapter_id,
+                "adapter_identity_digest": summary.adapter_identity_digest,
                 "blueprint_program_id": summary.blueprint_program_id,
+                "provider_boundary_id": summary.provider_boundary_id,
+                "provider_route_hash": summary.provider_route_hash,
                 "scoring_policy_id": summary.scoring_policy_id,
                 "terminal_state": summary.terminal_state,
                 "score": {
                     "pass_count": summary.pass_count,
                     "check_count": summary.check_count,
-                    "pass_rate_bps": summary.pass_rate_bps
+                    "pass_rate_bps": summary.pass_rate_bps,
+                    "delta_vs_baseline_bps": score_delta_vs_baseline_bps
                 },
                 "output_artifact_count": summary.output_artifact_count,
                 "tool_receipt_count": summary.tool_receipt_count,
@@ -803,14 +965,22 @@ fn suite_report(
             "adapter_path": adapter_path,
             "adapter_artifact_digest": adapter_digest,
             "adapter_report_digest": adapter_report_digest,
+            "adapter_identity": adapter_identity,
+            "adapter_identity_digest": adapter_identity_digest,
+            "provider_boundary_id": PROVIDER_BOUNDARY_ID,
+            "benchmark_authority_id": BENCHMARK_AUTHORITY_ID,
             "blueprint_program_id": "autopilot.blueprint.legal_work_product_scaffold.v1"
         },
         "adapter_path": adapter_path,
         "adapter_artifact_digest": adapter_digest,
         "adapter_report_digest": adapter_report_digest,
+        "adapter_identity_digest": adapter_identity_digest,
+        "provider_boundary_id": PROVIDER_BOUNDARY_ID,
+        "benchmark_authority_id": BENCHMARK_AUTHORITY_ID,
         "base_model_revision": MODEL_REVISION,
         "max_output_tokens": max_output_tokens,
         "scoring_policy_id": "judge.harvey.no_cheat_suite.v1",
+        "runtime_modes": ["model_only", "blueprint_scaffold"],
         "mode_average_pass_rate_bps": {
             "baseline": baseline_avg,
             "model_only": model_only_avg,
@@ -828,11 +998,12 @@ fn suite_report(
         },
         "runs": by_task,
         "replay_commands": [
-            "cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_no_cheat_suite -- <output-dir>",
+            "cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_no_cheat_suite -- --adapter-manifest fixtures/legal_benchmark/adapter_registry/qwen_legal_candidate_adapter_manifest.json --out <output-dir>",
             "jq '.mode_average_pass_rate_bps,.promotion_decision' <output-dir>/harvey_no_cheat_suite_report.json"
         ],
         "claim_boundary": [
             "These are local Harvey measurement-ladder runs through the Rust legal agent loop.",
+            "Provider choice is a runtime model adapter; benchmark authority stays with the Autopilot/Blueprint flow and score import.",
             "The split name says whether the run was trainable, public holdout, or a later private gate.",
             "No runner path adds or rewrites model output.",
             "Scaffold-assisted means prompt/module requirements only; it does not inject answer text.",
@@ -842,6 +1013,117 @@ fn suite_report(
     let digest = stable_json_digest("psionic.harvey_no_cheat_suite.v1", &report)?;
     report["suite_report_digest"] = Value::String(digest);
     Ok(report)
+}
+
+fn parse_cli_args() -> Result<CliArgs, Box<dyn Error>> {
+    let mut output_dir = None;
+    let mut adapter_manifest_path = env::var("QWEN_LEGAL_ADAPTER_MANIFEST")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from);
+    let mut expected_adapter_id = env::var("QWEN_LEGAL_ADAPTER_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--out" => {
+                output_dir =
+                    Some(PathBuf::from(args.next().ok_or_else(|| {
+                        io::Error::other("--out requires an output directory")
+                    })?));
+            }
+            "--adapter-manifest" => {
+                adapter_manifest_path =
+                    Some(PathBuf::from(args.next().ok_or_else(|| {
+                        io::Error::other("--adapter-manifest requires a path")
+                    })?));
+            }
+            "--adapter-id" => {
+                expected_adapter_id = Some(
+                    args.next()
+                        .ok_or_else(|| io::Error::other("--adapter-id requires an adapter id"))?,
+                );
+            }
+            "--help" | "-h" => {
+                return Err(io::Error::other(
+                    "usage: qwen35_legal_mlx_lora_harvey_no_cheat_suite [--out <dir>] [--adapter-manifest <path>] [--adapter-id <id>]",
+                )
+                .into());
+            }
+            other if other.starts_with("--") => {
+                return Err(io::Error::other(format!("unsupported argument `{other}`")).into());
+            }
+            positional => {
+                if output_dir.is_some() {
+                    return Err(io::Error::other(format!(
+                        "unexpected extra positional argument `{positional}`"
+                    ))
+                    .into());
+                }
+                output_dir = Some(PathBuf::from(positional));
+            }
+        }
+    }
+    Ok(CliArgs {
+        output_dir: output_dir.unwrap_or_else(|| PathBuf::from(DEFAULT_OUTPUT_DIR)),
+        adapter_manifest_path: adapter_manifest_path
+            .unwrap_or_else(|| PathBuf::from(DEFAULT_ADAPTER_MANIFEST)),
+        expected_adapter_id,
+    })
+}
+
+fn load_named_adapter_identity(
+    manifest_path: &Path,
+    expected_adapter_id: Option<&str>,
+    adapter_digest_fallback: &str,
+    adapter_report_digest_fallback: &str,
+) -> Result<NamedAdapterIdentity, Box<dyn Error>> {
+    let manifest_bytes = fs::read(manifest_path)?;
+    let manifest = serde_json::from_slice::<NamedAdapterManifest>(&manifest_bytes)?;
+    if let Some(expected) = expected_adapter_id {
+        if manifest.adapter_id != expected {
+            return Err(io::Error::other(format!(
+                "adapter manifest id `{}` does not match requested `{expected}`",
+                manifest.adapter_id
+            ))
+            .into());
+        }
+    }
+    let mut score_report_hashes = manifest
+        .score_report_hashes
+        .into_iter()
+        .map(|(key, digest)| (key, digest.value))
+        .collect::<BTreeMap<_, _>>();
+    if score_report_hashes.is_empty() {
+        let fallback = manifest
+            .eval_result_hash
+            .as_ref()
+            .map(|digest| digest.value.clone())
+            .unwrap_or_else(|| String::from(adapter_report_digest_fallback));
+        score_report_hashes.insert(manifest.eval_suite_id.clone(), fallback);
+    }
+    Ok(NamedAdapterIdentity {
+        adapter_id: manifest.adapter_id,
+        base_model_id: manifest.base_model_id,
+        base_model_hash: manifest.base_model_hash.value,
+        adapter_artifact_hash: manifest
+            .adapter_artifact_hash
+            .map(|digest| digest.value)
+            .unwrap_or_else(|| String::from(adapter_digest_fallback)),
+        corpus_id: manifest.training_dataset_id,
+        corpus_hash: manifest.training_dataset_hash.value,
+        eval_suite_id: manifest.eval_suite_id,
+        score_report_hashes,
+        parent_adapter_id: manifest.parent_adapter_id,
+        rollback_adapter_id: manifest.rollback_adapter_id,
+        manifest_path: manifest_path.display().to_string(),
+        manifest_sha256: sha256_hex(manifest_bytes.as_slice()),
+    })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
 }
 
 fn split_role(data_split_id: &str) -> String {

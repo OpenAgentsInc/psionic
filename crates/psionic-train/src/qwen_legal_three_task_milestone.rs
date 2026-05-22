@@ -544,6 +544,7 @@ fn register_and_promote_candidate(
     let champion_entry = registry_entry(
         champion_adapter_id,
         config.champion_model_id.as_str(),
+        digest_seed("frozen-current-champion-adapter").as_str(),
         dataset,
         sft_config_sha256,
         Some(digest_seed("frozen-current-champion-training-receipt")),
@@ -560,9 +561,11 @@ fn register_and_promote_candidate(
         .champion_adapter_by_suite
         .insert(eval_report.suite_id.clone(), champion_adapter_id.to_owned());
     save_qwen_legal_adapter_registry(registry_path, &registry)?;
+    let candidate_adapter_sha256 = sha256_file(Path::new(&sft_artifacts.adapter_artifact_path))?;
     let candidate_entry = registry_entry(
         "qwen36-27b-legal-ft-milestone-001",
         config.candidate_base_model_id.as_str(),
+        candidate_adapter_sha256.as_str(),
         dataset,
         sft_config_sha256,
         Some(sft_artifacts.receipt.receipt_digest.clone()),
@@ -598,6 +601,7 @@ fn register_and_promote_candidate(
 fn registry_entry(
     adapter_id: &str,
     base_model_id: &str,
+    adapter_artifact_hash: &str,
     dataset: &QwenLegalThreeTaskSftDatasetReceipt,
     sft_config_sha256: &str,
     training_receipt_hash: Option<String>,
@@ -607,11 +611,15 @@ fn registry_entry(
     promotion_status: QwenLegalAdapterPromotionStatus,
     eval_summary: QwenLegalAdapterEvalSummary,
 ) -> QwenLegalAdapterRegistryEntry {
+    let score_report_hash = eval_result_hash
+        .clone()
+        .unwrap_or_else(|| digest_seed("missing-eval-result"));
     QwenLegalAdapterRegistryEntry {
         schema_version: crate::QWEN_LEGAL_ADAPTER_REGISTRY_SCHEMA_VERSION,
         adapter_id: adapter_id.to_owned(),
         base_model_id: base_model_id.to_owned(),
         base_model_hash: QwenLegalRegistryDigest::sha256(digest_seed(base_model_id)),
+        adapter_artifact_hash: QwenLegalRegistryDigest::sha256(adapter_artifact_hash.to_owned()),
         training_dataset_id: dataset.dataset_id.clone(),
         training_dataset_hash: QwenLegalRegistryDigest::sha256(dataset.dataset_sha256.clone()),
         training_config_id: String::from("qwen36-27b-legal-ft-milestone-001"),
@@ -625,6 +633,11 @@ fn registry_entry(
         eval_result_hash: eval_result_hash.map(QwenLegalRegistryDigest::sha256),
         promotion_status,
         parent_adapter_id: None,
+        rollback_adapter_id: Some(String::from("qwen36-27b-current-three-task-champion")),
+        score_report_hashes: BTreeMap::from([(
+            eval_suite_id.to_owned(),
+            QwenLegalRegistryDigest::sha256(score_report_hash),
+        )]),
         training_data_allowed: true,
         excluded_training_data: false,
         produced_by_allowed_psionic_path: true,

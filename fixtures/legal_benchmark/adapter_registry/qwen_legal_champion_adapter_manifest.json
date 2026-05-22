@@ -6,6 +6,10 @@
     "algorithm": "sha256",
     "value": "cae662172fd450bb0cd710a769079c05bfc5d8e35efa6576edc7d0377afdd4a2"
   },
+  "adapter_artifact_hash": {
+    "algorithm": "sha256",
+    "value": "fb49c3fc9bb801c081ca6d4f6ad5349df920ec42a156312d57c3d329b7914c40"
+  },
   "training_dataset_id": "legal-sft-v1-public-smoke",
   "training_dataset_hash": {
     "algorithm": "sha256",
@@ -35,6 +39,13 @@
     "value": "1d601c995e7de894d4bdb9a4630310a4ae93df1269da35abf84f83431ba5c459"
   },
   "promotion_status": "champion",
+  "rollback_adapter_id": "qwen36-legal-prior-champion-000",
+  "score_report_hashes": {
+    "harvey_public_three_deterministic_replay_v1": {
+      "algorithm": "sha256",
+      "value": "1d601c995e7de894d4bdb9a4630310a4ae93df1269da35abf84f83431ba5c459"
+    }
+  },
   "training_data_allowed": true,
   "excluded_training_data": false,
   "produced_by_allowed_psionic_path": true,

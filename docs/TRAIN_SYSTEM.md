@@ -352,7 +352,14 @@ missing adapter, missing checkpoint, loaded-base hash mismatch, backend
 unavailability, incomplete promotion metadata, or fallback paths that are not
 explicit-fallback-only. Canary and rollback receipts are typed, and retired
 OpenAI-compatible routes are kept only as explicit fallback paths, not default
-benchmark routes. The same run now also emits a typed RL hillclimb plan that
+benchmark routes. The no-cheat Harvey measurement command now accepts a named
+adapter manifest with `--adapter-manifest` / `--adapter-id`, carries adapter
+artifact hash, base checkpoint hash, corpus hash, score report hashes, rollback
+adapter pointer, provider route hash, Blueprint program id, and per-task score
+delta into `harvey_no_cheat_suite_report.json`, and runs model-only plus
+Blueprint-assisted modes over the same task set. Provider choice is a runtime
+adapter; the benchmark authority remains the Autopilot/Blueprint workflow and
+score-import record. The same run now also emits a typed RL hillclimb plan that
 points Pylon/Nexus at
 `Qwen/Qwen3.6-35B-A3B`, requires retained 20-task Harvey slices, links back to
 the Blueprint optimizer frontier, and assigns document coverage, citation

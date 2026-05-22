@@ -722,7 +722,9 @@ set:
 
 ```bash
 cargo run -p psionic-eval --example qwen35_legal_mlx_lora_harvey_no_cheat_suite -- \
-  target/legal/harvey_measurement_ladder/local-smoke
+  --adapter-manifest fixtures/legal_benchmark/adapter_registry/qwen_legal_candidate_adapter_manifest.json \
+  --adapter-id qwen36-legal-public-three-candidate-001 \
+  --out target/legal/harvey_measurement_ladder/local-smoke
 ```
 
 The three lanes are:
@@ -741,9 +743,11 @@ cargo test -p psionic-eval runner_does_not_materialize_answer_text_from_final_re
 ```
 
 The report records the task set id, data split id, split role, whether the
-split is trainable, model ids, adapter ids, Blueprint program id, scoring
-policy id, score report hashes, run record hashes, transcript hashes, output
-file hashes, and replay commands.
+split is trainable, model ids, the named adapter registry identity, adapter
+artifact hash, base checkpoint hash, corpus hash, score report hashes, rollback
+adapter pointer, provider route hash, Blueprint program id, scoring policy id,
+per-task score delta against baseline, run record hashes, transcript hashes,
+output file hashes, and replay commands.
 
 Set `HARVEY_MEASURE_SPLIT` to name the split:
 
@@ -1209,6 +1213,14 @@ Plain boundary: this wires the provider route contract the Rust Harvey runner
 can request by stable served model id. It does not itself load a real 35B
 checkpoint into a live serving process; that live process still depends on the
 real Qwen forward/backward and artifact-serving work tracked separately.
+
+Provider choice is a runtime adapter. The measurement authority remains the
+Autopilot/Blueprint legal workflow path: the runner records the selected
+provider route and adapter manifest, but score import is still bound to the
+Blueprint program identity, run records, transcripts, tool receipts, document
+manifests, produced files, answers, and score reports. Model-only and
+Blueprint-assisted runs stay side by side on the same task set so adapter gains
+can be separated from scaffold/workflow gains.
 
 ## Pylon Training Job Protocol
 

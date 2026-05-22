@@ -60,6 +60,7 @@ pub struct QwenLegalAdapterRegistryEntry {
     pub adapter_id: String,
     pub base_model_id: String,
     pub base_model_hash: QwenLegalRegistryDigest,
+    pub adapter_artifact_hash: QwenLegalRegistryDigest,
     pub training_dataset_id: String,
     pub training_dataset_hash: QwenLegalRegistryDigest,
     pub training_config_id: String,
@@ -76,6 +77,10 @@ pub struct QwenLegalAdapterRegistryEntry {
     pub promotion_status: QwenLegalAdapterPromotionStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_adapter_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollback_adapter_id: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub score_report_hashes: BTreeMap<String, QwenLegalRegistryDigest>,
     pub training_data_allowed: bool,
     pub excluded_training_data: bool,
     pub produced_by_allowed_psionic_path: bool,
@@ -440,12 +445,21 @@ fn registration_rejection_reasons(entry: &QwenLegalAdapterRegistryEntry) -> Vec<
     }
     for (field, digest) in [
         ("base_model_hash", &entry.base_model_hash),
+        ("adapter_artifact_hash", &entry.adapter_artifact_hash),
         ("training_dataset_hash", &entry.training_dataset_hash),
         ("training_config_hash", &entry.training_config_hash),
         ("eval_suite_hash", &entry.eval_suite_hash),
     ] {
         if !digest.is_complete() {
             reasons.push(format!("missing or invalid {field}"));
+        }
+    }
+    if entry.score_report_hashes.is_empty() {
+        reasons.push(String::from("missing score report hashes"));
+    }
+    for (score_report_id, digest) in &entry.score_report_hashes {
+        if score_report_id.trim().is_empty() || !digest.is_complete() {
+            reasons.push(String::from("missing or invalid score report hash"));
         }
     }
     match &entry.training_receipt_hash {
@@ -567,6 +581,7 @@ mod tests {
             adapter_id: String::from(adapter_id),
             base_model_id: String::from("Qwen/Qwen3.6-27B"),
             base_model_hash: digest("base"),
+            adapter_artifact_hash: digest("adapter"),
             training_dataset_id: String::from("legal-sft-v1"),
             training_dataset_hash: digest("dataset"),
             training_config_id: String::from("qwen36-legal-sft-smoke"),
@@ -580,6 +595,11 @@ mod tests {
             eval_result_hash: Some(digest("eval")),
             promotion_status: status,
             parent_adapter_id: None,
+            rollback_adapter_id: Some(String::from("adapter.rollback")),
+            score_report_hashes: BTreeMap::from([(
+                String::from("harvey_public_three_deterministic_replay_v1"),
+                digest("score-report"),
+            )]),
             training_data_allowed: true,
             excluded_training_data: false,
             produced_by_allowed_psionic_path: true,
@@ -636,6 +656,28 @@ mod tests {
     }
 
     #[test]
+    fn registry_rejects_missing_adapter_identity_fields() {
+        let mut candidate = entry(
+            "adapter.missing.identity",
+            9_000,
+            QwenLegalAdapterPromotionStatus::Candidate,
+        );
+        candidate.adapter_artifact_hash = QwenLegalRegistryDigest::sha256(String::new());
+        candidate.score_report_hashes.clear();
+        let mut registry = QwenLegalAdapterRegistry::default();
+        let temp = tempfile::tempdir().expect("tempdir");
+        let error = register_qwen_legal_adapter_entry(
+            &mut registry,
+            candidate,
+            temp.path().join("registry.json"),
+        )
+        .expect_err("missing adapter identity should fail");
+        let message = error.to_string();
+        assert!(message.contains("adapter_artifact_hash"));
+        assert!(message.contains("missing score report hashes"));
+    }
+
+    #[test]
     fn registry_rejects_excluded_training_data() {
         let mut candidate = entry(
             "adapter.excluded",
@@ -686,12 +728,10 @@ mod tests {
         )
         .expect("promotion receipt");
         assert_eq!(receipt.decision, QwenLegalPromotionDecision::Reject);
-        assert!(
-            receipt
-                .reasons
-                .iter()
-                .any(|reason| reason.contains("does not beat"))
-        );
+        assert!(receipt
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("does not beat")));
     }
 
     #[test]
