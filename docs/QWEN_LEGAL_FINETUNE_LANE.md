@@ -2414,6 +2414,11 @@ Rust eval suite when requested, and writes a machine-readable merge receipt
 next to the output adapter. The receipt includes a compatibility matrix,
 rejected-contribution list, local validation metrics, deterministic replay
 command, and promotion-candidate pointer for the registry path.
+When compatibility preflight rejects a worker artifact, the merge command now
+also writes `<manifest>.quarantine.json`. Those records retain worker id,
+adapter path and hash, dataset shard hash, replay-required posture, and plain
+reasons. Quarantined artifacts are debug material only and are not aggregation
+eligible.
 
 Two merge modes are supported:
 

@@ -425,7 +425,10 @@ receipt hash
 `b8dedbb01823cb94d1a017b969eea99f3af4ade49ed7194fcfac572fb77185da`, and
 runs the local Harvey public-three Rust eval. Promotion is still guarded: a
 merged adapter is only promotable when it beats the declared champion score on
-the same suite and has no hard eval failures.
+the same suite and has no hard eval failures. Compatibility failures now also
+write a quarantine record next to the merge manifest, retaining the rejected
+worker artifact identity and reasons without making that artifact aggregation
+eligible.
 The legal lane now also owns the first Pylon worker job protocol in
 `crates/psionic-train/src/qwen_legal_pylon_training_job.rs`. It defines the
 job envelope for dataset shard builds, SFT/DPO/GRPO shard work, eval shards,

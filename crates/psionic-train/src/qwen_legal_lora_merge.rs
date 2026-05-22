@@ -9,8 +9,8 @@ use psionic_adapters::{
     LmHeadLoraAdapterArtifact, LmHeadLoraLoadError,
 };
 use psionic_core::QuantizationMode;
-use psionic_eval::{LegalBenchmarkEvalSuiteRunConfig, run_legal_benchmark_eval_suite};
-use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
+use psionic_eval::{run_legal_benchmark_eval_suite, LegalBenchmarkEvalSuiteRunConfig};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -23,6 +23,9 @@ pub const QWEN_LEGAL_LORA_MERGE_MANIFEST_SCHEMA_VERSION: &str =
 /// Receipt schema emitted by `psionic-train merge-lora`.
 pub const QWEN_LEGAL_LORA_MERGE_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_lora_merge_receipt.v1";
+/// Quarantine record schema emitted before rejecting incompatible worker artifacts.
+pub const QWEN_LEGAL_LORA_QUARANTINE_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_lora_quarantine_record.v1";
 /// Deterministic delta-averaging rule for worker LoRA factors.
 pub const QWEN_LEGAL_LORA_DELTA_AVERAGE_RULE: &str = "trusted_weighted_lora_factor_average_v1";
 /// Deterministic sequential shard handoff rule.
@@ -255,6 +258,39 @@ pub struct QwenLegalLoraRejectedContribution {
     pub reasons: Vec<String>,
 }
 
+/// Retained debug record for one rejected worker artifact.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct QwenLegalLoraQuarantineRecord {
+    /// Schema version.
+    pub schema_version: String,
+    /// Merge id that rejected this artifact.
+    pub merge_id: String,
+    /// Worker id.
+    pub worker_id: String,
+    /// Adapter artifact path as declared by the worker.
+    pub adapter_path: String,
+    /// Adapter artifact hash.
+    pub adapter_sha256: String,
+    /// Dataset shard hash.
+    pub dataset_shard_hash: String,
+    /// Retention class.
+    pub retention_class: String,
+    /// Whether validator replay is required before this artifact can be reconsidered.
+    pub replay_required: bool,
+    /// Rejection reasons.
+    pub reasons: Vec<String>,
+    /// Stable quarantine digest.
+    pub quarantine_digest: String,
+}
+
+impl QwenLegalLoraQuarantineRecord {
+    fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.quarantine_digest.clear();
+        stable_json_digest("psionic.qwen_legal_lora_quarantine_record.v1", &clone)
+    }
+}
+
 /// One worker's verified contribution inside the merge receipt.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct QwenLegalLoraMergeWorkerReceipt {
@@ -447,6 +483,7 @@ pub fn run_qwen_legal_lora_merge_manifest(
     validate_manifest(&manifest)?;
     let (compatibility_matrix, rejected_contributions) = compatibility_preflight(&manifest);
     if !rejected_contributions.is_empty() {
+        write_quarantine_records(manifest_path, &manifest, rejected_contributions.as_slice())?;
         return Err(QwenLegalLoraMergeError::CompatibilityRejected {
             rejected_count: rejected_contributions.len(),
             reasons: rejected_contributions
@@ -865,6 +902,53 @@ fn compatibility_preflight(
     }
 
     (rows, rejected)
+}
+
+fn write_quarantine_records(
+    manifest_path: &Path,
+    manifest: &QwenLegalLoraMergeManifest,
+    rejected: &[QwenLegalLoraRejectedContribution],
+) -> Result<(), QwenLegalLoraMergeError> {
+    let records = rejected
+        .iter()
+        .map(|rejection| {
+            let worker = manifest
+                .worker_adapters
+                .iter()
+                .find(|worker| {
+                    worker.worker_id == rejection.worker_id
+                        && worker.sha256 == rejection.adapter_sha256
+                })
+                .or_else(|| {
+                    manifest
+                        .worker_adapters
+                        .iter()
+                        .find(|worker| worker.worker_id == rejection.worker_id)
+                });
+            let mut record = QwenLegalLoraQuarantineRecord {
+                schema_version: String::from(QWEN_LEGAL_LORA_QUARANTINE_SCHEMA_VERSION),
+                merge_id: manifest.merge_id.clone(),
+                worker_id: rejection.worker_id.clone(),
+                adapter_path: worker
+                    .map(|worker| worker.path.clone())
+                    .unwrap_or_else(|| String::from("unknown")),
+                adapter_sha256: rejection.adapter_sha256.clone(),
+                dataset_shard_hash: worker
+                    .map(|worker| worker.dataset_shard_hash.clone())
+                    .unwrap_or_default(),
+                retention_class: String::from("debug_only_not_aggregation_eligible"),
+                replay_required: true,
+                reasons: rejection.reasons.clone(),
+                quarantine_digest: String::new(),
+            };
+            record.quarantine_digest = record.stable_digest();
+            record
+        })
+        .collect::<Vec<_>>();
+    write_file_pretty(
+        manifest_path.with_extension("quarantine.json").as_path(),
+        &records,
+    )
 }
 
 fn sorted_strings(values: &[String]) -> Vec<String> {
@@ -1297,6 +1381,17 @@ mod tests {
         let error = run_qwen_legal_lora_merge_manifest(&manifest_path)
             .expect_err("base mismatch must fail");
         assert!(error.to_string().contains("base checkpoint mismatch"));
+        let records = serde_json::from_slice::<Vec<QwenLegalLoraQuarantineRecord>>(&fs::read(
+            manifest_path.with_extension("quarantine.json"),
+        )?)?;
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].worker_id, manifest.worker_adapters[0].worker_id);
+        assert_eq!(
+            records[0].retention_class,
+            "debug_only_not_aggregation_eligible"
+        );
+        assert!(records[0].replay_required);
+        assert_eq!(records[0].quarantine_digest, records[0].stable_digest());
         Ok(())
     }
 
@@ -1375,8 +1470,8 @@ mod tests {
     }
 
     #[test]
-    fn merge_lora_sequential_mode_uses_last_adapter_and_validates_chain()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn merge_lora_sequential_mode_uses_last_adapter_and_validates_chain(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let manifest_path = temp.path().join("merge.json");
         let mut manifest = fixture_manifest(temp.path());
@@ -1415,12 +1510,10 @@ mod tests {
         };
         let receipt = promotion_gate_receipt("candidate", &validation_manifest, &validation);
         assert_eq!(receipt.decision, QwenLegalLoraMergePromotionDecision::Hold);
-        assert!(
-            receipt
-                .reasons
-                .iter()
-                .any(|reason| reason.contains("does not beat"))
-        );
+        assert!(receipt
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("does not beat")));
     }
 
     fn fixture_manifest(temp: &Path) -> QwenLegalLoraMergeManifest {
