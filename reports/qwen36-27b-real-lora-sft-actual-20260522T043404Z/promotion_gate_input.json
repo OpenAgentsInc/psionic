@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "suite_id": "harvey_public_three_deterministic_replay_v1",
+  "suite_hash": "c30e4db622aa6f7a9e16a058b5579d1233a140ee5aa34243a4d152e4b641649a",
+  "baseline_model_id": "Qwen/Qwen3.6-27B",
+  "candidate_model_id": "qwen3.6-legal-adapter",
+  "candidate_adapter_id": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+  "baseline_legal_score_bps": 3333,
+  "candidate_legal_score_bps": 10000,
+  "score_delta_bps": 6667,
+  "candidate_answer_file_success_rate_bps": 10000,
+  "candidate_integrity_failure_count": 0,
+  "candidate_tool_failure_count": 0,
+  "candidate_timeout_failure_count": 0,
+  "regression_detected": false,
+  "decision": "promote",
+  "replay_command": [
+    "target/debug/examples/legal_benchmark_eval_suite",
+    "--suite",
+    "suites/harvey_public_three.json",
+    "--model",
+    "Qwen/Qwen3.6-27B",
+    "--adapter",
+    "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+    "--out",
+    "target/legal/qwen36_27b_eval_actual_20260522T043404Z"
+  ]
+}

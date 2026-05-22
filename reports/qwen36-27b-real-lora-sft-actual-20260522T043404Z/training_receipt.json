@@ -1,0 +1,137 @@
+{
+  "schema_version": "psionic.qwen36_real_lora_sft_receipt.v1",
+  "run_id": "qwen36-27b-real-lora-sft-full-layer-smoke-001",
+  "base_model": "Qwen/Qwen3.6-27B",
+  "served_model_id": "qwen3.6-27b",
+  "model_dir": "/Users/christopherdavid/work/psionic-pylon/target/models/qwen/Qwen3.6-27B",
+  "model_hashes": {
+    "config_sha256": "69db4eb7196bc8190813231b3018ca05d8c2e3abc7b1af19d55c157af44a9d9c",
+    "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "index_sha256": "a8ad2c26fb707ff8c245806315b03e3b4b74595528492423af5dae0ce39b4d9b"
+  },
+  "train_type": "lora",
+  "qlora": {
+    "enabled": false,
+    "base_weight_quantization": "none",
+    "adapter_weight_dtype": "f32",
+    "compatibility_note": "LoRA jobs train F32 adapter deltas over frozen BF16 Qwen3.6 base weights."
+  },
+  "activation_mode": "bounded_full_layer_row_sparse_forward_v1",
+  "activation_receipt": {
+    "activation_source": "full_forward_smoke",
+    "activation_mode": "bounded_full_layer_row_sparse_forward_v1",
+    "exact_full_width_logits": false,
+    "layer_receipt_count": 65,
+    "full_attention_layer_count": 16,
+    "linear_attention_layer_count": 48,
+    "mtp_layer_count": 1,
+    "claim_boundary": "This is a bounded row-sparse full-layer smoke. It executes every declared Qwen3.6-27B text layer in order and reads real layer tensors, but it does not materialize full attention, full MLP activations, full-vocabulary logits, or generation."
+  },
+  "prompt_receipt": {
+    "template_id": "qwen3.6.chat_template.v1",
+    "reasoning_mode": "direct_answer",
+    "prompt_hash": "5477d3c82b83080b6fa19c26fb82ad74d8a20a38e68ef5123b9f909e392126bf",
+    "token_count": 50
+  },
+  "target_token_id": 271,
+  "candidate_token_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    271
+  ],
+  "base_sampled_logits": [
+    {
+      "token_id": 0,
+      "token_label": "token:0",
+      "logit": -0.829761005895244
+    },
+    {
+      "token_id": 1,
+      "token_label": "token:1",
+      "logit": -0.9188269849562424
+    },
+    {
+      "token_id": 2,
+      "token_label": "token:2",
+      "logit": 0.3755067110296626
+    },
+    {
+      "token_id": 3,
+      "token_label": "token:3",
+      "logit": -0.4998711945690415
+    },
+    {
+      "token_id": 4,
+      "token_label": "token:4",
+      "logit": -0.28033743337156247
+    },
+    {
+      "token_id": 5,
+      "token_label": "token:5",
+      "logit": 1.053115274940075
+    },
+    {
+      "token_id": 271,
+      "token_label": "token:271",
+      "logit": -0.7141242831552918
+    }
+  ],
+  "base_logits_sha256": "bed623e2a8d992086b0ab346cc8216553a67884eefaefa110ba14e15dfc7144a",
+  "hidden_state_sha256": "80d36968a6ec661313d1091cffea73b9fdeb50fe7aa63270f45ce65578c9b97f",
+  "active_trainable_target": "lm_head.weight",
+  "adapter_format": "lm_head_lora_safetensors",
+  "dense_lora_target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "requested_target_modules": [
+    "all-linear"
+  ],
+  "resolved_target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "deferred_target_modules_reason": "The dense attention/MLP target set is now validated and the SFT surface comes from the bounded Rust full-layer activation path. The exported adapter remains LM-head LoRA because serving, DPO, and GRPO currently load that artifact shape; exact per-q_proj/k_proj/v_proj/o_proj/gate/up/down backward kernels remain the next implementation step.",
+  "lora_rank": 4,
+  "lora_alpha": 8.0,
+  "trainable_parameter_count": 1013760,
+  "frozen_base_weights": true,
+  "optimizer": {
+    "optimizer": "adamw",
+    "learning_rate": 0.01,
+    "weight_decay": 0.0,
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "epsilon": 1e-8,
+    "gradient_clip_norm": 1.0
+  },
+  "completed_steps": 3,
+  "initial_loss": 2.6618745,
+  "final_loss": 1.9467509,
+  "loss_improved": true,
+  "adapter_artifact_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+  "adapter_artifact_sha256": "7753611f0873897ed5e058d1b867288f986965e58d9c8b6a4d157849d86ad046",
+  "adapter_identity_digest": "852cb8ed66663ad3153e3a81017404777ead0ac68902b1e2bd0b585594a39939",
+  "loss_curve_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/loss_curve.json",
+  "checkpoint_summary_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/checkpoint_summary.json",
+  "state_checkpoint_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/state_checkpoint.safetensors",
+  "state_checkpoint_sha256": "bfdd8a621128fbd87402e948a628f7ea8de9fbb137c2e1e103740f78976f2466",
+  "dpo_grpo_adapter_compatibility": "The artifact exports lm_head.lora_A.weight and lm_head.lora_B.weight in the same safetensors shape consumed by the existing legal DPO and GRPO parent-adapter paths.",
+  "python_invoked": false,
+  "claim_boundary": "This is a real Qwen3.6-27B bounded full-layer LoRA update: the hidden vector comes from the downloaded BF16 safetensors after the Rust row-sparse layer-stack smoke. It keeps all base weights frozen and trains a loadable LM-head LoRA adapter. It is not exact full-width transformer backprop through q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, or down_proj yet.",
+  "receipt_digest": "edd1a376faa5e5884a3aa5530ba30f43f69e57d50defe546785c7d9ab33fc92d"
+}

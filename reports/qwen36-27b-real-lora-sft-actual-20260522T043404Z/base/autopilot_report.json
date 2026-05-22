@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "report_id": "harvey_public_three_deterministic_replay_v1.base",
+  "generated_at_ms": 1779424746791,
+  "global": {
+    "run_count": 3,
+    "all_pass_count": 1,
+    "all_pass_rate_bps": 3333,
+    "criterion_pass_rate_bps": 3333,
+    "total_cost_micro_usd": 0,
+    "total_wall_time_ms": 452,
+    "input_tokens": 960,
+    "output_tokens": 180,
+    "document_coverage_bps": 0
+  },
+  "by_task": [
+    {
+      "task_id": "harvey.public.lease_notice",
+      "run_count": 1,
+      "best_all_pass": false,
+      "best_criterion_pass_rate_bps": 0,
+      "latest_score_report_hash": "3722566e1eef6e96d9c0f64a9dd699a2ba604e30bd1f0c62723ed9e11d36eaf3"
+    },
+    {
+      "task_id": "harvey.public.privilege_log",
+      "run_count": 1,
+      "best_all_pass": true,
+      "best_criterion_pass_rate_bps": 10000,
+      "latest_score_report_hash": "fae0f4f94993ba1b5302c28d17082c21dde9f124477211ff45d26e7e5160ac7e"
+    },
+    {
+      "task_id": "harvey.public.purchase_indemnity",
+      "run_count": 1,
+      "best_all_pass": false,
+      "best_criterion_pass_rate_bps": 0,
+      "latest_score_report_hash": "2cf67c9e1be358da1a0d1c90b36c16cb5b55fb0b40881c878165b27149d10825"
+    }
+  ],
+  "by_model_config": [
+    {
+      "run_config_hash": "59483b575ca407d29834589d1e0905219d72d88ad4129c8cbe46c277410746fe",
+      "run_count": 3,
+      "all_pass_rate_bps": 3333,
+      "criterion_pass_rate_bps": 3333,
+      "total_cost_micro_usd": 0,
+      "total_wall_time_ms": 452
+    }
+  ],
+  "failure_clusters": [
+    {
+      "cluster_id": "failure.deterministic_precheck",
+      "failure_family": "deterministic_precheck",
+      "task_ids": [
+        "harvey.public.lease_notice",
+        "harvey.public.purchase_indemnity"
+      ],
+      "criterion_ids": [
+        "harvey.public.lease_notice.answer_file",
+        "harvey.public.lease_notice.legal_work_product",
+        "harvey.public.purchase_indemnity.answer_file",
+        "harvey.public.purchase_indemnity.legal_work_product"
+      ],
+      "failure_count": 4,
+      "score_delta_bps": -10000,
+      "repro_command": "cargo test -p psionic-eval --no-default-features --lib legal_benchmark_reports",
+      "affected_modules": [
+        "psionic-eval/legal_benchmark"
+      ],
+      "diagnostics": [
+        "required deliverable failed deterministic precheck"
+      ]
+    }
+  ],
+  "coverage_failure_comparisons": [
+    {
+      "criterion_id": "harvey.public.lease_notice.answer_file",
+      "failure_class": "drafting_gap",
+      "missing_source_artifact_ids": [],
+      "missing_deliverable_ids": [
+        "answer"
+      ],
+      "evidence_refs": [],
+      "diagnostic": "evidence was available but required deliverable drafting was incomplete"
+    },
+    {
+      "criterion_id": "harvey.public.lease_notice.legal_work_product",
+      "failure_class": "coverage_gap",
+      "missing_source_artifact_ids": [
+        "lease_notice"
+      ],
+      "missing_deliverable_ids": [
+        "answer"
+      ],
+      "evidence_refs": [],
+      "diagnostic": "missed criterion aligns to unread required source artifacts"
+    },
+    {
+      "criterion_id": "harvey.public.purchase_indemnity.answer_file",
+      "failure_class": "drafting_gap",
+      "missing_source_artifact_ids": [],
+      "missing_deliverable_ids": [
+        "answer"
+      ],
+      "evidence_refs": [],
+      "diagnostic": "evidence was available but required deliverable drafting was incomplete"
+    },
+    {
+      "criterion_id": "harvey.public.purchase_indemnity.legal_work_product",
+      "failure_class": "coverage_gap",
+      "missing_source_artifact_ids": [
+        "purchase_indemnity"
+      ],
+      "missing_deliverable_ids": [
+        "answer"
+      ],
+      "evidence_refs": [],
+      "diagnostic": "missed criterion aligns to unread required source artifacts"
+    }
+  ],
+  "score_report_hashes": [
+    "3722566e1eef6e96d9c0f64a9dd699a2ba604e30bd1f0c62723ed9e11d36eaf3",
+    "2cf67c9e1be358da1a0d1c90b36c16cb5b55fb0b40881c878165b27149d10825",
+    "fae0f4f94993ba1b5302c28d17082c21dde9f124477211ff45d26e7e5160ac7e"
+  ]
+}

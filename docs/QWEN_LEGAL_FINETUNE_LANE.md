@@ -16,7 +16,8 @@
 > 2026-05-21; signed two-node Pylon dispatch smoke added on 2026-05-21;
 > full-artifact promotion gates and Autopilot4-safe summary feed added on
 > 2026-05-21; Bitcoin/Lightning settlement evidence hooks added on
-> 2026-05-21.
+> 2026-05-21; fresh real-checkpoint Qwen3.6-27B bounded full-layer LoRA SFT
+> run recorded on 2026-05-22.
 
 This lane is the first Psionic-owned legal benchmark adapter-SFT path for
 Qwen. It starts with `Qwen/Qwen3.5-4B` only to prove the wiring:
@@ -518,6 +519,42 @@ q4-k placement compatibility and still writes F32 adapter deltas, but exact
 4-bit base matmul kernels remain separate serving/training work. Router and
 MoE target names still refuse; the dense 27B lane accepts only `q_proj`,
 `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, and `down_proj`.
+
+Fresh actual run recorded on 2026-05-22:
+
+- report directory:
+  `reports/qwen36-27b-real-lora-sft-actual-20260522T043404Z/`
+- source git ref:
+  `e8dab9accda2dea4351ac822712b41139a728ddd`
+- model checkpoint used:
+  `/Users/christopherdavid/work/psionic-pylon/target/models/qwen/Qwen3.6-27B`
+- output directory:
+  `target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z`
+- eval output directory:
+  `target/legal/qwen36_27b_eval_actual_20260522T043404Z`
+- completed steps: `3`
+- initial loss: `2.6618745`
+- final loss: `1.9467509`
+- loss delta: `-0.7151236` (`-26.8654%`)
+- target probability: `0.06981722 -> 0.14273709`
+- adapter sha256:
+  `7753611f0873897ed5e058d1b867288f986965e58d9c8b6a4d157849d86ad046`
+- state checkpoint sha256:
+  `bfdd8a621128fbd87402e948a628f7ea8de9fbb137c2e1e103740f78976f2466`
+- training receipt digest:
+  `edd1a376faa5e5884a3aa5530ba30f43f69e57d50defe546785c7d9ab33fc92d`
+- public Harvey replay base score: `3333` bps
+- public Harvey replay adapter score: `10000` bps
+- public Harvey replay delta: `6667` bps
+- public Harvey replay report hash:
+  `3dbe071364f814012f5bdccc3a21543bb6a5efb166201cd3ad4e00d25fa5b573`
+- promotion gate decision: `promote`
+
+The tracked report preserves the generated training receipt, loss curve,
+checkpoint summary, eval report, promotion gate input, replay receipt, and
+base/adapter Autopilot reports. The adapter and optimizer-state checkpoint
+remain ignored `target/` artifacts and are identified by size and sha256 in
+the report.
 
 The first two-worker real-Qwen Pylon rehearsal command is:
 

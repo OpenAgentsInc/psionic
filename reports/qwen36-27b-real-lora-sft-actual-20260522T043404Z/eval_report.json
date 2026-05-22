@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "suite_id": "harvey_public_three_deterministic_replay_v1",
+  "suite_hash": "c30e4db622aa6f7a9e16a058b5579d1233a140ee5aa34243a4d152e4b641649a",
+  "mode": "public_harvey_three_task",
+  "fixed_task_order": [
+    "harvey.public.lease_notice",
+    "harvey.public.purchase_indemnity",
+    "harvey.public.privilege_log"
+  ],
+  "prompt_template_hash": "419ccc8b3507fb02f376004d6046809966e124dbe3caed77d326d561d4bb724a",
+  "scorer_version": "psionic-rust-legal-scorer-v1",
+  "source_document_hashes": {
+    "lease_notice": "e42e52b5f48a499c3948c2452fe01b6f1aa0a515974b9850b7380e12f2416de8",
+    "privilege_log": "0aa9f5bbdbfb72ad299ebd934f79baa554f580cb2e225340db1c00627b441cdc",
+    "purchase_indemnity": "939cd0cb216da9c1e50897413ece81096dd992ec6dd41f1f1ad3e4351a9c4b8b"
+  },
+  "base_model_result": {
+    "model_binding": {
+      "role": "base",
+      "model_id": "Qwen/Qwen3.6-27B",
+      "artifact_materialized": false
+    },
+    "answer_file_write_rate_bps": 3333,
+    "answer_file_success_rate_bps": 3333,
+    "correct_path_rate_bps": 3333,
+    "submit_rate_bps": 3333,
+    "integrity_valid_rate_bps": 3333,
+    "mean_legal_score_bps": 3333,
+    "median_legal_score_bps": 0,
+    "legal_score_bps": 3333,
+    "integrity_failure_count": 2,
+    "tool_failure_count": 1,
+    "timeout_failure_count": 0,
+    "failure_class_counts": {
+      "integrity_failure": 2,
+      "missing_answer": 1,
+      "tool_failure": 1
+    },
+    "score_by_task_type": {
+      "litigation/classify": {
+        "task_type": "litigation/classify",
+        "task_count": 1,
+        "mean_legal_score_bps": 10000,
+        "median_legal_score_bps": 10000,
+        "answer_file_write_rate_bps": 10000,
+        "correct_path_rate_bps": 10000,
+        "submit_rate_bps": 10000,
+        "integrity_valid_rate_bps": 10000,
+        "failure_class_counts": {}
+      },
+      "ma/analyze": {
+        "task_type": "ma/analyze",
+        "task_count": 1,
+        "mean_legal_score_bps": 0,
+        "median_legal_score_bps": 0,
+        "answer_file_write_rate_bps": 0,
+        "correct_path_rate_bps": 0,
+        "submit_rate_bps": 0,
+        "integrity_valid_rate_bps": 0,
+        "failure_class_counts": {
+          "integrity_failure": 1,
+          "tool_failure": 1
+        }
+      },
+      "real_estate/review": {
+        "task_type": "real_estate/review",
+        "task_count": 1,
+        "mean_legal_score_bps": 0,
+        "median_legal_score_bps": 0,
+        "answer_file_write_rate_bps": 0,
+        "correct_path_rate_bps": 0,
+        "submit_rate_bps": 0,
+        "integrity_valid_rate_bps": 0,
+        "failure_class_counts": {
+          "integrity_failure": 1,
+          "missing_answer": 1
+        }
+      }
+    },
+    "score_confidence_notes": [
+      "Deterministic replay fixture: scores measure harness behavior for declared outcomes, not live model legal quality or performance on private Harvey tasks.",
+      "Small suite: 3 task(s), so use this only as a smoke/workflow gate."
+    ],
+    "task_reports": [
+      {
+        "task_id": "harvey.public.lease_notice",
+        "model_role": "base",
+        "run_id": "run.base.harvey.public.lease_notice",
+        "task_type": "real_estate/review",
+        "outcome": "missing_answer",
+        "submitted": false,
+        "correct_path": false,
+        "answer_file_success": false,
+        "legal_score_bps": 0,
+        "integrity_valid": false,
+        "tool_failure": false,
+        "timeout_failure": false,
+        "failure_classes": [
+          "integrity_failure",
+          "missing_answer"
+        ],
+        "score_report_hash": "3722566e1eef6e96d9c0f64a9dd699a2ba604e30bd1f0c62723ed9e11d36eaf3",
+        "run_record_hash": "04e5e4bb304be6e5de7b9fafbee1cdf098e0a193e3423d346a718bbf1ad4e738"
+      },
+      {
+        "task_id": "harvey.public.purchase_indemnity",
+        "model_role": "base",
+        "run_id": "run.base.harvey.public.purchase_indemnity",
+        "task_type": "ma/analyze",
+        "outcome": "tool_failure",
+        "submitted": false,
+        "correct_path": false,
+        "answer_file_success": false,
+        "legal_score_bps": 0,
+        "integrity_valid": false,
+        "tool_failure": true,
+        "timeout_failure": false,
+        "failure_classes": [
+          "integrity_failure",
+          "tool_failure"
+        ],
+        "score_report_hash": "2cf67c9e1be358da1a0d1c90b36c16cb5b55fb0b40881c878165b27149d10825",
+        "run_record_hash": "e9c8bd89fd17fd0c7c60dca57645aa52e30829b205c893128e2593767491d4c5"
+      },
+      {
+        "task_id": "harvey.public.privilege_log",
+        "model_role": "base",
+        "run_id": "run.base.harvey.public.privilege_log",
+        "task_type": "litigation/classify",
+        "outcome": "pass",
+        "submitted": true,
+        "correct_path": true,
+        "answer_file_success": true,
+        "legal_score_bps": 10000,
+        "integrity_valid": true,
+        "tool_failure": false,
+        "timeout_failure": false,
+        "failure_classes": [],
+        "score_report_hash": "fae0f4f94993ba1b5302c28d17082c21dde9f124477211ff45d26e7e5160ac7e",
+        "run_record_hash": "ec71ed5b2045fdf339908e4c8442af15a3b9c7bd55cb297617d218e816629b46"
+      }
+    ]
+  },
+  "adapter_result": {
+    "model_binding": {
+      "role": "adapter",
+      "model_id": "qwen3.6-legal-adapter",
+      "adapter_id": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+      "artifact_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+      "artifact_sha256": "7753611f0873897ed5e058d1b867288f986965e58d9c8b6a4d157849d86ad046",
+      "artifact_materialized": true
+    },
+    "answer_file_write_rate_bps": 10000,
+    "answer_file_success_rate_bps": 10000,
+    "correct_path_rate_bps": 10000,
+    "submit_rate_bps": 10000,
+    "integrity_valid_rate_bps": 10000,
+    "mean_legal_score_bps": 10000,
+    "median_legal_score_bps": 10000,
+    "legal_score_bps": 10000,
+    "integrity_failure_count": 0,
+    "tool_failure_count": 0,
+    "timeout_failure_count": 0,
+    "failure_class_counts": {},
+    "score_by_task_type": {
+      "litigation/classify": {
+        "task_type": "litigation/classify",
+        "task_count": 1,
+        "mean_legal_score_bps": 10000,
+        "median_legal_score_bps": 10000,
+        "answer_file_write_rate_bps": 10000,
+        "correct_path_rate_bps": 10000,
+        "submit_rate_bps": 10000,
+        "integrity_valid_rate_bps": 10000,
+        "failure_class_counts": {}
+      },
+      "ma/analyze": {
+        "task_type": "ma/analyze",
+        "task_count": 1,
+        "mean_legal_score_bps": 10000,
+        "median_legal_score_bps": 10000,
+        "answer_file_write_rate_bps": 10000,
+        "correct_path_rate_bps": 10000,
+        "submit_rate_bps": 10000,
+        "integrity_valid_rate_bps": 10000,
+        "failure_class_counts": {}
+      },
+      "real_estate/review": {
+        "task_type": "real_estate/review",
+        "task_count": 1,
+        "mean_legal_score_bps": 10000,
+        "median_legal_score_bps": 10000,
+        "answer_file_write_rate_bps": 10000,
+        "correct_path_rate_bps": 10000,
+        "submit_rate_bps": 10000,
+        "integrity_valid_rate_bps": 10000,
+        "failure_class_counts": {}
+      }
+    },
+    "score_confidence_notes": [
+      "Deterministic replay fixture: scores measure harness behavior for declared outcomes, not live model legal quality or performance on private Harvey tasks.",
+      "Small suite: 3 task(s), so use this only as a smoke/workflow gate."
+    ],
+    "task_reports": [
+      {
+        "task_id": "harvey.public.lease_notice",
+        "model_role": "adapter",
+        "run_id": "run.adapter.harvey.public.lease_notice",
+        "task_type": "real_estate/review",
+        "outcome": "pass",
+        "submitted": true,
+        "correct_path": true,
+        "answer_file_success": true,
+        "legal_score_bps": 10000,
+        "integrity_valid": true,
+        "tool_failure": false,
+        "timeout_failure": false,
+        "failure_classes": [],
+        "score_report_hash": "b2483a49c96d85c77b7410c885263e43dd41752d25fc38be396447ea3dc6fdc7",
+        "run_record_hash": "bdfb3e9a04d5a1c23d343c4099e901a9a3e4a6606595d46fec89f8531ed4f6d4"
+      },
+      {
+        "task_id": "harvey.public.purchase_indemnity",
+        "model_role": "adapter",
+        "run_id": "run.adapter.harvey.public.purchase_indemnity",
+        "task_type": "ma/analyze",
+        "outcome": "pass",
+        "submitted": true,
+        "correct_path": true,
+        "answer_file_success": true,
+        "legal_score_bps": 10000,
+        "integrity_valid": true,
+        "tool_failure": false,
+        "timeout_failure": false,
+        "failure_classes": [],
+        "score_report_hash": "7b5feaa382bf2717d8f27ca622ef8c858c7cf7392ed74214fd874a5f9f5f72b4",
+        "run_record_hash": "bfe711d1b1ac2cc1332dc801114fd36753a8627a5545bf001355eaf31a85c2b4"
+      },
+      {
+        "task_id": "harvey.public.privilege_log",
+        "model_role": "adapter",
+        "run_id": "run.adapter.harvey.public.privilege_log",
+        "task_type": "litigation/classify",
+        "outcome": "pass",
+        "submitted": true,
+        "correct_path": true,
+        "answer_file_success": true,
+        "legal_score_bps": 10000,
+        "integrity_valid": true,
+        "tool_failure": false,
+        "timeout_failure": false,
+        "failure_classes": [],
+        "score_report_hash": "67379560508bf5c6e6813091d95cd2b5e96c22b382fb16a19e53c52d6358b9ad",
+        "run_record_hash": "16a612438dc6b96738c2d4ef44189ed9c96e13c1e9b3d68d1b7c71362de08f1b"
+      }
+    ]
+  },
+  "comparison": {
+    "champion_legal_score_bps": 3333,
+    "candidate_legal_score_bps": 10000,
+    "score_delta_bps": 6667,
+    "regression_vs_champion_bps": 6667,
+    "answer_file_success_delta_bps": 6667,
+    "integrity_failure_delta": -2,
+    "tool_failure_delta": -1,
+    "timeout_failure_delta": 0,
+    "regression_detected": false
+  },
+  "promotion_gate_input": {
+    "schema_version": 1,
+    "suite_id": "harvey_public_three_deterministic_replay_v1",
+    "suite_hash": "c30e4db622aa6f7a9e16a058b5579d1233a140ee5aa34243a4d152e4b641649a",
+    "baseline_model_id": "Qwen/Qwen3.6-27B",
+    "candidate_model_id": "qwen3.6-legal-adapter",
+    "candidate_adapter_id": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+    "baseline_legal_score_bps": 3333,
+    "candidate_legal_score_bps": 10000,
+    "score_delta_bps": 6667,
+    "candidate_answer_file_success_rate_bps": 10000,
+    "candidate_integrity_failure_count": 0,
+    "candidate_tool_failure_count": 0,
+    "candidate_timeout_failure_count": 0,
+    "regression_detected": false,
+    "decision": "promote",
+    "replay_command": [
+      "target/debug/examples/legal_benchmark_eval_suite",
+      "--suite",
+      "suites/harvey_public_three.json",
+      "--model",
+      "Qwen/Qwen3.6-27B",
+      "--adapter",
+      "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+      "--out",
+      "target/legal/qwen36_27b_eval_actual_20260522T043404Z"
+    ]
+  },
+  "replay_receipt": {
+    "schema_version": 1,
+    "suite_path": "suites/harvey_public_three.json",
+    "suite_hash": "c30e4db622aa6f7a9e16a058b5579d1233a140ee5aa34243a4d152e4b641649a",
+    "output_dir": "target/legal/qwen36_27b_eval_actual_20260522T043404Z",
+    "report_hash": "3dbe071364f814012f5bdccc3a21543bb6a5efb166201cd3ad4e00d25fa5b573",
+    "replay_command": [
+      "target/debug/examples/legal_benchmark_eval_suite",
+      "--suite",
+      "suites/harvey_public_three.json",
+      "--model",
+      "Qwen/Qwen3.6-27B",
+      "--adapter",
+      "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+      "--out",
+      "target/legal/qwen36_27b_eval_actual_20260522T043404Z"
+    ],
+    "generated_artifacts": [
+      "eval_report.json",
+      "promotion_gate_input.json",
+      "replay_receipt.json",
+      "base/report.md",
+      "base/autopilot_report.json",
+      "adapter/report.md",
+      "adapter/autopilot_report.json"
+    ]
+  },
+  "report_boundary": "This is a deterministic local replay report. It compares declared base and adapter outputs through the Rust scorer; it is not proof of performance on private benchmark tasks."
+}

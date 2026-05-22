@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "report_id": "harvey_public_three_deterministic_replay_v1.adapter",
+  "generated_at_ms": 1779424746793,
+  "global": {
+    "run_count": 3,
+    "all_pass_count": 3,
+    "all_pass_rate_bps": 10000,
+    "criterion_pass_rate_bps": 10000,
+    "total_cost_micro_usd": 0,
+    "total_wall_time_ms": 456,
+    "input_tokens": 960,
+    "output_tokens": 540,
+    "document_coverage_bps": 0
+  },
+  "by_task": [
+    {
+      "task_id": "harvey.public.lease_notice",
+      "run_count": 1,
+      "best_all_pass": true,
+      "best_criterion_pass_rate_bps": 10000,
+      "latest_score_report_hash": "b2483a49c96d85c77b7410c885263e43dd41752d25fc38be396447ea3dc6fdc7"
+    },
+    {
+      "task_id": "harvey.public.privilege_log",
+      "run_count": 1,
+      "best_all_pass": true,
+      "best_criterion_pass_rate_bps": 10000,
+      "latest_score_report_hash": "67379560508bf5c6e6813091d95cd2b5e96c22b382fb16a19e53c52d6358b9ad"
+    },
+    {
+      "task_id": "harvey.public.purchase_indemnity",
+      "run_count": 1,
+      "best_all_pass": true,
+      "best_criterion_pass_rate_bps": 10000,
+      "latest_score_report_hash": "7b5feaa382bf2717d8f27ca622ef8c858c7cf7392ed74214fd874a5f9f5f72b4"
+    }
+  ],
+  "by_model_config": [
+    {
+      "run_config_hash": "8b566341af6f7778ac2259bc1fd0d1b87f28c090f89800089ef4a1b318f46a0d",
+      "run_count": 3,
+      "all_pass_rate_bps": 10000,
+      "criterion_pass_rate_bps": 10000,
+      "total_cost_micro_usd": 0,
+      "total_wall_time_ms": 456
+    }
+  ],
+  "failure_clusters": [],
+  "score_report_hashes": [
+    "b2483a49c96d85c77b7410c885263e43dd41752d25fc38be396447ea3dc6fdc7",
+    "7b5feaa382bf2717d8f27ca622ef8c858c7cf7392ed74214fd874a5f9f5f72b4",
+    "67379560508bf5c6e6813091d95cd2b5e96c22b382fb16a19e53c52d6358b9ad"
+  ]
+}

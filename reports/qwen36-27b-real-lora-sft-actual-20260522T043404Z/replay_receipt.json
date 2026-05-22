@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "suite_path": "suites/harvey_public_three.json",
+  "suite_hash": "c30e4db622aa6f7a9e16a058b5579d1233a140ee5aa34243a4d152e4b641649a",
+  "output_dir": "target/legal/qwen36_27b_eval_actual_20260522T043404Z",
+  "report_hash": "3dbe071364f814012f5bdccc3a21543bb6a5efb166201cd3ad4e00d25fa5b573",
+  "replay_command": [
+    "target/debug/examples/legal_benchmark_eval_suite",
+    "--suite",
+    "suites/harvey_public_three.json",
+    "--model",
+    "Qwen/Qwen3.6-27B",
+    "--adapter",
+    "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+    "--out",
+    "target/legal/qwen36_27b_eval_actual_20260522T043404Z"
+  ],
+  "generated_artifacts": [
+    "eval_report.json",
+    "promotion_gate_input.json",
+    "replay_receipt.json",
+    "base/report.md",
+    "base/autopilot_report.json",
+    "adapter/report.md",
+    "adapter/autopilot_report.json"
+  ]
+}

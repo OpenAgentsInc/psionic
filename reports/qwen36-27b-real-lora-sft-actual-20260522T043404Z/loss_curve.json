@@ -1,0 +1,24 @@
+{
+  "schema_version": "psionic.qwen36_real_lora_sft_loss_curve.v1",
+  "run_id": "qwen36-27b-real-lora-sft-full-layer-smoke-001",
+  "points": [
+    {
+      "step": 1,
+      "loss": 2.6618745,
+      "target_probability": 0.06981722,
+      "logits_sha256": "f6bf48074146ea3562b7d52dee0ea209593e7762f06f25cad9883f594df8f1a4"
+    },
+    {
+      "step": 2,
+      "loss": 3.6199322,
+      "target_probability": 0.026784495,
+      "logits_sha256": "202ab1e204ba353a262be396a64cf7ff10caf50e761207db5de87baf3f8473c7"
+    },
+    {
+      "step": 3,
+      "loss": 1.9467509,
+      "target_probability": 0.14273709,
+      "logits_sha256": "efe6a2366736b21d9f68d244a446392d82171aa0b067cef14637de444d9d950b"
+    }
+  ]
+}

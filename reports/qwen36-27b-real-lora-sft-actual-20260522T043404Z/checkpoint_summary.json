@@ -1,0 +1,12 @@
+{
+  "schema_version": "psionic.qwen36_real_lora_sft_checkpoint.v1",
+  "run_id": "qwen36-27b-real-lora-sft-full-layer-smoke-001",
+  "step": 3,
+  "adapter_artifact_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/adapter.safetensors",
+  "adapter_artifact_sha256": "7753611f0873897ed5e058d1b867288f986965e58d9c8b6a4d157849d86ad046",
+  "state_checkpoint_path": "target/legal/qwen36_27b_real_lora_sft_actual_20260522T043404Z/state_checkpoint.safetensors",
+  "state_checkpoint_sha256": "bfdd8a621128fbd87402e948a628f7ea8de9fbb137c2e1e103740f78976f2466",
+  "optimizer_state_sha256": "a5fd2c295303881650063592f399717a4205c7c31a5860a641f37e822027d874",
+  "scheduler_cursor_state_sha256": "8ea8e0dd4287d750a80e6674d1371c452fd3c4b19e8c32379a0725f09a3f2900",
+  "state_digest": "812439608f114db5a3c6b56a309f8ba4eb959f0a14c32caf16afb0fb79ffe8bc"
+}
