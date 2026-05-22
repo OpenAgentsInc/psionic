@@ -463,14 +463,19 @@ The same Pylon payment surface now emits deterministic Bitcoin/Lightning
 handoff batches for Treasury/Nexus and ingests returned settlement proofs into
 the training closeout. Psionic records payout target references, amount,
 currency, expiry, fee policy, payout authorization id, worker receipt digest,
-and reconciliation digest, but does not dispatch payments or store wallet
-keys, node credentials, seed words, or channel monitor material. Adapter
-promotion is blocked unless all accepted Pylon work has settled payment proof
-or an explicit operator-approved deferred-payment policy. Duplicate worker
+settlement method, settlement execution mode, payment hash or transaction proof,
+fee, settlement time, and reconciliation digest, but does not dispatch payments
+or store wallet keys, node credentials, seed words, or channel monitor material.
+The accepted closeout can use local dry-run settlement proof for tests or
+operator-approved live small-value proof for controlled runs. Adapter promotion
+is blocked unless all accepted Pylon work has settled payment proof or an
+explicit operator-approved deferred-payment policy. The report exposes payable,
+pending, settled, failed, and deferred payment counts plainly. Duplicate worker
 outputs, missing receipts, invalid receipts, unknown payout authorizations,
-duplicate settlement proofs, failed payments, and proof fields that look like
-wallet secret material are rejected or blocked before promotion. The focused
-verification command is
+duplicate settlement proofs, bad proof digests, mismatched worker receipt
+digests, mismatched amounts or methods, failed payments, and proof fields that
+look like wallet secret material are rejected or blocked before promotion. The
+focused verification command is
 `cargo test -p psionic-train qwen_legal_pylon_training_job --lib`.
 The Qwen legal Pylon path now also owns a checkpoint recovery contract in
 `crates/psionic-train/src/qwen_legal_checkpoint_recovery.rs` with the runnable

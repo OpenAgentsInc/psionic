@@ -116,17 +116,23 @@ The current boundary is:
   worker id, worker receipt digest, shard key, agreed price, payout target
   reference, amount in millisatoshis, expiry, fee-policy reference, and payout
   authorization id.
-- Treasury/Nexus executes the payment outside Psionic and returns a settlement
-  proof.
+- Treasury/Nexus executes the payment outside Psionic in either local dry-run
+  settlement mode or operator-approved live small-value mode and returns a
+  settlement proof.
 - Psionic attaches the returned proof to the training closeout and blocks
   adapter promotion unless accepted work has settled payment proof or an
   explicit operator-approved deferred-payment policy.
 
 The settlement proof shape records operation id, payout authorization id,
-status, payment hash or method-specific proof field, fee, settlement time, and
-reconciliation digest. Proof ingestion rejects unknown payout authorizations,
-duplicate settlement proofs, bad proof digests, and any field that appears to
-contain wallet secret material.
+worker receipt digest, amount in millisatoshis, settlement method, settlement
+mode, status, payment hash or transaction proof, method-specific proof fields,
+fee, settlement time, and reconciliation digest. Proof ingestion cross-checks
+the worker receipt digest, amount, and method against the handoff item, and
+rejects unknown payout authorizations, duplicate settlement proofs, bad proof
+digests, and any field that appears to contain wallet secret material. The
+closeout reports the payable, pending, settled, failed, and deferred counts
+plainly; Psionic records the evidence, while Treasury/Nexus remains the payment
+sender.
 
 The Rust entry points are:
 

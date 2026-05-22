@@ -65,6 +65,14 @@ pub enum PylonTrainingBitcoinSettlementStatus {
     DeferredByOperator,
 }
 
+/// Settlement execution mode used for local tests and operator-approved runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PylonTrainingSettlementExecutionMode {
+    DryRunLocal,
+    LiveSmallValueOperatorApproved,
+}
+
 /// Promotion payment gate applied to adapter promotion closeout.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -259,11 +267,17 @@ pub struct PylonTrainingBitcoinSettlementProof {
     pub schema_version: String,
     pub operation_id: String,
     pub payout_authorization_id: String,
+    pub worker_receipt_digest: String,
+    pub amount_msat: u64,
+    pub settlement_method: PylonTrainingBitcoinPayoutTargetKind,
+    pub settlement_mode: PylonTrainingSettlementExecutionMode,
     pub status: PylonTrainingBitcoinSettlementStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_preimage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction_proof: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bolt11_invoice: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -308,6 +322,8 @@ pub struct PylonTrainingPaymentCloseout {
     pub closeout_id: String,
     pub batch_id: String,
     pub accepted_work_count: u32,
+    pub payable_payment_count: u32,
+    pub pending_payment_count: u32,
     pub settled_payment_count: u32,
     pub deferred_payment_count: u32,
     pub failed_payment_count: u32,
@@ -1109,8 +1125,8 @@ pub fn settle_qwen_legal_pylon_training_job_spec(
 }
 
 /// Builds payment table rows for the canonical Pylon legal jobs.
-pub fn qwen_legal_pylon_worker_contribution_payment_table(
-) -> Result<Vec<PylonTrainingWorkerContributionPaymentRow>, QwenLegalPylonTrainingJobError> {
+pub fn qwen_legal_pylon_worker_contribution_payment_table()
+-> Result<Vec<PylonTrainingWorkerContributionPaymentRow>, QwenLegalPylonTrainingJobError> {
     canonical_qwen_legal_pylon_training_jobs()
         .iter()
         .map(settle_qwen_legal_pylon_training_job_spec)
@@ -1204,11 +1220,11 @@ pub fn attach_qwen_legal_pylon_settlement_proofs(
         left.payout_authorization_id
             .cmp(&right.payout_authorization_id)
     });
-    let payable_authorizations = batch
+    let item_by_authorization = batch
         .payable_items
         .iter()
-        .map(|item| item.payout_authorization_id.as_str())
-        .collect::<BTreeSet<_>>();
+        .map(|item| (item.payout_authorization_id.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
     let mut seen_proofs = BTreeSet::new();
     for proof in &proofs {
         validate_settlement_proof(proof)?;
@@ -1218,17 +1234,21 @@ pub fn attach_qwen_legal_pylon_settlement_proofs(
                 proof.payout_authorization_id
             ));
         }
-        if !payable_authorizations.contains(proof.payout_authorization_id.as_str()) {
+        let Some(item) = item_by_authorization.get(proof.payout_authorization_id.as_str()) else {
             return invalid_job(format!(
                 "settlement proof references unknown payout authorization `{}`",
                 proof.payout_authorization_id
             ));
-        }
+        };
+        validate_settlement_proof_matches_handoff(proof, item)?;
     }
     let proof_by_authorization = proofs
         .iter()
         .map(|proof| (proof.payout_authorization_id.as_str(), proof))
         .collect::<BTreeMap<_, _>>();
+    let accepted_work_count = u32::try_from(batch.payable_items.len()).unwrap_or(u32::MAX);
+    let payable_payment_count = accepted_work_count;
+    let mut pending_payment_count = 0_u32;
     let mut settled_payment_count = 0_u32;
     let mut failed_payment_count = 0_u32;
     let mut deferred_payment_count = 0_u32;
@@ -1244,22 +1264,24 @@ pub fn attach_qwen_legal_pylon_settlement_proofs(
                 PylonTrainingBitcoinSettlementStatus::Failed => {
                     failed_payment_count = failed_payment_count.saturating_add(1);
                 }
-                PylonTrainingBitcoinSettlementStatus::Pending => {}
+                PylonTrainingBitcoinSettlementStatus::Pending => {
+                    pending_payment_count = pending_payment_count.saturating_add(1);
+                }
             },
             None => {
                 if deferred_policy.is_some() {
                     deferred_payment_count = deferred_payment_count.saturating_add(1);
                 } else {
-                    failed_payment_count = failed_payment_count.saturating_add(1);
+                    pending_payment_count = pending_payment_count.saturating_add(1);
                 }
             }
         }
     }
-    let accepted_work_count = u32::try_from(batch.payable_items.len()).unwrap_or(u32::MAX);
     let promotion_payment_gate_status =
         if accepted_work_count > 0 && settled_payment_count == accepted_work_count {
             PylonTrainingPromotionPaymentGateStatus::PaymentSettled
         } else if failed_payment_count == 0
+            && pending_payment_count == 0
             && deferred_policy
                 .as_ref()
                 .is_some_and(valid_deferred_payment_policy)
@@ -1278,6 +1300,8 @@ pub fn attach_qwen_legal_pylon_settlement_proofs(
         closeout_id: closeout_id.into(),
         batch_id: batch.batch_id.clone(),
         accepted_work_count,
+        payable_payment_count,
+        pending_payment_count,
         settled_payment_count,
         deferred_payment_count,
         failed_payment_count,
@@ -1300,11 +1324,16 @@ pub fn settled_qwen_legal_pylon_bitcoin_proof_fixture(
         schema_version: String::from(QWEN_LEGAL_PYLON_BITCOIN_SETTLEMENT_PROOF_SCHEMA_VERSION),
         operation_id: format!("nexus.lightning.settle.{}", item.payout_authorization_id),
         payout_authorization_id: item.payout_authorization_id.clone(),
+        worker_receipt_digest: item.worker_receipt_digest.clone(),
+        amount_msat: item.payout.amount_msat,
+        settlement_method: item.payout.target_kind,
+        settlement_mode: PylonTrainingSettlementExecutionMode::DryRunLocal,
         status: PylonTrainingBitcoinSettlementStatus::Settled,
         payment_hash: Some(sha256_hex(item.payout_authorization_id.as_bytes())),
         payment_preimage: Some(sha256_hex(
             format!("preimage:{}", item.decision_id).as_bytes(),
         )),
+        transaction_proof: None,
         bolt11_invoice: Some(item.payout.payout_target_ref.clone()),
         bolt12_offer: None,
         bip353_address: None,
@@ -1459,14 +1488,34 @@ fn validate_settlement_proof(
         "settlement payout_authorization_id",
     )?;
     require_nonempty(
+        proof.worker_receipt_digest.as_str(),
+        "settlement worker_receipt_digest",
+    )?;
+    require_nonempty(
         proof.reconciliation_digest.as_str(),
         "settlement reconciliation_digest",
     )?;
+    if proof.amount_msat == 0 {
+        return invalid_job("settlement amount_msat must be greater than zero");
+    }
     if proof.proof_digest != proof.stable_digest() {
         return invalid_job("settlement proof digest drifted");
     }
+    if proof.settlement_mode == PylonTrainingSettlementExecutionMode::LiveSmallValueOperatorApproved
+        && proof.status == PylonTrainingBitcoinSettlementStatus::Settled
+    {
+        if proof.settled_at_ms == 0 {
+            return invalid_job("live settled proof must carry a settlement time");
+        }
+        if proof.payment_hash.is_none() && proof.transaction_proof.is_none() {
+            return invalid_job(
+                "live settled proof must carry a payment hash or transaction proof",
+            );
+        }
+    }
     if proof.status == PylonTrainingBitcoinSettlementStatus::Settled
         && proof.payment_hash.is_none()
+        && proof.transaction_proof.is_none()
         && proof.bolt11_invoice.is_none()
         && proof.bolt12_offer.is_none()
         && proof.bip353_address.is_none()
@@ -1476,6 +1525,31 @@ fn validate_settlement_proof(
     }
     if settlement_proof_contains_wallet_secret_material(proof) {
         return invalid_job("settlement proof must not contain wallet secret material");
+    }
+    Ok(())
+}
+
+fn validate_settlement_proof_matches_handoff(
+    proof: &PylonTrainingBitcoinSettlementProof,
+    item: &PylonTrainingTreasuryHandoffItem,
+) -> Result<(), QwenLegalPylonTrainingJobError> {
+    if proof.worker_receipt_digest != item.worker_receipt_digest {
+        return invalid_job(format!(
+            "settlement proof worker receipt digest mismatch for payout authorization `{}`",
+            proof.payout_authorization_id
+        ));
+    }
+    if proof.amount_msat != item.payout.amount_msat {
+        return invalid_job(format!(
+            "settlement proof amount mismatch for payout authorization `{}`",
+            proof.payout_authorization_id
+        ));
+    }
+    if proof.settlement_method != item.payout.target_kind {
+        return invalid_job(format!(
+            "settlement proof method mismatch for payout authorization `{}`",
+            proof.payout_authorization_id
+        ));
     }
     Ok(())
 }
@@ -1513,6 +1587,7 @@ fn settlement_proof_contains_wallet_secret_material(
         Some(proof.payout_authorization_id.as_str()),
         proof.payment_hash.as_deref(),
         proof.payment_preimage.as_deref(),
+        proof.transaction_proof.as_deref(),
         proof.bolt11_invoice.as_deref(),
         proof.bolt12_offer.as_deref(),
         proof.bip353_address.as_deref(),
@@ -2040,8 +2115,8 @@ pub fn write_canonical_qwen_legal_pylon_training_job_fixtures(
 mod tests {
     use super::*;
 
-    fn payable_decision_fixture(
-    ) -> Result<(tempfile::TempDir, PylonTrainingPaymentDecisionReceipt), Box<dyn std::error::Error>>
+    fn payable_decision_fixture()
+    -> Result<(tempfile::TempDir, PylonTrainingPaymentDecisionReceipt), Box<dyn std::error::Error>>
     {
         let temp = tempfile::tempdir()?;
         let mut job = canonical_qwen_legal_dataset_shard_job();
@@ -2057,8 +2132,8 @@ mod tests {
     }
 
     #[test]
-    fn pylon_worker_accepts_dataset_shard_and_verifies_receipt(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_worker_accepts_dataset_shard_and_verifies_receipt()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let mut job = canonical_qwen_legal_dataset_shard_job();
         job.output_dir = temp.path().display().to_string();
@@ -2078,8 +2153,8 @@ mod tests {
     }
 
     #[test]
-    fn pylon_worker_accepts_eval_shard_and_verifies_receipt(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_worker_accepts_eval_shard_and_verifies_receipt()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let mut job = canonical_qwen_legal_eval_shard_job();
         job.output_dir = temp.path().display().to_string();
@@ -2110,11 +2185,13 @@ mod tests {
         let receipt =
             run_qwen_legal_pylon_worker_job(&job, &PylonLocalWorkerRunOptions::default())?;
         assert_eq!(receipt.status, PylonTrainingWorkerJobStatus::Failed);
-        assert!(receipt
-            .failure_reason
-            .as_deref()
-            .unwrap_or_default()
-            .contains("hash mismatch"));
+        assert!(
+            receipt
+                .failure_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("hash mismatch")
+        );
         verify_qwen_legal_pylon_worker_receipt_path(&job.receipt_path)?;
         Ok(())
     }
@@ -2137,18 +2214,20 @@ mod tests {
 
         let receipt = run_qwen_legal_pylon_worker_job(&job, &options)?;
         assert_eq!(receipt.status, PylonTrainingWorkerJobStatus::Failed);
-        assert!(receipt
-            .failure_reason
-            .as_deref()
-            .unwrap_or_default()
-            .contains("required output artifact"));
+        assert!(
+            receipt
+                .failure_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("required output artifact")
+        );
         verify_qwen_legal_pylon_worker_receipt_path(&job.receipt_path)?;
         Ok(())
     }
 
     #[test]
-    fn pylon_payment_settlement_marks_valid_receipt_payable(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_payment_settlement_marks_valid_receipt_payable()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let mut job = canonical_qwen_legal_dataset_shard_job();
         job.output_dir = temp.path().display().to_string();
@@ -2196,8 +2275,8 @@ mod tests {
     }
 
     #[test]
-    fn pylon_treasury_closeout_attaches_settled_proof_and_opens_promotion_gate(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_treasury_closeout_attaches_settled_proof_and_opens_promotion_gate()
+    -> Result<(), Box<dyn std::error::Error>> {
         let (_temp, decision) = payable_decision_fixture()?;
         let batch = build_qwen_legal_pylon_treasury_handoff_batch(
             "treasury.qwen-legal.batch.001",
@@ -2213,6 +2292,8 @@ mod tests {
         )?;
 
         assert_eq!(closeout.accepted_work_count, 1);
+        assert_eq!(closeout.payable_payment_count, 1);
+        assert_eq!(closeout.pending_payment_count, 0);
         assert_eq!(closeout.settled_payment_count, 1);
         assert_eq!(closeout.failed_payment_count, 0);
         assert_eq!(
@@ -2225,8 +2306,8 @@ mod tests {
     }
 
     #[test]
-    fn pylon_treasury_closeout_allows_operator_deferred_policy(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn pylon_treasury_closeout_allows_operator_deferred_policy()
+    -> Result<(), Box<dyn std::error::Error>> {
         let (_temp, decision) = payable_decision_fixture()?;
         let batch = build_qwen_legal_pylon_treasury_handoff_batch(
             "treasury.qwen-legal.batch.001",
@@ -2248,6 +2329,8 @@ mod tests {
         )?;
 
         assert_eq!(closeout.accepted_work_count, 1);
+        assert_eq!(closeout.payable_payment_count, 1);
+        assert_eq!(closeout.pending_payment_count, 0);
         assert_eq!(closeout.deferred_payment_count, 1);
         assert_eq!(
             closeout.promotion_payment_gate_status,
@@ -2274,10 +2357,165 @@ mod tests {
         )?;
 
         assert_eq!(closeout.failed_payment_count, 1);
+        assert_eq!(closeout.pending_payment_count, 0);
         assert_eq!(
             closeout.promotion_payment_gate_status,
             PylonTrainingPromotionPaymentGateStatus::Blocked
         );
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_treasury_closeout_accepts_operator_approved_live_proof()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temp, decision) = payable_decision_fixture()?;
+        let batch = build_qwen_legal_pylon_treasury_handoff_batch(
+            "treasury.qwen-legal.batch.001",
+            std::slice::from_ref(&decision),
+        )?;
+        let mut proof = settled_qwen_legal_pylon_bitcoin_proof_fixture(&batch.payable_items[0]);
+        proof.settlement_mode =
+            PylonTrainingSettlementExecutionMode::LiveSmallValueOperatorApproved;
+        proof.transaction_proof = Some(format!(
+            "treasury.txproof.{}",
+            proof.payment_hash.as_deref().unwrap_or_default()
+        ));
+        proof.proof_digest = String::new();
+        proof.proof_digest = proof.stable_digest();
+
+        let closeout = attach_qwen_legal_pylon_settlement_proofs(
+            "closeout.qwen-legal.batch.001",
+            &batch,
+            &[proof],
+            None,
+        )?;
+
+        assert_eq!(closeout.payable_payment_count, 1);
+        assert_eq!(closeout.settled_payment_count, 1);
+        assert_eq!(
+            closeout.promotion_payment_gate_status,
+            PylonTrainingPromotionPaymentGateStatus::PaymentSettled
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_treasury_closeout_rejects_duplicate_payment_proof()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temp, decision) = payable_decision_fixture()?;
+        let batch = build_qwen_legal_pylon_treasury_handoff_batch(
+            "treasury.qwen-legal.batch.001",
+            std::slice::from_ref(&decision),
+        )?;
+        let proof = settled_qwen_legal_pylon_bitcoin_proof_fixture(&batch.payable_items[0]);
+
+        let err = attach_qwen_legal_pylon_settlement_proofs(
+            "closeout.qwen-legal.batch.001",
+            &batch,
+            &[proof.clone(), proof],
+            None,
+        )
+        .expect_err("duplicate proof should be rejected");
+
+        assert!(err.to_string().contains("duplicate settlement proof"));
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_treasury_closeout_rejects_bad_payment_proof_digest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temp, decision) = payable_decision_fixture()?;
+        let batch = build_qwen_legal_pylon_treasury_handoff_batch(
+            "treasury.qwen-legal.batch.001",
+            std::slice::from_ref(&decision),
+        )?;
+        let mut proof = settled_qwen_legal_pylon_bitcoin_proof_fixture(&batch.payable_items[0]);
+        proof.fee_msat = proof.fee_msat.saturating_add(1);
+
+        let err = attach_qwen_legal_pylon_settlement_proofs(
+            "closeout.qwen-legal.batch.001",
+            &batch,
+            &[proof],
+            None,
+        )
+        .expect_err("digest drift should be rejected");
+
+        assert!(err.to_string().contains("settlement proof digest drifted"));
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_treasury_closeout_rejects_unknown_payment_authorization()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temp, decision) = payable_decision_fixture()?;
+        let batch = build_qwen_legal_pylon_treasury_handoff_batch(
+            "treasury.qwen-legal.batch.001",
+            std::slice::from_ref(&decision),
+        )?;
+        let mut proof = settled_qwen_legal_pylon_bitcoin_proof_fixture(&batch.payable_items[0]);
+        proof.payout_authorization_id = String::from("auth.qwen-legal-pylon.unknown");
+        proof.proof_digest = String::new();
+        proof.proof_digest = proof.stable_digest();
+
+        let err = attach_qwen_legal_pylon_settlement_proofs(
+            "closeout.qwen-legal.batch.001",
+            &batch,
+            &[proof],
+            None,
+        )
+        .expect_err("unknown authorization should be rejected");
+
+        assert!(err.to_string().contains("unknown payout authorization"));
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_treasury_closeout_rejects_secret_looking_payment_proof_fields()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temp, decision) = payable_decision_fixture()?;
+        let batch = build_qwen_legal_pylon_treasury_handoff_batch(
+            "treasury.qwen-legal.batch.001",
+            std::slice::from_ref(&decision),
+        )?;
+        let mut proof = settled_qwen_legal_pylon_bitcoin_proof_fixture(&batch.payable_items[0]);
+        proof.transaction_proof = Some(String::from("wallet_secret=do-not-store"));
+        proof.proof_digest = String::new();
+        proof.proof_digest = proof.stable_digest();
+
+        let err = attach_qwen_legal_pylon_settlement_proofs(
+            "closeout.qwen-legal.batch.001",
+            &batch,
+            &[proof],
+            None,
+        )
+        .expect_err("secret-looking proof fields should be rejected");
+
+        assert!(err.to_string().contains("wallet secret material"));
+        Ok(())
+    }
+
+    #[test]
+    fn pylon_treasury_closeout_rejects_mismatched_proof_amount()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temp, decision) = payable_decision_fixture()?;
+        let batch = build_qwen_legal_pylon_treasury_handoff_batch(
+            "treasury.qwen-legal.batch.001",
+            std::slice::from_ref(&decision),
+        )?;
+        let mut proof = settled_qwen_legal_pylon_bitcoin_proof_fixture(&batch.payable_items[0]);
+        proof.amount_msat = proof.amount_msat.saturating_add(1);
+        proof.proof_digest = String::new();
+        proof.proof_digest = proof.stable_digest();
+
+        let err = attach_qwen_legal_pylon_settlement_proofs(
+            "closeout.qwen-legal.batch.001",
+            &batch,
+            &[proof],
+            None,
+        )
+        .expect_err("mismatched amount should be rejected");
+
+        assert!(err.to_string().contains("amount mismatch"));
         Ok(())
     }
 
