@@ -2,7 +2,8 @@
 
 This ladder keeps legal fine-tuning work in a practical order. Small-model
 success is plumbing proof only. Strong legal-model claims start at the dense
-27B rung and still need the promotion, payment, and benchmark gates.
+27B rung and still need the promotion, payment, and benchmark gates defined in
+`docs/QWEN_LEGAL_ACCEPTANCE_TARGETS.md`.
 
 | Rung | Model | Why It Exists | Proves | Does Not Prove | Expected Memory | Quantization | Pylons | Method | Acceptance Target |
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |

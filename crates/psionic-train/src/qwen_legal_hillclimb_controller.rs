@@ -19,6 +19,8 @@ pub const QWEN_LEGAL_HILLCLIMB_REGISTRY_SCHEMA_VERSION: &str =
 pub const QWEN_LEGAL_HILLCLIMB_PROGRESS_FEED_SCHEMA_VERSION: &str =
     "psionic.qwen_legal_hillclimb_progress_feed.v1";
 pub const QWEN_LEGAL_MODEL_LADDER_SCHEMA_VERSION: &str = "psionic.qwen_legal_model_ladder.v1";
+pub const QWEN_LEGAL_ACCEPTANCE_TARGETS_SCHEMA_VERSION: &str =
+    "psionic.qwen_legal_acceptance_targets.v1";
 
 const DEFAULT_OUTPUT_DIR: &str = "target/legal/qwen_hillclimb";
 const DEFAULT_REGISTRY_PATH: &str =
@@ -65,6 +67,19 @@ pub struct QwenLegalModelLadderRung {
     pub acceptance_target: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalAcceptanceTarget {
+    pub schema_version: String,
+    pub split_name: String,
+    pub baseline_score_bps: u32,
+    pub first_credible_score_bps: u32,
+    pub strong_model_threshold_bps: u32,
+    pub near_perfect_threshold_bps: u32,
+    pub max_critical_regression_bps: u32,
+    pub plain_language_definition: String,
+    pub stop_condition: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum QwenLegalHillclimbTrainingMethod {
@@ -100,6 +115,33 @@ pub enum QwenLegalHillclimbPromotionDecision {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum QwenLegalHillclimbScoreClaimLevel {
+    PlumbingProof,
+    PublicFixtureWin,
+    HoldoutImprovement,
+    StrongLegalModel,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QwenLegalHillclimbReportMode {
+    TrainablePublicFixture,
+    PublicHoldout,
+    ModelOnly,
+    BlueprintAssisted,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QwenLegalHillclimbStopDecision {
+    Hold,
+    ContinueTraining,
+    Rollback,
+    Promote,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum QwenLegalHillclimbRegistryRole {
     Champion,
     LatestCandidate,
@@ -120,6 +162,9 @@ pub struct QwenLegalHillclimbDeclaredRun {
     pub worker_set: Vec<String>,
     pub payment_status: String,
     pub replay_command: String,
+    pub report_path: String,
+    pub trace_retained: bool,
+    pub runner_added_answer_text_count: u32,
     #[serde(default)]
     pub failed: bool,
     #[serde(default)]
@@ -132,10 +177,26 @@ pub struct QwenLegalHillclimbDeclaredRun {
 pub struct QwenLegalHillclimbRegressionCheck {
     pub check_id: String,
     pub evaluator_split: String,
+    pub task_type: String,
+    pub failure_category: String,
+    pub critical: bool,
     pub baseline_score_bps: u32,
     pub candidate_score_bps: u32,
     pub max_allowed_regression_bps: u32,
     pub replay_command: String,
+    pub report_path: String,
+    pub trace_retained: bool,
+    pub runner_added_answer_text_count: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QwenLegalHillclimbAcceptanceReportRef {
+    pub report_mode: QwenLegalHillclimbReportMode,
+    pub data_split: String,
+    pub report_path: String,
+    pub replay_command: String,
+    pub trace_retained: bool,
+    pub runner_added_answer_text_count: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,11 +211,13 @@ pub struct QwenLegalHillclimbExperimentPlan {
     pub training_method: QwenLegalHillclimbTrainingMethod,
     pub evaluator_split: String,
     pub promotion_rule: QwenLegalHillclimbPromotionRule,
+    pub score_claim_level: QwenLegalHillclimbScoreClaimLevel,
     pub min_candidate_delta_bps: u32,
     pub max_regression_bps: u32,
     pub baseline: QwenLegalHillclimbDeclaredRun,
     pub candidate: QwenLegalHillclimbDeclaredRun,
     pub regression_checks: Vec<QwenLegalHillclimbRegressionCheck>,
+    pub acceptance_reports: Vec<QwenLegalHillclimbAcceptanceReportRef>,
     pub plan_digest: String,
 }
 
@@ -182,17 +245,27 @@ pub struct QwenLegalHillclimbRunRecord {
     pub evaluator_split: String,
     pub training_method: QwenLegalHillclimbTrainingMethod,
     pub pylon_count: u32,
+    pub score_claim_level: QwenLegalHillclimbScoreClaimLevel,
     pub score_bps: u32,
     pub delta_vs_baseline_bps: i32,
     pub data_split: String,
     pub worker_set: Vec<String>,
     pub payment_status: String,
     pub replay_command: String,
+    pub report_path: String,
+    pub trace_retained: bool,
+    pub runner_added_answer_text_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regression_task_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regression_failure_category: Option<String>,
+    pub critical_regression: bool,
     pub failed: bool,
     pub train_only_improvement: bool,
     pub presented_as_broad_benchmark_gain: bool,
     pub guardrail_passed: bool,
     pub promotion_decision: QwenLegalHillclimbPromotionDecision,
+    pub stop_decision: QwenLegalHillclimbStopDecision,
     pub refusal_reasons: Vec<String>,
     pub record_index: u64,
     pub record_digest: String,
@@ -251,12 +324,15 @@ pub struct QwenLegalHillclimbFeedRunSummary {
     pub model_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adapter_id: Option<String>,
+    pub score_claim_level: QwenLegalHillclimbScoreClaimLevel,
     pub score_bps: u32,
     pub delta_vs_baseline_bps: i32,
     pub payment_status: String,
     pub promotion_decision: QwenLegalHillclimbPromotionDecision,
+    pub stop_decision: QwenLegalHillclimbStopDecision,
     pub refusal_reasons: Vec<String>,
     pub replay_command: String,
+    pub report_path: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -265,9 +341,11 @@ pub struct QwenLegalHillclimbScorePoint {
     pub run_id: String,
     pub run_kind: QwenLegalHillclimbRunKind,
     pub model_ladder_rung: String,
+    pub score_claim_level: QwenLegalHillclimbScoreClaimLevel,
     pub score_bps: u32,
     pub delta_vs_baseline_bps: i32,
     pub evaluator_split: String,
+    pub report_path: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -307,6 +385,7 @@ pub struct QwenLegalHillclimbControllerOutput {
     pub candidate_run_id: String,
     pub model_ladder_rung: String,
     pub promotion_decision: QwenLegalHillclimbPromotionDecision,
+    pub stop_decision: QwenLegalHillclimbStopDecision,
     pub refusal_reasons: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub champion_run_id: Option<String>,
@@ -444,6 +523,78 @@ pub fn qwen_legal_model_ladder_rung(name: &str) -> Option<QwenLegalModelLadderRu
         .find(|rung| rung.rung_name == name)
 }
 
+pub fn qwen_legal_acceptance_targets() -> Vec<QwenLegalAcceptanceTarget> {
+    vec![
+        QwenLegalAcceptanceTarget {
+            schema_version: String::from(QWEN_LEGAL_ACCEPTANCE_TARGETS_SCHEMA_VERSION),
+            split_name: String::from("trainable_public_fixture"),
+            baseline_score_bps: 10_000,
+            first_credible_score_bps: 10_000,
+            strong_model_threshold_bps: 10_000,
+            near_perfect_threshold_bps: 10_000,
+            max_critical_regression_bps: 0,
+            plain_language_definition: String::from(
+                "plumbing proof only; this split can show the runner and trainer work but cannot support a strong-model claim",
+            ),
+            stop_condition: String::from(
+                "continue training unless this split fails, leaks, or adds runner-written answer text",
+            ),
+        },
+        QwenLegalAcceptanceTarget {
+            schema_version: String::from(QWEN_LEGAL_ACCEPTANCE_TARGETS_SCHEMA_VERSION),
+            split_name: String::from("public_heldout"),
+            baseline_score_bps: 5_260,
+            first_credible_score_bps: 5_310,
+            strong_model_threshold_bps: 7_000,
+            near_perfect_threshold_bps: 9_500,
+            max_critical_regression_bps: 0,
+            plain_language_definition: String::from(
+                "holdout improvement; this is the first split that can support a serious legal-quality claim",
+            ),
+            stop_condition: String::from(
+                "promote only above the declared threshold with zero critical regressions; continue training below threshold; roll back on critical regression",
+            ),
+        },
+        QwenLegalAcceptanceTarget {
+            schema_version: String::from(QWEN_LEGAL_ACCEPTANCE_TARGETS_SCHEMA_VERSION),
+            split_name: String::from("model_only"),
+            baseline_score_bps: 5_260,
+            first_credible_score_bps: 5_310,
+            strong_model_threshold_bps: 6_500,
+            near_perfect_threshold_bps: 9_000,
+            max_critical_regression_bps: 0,
+            plain_language_definition: String::from(
+                "model-only run; measures the adapter without Blueprint scaffold help",
+            ),
+            stop_condition: String::from(
+                "continue training until model-only improvement clears the first credible bar and does not regress critical task/failure categories",
+            ),
+        },
+        QwenLegalAcceptanceTarget {
+            schema_version: String::from(QWEN_LEGAL_ACCEPTANCE_TARGETS_SCHEMA_VERSION),
+            split_name: String::from("blueprint_assisted"),
+            baseline_score_bps: 5_260,
+            first_credible_score_bps: 5_310,
+            strong_model_threshold_bps: 7_500,
+            near_perfect_threshold_bps: 9_500,
+            max_critical_regression_bps: 0,
+            plain_language_definition: String::from(
+                "Blueprint-assisted run; measures the model inside the intended legal-workflow scaffold",
+            ),
+            stop_condition: String::from(
+                "promote only when holdout/model-only evidence is also clean; otherwise keep it as workflow evidence",
+            ),
+        },
+    ]
+}
+
+pub fn qwen_legal_acceptance_target(split_name: &str) -> Option<QwenLegalAcceptanceTarget> {
+    let normalized = normalize_split_name(split_name);
+    qwen_legal_acceptance_targets()
+        .into_iter()
+        .find(|target| target.split_name == normalized)
+}
+
 pub fn run_qwen_legal_hillclimb_cli(
     args: &[String],
 ) -> Result<QwenLegalHillclimbControllerOutput, QwenLegalHillclimbControllerError> {
@@ -566,6 +717,7 @@ pub fn run_qwen_legal_hillclimb_controller(
         candidate_run_id: candidate_record.run_id,
         model_ladder_rung: plan.model_ladder_rung,
         promotion_decision: candidate_record.promotion_decision,
+        stop_decision: candidate_record.stop_decision,
         refusal_reasons: candidate_record.refusal_reasons,
         champion_run_id: registry.champion_run_id,
         latest_candidate_run_id: registry.latest_candidate_run_id,
@@ -596,17 +748,25 @@ fn build_records_for_plan(
         evaluator_split: plan.evaluator_split.clone(),
         training_method: plan.training_method,
         pylon_count: plan.pylon_count,
+        score_claim_level: QwenLegalHillclimbScoreClaimLevel::PlumbingProof,
         score_bps: plan.baseline.score_bps,
         delta_vs_baseline_bps: 0,
         data_split: plan.baseline.data_split.clone(),
         worker_set: plan.baseline.worker_set.clone(),
         payment_status: plan.baseline.payment_status.clone(),
         replay_command: plan.baseline.replay_command.clone(),
+        report_path: plan.baseline.report_path.clone(),
+        trace_retained: plan.baseline.trace_retained,
+        runner_added_answer_text_count: plan.baseline.runner_added_answer_text_count,
+        regression_task_type: None,
+        regression_failure_category: None,
+        critical_regression: false,
         failed: plan.baseline.failed,
         train_only_improvement: plan.baseline.train_only_improvement,
         presented_as_broad_benchmark_gain: plan.baseline.broad_benchmark_claim,
         guardrail_passed: !plan.baseline.failed,
         promotion_decision: QwenLegalHillclimbPromotionDecision::Hold,
+        stop_decision: QwenLegalHillclimbStopDecision::Hold,
         refusal_reasons: if plan.baseline.failed {
             vec![String::from("baseline run failed")]
         } else {
@@ -617,6 +777,7 @@ fn build_records_for_plan(
     })?);
 
     let candidate_refusals = candidate_refusal_reasons(plan);
+    let candidate_stop_decision = candidate_stop_decision(plan, candidate_refusals.as_slice());
     let candidate_delta = score_delta(plan.candidate.score_bps, baseline_score);
     records.push(finalize_record(QwenLegalHillclimbRunRecord {
         schema_version: String::from(QWEN_LEGAL_HILLCLIMB_RUN_RECORD_SCHEMA_VERSION),
@@ -636,12 +797,19 @@ fn build_records_for_plan(
         evaluator_split: plan.evaluator_split.clone(),
         training_method: plan.training_method,
         pylon_count: plan.pylon_count,
+        score_claim_level: plan.score_claim_level,
         score_bps: plan.candidate.score_bps,
         delta_vs_baseline_bps: candidate_delta,
         data_split: plan.candidate.data_split.clone(),
         worker_set: plan.candidate.worker_set.clone(),
         payment_status: plan.candidate.payment_status.clone(),
         replay_command: plan.candidate.replay_command.clone(),
+        report_path: plan.candidate.report_path.clone(),
+        trace_retained: plan.candidate.trace_retained,
+        runner_added_answer_text_count: plan.candidate.runner_added_answer_text_count,
+        regression_task_type: None,
+        regression_failure_category: None,
+        critical_regression: false,
         failed: plan.candidate.failed,
         train_only_improvement: plan.candidate.train_only_improvement,
         presented_as_broad_benchmark_gain: plan.candidate.broad_benchmark_claim,
@@ -651,6 +819,7 @@ fn build_records_for_plan(
         } else {
             QwenLegalHillclimbPromotionDecision::Reject
         },
+        stop_decision: candidate_stop_decision,
         refusal_reasons: candidate_refusals,
         record_index: starting_index.saturating_add(1),
         record_digest: String::new(),
@@ -664,6 +833,7 @@ fn build_records_for_plan(
         let max_allowed = plan
             .max_regression_bps
             .min(check.max_allowed_regression_bps);
+        let critical_breach = check.critical && regression_bps > max_allowed;
         let refusal_reasons = if regression_bps > max_allowed {
             vec![format!(
                 "regression check `{}` lost {regression_bps} bps; max allowed is {max_allowed} bps",
@@ -686,12 +856,19 @@ fn build_records_for_plan(
             evaluator_split: check.evaluator_split.clone(),
             training_method: plan.training_method,
             pylon_count: plan.pylon_count,
+            score_claim_level: plan.score_claim_level,
             score_bps: check.candidate_score_bps,
             delta_vs_baseline_bps: regression_delta,
             data_split: check.evaluator_split.clone(),
             worker_set: plan.candidate.worker_set.clone(),
             payment_status: plan.candidate.payment_status.clone(),
             replay_command: check.replay_command.clone(),
+            report_path: check.report_path.clone(),
+            trace_retained: check.trace_retained,
+            runner_added_answer_text_count: check.runner_added_answer_text_count,
+            regression_task_type: Some(check.task_type.clone()),
+            regression_failure_category: Some(check.failure_category.clone()),
+            critical_regression: check.critical,
             failed: false,
             train_only_improvement: false,
             presented_as_broad_benchmark_gain: false,
@@ -700,6 +877,11 @@ fn build_records_for_plan(
                 QwenLegalHillclimbPromotionDecision::Hold
             } else {
                 QwenLegalHillclimbPromotionDecision::Reject
+            },
+            stop_decision: if critical_breach {
+                QwenLegalHillclimbStopDecision::Rollback
+            } else {
+                QwenLegalHillclimbStopDecision::Hold
             },
             refusal_reasons,
             record_index: starting_index.saturating_add(2 + offset as u64),
@@ -733,12 +915,77 @@ fn candidate_refusal_reasons(plan: &QwenLegalHillclimbExperimentPlan) -> Vec<Str
             candidate.payment_status
         ));
     }
+    if !candidate.trace_retained {
+        reasons.push(String::from("candidate scored trace was not retained"));
+    }
+    if candidate.runner_added_answer_text_count > 0 {
+        reasons.push(format!(
+            "candidate has {} runner-added answer text events",
+            candidate.runner_added_answer_text_count
+        ));
+    }
+    if candidate.report_path.trim().is_empty() {
+        reasons.push(String::from(
+            "candidate score claim lacks a replayable report path",
+        ));
+    }
     let delta = score_delta(candidate.score_bps, plan.baseline.score_bps);
     if delta < i32::try_from(plan.min_candidate_delta_bps).unwrap_or(i32::MAX) {
         reasons.push(format!(
             "candidate delta {delta} bps is below required {} bps",
             plan.min_candidate_delta_bps
         ));
+    }
+    match plan.score_claim_level {
+        QwenLegalHillclimbScoreClaimLevel::StrongLegalModel => {
+            if !split_is_holdout(plan.evaluator_split.as_str())
+                || !split_is_holdout(candidate.data_split.as_str())
+            {
+                reasons.push(String::from(
+                    "strong legal model claim requires a holdout evaluator and candidate data split",
+                ));
+            }
+            if let Some(target) = qwen_legal_acceptance_target(plan.evaluator_split.as_str()) {
+                if candidate.score_bps < target.strong_model_threshold_bps {
+                    reasons.push(format!(
+                        "strong legal model claim score {} bps is below {} bps threshold for `{}`",
+                        candidate.score_bps, target.strong_model_threshold_bps, target.split_name
+                    ));
+                }
+            } else {
+                reasons.push(format!(
+                    "no acceptance target is defined for evaluator split `{}`",
+                    plan.evaluator_split
+                ));
+            }
+        }
+        QwenLegalHillclimbScoreClaimLevel::HoldoutImprovement => {
+            if !split_is_holdout(plan.evaluator_split.as_str())
+                || !split_is_holdout(candidate.data_split.as_str())
+            {
+                reasons.push(String::from(
+                    "holdout improvement claim requires a holdout evaluator and candidate data split",
+                ));
+            }
+            if let Some(target) = qwen_legal_acceptance_target(plan.evaluator_split.as_str()) {
+                if candidate.score_bps < target.first_credible_score_bps {
+                    reasons.push(format!(
+                        "holdout improvement score {} bps is below first credible target {} bps for `{}`",
+                        candidate.score_bps,
+                        target.first_credible_score_bps,
+                        target.split_name
+                    ));
+                }
+            }
+        }
+        QwenLegalHillclimbScoreClaimLevel::PublicFixtureWin => {
+            if !normalize_split_name(plan.evaluator_split.as_str()).contains("fixture") {
+                reasons.push(String::from(
+                    "public fixture win claim must be reported on the trainable public fixture split",
+                ));
+            }
+        }
+        QwenLegalHillclimbScoreClaimLevel::PlumbingProof => {}
     }
     for check in &plan.regression_checks {
         let regression_bps = check
@@ -749,12 +996,48 @@ fn candidate_refusal_reasons(plan: &QwenLegalHillclimbExperimentPlan) -> Vec<Str
             .min(check.max_allowed_regression_bps);
         if regression_bps > max_allowed {
             reasons.push(format!(
-                "regression check `{}` lost {regression_bps} bps; max allowed is {max_allowed} bps",
-                check.check_id
+                "regression check `{}` ({}/{}) lost {regression_bps} bps; max allowed is {max_allowed} bps",
+                check.check_id, check.task_type, check.failure_category
             ));
         }
     }
     reasons
+}
+
+fn candidate_stop_decision(
+    plan: &QwenLegalHillclimbExperimentPlan,
+    reasons: &[String],
+) -> QwenLegalHillclimbStopDecision {
+    if reasons.is_empty() {
+        return QwenLegalHillclimbStopDecision::Promote;
+    }
+    if plan.candidate.failed
+        || plan.candidate.runner_added_answer_text_count > 0
+        || has_critical_regression_breach(plan)
+    {
+        return QwenLegalHillclimbStopDecision::Rollback;
+    }
+    let delta = score_delta(plan.candidate.score_bps, plan.baseline.score_bps);
+    if delta < i32::try_from(plan.min_candidate_delta_bps).unwrap_or(i32::MAX)
+        || reasons
+            .iter()
+            .any(|reason| reason.contains("below first credible target"))
+    {
+        return QwenLegalHillclimbStopDecision::ContinueTraining;
+    }
+    QwenLegalHillclimbStopDecision::Hold
+}
+
+fn has_critical_regression_breach(plan: &QwenLegalHillclimbExperimentPlan) -> bool {
+    plan.regression_checks.iter().any(|check| {
+        let regression_bps = check
+            .baseline_score_bps
+            .saturating_sub(check.candidate_score_bps);
+        let max_allowed = plan
+            .max_regression_bps
+            .min(check.max_allowed_regression_bps);
+        check.critical && regression_bps > max_allowed
+    })
 }
 
 fn refresh_registry_roles(
@@ -862,9 +1145,11 @@ fn build_progress_feed(
             run_id: record.run_id.clone(),
             run_kind: record.run_kind,
             model_ladder_rung: record.model_ladder_rung.clone(),
+            score_claim_level: record.score_claim_level,
             score_bps: record.score_bps,
             delta_vs_baseline_bps: record.delta_vs_baseline_bps,
             evaluator_split: record.evaluator_split.clone(),
+            report_path: record.report_path.clone(),
         })
         .collect::<Vec<_>>();
     score_history.sort_by_key(|point| point.record_index);
@@ -893,12 +1178,15 @@ fn build_progress_feed(
                 model_ladder_rung: record.model_ladder_rung.clone(),
                 model_id: record.model_id.clone(),
                 adapter_id: record.adapter_id.clone(),
+                score_claim_level: record.score_claim_level,
                 score_bps: record.score_bps,
                 delta_vs_baseline_bps: record.delta_vs_baseline_bps,
                 payment_status: record.payment_status.clone(),
                 promotion_decision: record.promotion_decision,
+                stop_decision: record.stop_decision,
                 refusal_reasons: record.refusal_reasons.clone(),
                 replay_command: record.replay_command.clone(),
+                report_path: record.report_path.clone(),
             })
             .collect(),
         score_history,
@@ -946,10 +1234,29 @@ fn validate_and_finalize_plan(
     validate_model_ladder_selection(plan)?;
     validate_declared_run(&plan.baseline, "baseline")?;
     validate_declared_run(&plan.candidate, "candidate")?;
+    validate_acceptance_reports(plan.acceptance_reports.as_slice())?;
     for check in &plan.regression_checks {
         require_nonempty(check.check_id.as_str(), "regression check_id")?;
         require_nonempty(check.evaluator_split.as_str(), "regression evaluator_split")?;
+        require_nonempty(check.task_type.as_str(), "regression task_type")?;
+        require_nonempty(
+            check.failure_category.as_str(),
+            "regression failure_category",
+        )?;
         require_nonempty(check.replay_command.as_str(), "regression replay_command")?;
+        require_nonempty(check.report_path.as_str(), "regression report_path")?;
+        if !check.trace_retained {
+            return Err(invalid_plan_error(format!(
+                "regression check `{}` must retain its scored trace",
+                check.check_id
+            )));
+        }
+        if check.runner_added_answer_text_count > 0 {
+            return Err(invalid_plan_error(format!(
+                "regression check `{}` has runner-added answer text",
+                check.check_id
+            )));
+        }
         validate_score(check.baseline_score_bps, "regression baseline_score_bps")?;
         validate_score(check.candidate_score_bps, "regression candidate_score_bps")?;
     }
@@ -1033,11 +1340,66 @@ fn validate_declared_run(
         run.replay_command.as_str(),
         format!("{label} replay_command").as_str(),
     )?;
+    require_nonempty(
+        run.report_path.as_str(),
+        format!("{label} report_path").as_str(),
+    )?;
+    if !run.trace_retained {
+        return Err(invalid_plan_error(format!(
+            "{label} scored trace must be retained"
+        )));
+    }
+    if run.runner_added_answer_text_count > 0 {
+        return Err(invalid_plan_error(format!(
+            "{label} has runner-added answer text"
+        )));
+    }
     validate_score(run.score_bps, format!("{label} score_bps").as_str())?;
     if run.worker_set.is_empty() {
         return Err(invalid_plan_error(format!(
             "{label} worker_set must include at least one worker id"
         )));
+    }
+    Ok(())
+}
+
+fn validate_acceptance_reports(
+    reports: &[QwenLegalHillclimbAcceptanceReportRef],
+) -> Result<(), QwenLegalHillclimbControllerError> {
+    let mut modes = BTreeSet::new();
+    for report in reports {
+        require_nonempty(report.data_split.as_str(), "acceptance report data_split")?;
+        require_nonempty(report.report_path.as_str(), "acceptance report report_path")?;
+        require_nonempty(
+            report.replay_command.as_str(),
+            "acceptance report replay_command",
+        )?;
+        if !report.trace_retained {
+            return Err(invalid_plan_error(format!(
+                "acceptance report {:?} must retain its scored trace",
+                report.report_mode
+            )));
+        }
+        if report.runner_added_answer_text_count > 0 {
+            return Err(invalid_plan_error(format!(
+                "acceptance report {:?} has runner-added answer text",
+                report.report_mode
+            )));
+        }
+        modes.insert(report.report_mode);
+    }
+    for required in [
+        QwenLegalHillclimbReportMode::TrainablePublicFixture,
+        QwenLegalHillclimbReportMode::PublicHoldout,
+        QwenLegalHillclimbReportMode::ModelOnly,
+        QwenLegalHillclimbReportMode::BlueprintAssisted,
+    ] {
+        if !modes.contains(&required) {
+            return Err(invalid_plan_error(format!(
+                "acceptance reports must include {:?}",
+                required
+            )));
+        }
     }
     Ok(())
 }
@@ -1120,6 +1482,19 @@ fn evaluator_is_training_split(evaluator_split: &str) -> bool {
     lower.contains("train") || lower.contains("training")
 }
 
+fn split_is_holdout(split: &str) -> bool {
+    let normalized = normalize_split_name(split);
+    normalized.contains("holdout") || normalized.contains("heldout")
+}
+
+fn normalize_split_name(split: &str) -> String {
+    split
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace("public_holdout", "public_heldout")
+}
+
 fn payment_status_allows_promotion(status: &str) -> bool {
     matches!(
         status,
@@ -1191,6 +1566,7 @@ mod tests {
             training_method: QwenLegalHillclimbTrainingMethod::Grpo,
             evaluator_split: String::from("public_heldout"),
             promotion_rule: QwenLegalHillclimbPromotionRule::PublicHeldoutNoRegression,
+            score_claim_level: QwenLegalHillclimbScoreClaimLevel::HoldoutImprovement,
             min_candidate_delta_bps: 50,
             max_regression_bps: 25,
             baseline: QwenLegalHillclimbDeclaredRun {
@@ -1201,6 +1577,9 @@ mod tests {
                 worker_set: vec![String::from("pylon.legal.baseline.01")],
                 payment_status: String::from("settled"),
                 replay_command: String::from("psionic-train qwen-legal-hillclimb baseline"),
+                report_path: String::from("target/legal/qwen_hillclimb/baseline_report.json"),
+                trace_retained: true,
+                runner_added_answer_text_count: 0,
                 failed: false,
                 train_only_improvement: false,
                 broad_benchmark_claim: false,
@@ -1216,6 +1595,9 @@ mod tests {
                 ],
                 payment_status: String::from("settled"),
                 replay_command: String::from("psionic-train qwen-legal-hillclimb candidate"),
+                report_path: String::from("target/legal/qwen_hillclimb/candidate_report.json"),
+                trace_retained: true,
+                runner_added_answer_text_count: 0,
                 failed: false,
                 train_only_improvement: false,
                 broad_benchmark_claim: true,
@@ -1223,13 +1605,69 @@ mod tests {
             regression_checks: vec![QwenLegalHillclimbRegressionCheck {
                 check_id: format!("{experiment_id}.regression.public_three"),
                 evaluator_split: String::from("public_three_regression"),
+                task_type: String::from("legal_work_product"),
+                failure_category: String::from("public_three_regression"),
+                critical: true,
                 baseline_score_bps: 10_000,
                 candidate_score_bps: 10_000,
                 max_allowed_regression_bps: 0,
                 replay_command: String::from(
                     "psionic-train qwen-legal-hillclimb regression public-three",
                 ),
+                report_path: String::from(
+                    "target/legal/qwen_hillclimb/public_three_regression_report.json",
+                ),
+                trace_retained: true,
+                runner_added_answer_text_count: 0,
             }],
+            acceptance_reports: vec![
+                QwenLegalHillclimbAcceptanceReportRef {
+                    report_mode: QwenLegalHillclimbReportMode::TrainablePublicFixture,
+                    data_split: String::from("trainable_public_fixture"),
+                    report_path: String::from(
+                        "target/legal/qwen_hillclimb/trainable_public_fixture_report.json",
+                    ),
+                    replay_command: String::from(
+                        "psionic-train qwen-legal-hillclimb report trainable-public-fixture",
+                    ),
+                    trace_retained: true,
+                    runner_added_answer_text_count: 0,
+                },
+                QwenLegalHillclimbAcceptanceReportRef {
+                    report_mode: QwenLegalHillclimbReportMode::PublicHoldout,
+                    data_split: String::from("public_heldout"),
+                    report_path: String::from(
+                        "target/legal/qwen_hillclimb/public_holdout_report.json",
+                    ),
+                    replay_command: String::from(
+                        "psionic-train qwen-legal-hillclimb report public-holdout",
+                    ),
+                    trace_retained: true,
+                    runner_added_answer_text_count: 0,
+                },
+                QwenLegalHillclimbAcceptanceReportRef {
+                    report_mode: QwenLegalHillclimbReportMode::ModelOnly,
+                    data_split: String::from("model_only"),
+                    report_path: String::from("target/legal/qwen_hillclimb/model_only_report.json"),
+                    replay_command: String::from(
+                        "psionic-train qwen-legal-hillclimb report model-only",
+                    ),
+                    trace_retained: true,
+                    runner_added_answer_text_count: 0,
+                },
+                QwenLegalHillclimbAcceptanceReportRef {
+                    report_mode: QwenLegalHillclimbReportMode::BlueprintAssisted,
+                    data_split: String::from("blueprint_assisted"),
+                    report_path: String::from(
+                        "target/legal/qwen_hillclimb/blueprint_assisted_report.json",
+                    ),
+                    replay_command: String::from(
+                        "psionic-train qwen-legal-hillclimb report blueprint-assisted",
+                    ),
+                    trace_retained: true,
+                    runner_added_answer_text_count: 0,
+                },
+            ],
             plan_digest: String::new(),
         }
     }
@@ -1290,6 +1728,62 @@ mod tests {
         assert_eq!(
             registry.rejected_candidate_run_ids,
             vec![String::from("hillclimb.refuse.candidate")]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hillclimb_refuses_strong_claim_without_holdout_improvement()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let mut plan = canonical_plan("hillclimb.strong.refuse");
+        plan.score_claim_level = QwenLegalHillclimbScoreClaimLevel::StrongLegalModel;
+        plan.evaluator_split = String::from("trainable_public_fixture");
+        plan.candidate.data_split = String::from("trainable_public_fixture");
+        plan.candidate.score_bps = 10_000;
+        plan.plan_digest.clear();
+        let plan_path = write_plan(temp.path(), &mut plan)?;
+        let output =
+            run_qwen_legal_hillclimb_controller(&controller_config(temp.path(), plan_path))?;
+
+        assert_eq!(
+            output.promotion_decision,
+            QwenLegalHillclimbPromotionDecision::Reject
+        );
+        assert_eq!(output.stop_decision, QwenLegalHillclimbStopDecision::Hold);
+        assert!(
+            output
+                .refusal_reasons
+                .iter()
+                .any(|reason| reason.contains("requires a holdout evaluator"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hillclimb_rolls_back_on_critical_regression() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let mut plan = canonical_plan("hillclimb.critical.regression");
+        plan.candidate.score_bps = 9_500;
+        plan.regression_checks[0].candidate_score_bps = 9_900;
+        plan.plan_digest.clear();
+        let plan_path = write_plan(temp.path(), &mut plan)?;
+        let output =
+            run_qwen_legal_hillclimb_controller(&controller_config(temp.path(), plan_path))?;
+
+        assert_eq!(
+            output.promotion_decision,
+            QwenLegalHillclimbPromotionDecision::Reject
+        );
+        assert_eq!(
+            output.stop_decision,
+            QwenLegalHillclimbStopDecision::Rollback
+        );
+        assert!(
+            output
+                .refusal_reasons
+                .iter()
+                .any(|reason| reason.contains("legal_work_product/public_three_regression"))
         );
         Ok(())
     }

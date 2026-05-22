@@ -2177,22 +2177,40 @@ cargo run -p psionic-train -- qwen-legal-hillclimb \
   --out target/legal/qwen_hillclimb
 ```
 
-The model sequence is fixed in `docs/QWEN_LEGAL_MODEL_LADDER.md`. Start with
-`smoke-qwen35-08b` or `plumbing-qwen35-4b` only to prove plumbing. The first
-serious legal target is `dense-qwen36-27b`; `moe-qwen36-35b-a3b` is later and
-requires stable dense training plus MoE-safe serving. Very large Qwen targets
-remain serving/evaluation rungs until distributed training, payment, and
-promotion gates are reliable.
+The model sequence is fixed in `docs/QWEN_LEGAL_MODEL_LADDER.md`, and the
+strong-model claim bar is fixed in `docs/QWEN_LEGAL_ACCEPTANCE_TARGETS.md`.
+Start with `smoke-qwen35-08b` or `plumbing-qwen35-4b` only to prove plumbing.
+The first serious legal target is `dense-qwen36-27b`; `moe-qwen36-35b-a3b` is
+later and requires stable dense training plus MoE-safe serving. Very large
+Qwen targets remain serving/evaluation rungs until distributed training,
+payment, and promotion gates are reliable.
 
 The plan schema is `psionic.qwen_legal_hillclimb_experiment_plan.v1`. Each
 plan declares the model ladder rung, model id, adapter target, corpus split,
-Pylon count, training method, evaluator split, promotion rule, baseline run,
-candidate run, and regression checks. The controller can select a rung by name
-with `--rung <rung-name>` and validates the model id, adapter target, Pylon
-count, and training method before it records every baseline, candidate, and
-regression check into an append-only local registry with score, delta, model,
-adapter, data split, worker set, payment status, replay command, guardrail
-decision, and refusal reasons.
+Pylon count, training method, evaluator split, promotion rule, score-claim
+level, baseline run, candidate run, regression checks, and the four required
+acceptance report modes: trainable public fixture, public holdout, model-only,
+and Blueprint-assisted. The controller can select a rung by name with
+`--rung <rung-name>` and validates the model id, adapter target, Pylon count,
+training method, report paths, replay commands, retained traces, zero
+runner-added answer text, and task/failure-category regression metadata before
+it records every baseline, candidate, and regression check into an append-only
+local registry with score, delta, model, adapter, data split, worker set,
+payment status, replay command, report path, guardrail decision, stop decision,
+and refusal reasons.
+
+Plain claim levels:
+
+- `plumbing_proof`: runner/trainer/scorer/report plumbing works; no quality
+  claim.
+- `public_fixture_win`: candidate wins on a public trainable fixture; still
+  not strong legal evidence.
+- `holdout_improvement`: candidate beats the retained baseline on a public
+  held-out split with replayable reports and no critical regression breach.
+- `strong_legal_model`: candidate clears the strong threshold on holdout,
+  reports model-only and Blueprint-assisted views separately, retains every
+  scored trace, links every score claim to a replayable report, and has zero
+  runner-added answer text.
 
 To continue the hillclimb, keep the same registry path and submit a new plan
 with a new experiment id. The registry exposes the current champion, latest

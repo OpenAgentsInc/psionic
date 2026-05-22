@@ -9,6 +9,7 @@
   "training_method": "grpo",
   "evaluator_split": "public_heldout",
   "promotion_rule": "public_heldout_no_regression",
+  "score_claim_level": "holdout_improvement",
   "min_candidate_delta_bps": 50,
   "max_regression_bps": 25,
   "baseline": {
@@ -19,6 +20,9 @@
     "worker_set": ["pylon.legal.baseline.01"],
     "payment_status": "settled",
     "replay_command": "cargo run -p psionic-train -- qwen-legal-artifact-promotion --out target/legal/qwen_promotion_gate/full-artifact-001",
+    "report_path": "target/legal/qwen_promotion_gate/full-artifact-001/promotion_report.json",
+    "trace_retained": true,
+    "runner_added_answer_text_count": 0,
     "failed": false,
     "train_only_improvement": false,
     "broad_benchmark_claim": false
@@ -31,6 +35,9 @@
     "worker_set": ["pylon.legal.candidate.01", "pylon.legal.candidate.02"],
     "payment_status": "settled",
     "replay_command": "cargo run -p psionic-train -- qwen-legal-rl-rollouts --out target/legal/qwen_rl_rollouts/batch-001",
+    "report_path": "target/legal/qwen_rl_rollouts/batch-001/rollout_batch_report.json",
+    "trace_retained": true,
+    "runner_added_answer_text_count": 0,
     "failed": false,
     "train_only_improvement": false,
     "broad_benchmark_claim": true
@@ -39,10 +46,50 @@
     {
       "check_id": "qwen-legal-hillclimb-public-heldout-001.regression.public_three",
       "evaluator_split": "public_three_regression",
+      "task_type": "legal_work_product",
+      "failure_category": "public_three_regression",
+      "critical": true,
       "baseline_score_bps": 10000,
       "candidate_score_bps": 10000,
       "max_allowed_regression_bps": 0,
-      "replay_command": "cargo run -p psionic-train --example qwen_legal_three_task_milestone -- --out target/legal/legal-ft-milestone-001"
+      "replay_command": "cargo run -p psionic-train --example qwen_legal_three_task_milestone -- --out target/legal/legal-ft-milestone-001",
+      "report_path": "target/legal/legal-ft-milestone-001/harvey_public_three_report.json",
+      "trace_retained": true,
+      "runner_added_answer_text_count": 0
+    }
+  ],
+  "acceptance_reports": [
+    {
+      "report_mode": "trainable_public_fixture",
+      "data_split": "trainable_public_fixture",
+      "report_path": "target/legal/qwen_hillclimb/trainable_public_fixture_report.json",
+      "replay_command": "cargo run -p psionic-train -- qwen-legal-hillclimb --plan fixtures/qwen_legal/hillclimb/qwen_legal_hillclimb_plan_v1.json --rung smoke-qwen35-08b --out target/legal/qwen_hillclimb/trainable_public_fixture",
+      "trace_retained": true,
+      "runner_added_answer_text_count": 0
+    },
+    {
+      "report_mode": "public_holdout",
+      "data_split": "public_heldout",
+      "report_path": "target/legal/qwen_hillclimb/public_holdout_report.json",
+      "replay_command": "cargo run -p psionic-train -- qwen-legal-hillclimb --plan fixtures/qwen_legal/hillclimb/qwen_legal_hillclimb_plan_v1.json --rung dense-qwen36-27b --out target/legal/qwen_hillclimb/public_holdout",
+      "trace_retained": true,
+      "runner_added_answer_text_count": 0
+    },
+    {
+      "report_mode": "model_only",
+      "data_split": "model_only",
+      "report_path": "target/legal/qwen_hillclimb/model_only_report.json",
+      "replay_command": "cargo run -p psionic-train -- qwen-legal-hillclimb --plan fixtures/qwen_legal/hillclimb/qwen_legal_hillclimb_plan_v1.json --out target/legal/qwen_hillclimb/model_only",
+      "trace_retained": true,
+      "runner_added_answer_text_count": 0
+    },
+    {
+      "report_mode": "blueprint_assisted",
+      "data_split": "blueprint_assisted",
+      "report_path": "target/legal/qwen_hillclimb/blueprint_assisted_report.json",
+      "replay_command": "cargo run -p psionic-train -- qwen-legal-hillclimb --plan fixtures/qwen_legal/hillclimb/qwen_legal_hillclimb_plan_v1.json --out target/legal/qwen_hillclimb/blueprint_assisted",
+      "trace_retained": true,
+      "runner_added_answer_text_count": 0
     }
   ],
   "plan_digest": ""
