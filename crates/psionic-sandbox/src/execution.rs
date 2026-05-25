@@ -86,6 +86,14 @@ pub struct ProviderSandboxDeliveryEvidence {
     pub evidence_id: String,
     pub profile_id: String,
     pub profile_digest: String,
+    pub declared_network_policy: String,
+    pub requested_network_policy: String,
+    pub declared_filesystem_policy: String,
+    pub requested_filesystem_policy: String,
+    pub declared_timeout_limit_s: u64,
+    pub requested_timeout_s: u64,
+    pub artifact_output_policy: String,
+    pub secret_policy: String,
     pub runtime_environment_digest: String,
     pub job_input_digest: String,
     pub entrypoint_digest: String,
@@ -731,6 +739,14 @@ fn build_result(
         ),
         profile_id: profile.profile_id.clone(),
         profile_digest: profile.profile_digest.clone(),
+        declared_network_policy: profile.network_mode.clone(),
+        requested_network_policy: request.network_request.clone(),
+        declared_filesystem_policy: profile.filesystem_mode.clone(),
+        requested_filesystem_policy: request.filesystem_request.clone(),
+        declared_timeout_limit_s: profile.timeout_limit_s,
+        requested_timeout_s: request.timeout_request_s,
+        artifact_output_policy: profile.artifact_output_mode.clone(),
+        secret_policy: profile.secrets_mode.clone(),
         runtime_environment_digest: runtime_environment_digest(profile),
         job_input_digest: completed.job_input_digest.clone(),
         entrypoint_digest: completed.entrypoint_digest.clone(),
@@ -878,6 +894,13 @@ fn job_input_digest(request: &ProviderSandboxJobRequest) -> String {
     for output in &request.expected_outputs {
         encoded.extend_from_slice(output.as_bytes());
     }
+    encoded.extend_from_slice(request.timeout_request_s.to_string().as_bytes());
+    encoded.extend_from_slice(request.network_request.as_bytes());
+    encoded.extend_from_slice(request.filesystem_request.as_bytes());
+    for env in &request.environment {
+        encoded.extend_from_slice(env.key.as_bytes());
+        encoded.extend_from_slice(env.value.as_bytes());
+    }
     sha256_prefixed(encoded.as_slice())
 }
 
@@ -936,9 +959,9 @@ mod tests {
     use psionic_core::{PsionicRefusalCode, PsionicRefusalScope};
 
     use super::{
-        ProviderSandboxEntrypointType, ProviderSandboxExecutionControls,
+        execute_sandbox_job, ProviderSandboxEntrypointType, ProviderSandboxExecutionControls,
         ProviderSandboxExecutionState, ProviderSandboxJobRequest, ProviderSandboxResourceRequest,
-        ProviderSandboxTerminationReason, execute_sandbox_job,
+        ProviderSandboxTerminationReason,
     };
     use crate::{
         ProviderSandboxExecutionClass, ProviderSandboxProfile, ProviderSandboxRuntimeKind,
@@ -1066,8 +1089,8 @@ mod tests {
     }
 
     #[test]
-    fn local_subprocess_success_emits_receipt_and_artifacts()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn local_subprocess_success_emits_receipt_and_artifacts(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let runtime = fake_binary(
             temp.path(),
@@ -1103,12 +1126,40 @@ mod tests {
             result.receipt.evidence.payout_reference.as_deref() == Some("payment-1"),
             "sandbox subprocess should retain payout reference",
         )?;
+        ensure(
+            result.receipt.evidence.profile_digest == "sha256:profile",
+            "sandbox receipt should cite the profile digest",
+        )?;
+        ensure(
+            result.receipt.evidence.declared_network_policy == "host_inherit",
+            "sandbox receipt should cite declared network policy",
+        )?;
+        ensure(
+            result.receipt.evidence.requested_network_policy == "host_inherit",
+            "sandbox receipt should cite requested network policy",
+        )?;
+        ensure(
+            result.receipt.evidence.declared_filesystem_policy == "host_inherit",
+            "sandbox receipt should cite declared filesystem policy",
+        )?;
+        ensure(
+            result.receipt.evidence.requested_filesystem_policy == "host_inherit",
+            "sandbox receipt should cite requested filesystem policy",
+        )?;
+        ensure(
+            result.receipt.evidence.declared_timeout_limit_s == 5,
+            "sandbox receipt should cite declared timeout limit",
+        )?;
+        ensure(
+            result.receipt.evidence.requested_timeout_s == 2,
+            "sandbox receipt should cite requested timeout",
+        )?;
         Ok(())
     }
 
     #[test]
-    fn node_runner_executes_inline_payload_and_emits_artifact()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn node_runner_executes_inline_payload_and_emits_artifact(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let runtime = fake_binary(
             temp.path(),
@@ -1143,8 +1194,8 @@ mod tests {
     }
 
     #[test]
-    fn container_adapter_passes_workspace_and_network_policy()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn container_adapter_passes_workspace_and_network_policy(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let runtime = fake_binary(
             temp.path(),
@@ -1255,8 +1306,110 @@ mod tests {
     }
 
     #[test]
-    fn policy_rejection_receipt_maps_into_refusal_taxonomy()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn network_policy_mismatch_is_rejected_and_receipted() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempfile::tempdir()?;
+        let runtime = fake_binary(
+            temp.path(),
+            "runtime",
+            "#!/bin/sh\nscript=\"$1\"\nshift\n/bin/sh \"$script\" \"$@\"\n",
+        )?;
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace)?;
+        let profile =
+            subprocess_profile(runtime.as_path(), ProviderSandboxExecutionClass::PythonExec);
+        let mut request = request(&workspace, ProviderSandboxExecutionClass::PythonExec);
+        request.network_request = "none".to_string();
+
+        let result = execute_sandbox_job(
+            &profile,
+            &request,
+            &ProviderSandboxExecutionControls::default(),
+        );
+
+        ensure(
+            result.receipt.final_state == ProviderSandboxExecutionState::Rejected,
+            "sandbox network policy mismatch should be rejected",
+        )?;
+        ensure(
+            result.receipt.evidence.termination_reason
+                == ProviderSandboxTerminationReason::PolicyRejected,
+            "sandbox network mismatch should be a policy rejection",
+        )?;
+        ensure(
+            result.receipt.evidence.declared_network_policy == "host_inherit",
+            "network mismatch receipt should cite declared policy",
+        )?;
+        ensure(
+            result.receipt.evidence.requested_network_policy == "none",
+            "network mismatch receipt should cite requested policy",
+        )?;
+        ensure(
+            result
+                .receipt
+                .evidence
+                .policy_detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("network request")),
+            "network mismatch should preserve refusal detail",
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn filesystem_policy_mismatch_is_rejected_and_receipted(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let runtime = fake_binary(
+            temp.path(),
+            "runtime",
+            "#!/bin/sh\nscript=\"$1\"\nshift\n/bin/sh \"$script\" \"$@\"\n",
+        )?;
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace)?;
+        let profile =
+            subprocess_profile(runtime.as_path(), ProviderSandboxExecutionClass::PythonExec);
+        let mut request = request(&workspace, ProviderSandboxExecutionClass::PythonExec);
+        request.filesystem_request = "workspace_only".to_string();
+
+        let result = execute_sandbox_job(
+            &profile,
+            &request,
+            &ProviderSandboxExecutionControls::default(),
+        );
+
+        ensure(
+            result.receipt.final_state == ProviderSandboxExecutionState::Rejected,
+            "sandbox filesystem policy mismatch should be rejected",
+        )?;
+        ensure(
+            result.receipt.evidence.termination_reason
+                == ProviderSandboxTerminationReason::PolicyRejected,
+            "sandbox filesystem mismatch should be a policy rejection",
+        )?;
+        ensure(
+            result.receipt.evidence.declared_filesystem_policy == "host_inherit",
+            "filesystem mismatch receipt should cite declared policy",
+        )?;
+        ensure(
+            result.receipt.evidence.requested_filesystem_policy == "workspace_only",
+            "filesystem mismatch receipt should cite requested policy",
+        )?;
+        ensure(
+            result
+                .receipt
+                .evidence
+                .policy_detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("filesystem request")),
+            "filesystem mismatch should preserve refusal detail",
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn policy_rejection_receipt_maps_into_refusal_taxonomy(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let runtime = fake_binary(
             temp.path(),

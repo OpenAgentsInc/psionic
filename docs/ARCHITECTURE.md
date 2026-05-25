@@ -3010,7 +3010,7 @@ training subsystems.
 | `ModelIoCompatibilityContract` | `psionic-train` | machine-readable boundary contract for supported and unsupported checkpoint/model portability surfaces | `implemented` |
 | `AdapterArtifactIdentity` | `psionic-adapters` | stable identity for one adapter artifact | `implemented` |
 | `AdapterPackageManifest` | `psionic-adapters` | package manifest for adapter bytes tied to datastream | `implemented` |
-| `ProviderSandboxExecutionReceipt` | `psionic-sandbox` | receipt for one bounded sandbox run | `implemented` |
+| `ProviderSandboxExecutionReceipt` | `psionic-sandbox` | receipt for one bounded sandbox run, including profile digest plus declared/requested network, filesystem, timeout, artifact, and secret policy evidence | `implemented` |
 | `TrainingRun` | `psionic-train` | root identity, participant graph, and lifecycle state for one training program | `implemented_early` |
 | `TrainingWindow` | `psionic-train` | one synchronized contribution or trainer interval with contributor-set and transition state | `implemented_early` |
 | `LiveRlRunStatusArtifact` | `psionic-train` | durable operator-facing run-status artifact for one live RL run | `implemented_early` |
