@@ -26,6 +26,7 @@ mod legal_benchmark_regression;
 mod legal_benchmark_reports;
 mod legal_benchmark_reward_traces;
 mod legal_benchmark_schema;
+mod legal_benchmark_signature_routing;
 mod legal_benchmark_sweeps;
 mod legal_benchmark_tools;
 #[cfg(feature = "full")]
@@ -45,6 +46,7 @@ pub use legal_benchmark_regression::*;
 pub use legal_benchmark_reports::*;
 pub use legal_benchmark_reward_traces::*;
 pub use legal_benchmark_schema::*;
+pub use legal_benchmark_signature_routing::*;
 pub use legal_benchmark_sweeps::*;
 pub use legal_benchmark_tools::*;
 #[cfg(feature = "full")]

@@ -23,8 +23,9 @@ The check script runs:
 - mock sweep manifest checks
 - mock sweep matrix fixture validation
 - product regression guardrail fixture and blocked-promotion simulation checks
+- public/synthetic legal signature-routing fixture checks for Probe+Codex
 - JSON validation for the legal benchmark fixtures used by the runner,
-  evaluator, report, sweep, and product-regression paths
+  evaluator, report, sweep, product-regression, and signature-routing paths
 
 The audited Harvey corpus fixture pins:
 

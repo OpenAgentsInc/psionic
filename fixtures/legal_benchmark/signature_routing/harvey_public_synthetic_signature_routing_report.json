@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "suite_id": "harvey_public_synthetic_signature_routing_v1",
+  "suite_hash": "535a79e858dd1c4d5f43ed4092a471c7417f90cb999ad536bcd63d43201e03b3",
+  "report_hash": "c06b2076ee7db63afb0468741747f5b0f21ce5303e8d649c675d5607baf64f97",
+  "boundary": "Public/synthetic legal signature-routing fixtures for Probe+Codex selection. This is not a private Harvey score and does not expose hidden labels or legal authority.",
+  "summary": {
+    "fixture_count": 6,
+    "selection_pass_count": 6,
+    "selection_pass_rate_bps": 10000,
+    "raw_codex_mean_score_bps": 2222,
+    "probe_codex_mean_score_bps": 10000,
+    "mean_score_delta_bps": 7777,
+    "failure_family_counts": {
+      "missing_deliverable": 1,
+      "wrong_output_path": 1,
+      "source_grounding_missing": 1,
+      "citation_provenance_missing": 1,
+      "answer_integrity_invalid": 1,
+      "judge_supervisor_needed": 1
+    }
+  },
+  "rows": [
+    {
+      "fixture_id": "harvey.synthetic.missing_deliverable.v1",
+      "task_id": "harvey.public.synthetic.missing_deliverable",
+      "failure_family": "missing_deliverable",
+      "expected_signature_ids": [
+        "legal.deliverable_file_workflow",
+        "legal.output_path_contract",
+        "legal.answer_integrity_guard"
+      ],
+      "selected_signature_ids": [
+        "legal.deliverable_file_workflow",
+        "legal.output_path_contract",
+        "legal.answer_integrity_guard"
+      ],
+      "selection_passed": true,
+      "raw_codex_score_bps": 0,
+      "probe_codex_score_bps": 10000,
+      "score_delta_bps": 10000,
+      "raw_codex_failures": [
+        "missing_deliverable",
+        "no_submit",
+        "answer_integrity_invalid"
+      ],
+      "probe_codex_evidence_refs": [
+        "answer.md",
+        "source_refs.json",
+        "answer_integrity.json",
+        "score_report.json"
+      ]
+    },
+    {
+      "fixture_id": "harvey.synthetic.wrong_output_path.v1",
+      "task_id": "harvey.public.synthetic.wrong_output_path",
+      "failure_family": "wrong_output_path",
+      "expected_signature_ids": [
+        "legal.output_path_contract",
+        "legal.deliverable_file_workflow",
+        "legal.answer_integrity_guard"
+      ],
+      "selected_signature_ids": [
+        "legal.output_path_contract",
+        "legal.deliverable_file_workflow",
+        "legal.answer_integrity_guard"
+      ],
+      "selection_passed": true,
+      "raw_codex_score_bps": 0,
+      "probe_codex_score_bps": 10000,
+      "score_delta_bps": 10000,
+      "raw_codex_failures": [
+        "wrong_output_path",
+        "missing_required_answer",
+        "answer_integrity_invalid"
+      ],
+      "probe_codex_evidence_refs": [
+        "outputs/memo.md",
+        "source_refs.json",
+        "answer_integrity.json",
+        "score_report.json"
+      ]
+    },
+    {
+      "fixture_id": "harvey.synthetic.source_grounding_missing.v1",
+      "task_id": "harvey.public.synthetic.source_grounding_missing",
+      "failure_family": "source_grounding_missing",
+      "expected_signature_ids": [
+        "legal.source_grounding_trace",
+        "legal.citation_provenance_check",
+        "legal.answer_integrity_guard"
+      ],
+      "selected_signature_ids": [
+        "legal.source_grounding_trace",
+        "legal.citation_provenance_check",
+        "legal.answer_integrity_guard"
+      ],
+      "selection_passed": true,
+      "raw_codex_score_bps": 3333,
+      "probe_codex_score_bps": 10000,
+      "score_delta_bps": 6667,
+      "raw_codex_failures": [
+        "source_grounding_missing",
+        "unsupported_factual_assertion"
+      ],
+      "probe_codex_evidence_refs": [
+        "answer.md",
+        "source_refs.json",
+        "answer_integrity.json",
+        "score_report.json"
+      ]
+    },
+    {
+      "fixture_id": "harvey.synthetic.citation_provenance_missing.v1",
+      "task_id": "harvey.public.synthetic.citation_provenance_missing",
+      "failure_family": "citation_provenance_missing",
+      "expected_signature_ids": [
+        "legal.citation_provenance_check",
+        "legal.source_grounding_trace",
+        "legal.answer_integrity_guard"
+      ],
+      "selected_signature_ids": [
+        "legal.citation_provenance_check",
+        "legal.source_grounding_trace",
+        "legal.answer_integrity_guard"
+      ],
+      "selection_passed": true,
+      "raw_codex_score_bps": 5000,
+      "probe_codex_score_bps": 10000,
+      "score_delta_bps": 5000,
+      "raw_codex_failures": [
+        "citation_provenance_missing",
+        "evidence_refs_missing"
+      ],
+      "probe_codex_evidence_refs": [
+        "answer.md",
+        "source_refs.json",
+        "answer_integrity.json",
+        "score_report.json"
+      ]
+    },
+    {
+      "fixture_id": "harvey.synthetic.answer_integrity_invalid.v1",
+      "task_id": "harvey.public.synthetic.answer_integrity_invalid",
+      "failure_family": "answer_integrity_invalid",
+      "expected_signature_ids": [
+        "legal.answer_integrity_guard",
+        "legal.deliverable_file_workflow",
+        "legal.output_path_contract"
+      ],
+      "selected_signature_ids": [
+        "legal.answer_integrity_guard",
+        "legal.deliverable_file_workflow",
+        "legal.output_path_contract"
+      ],
+      "selection_passed": true,
+      "raw_codex_score_bps": 0,
+      "probe_codex_score_bps": 10000,
+      "score_delta_bps": 10000,
+      "raw_codex_failures": [
+        "answer_integrity_invalid",
+        "missing_model_write_hash"
+      ],
+      "probe_codex_evidence_refs": [
+        "answer.md",
+        "source_refs.json",
+        "answer_integrity.json",
+        "score_report.json"
+      ]
+    },
+    {
+      "fixture_id": "harvey.synthetic.judge_supervisor_needed.v1",
+      "task_id": "harvey.public.synthetic.judge_supervisor_needed",
+      "failure_family": "judge_supervisor_needed",
+      "expected_signature_ids": [
+        "benchmark.legal_judge_supervisor",
+        "legal.answer_integrity_guard",
+        "legal.source_grounding_trace"
+      ],
+      "selected_signature_ids": [
+        "benchmark.legal_judge_supervisor",
+        "legal.answer_integrity_guard",
+        "legal.source_grounding_trace"
+      ],
+      "selection_passed": true,
+      "raw_codex_score_bps": 5000,
+      "probe_codex_score_bps": 10000,
+      "score_delta_bps": 5000,
+      "raw_codex_failures": [
+        "judge_supervisor_needed",
+        "score_report_missing",
+        "promotion_gate_evidence_missing"
+      ],
+      "probe_codex_evidence_refs": [
+        "answer.md",
+        "source_refs.json",
+        "answer_integrity.json",
+        "score_report.json",
+        "judge_sidecar.json"
+      ]
+    }
+  ]
+}

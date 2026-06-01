@@ -48,6 +48,7 @@ promotion decision that refuses held-out regressions or failed operator review.
 - Blueprint program integration boundary: Blueprint owns business-facing
   Program records; Psionic supplies execution and optimization evidence.
 - Legal benchmark engine: [docs/LEGAL_BENCHMARK_ENGINE.md](docs/LEGAL_BENCHMARK_ENGINE.md)
+- Legal benchmark signature routing: [docs/LEGAL_BENCHMARK_SIGNATURE_ROUTING.md](docs/LEGAL_BENCHMARK_SIGNATURE_ROUTING.md)
 - Sandbox profile enforcement: [docs/SANDBOX_PROFILE_ENFORCEMENT.md](docs/SANDBOX_PROFILE_ENFORCEMENT.md)
 - Forge-facing eval pack publication: [docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md](docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)

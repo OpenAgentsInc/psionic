@@ -140,6 +140,31 @@ cargo test -p psionic-eval failed_trajectory_capture
 cargo run -p psionic-eval --example legal_benchmark_inspect_failures -- <run-dir>
 ```
 
+`crates/psionic-eval/src/legal_benchmark_signature_routing.rs` adds the
+public/synthetic Harvey-compatible signature-routing fixture lane. It maps
+structured legal failure families to Probe seed signatures without keyword
+matching over prompts and without exposing hidden Harvey labels. The first
+fixture suite covers missing deliverables, wrong output paths, missing source
+grounding, missing citation provenance, answer-integrity failures, and
+judge-supervisor evidence gaps.
+
+The retained routing report lives at
+`fixtures/legal_benchmark/signature_routing/harvey_public_synthetic_signature_routing_report.json`.
+Current result: six fixtures, `10000` bps selector pass rate, raw Codex
+fixture mean `2222` bps, Probe+Codex fixture mean `10000` bps, and mean delta
+`7777` bps. This is a deterministic workflow/evidence fixture, not a private
+Harvey score or proof of live legal quality.
+
+Use:
+
+```bash
+cargo test -p psionic-eval --no-default-features --lib legal_benchmark_signature_routing
+cargo run -q -p psionic-eval --no-default-features --example legal_benchmark_signature_routing_report
+```
+
+The detailed contract is documented in
+`docs/LEGAL_BENCHMARK_SIGNATURE_ROUTING.md`.
+
 ## Rust GRPO Smoke Trainer
 
 `psionic-train` now has a Rust-only legal GRPO smoke command:

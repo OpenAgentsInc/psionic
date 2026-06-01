@@ -10,6 +10,7 @@ cargo test -p psionic-eval --no-default-features --lib legal_benchmark_tools
 cargo test -p psionic-eval --no-default-features --lib legal_benchmark_reports
 cargo test -p psionic-eval --no-default-features --lib legal_benchmark_sweeps
 cargo test -p psionic-eval --no-default-features --lib legal_benchmark_regression
+cargo test -p psionic-eval --no-default-features --lib legal_benchmark_signature_routing
 
 python3 -m json.tool fixtures/legal_benchmark/harvey_corpus_metadata.json >/dev/null
 python3 -m json.tool fixtures/legal_benchmark/normalization_snapshot_minimal.json >/dev/null
@@ -19,3 +20,5 @@ python3 -m json.tool fixtures/legal_benchmark/sweep_smoke_config.json >/dev/null
 python3 -m json.tool fixtures/legal_benchmark/sweep_matrix_smoke_config.json >/dev/null
 python3 -m json.tool fixtures/legal_benchmark/product_regression_suite.json >/dev/null
 python3 -m json.tool fixtures/legal_benchmark/product_regression_candidate_failure.json >/dev/null
+python3 -m json.tool fixtures/legal_benchmark/signature_routing/harvey_public_synthetic_signature_routing_suite.json >/dev/null
+python3 -m json.tool fixtures/legal_benchmark/signature_routing/harvey_public_synthetic_signature_routing_report.json >/dev/null
