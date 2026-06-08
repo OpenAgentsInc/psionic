@@ -95,8 +95,11 @@ The same Probe GEPA lane now also has an early rollout coordinator in
 `docs/PROBE_GEPA_ROLLOUT_COORDINATOR.md`. The coordinator runs Stage 0 locally
 first, caches rollout results for resume, preserves candidate hashes and
 rollout refs, separates infrastructure failures from model/agent failures, and
-keeps Pylon as a later parallel metric-call backend rather than claiming live
-distributed neural-network training.
+imports live Omega/Pylon closeouts into the same frontier state when normalized
+assignment evidence is available. Pylon remains a parallel metric-call rollout
+backend rather than distributed neural-network training. Settlement, public
+benchmark claims, and runtime promotion stay outside Psionic's importer
+authority.
 
 The repo now also owns the canonical actual-lane recipe and admitted
 topology/storage bundles in
