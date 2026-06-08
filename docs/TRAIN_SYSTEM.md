@@ -90,6 +90,14 @@ separate from Probe/Omega runtime promotion, and expose import refs for Probe
 and benchmark-cloud without granting runtime authority or bypassing release
 gates.
 
+The same Probe GEPA lane now also has an early rollout coordinator in
+`crates/psionic-train/src/probe_gepa_rollout_coordinator.rs`, documented at
+`docs/PROBE_GEPA_ROLLOUT_COORDINATOR.md`. The coordinator runs Stage 0 locally
+first, caches rollout results for resume, preserves candidate hashes and
+rollout refs, separates infrastructure failures from model/agent failures, and
+keeps Pylon as a later parallel metric-call backend rather than claiming live
+distributed neural-network training.
+
 The repo now also owns the canonical actual-lane recipe and admitted
 topology/storage bundles in
 `crates/psionic-train/src/psion_actual_pretraining_recipe_bundle.rs`, the

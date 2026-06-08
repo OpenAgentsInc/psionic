@@ -46,6 +46,7 @@ promotion decision that refuses held-out regressions or failed operator review.
 - Mesh lane service mode: [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md)
 - Optimizer substrate: [docs/OPTIMIZER_SUBSTRATE.md](docs/OPTIMIZER_SUBSTRATE.md)
 - Probe GEPA candidate manifests: [docs/PROBE_GEPA_CANDIDATE_MANIFESTS.md](docs/PROBE_GEPA_CANDIDATE_MANIFESTS.md)
+- Probe GEPA rollout coordinator: [docs/PROBE_GEPA_ROLLOUT_COORDINATOR.md](docs/PROBE_GEPA_ROLLOUT_COORDINATOR.md)
 - Blueprint program integration boundary: Blueprint owns business-facing
   Program records; Psionic supplies execution and optimization evidence.
 - Legal benchmark engine: [docs/LEGAL_BENCHMARK_ENGINE.md](docs/LEGAL_BENCHMARK_ENGINE.md)
