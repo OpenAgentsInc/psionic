@@ -80,6 +80,16 @@ That surface freezes one named actual lane above the bounded
 `broader_pretraining` trusted-cluster bundle instead of leaving "actual
 pretraining" as prose.
 
+The repo now also owns the first Probe GEPA text-bundle candidate manifest
+surface in `crates/psionic-train/src/probe_gepa_candidate_manifest.rs`, with
+the focused doc `docs/PROBE_GEPA_CANDIDATE_MANIFESTS.md` and retained fixture
+`fixtures/probe/gepa/probe_gepa_candidate_manifest_stage_0_1_seed_v1.json`.
+This is optimizer evidence for Probe/Blueprint text artifacts, not model-weight
+training. Candidate manifests are content-addressed, keep optimizer acceptance
+separate from Probe/Omega runtime promotion, and expose import refs for Probe
+and benchmark-cloud without granting runtime authority or bypassing release
+gates.
+
 The repo now also owns the canonical actual-lane recipe and admitted
 topology/storage bundles in
 `crates/psionic-train/src/psion_actual_pretraining_recipe_bundle.rs`, the
