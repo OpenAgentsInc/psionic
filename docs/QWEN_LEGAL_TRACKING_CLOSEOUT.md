@@ -30,9 +30,14 @@ The current strong-claim boundary is:
 | Model ladder | `docs/QWEN_LEGAL_MODEL_LADDER.md`. |
 | Acceptance targets | `docs/QWEN_LEGAL_ACCEPTANCE_TARGETS.md`. |
 
-## v0.2 Pylon Release Boundary
+## Qwen Legal Pylon Boundary v0.2
 
-The v0.2 release gate is `scripts/check-v0.2-pylon-release.sh`.
+The v0.2 Psionic boundary gate is
+`scripts/check-v0.2-pylon-release.sh`.
+
+This is not the OpenAgents public Pylon v0.2 release record. It is the
+Psionic-side Qwen legal worker, scheduler, receipt, and payment-proof boundary
+that later OpenAgents Pylon releases can consume.
 
 For Qwen legal Pylons, v0.2 now includes:
 

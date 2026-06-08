@@ -1,12 +1,15 @@
-# Qwen Legal v0.2 Pylon Release Readiness Run
+# Qwen Legal Pylon Boundary v0.2 Readiness Run
 
 Date: 2026-05-22
 Command: `scripts/check-v0.2-pylon-release.sh`
 Result: PASS
 
+This retained run is not the OpenAgents public Pylon v0.2 release record. It
+records the Psionic-side Qwen legal Pylon worker and scheduler boundary.
+
 ## Contract Gate
 
-The release gate verified:
+The boundary gate verified:
 
 - provider-neutral training evidence bundle
 - cross-provider whole-program run graph
@@ -71,7 +74,7 @@ operator-approved proof acceptance, duplicate proof rejection, bad proof digest
 rejection, unknown authorization rejection, secret-looking proof rejection, and
 amount mismatch rejection.
 
-The passing release boundary is the Psionic-side payment boundary: signed
+The passing boundary is the Psionic-side payment boundary: signed
 worker receipt validation, payment decision receipts, Treasury handoff,
 settlement proof validation, and promotion-gate status. Wallet execution and
 secret custody remain Treasury/Nexus responsibilities.

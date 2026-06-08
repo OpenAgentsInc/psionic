@@ -1,19 +1,23 @@
-# Psionic v0.2.0 Pylon Release
+# Psionic Qwen Legal Pylon Boundary v0.2.0
 
 Date: 2026-05-22
 
-## Release Identity
+## Boundary Identity
 
-- Version: `0.2.0`
-- Release gate: `scripts/check-v0.2-pylon-release.sh`
-- Retained release-readiness run:
+- Psionic boundary version: `0.2.0`
+- Boundary gate: `scripts/check-v0.2-pylon-release.sh`
+- Retained boundary-readiness run:
   `reports/qwen-legal-v02-pylon-release-readiness-20260522.md`
 - Primary crate surface: `psionic-train`
 - Pylon worker entrypoint:
   `cargo run -p psionic-train --bin qwen_legal_pylon_worker_server -- <bind-addr> <worker-id>`
 - Scheduler dispatch modes: `LocalOnly`, `Loopback`, `Tailnet`, `Production`
 
-## What v0.2.0 Supports
+This document is not the OpenAgents public Pylon v0.2 release record. It is the
+Psionic-side Qwen legal Pylon worker and scheduler boundary that later
+OpenAgents Pylon releases can consume.
+
+## What The Boundary Supports
 
 - Signed Qwen legal Pylon job envelopes.
 - Local and loopback Pylon worker execution.
@@ -39,7 +43,7 @@ a payment hash or transaction proof. Psionic rejects duplicate proofs, unknown
 authorizations, amount mismatches, bad proof digests, and secret-looking proof
 fields.
 
-## Required Release Validation
+## Required Boundary Validation
 
 Run from the repository root:
 
