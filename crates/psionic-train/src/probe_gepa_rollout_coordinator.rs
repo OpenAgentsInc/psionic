@@ -538,6 +538,61 @@ pub fn import_probe_gepa_live_closeout(
     })
 }
 
+pub fn canonical_probe_gepa_terminal_bench_pylon_canary_import(
+    candidate: &ProbeGepaCandidateManifest,
+) -> ProbeGepaLiveCloseoutImport {
+    let run_ref = "probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057";
+    ProbeGepaLiveCloseoutImport {
+        schema_version: PROBE_GEPA_LIVE_CLOSEOUT_IMPORT_SCHEMA_VERSION.to_string(),
+        assignment_id: "assignment.public.probe_gepa.terminal_bench_2.canary.20260608151057"
+            .to_string(),
+        closeout_ref: format!("probe_closeout.{run_ref}"),
+        campaign_id: candidate.campaign_id.clone(),
+        task_id: "configure-git-webserver".to_string(),
+        dataset: "terminal_bench_2".to_string(),
+        split_ref: candidate.split_refs[0].clone(),
+        split: "retained".to_string(),
+        probe_commit: "d58cc03".to_string(),
+        agent_slug: "probe".to_string(),
+        backend_model_ref: "pylon.artanis.gepa_stats_canary.20260608150415".to_string(),
+        candidate_hash: candidate.candidate_hash.clone(),
+        candidate_id: candidate.candidate_id.clone(),
+        selected_signature_refs: vec![
+            "program_signature.probe.benchmark.service_readiness.v1".to_string(),
+        ],
+        tool_menu_ref: "tool_menu.probe.terminal_bench_2.canary.unpaid_smoke.v1".to_string(),
+        verifier_refs: vec![
+            format!("verifier_result.public.{run_ref}.initial_retained.service_readiness"),
+            "accepted_work.public.probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057.probe_gepa_canary".to_string(),
+            "pylon_event.heartbeat.cbfba02f-8ce8-4161-954a-109f403a56c1".to_string(),
+            "pylon_event.wallet_readiness.ae6b9e8c-58d8-4dde-a1a0-d666d162087a"
+                .to_string(),
+            "pylon_event.assignment_acceptance.ab63a3aa-771e-47cd-8cf6-1d29f945021e".to_string(),
+            "pylon_event.assignment_progress.27bf8d2d-6979-4597-8e85-2da994990710".to_string(),
+            "pylon_event.artifact_proof_metadata.82e04c95-8084-4b95-bbd2-1183b760c7ae".to_string(),
+        ],
+        closeout_state: ProbeGepaLiveCloseoutState::AgentFailure,
+        payment_mode: ProbeGepaLivePaymentMode::UnpaidSmoke,
+        settlement_receipt_refs: Vec::new(),
+        scalar_score_bps: 0,
+        failure_family: ProbeGepaFailureClass::ServiceReadiness,
+        artifact_manifest_ref: format!("artifact.public.{run_ref}.probe_closeout_bundle"),
+        proof_bundle_ref: format!("proof.public.{run_ref}.no_spend_assignment_lifecycle"),
+        resource_usage_ref: format!("resource_usage.public.{run_ref}.unpaid_smoke.no_spend"),
+        route_scorecard_ref: format!("route_scorecard.public.{run_ref}"),
+        policy_findings: vec![
+            "no_public_benchmark_score_claimed".to_string(),
+            "worker_closeout_accepted_as_evidence_not_benchmark_pass".to_string(),
+            "no_paid_work_or_settlement_claimed".to_string(),
+        ],
+        duration_ms: 90_000,
+        cost_micros: 0,
+        public_claim: ProbeGepaLivePublicClaim::None,
+        runtime_promotion_claim: ProbeGepaCandidatePromotionState::Draft,
+        model_training_authority_claimed: false,
+    }
+}
+
 pub fn build_probe_gepa_rollout_assignment(
     candidate: &ProbeGepaCandidateManifest,
     config: &ProbeGepaCoordinatorConfig,
@@ -1396,6 +1451,93 @@ mod tests {
         );
         assert_eq!(state.candidate_frontier[0].agent_failures, 1);
         assert_eq!(state.candidate_frontier[0].mean_score_bps, 0);
+    }
+
+    #[test]
+    fn terminal_bench_pylon_canary_import_updates_frontier_without_overclaim() {
+        let candidate = canonical_probe_gepa_stage_0_1_candidate_manifest().unwrap();
+        let mut state = ProbeGepaCoordinatorState::default();
+        let import = canonical_probe_gepa_terminal_bench_pylon_canary_import(&candidate);
+
+        let receipt = import_probe_gepa_live_closeout(&mut state, &candidate, import).unwrap();
+
+        assert_eq!(
+            receipt.assignment_id,
+            "assignment.public.probe_gepa.terminal_bench_2.canary.20260608151057"
+        );
+        assert_eq!(
+            receipt.imported_result_status,
+            ProbeGepaRolloutStatus::AgentFailed
+        );
+        assert_eq!(receipt.payment_mode, ProbeGepaLivePaymentMode::UnpaidSmoke);
+        assert_eq!(
+            receipt.closeout_state,
+            ProbeGepaLiveCloseoutState::AgentFailure
+        );
+        assert_eq!(state.live_closeout_imports.len(), 1);
+        assert_eq!(state.candidate_frontier.len(), 1);
+        assert_eq!(state.candidate_frontier[0].agent_failures, 1);
+        assert_eq!(state.candidate_frontier[0].successful_rollouts, 0);
+        assert_eq!(state.candidate_frontier[0].mean_score_bps, 0);
+        assert_eq!(
+            state.live_closeout_imports[0].route_scorecard_ref,
+            "route_scorecard.public.probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057"
+        );
+        assert_eq!(
+            state.live_closeout_imports[0].settlement_receipt_refs.len(),
+            0
+        );
+        assert_eq!(
+            state.live_closeout_imports[0].public_claim,
+            ProbeGepaLivePublicClaim::None
+        );
+        assert_eq!(
+            state
+                .last_iteration_metrics
+                .as_ref()
+                .unwrap()
+                .pylon_assignment_count,
+            1
+        );
+        assert_eq!(
+            state.completed_rollouts[0].artifact_manifest_ref.as_deref(),
+            Some("artifact.public.probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057.probe_closeout_bundle")
+        );
+        assert_eq!(
+            state.completed_rollouts[0].proof_bundle_ref.as_deref(),
+            Some("proof.public.probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057.no_spend_assignment_lifecycle")
+        );
+    }
+
+    #[test]
+    fn terminal_bench_pylon_canary_import_rejects_score_training_or_settlement_overclaim() {
+        let candidate = canonical_probe_gepa_stage_0_1_candidate_manifest().unwrap();
+        let mut state = ProbeGepaCoordinatorState::default();
+        let mut public_score = canonical_probe_gepa_terminal_bench_pylon_canary_import(&candidate);
+        public_score.public_claim = ProbeGepaLivePublicClaim::PublicBenchmarkScore;
+        assert!(matches!(
+            import_probe_gepa_live_closeout(&mut state, &candidate, public_score),
+            Err(ProbeGepaCoordinatorError::LiveImportAuthorityOverclaim { field, .. })
+                if field == "public_claim"
+        ));
+
+        let mut training = canonical_probe_gepa_terminal_bench_pylon_canary_import(&candidate);
+        training.model_training_authority_claimed = true;
+        assert!(matches!(
+            import_probe_gepa_live_closeout(&mut state, &candidate, training),
+            Err(ProbeGepaCoordinatorError::LiveImportAuthorityOverclaim { field, .. })
+                if field == "model_training_authority_claimed"
+        ));
+
+        let mut settled = canonical_probe_gepa_terminal_bench_pylon_canary_import(&candidate);
+        settled.payment_mode = ProbeGepaLivePaymentMode::SettledBitcoin;
+        assert!(matches!(
+            import_probe_gepa_live_closeout(&mut state, &candidate, settled),
+            Err(ProbeGepaCoordinatorError::LiveImportMissingSettlementReceipt { .. })
+        ));
+
+        assert!(state.completed_rollouts.is_empty());
+        assert!(state.candidate_frontier.is_empty());
     }
 
     fn live_import_for_candidate(

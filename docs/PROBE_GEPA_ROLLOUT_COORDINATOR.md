@@ -28,6 +28,22 @@ artifact/proof/resource refs, route scorecard ref, payment mode, closeout
 state, public-claim posture, runtime-promotion claim, and model-training
 authority claim before mutating state.
 
+The current canonical live import fixture is the Probe GEPA Terminal-Bench 2
+Pylon canary:
+
+- assignment:
+  `assignment.public.probe_gepa.terminal_bench_2.canary.20260608151057`
+- Pylon: `pylon.artanis.gepa_stats_canary.20260608150415`
+- Probe run:
+  `probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057`
+- closeout:
+  `probe_closeout.probe_run.public.probe_gepa.terminal_bench_2.canary.20260608151057`
+
+The Pylon worker closeout was accepted as evidence work. The benchmark import
+enters Psionic as an `agent_failed` retained `service_readiness` rollout with
+score `0`, no public benchmark score, no paid-work claim, no settlement claim,
+no runtime promotion, and no model-training authority.
+
 The current Stage 0 target is 20 to 40 metric calls. The default local run uses
 20 metric calls over retained and validation-shaped Terminal-Bench task refs.
 
@@ -86,4 +102,6 @@ The focused tests cover local Stage 0 metric calls, resumable cache behavior,
 infrastructure versus agent failure classification, policy-blocked candidate
 refusal, accepted and rejected live closeout imports, missing evidence-ref
 rejection, settlement receipt enforcement, and import of the Stage 0 SHC Harbor
-live smoke recorded by OpenAgents.
+live smoke recorded by OpenAgents. They also cover the live Omega/Pylon
+Terminal-Bench canary import, including its no-score, no-training, no-paid-work,
+and no-settlement boundaries.
