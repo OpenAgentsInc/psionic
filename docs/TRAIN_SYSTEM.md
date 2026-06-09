@@ -101,6 +101,16 @@ backend rather than distributed neural-network training. Settlement, public
 benchmark claims, and runtime promotion stay outside Psionic's importer
 authority.
 
+The launch-facing GEPA/Qwen separation gate now lives in
+`crates/psionic-train/src/pylon_launch_promise_gates.rs`. It projects one
+`psionic.pylon_launch_dashboard.v1` bundle with separate GEPA live-import and
+Qwen Pylon training rows for Omega. The GEPA row requires live Omega/Pylon
+closeout receipt refs and keeps public-score, product-promotion, payout, and
+model-training authority false. The Qwen row requires worker, merge, eval,
+payment, and settlement refs, requires remote Pylon worker evidence for launch
+readiness, rejects duplicate or quarantined shards, and keeps sampled-
+projection LoRA distinct from full-forward and full-backprop claims.
+
 The repo now also owns the canonical actual-lane recipe and admitted
 topology/storage bundles in
 `crates/psionic-train/src/psion_actual_pretraining_recipe_bundle.rs`, the
@@ -233,6 +243,10 @@ report digest
 `3ae5e9f5660af0a048971556014521ac0072eca430fb7926a287cd0b8d1dd9c2`.
 This is local Pylon simulation; remote tailnet worker dispatch remains a
 separate Nexus/Pylon step.
+The launch gate treats this local loopback evidence as useful training
+substrate but blocked for remote-worker launch readiness until remote worker,
+payment, and settlement refs are present. It also blocks full-forward or
+full-backprop claims from the sampled-projection LoRA reports.
 The `submit-pylon-job` command now points at the signed two-node dispatcher
 smoke:
 `cargo run -p psionic-train --example qwen_legal_pylon_loopback_dispatch -- --mode loopback --out target/legal/pylon_dispatch/qwen-legal-loopback-dispatch`.
