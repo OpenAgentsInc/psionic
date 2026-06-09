@@ -1,0 +1,25 @@
+{
+  "schema": "openagents.psionic.model_artifact_manifest.v0.3",
+  "contractVersion": "psionic.model_artifact_manifest.v1",
+  "modelKey": "qwen35-0_8b-q8_0",
+  "modelRef": "model.psionic.qwen35.0_8b.q8_0",
+  "url": "https://artifacts.openagents.com/psionic/models/qwen35-0_8b-q8_0.gguf",
+  "sha256": "61a5f9639ac212363e461d9921634b734239a7f9610b5cd6a9db9353dfd3a3b1",
+  "artifactRef": "artifact.psionic.qwen35.0_8b.q8_0.gguf",
+  "modelFamily": "qwen35",
+  "parameterClass": "0.8b",
+  "quantization": "q8_0",
+  "role": "low_footprint_smoke_fallback",
+  "sizeBytes": 900000000,
+  "chatTemplateSha256": "fb35c8fa3d2f7d3caf8ec24b098d3cc1c446bc7033822f8a32a33cf74b7d2d2e",
+  "licenseBoundary": "operator_must_accept_upstream_qwen_license_before_download",
+  "supportedBackendFamilies": ["cpu", "cuda", "metal"],
+  "admittedEndpoints": ["/health", "/v1/models", "/v1/chat/completions"],
+  "toolCalling": {
+    "admitted": true,
+    "modes": ["auto", "required", "named", "none"],
+    "smokeRef": "evidence.psionic.qwen35.0_8b.tool_call_smoke"
+  },
+  "inferenceOnly": true,
+  "trainingClaim": "blocked"
+}

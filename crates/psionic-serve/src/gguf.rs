@@ -18301,6 +18301,7 @@ mod tests {
             GgufDecoderFamily::Llama => "llama",
             GgufDecoderFamily::Qwen => "qwen",
             GgufDecoderFamily::Qwen35 => "qwen35",
+            GgufDecoderFamily::Qwen3 => "qwen3",
             GgufDecoderFamily::Gemma4 => "gemma4",
             GgufDecoderFamily::Mistral => "mistral",
             GgufDecoderFamily::GptOss => "gpt_oss",

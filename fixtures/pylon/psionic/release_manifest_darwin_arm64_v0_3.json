@@ -1,0 +1,55 @@
+{
+  "schema": "openagents.psionic.release_manifest.v0.3",
+  "contractVersion": "psionic.release_manifest.v1",
+  "channel": "rc",
+  "version": "0.3.0-rc1",
+  "platform": "darwin-arm64",
+  "binary": {
+    "url": "https://artifacts.openagents.com/psionic/0.3.0-rc1/darwin-arm64/psionic-openai-server",
+    "sha256": "2faf2785db05af93aaff94b23a22eff38843eda190f818cb8b0afbcb8b36dc42",
+    "artifactRef": "artifact.psionic.binary.darwin_arm64.0_3_0_rc1",
+    "binaryRef": "binary.psionic.openai_server.darwin_arm64.0_3_0_rc1",
+    "signatureRef": "signature.psionic.binary.darwin_arm64.0_3_0_rc1",
+    "signatureSha256": "53dd53442749f9f2493a175e3683dbaeef997b2f6e124fdc180f386d448c4e8a"
+  },
+  "platforms": [
+    {
+      "platform": "darwin-arm64",
+      "binary": {
+        "url": "https://artifacts.openagents.com/psionic/0.3.0-rc1/darwin-arm64/psionic-openai-server",
+        "sha256": "2faf2785db05af93aaff94b23a22eff38843eda190f818cb8b0afbcb8b36dc42",
+        "artifactRef": "artifact.psionic.binary.darwin_arm64.0_3_0_rc1",
+        "binaryRef": "binary.psionic.openai_server.darwin_arm64.0_3_0_rc1",
+        "signatureRef": "signature.psionic.binary.darwin_arm64.0_3_0_rc1",
+        "signatureSha256": "53dd53442749f9f2493a175e3683dbaeef997b2f6e124fdc180f386d448c4e8a"
+      }
+    },
+    {
+      "platform": "linux-x64",
+      "binary": {
+        "url": "https://artifacts.openagents.com/psionic/0.3.0-rc1/linux-x64/psionic-openai-server",
+        "sha256": "cf1c4dd2cbb81b0395fd05dd821dfb1f4ec121b70542abf7840e75c970c93762",
+        "artifactRef": "artifact.psionic.binary.linux_x64.0_3_0_rc1",
+        "binaryRef": "binary.psionic.openai_server.linux_x64.0_3_0_rc1",
+        "signatureRef": "signature.psionic.binary.linux_x64.0_3_0_rc1",
+        "signatureSha256": "a89dd4f6bfa21377b354843ac54d4ff7314f37f58440acf02c3492819a795112"
+      }
+    },
+    {
+      "platform": "linux-arm64",
+      "binary": {
+        "url": "https://artifacts.openagents.com/psionic/0.3.0-rc1/linux-arm64/psionic-openai-server",
+        "sha256": "436596ff40382db9e4d2a25e5261588a19c9aef96d1537431a6f4c5ccabeaa0a",
+        "artifactRef": "artifact.psionic.binary.linux_arm64.0_3_0_rc1",
+        "binaryRef": "binary.psionic.openai_server.linux_arm64.0_3_0_rc1",
+        "signatureRef": "signature.psionic.binary.linux_arm64.0_3_0_rc1",
+        "signatureSha256": "40c6d7b603fc0d5338fc73502a4e37f0d23d4ddcd596f227a8de06fc4059621e"
+      }
+    }
+  ],
+  "supportedEndpoints": ["/health", "/v1/models", "/v1/chat/completions"],
+  "backendSupport": ["cpu", "cuda", "metal"],
+  "inferenceOnly": true,
+  "trainingClaim": "blocked",
+  "paidInferenceClaim": "blocked"
+}

@@ -72,6 +72,13 @@ into one generic engine claim.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
+- Pylon optional local inference now has a machine-readable Psionic manifest
+  producer contract in `docs/PYLON_PSIONIC_MANIFESTS.md` and
+  `fixtures/pylon/psionic/`. The first-pass rows cover the
+  `psionic-openai-server` binary for `darwin-arm64`, `linux-x64`, and
+  `linux-arm64`, plus Qwen3.5 0.8B and 2B Q8_0 model artifact manifests.
+  These rows are inference-only. They do not claim Qwen training or paid Qwen
+  inference is live.
 - `MedPsy` / Qwen3 has one new bounded pilot in `implemented_early` status.
   Psionic now records the QVAC MedPsy Qwen3 family label, tokenizer/prompt
   fixture, quantization admission policy, medical safety policy, and Rust-native

@@ -43,6 +43,7 @@ mod psion_rvllm_preflight_bundle;
 mod psion_rvllm_sampling_loop;
 mod psion_served_evidence;
 mod psion_served_output_claim_posture;
+mod pylon_release_manifest;
 mod qwen35;
 mod tassadar;
 mod tassadar_article_cross_machine_reproducibility_publication;
@@ -160,6 +161,7 @@ pub use psionic_transformer::{
     ActivationFunction, DecoderAttentionConfig, DecoderBlockConfig, DecoderConfig,
     DecoderFeedForwardConfig,
 };
+pub use pylon_release_manifest::*;
 pub use qwen35::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
