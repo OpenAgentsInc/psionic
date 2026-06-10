@@ -1,6 +1,7 @@
 //! Canonical graph and plan representation for Psionic.
 
 mod autodiff;
+mod tassadar_alm_graph;
 mod tassadar_article_abi;
 mod tassadar_component_linking_profile;
 mod tassadar_exception_profile;
@@ -32,6 +33,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub use autodiff::*;
+pub use tassadar_alm_graph::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_component_linking_profile::*;
 pub use tassadar_exception_profile::*;

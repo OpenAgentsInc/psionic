@@ -2704,6 +2704,15 @@ The current scope is:
   - `psionic-research::ExperimentFamily::ExecutorVariants`
   - `psionic-research::ExperimentFamily::ExecutorCircuitResearch`
 - `psionic-runtime::TassadarSparseTopKRunner`
+- landed executor-compiler E1 bar: `psionic-ir` now owns the bounded
+  Append-only Lookup Machine gate-graph IR
+  (`tassadar.alm_gate_graph.v1`: input, linear, ReGLU product, keyed
+  channel write/read, accumulator cumulative sum) with typed validation,
+  the strictly-prior-step write-visibility rule, and an exact checked-i64
+  reference evaluator producing digest-stable step traces; contract in
+  `docs/TASSADAR_ALM_GRAPH.md`. This is reference semantics for the
+  general program-to-weights compiler lane only — no scheduling, weight
+  emission, Wasm intake, or served claim
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
