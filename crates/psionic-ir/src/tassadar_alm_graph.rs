@@ -602,6 +602,298 @@ impl TassadarAlmEvaluator {
     }
 }
 
+/// Reference workload: exact running sum over one input field.
+#[must_use]
+pub fn tassadar_alm_running_sum_workload() -> TassadarAlmGraph {
+    TassadarAlmGraph {
+        schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+        graph_id: "alm.test.running_sum".to_string(),
+        input_field_count: 1,
+        channels: vec![TassadarAlmChannelDecl {
+            channel_id: TassadarAlmChannelId(0),
+            name: "total".to_string(),
+            kind: TassadarAlmChannelKind::Accumulator,
+        }],
+        seed_writes: Vec::new(),
+        gates: vec![
+            TassadarAlmGate::Input { field: 0 },
+            TassadarAlmGate::CumSum {
+                channel_id: TassadarAlmChannelId(0),
+                value: TassadarAlmValueId(0),
+            },
+        ],
+        outputs: vec![TassadarAlmValueId(1)],
+    }
+}
+
+/// The Percepta post's toy: track whether the count of verbs so far is
+/// odd or even. Each step reads the previous parity from a keyed channel
+/// (seeded for step zero), XORs it with the current indicator via the
+/// identity `a ^ b = a + b - 2ab`, and writes the new parity back under
+/// the current position key.
+#[must_use]
+pub fn tassadar_alm_verb_parity_workload() -> TassadarAlmGraph {
+    TassadarAlmGraph {
+        schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+        graph_id: "alm.test.verb_parity".to_string(),
+        input_field_count: 1,
+        channels: vec![
+            TassadarAlmChannelDecl {
+                channel_id: TassadarAlmChannelId(0),
+                name: "parity".to_string(),
+                kind: TassadarAlmChannelKind::Keyed,
+            },
+            TassadarAlmChannelDecl {
+                channel_id: TassadarAlmChannelId(1),
+                name: "position".to_string(),
+                kind: TassadarAlmChannelKind::Accumulator,
+            },
+        ],
+        seed_writes: vec![TassadarAlmSeedWrite {
+            channel_id: TassadarAlmChannelId(0),
+            key: 0,
+            value: 0,
+        }],
+        gates: vec![
+            // 0: is_verb input bit.
+            TassadarAlmGate::Input { field: 0 },
+            // 1: constant one.
+            TassadarAlmGate::Const { value: 1 },
+            // 2: position = cumsum(1) = t + 1.
+            TassadarAlmGate::CumSum {
+                channel_id: TassadarAlmChannelId(1),
+                value: TassadarAlmValueId(1),
+            },
+            // 3: previous position key = position - 1 = t.
+            TassadarAlmGate::Linear {
+                terms: vec![(1, TassadarAlmValueId(2))],
+                bias: -1,
+            },
+            // 4: previous parity read.
+            TassadarAlmGate::ChannelRead {
+                channel_id: TassadarAlmChannelId(0),
+                query: TassadarAlmValueId(3),
+            },
+            // 5: product = is_verb * relu(prev_parity); both are 0/1 bits.
+            TassadarAlmGate::ReGlu {
+                value: TassadarAlmValueId(0),
+                gate: TassadarAlmValueId(4),
+            },
+            // 6: xor = is_verb + prev_parity - 2 * product.
+            TassadarAlmGate::Linear {
+                terms: vec![
+                    (1, TassadarAlmValueId(0)),
+                    (1, TassadarAlmValueId(4)),
+                    (-2, TassadarAlmValueId(5)),
+                ],
+                bias: 0,
+            },
+            // 7: write parity under the current position key.
+            TassadarAlmGate::ChannelWrite {
+                channel_id: TassadarAlmChannelId(0),
+                key: TassadarAlmValueId(2),
+                value: TassadarAlmValueId(6),
+            },
+        ],
+        outputs: vec![TassadarAlmValueId(6)],
+    }
+}
+
+/// A bounded three-instruction stack micro: PUSH 3, PUSH 5, ADD, OUT.
+/// Opcodes: 0 = PUSH(operand), 1 = ADD, 2 = OUT. Stack values live in a
+/// keyed channel keyed by depth; depth is an accumulator over per-opcode
+/// deltas; writes are masked through indicator gates built from the ReLU
+/// step identity `1[x >= c] = relu(x - c + 1) - relu(x - c)`.
+#[must_use]
+pub fn tassadar_alm_stack_micro_workload() -> TassadarAlmGraph {
+    // 0: opcode, 1: operand, 2: constant one for relu gating.
+    let mut gates: Vec<TassadarAlmGate> = vec![
+        TassadarAlmGate::Input { field: 0 },
+        TassadarAlmGate::Input { field: 1 },
+        TassadarAlmGate::Const { value: 1 },
+    ];
+    // Step indicators: 1[op >= c] = relu(op - c + 1) - relu(op - c).
+    // 3: op - 0 + 1, 4: relu of it, 5: op - 0, 6: relu, 7: ge0 = 4 - 6.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(0))],
+        bias: 1,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(2),
+        gate: TassadarAlmValueId(3),
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(0))],
+        bias: 0,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(2),
+        gate: TassadarAlmValueId(5),
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(4)), (-1, TassadarAlmValueId(6))],
+        bias: 0,
+    });
+    // 8..=12: ge1 indicator.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(0))],
+        bias: 0,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(2),
+        gate: TassadarAlmValueId(8),
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(0))],
+        bias: -1,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(2),
+        gate: TassadarAlmValueId(10),
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(9)), (-1, TassadarAlmValueId(11))],
+        bias: 0,
+    });
+    // 13..=17: ge2 indicator.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(0))],
+        bias: -1,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(2),
+        gate: TassadarAlmValueId(13),
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(0))],
+        bias: -2,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(2),
+        gate: TassadarAlmValueId(15),
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(14)), (-1, TassadarAlmValueId(16))],
+        bias: 0,
+    });
+    // 18: is_push = ge0 - ge1; 19: is_add = ge1 - ge2; 20: is_out = ge2.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(7)), (-1, TassadarAlmValueId(12))],
+        bias: 0,
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(12)), (-1, TassadarAlmValueId(17))],
+        bias: 0,
+    });
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(17))],
+        bias: 0,
+    });
+    // 21: delta = is_push - is_add.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(18)), (-1, TassadarAlmValueId(19))],
+        bias: 0,
+    });
+    // 22: depth = cumsum(delta); after PUSH depth is the new slot index.
+    gates.push(TassadarAlmGate::CumSum {
+        channel_id: TassadarAlmChannelId(1),
+        value: TassadarAlmValueId(21),
+    });
+    // 23: top key before this step for ADD = depth + 1 (two operands at
+    // depth+1 and depth); for OUT the top is at depth.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(22))],
+        bias: 1,
+    });
+    // 24: addend_a = is_add * read(depth + 1).
+    // Reads must always resolve, so the stack channel is seeded for the
+    // keys this bounded program can touch when the opcode masks them out.
+    gates.push(TassadarAlmGate::ChannelRead {
+        channel_id: TassadarAlmChannelId(0),
+        query: TassadarAlmValueId(23),
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(24),
+        gate: TassadarAlmValueId(19),
+    });
+    // 26: operand_b = read(depth).
+    gates.push(TassadarAlmGate::ChannelRead {
+        channel_id: TassadarAlmChannelId(0),
+        query: TassadarAlmValueId(22),
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(26),
+        gate: TassadarAlmValueId(19),
+    });
+    // 28: sum = masked_a + masked_b.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(1, TassadarAlmValueId(25)), (1, TassadarAlmValueId(27))],
+        bias: 0,
+    });
+    // 29: pushed = is_push * operand.
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(1),
+        gate: TassadarAlmValueId(18),
+    });
+    // 30: keep = (1 - is_push - is_add) * read(depth) — preserves the top
+    // for OUT steps so the unconditional write is value-neutral.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![(-1, TassadarAlmValueId(18)), (-1, TassadarAlmValueId(19))],
+        bias: 1,
+    });
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(26),
+        gate: TassadarAlmValueId(30),
+    });
+    // 32: written = pushed + sum + keep.
+    gates.push(TassadarAlmGate::Linear {
+        terms: vec![
+            (1, TassadarAlmValueId(29)),
+            (1, TassadarAlmValueId(28)),
+            (1, TassadarAlmValueId(31)),
+        ],
+        bias: 0,
+    });
+    // 33: write at the post-step depth key.
+    gates.push(TassadarAlmGate::ChannelWrite {
+        channel_id: TassadarAlmChannelId(0),
+        key: TassadarAlmValueId(22),
+        value: TassadarAlmValueId(32),
+    });
+    // 34: out = is_out * read(depth).
+    gates.push(TassadarAlmGate::ReGlu {
+        value: TassadarAlmValueId(26),
+        gate: TassadarAlmValueId(20),
+    });
+    TassadarAlmGraph {
+        schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+        graph_id: "alm.test.stack_micro".to_string(),
+        input_field_count: 2,
+        channels: vec![
+            TassadarAlmChannelDecl {
+                channel_id: TassadarAlmChannelId(0),
+                name: "stack".to_string(),
+                kind: TassadarAlmChannelKind::Keyed,
+            },
+            TassadarAlmChannelDecl {
+                channel_id: TassadarAlmChannelId(1),
+                name: "depth".to_string(),
+                kind: TassadarAlmChannelKind::Accumulator,
+            },
+        ],
+        // Bounded program touches keys 0..=3 before they are written.
+        seed_writes: (0..=3)
+            .map(|key| TassadarAlmSeedWrite {
+                channel_id: TassadarAlmChannelId(0),
+                key,
+                value: 0,
+            })
+            .collect(),
+        gates,
+        outputs: vec![TassadarAlmValueId(34), TassadarAlmValueId(22)],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -614,31 +906,9 @@ mod tests {
         TassadarAlmChannelId(id)
     }
 
-    fn running_sum_graph() -> TassadarAlmGraph {
-        TassadarAlmGraph {
-            schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
-            graph_id: "alm.test.running_sum".to_string(),
-            input_field_count: 1,
-            channels: vec![TassadarAlmChannelDecl {
-                channel_id: channel(0),
-                name: "total".to_string(),
-                kind: TassadarAlmChannelKind::Accumulator,
-            }],
-            seed_writes: Vec::new(),
-            gates: vec![
-                TassadarAlmGate::Input { field: 0 },
-                TassadarAlmGate::CumSum {
-                    channel_id: channel(0),
-                    value: value(0),
-                },
-            ],
-            outputs: vec![value(1)],
-        }
-    }
-
     #[test]
     fn running_sum_matches_exact_prefix_sums() {
-        let graph = running_sum_graph();
+        let graph = tassadar_alm_running_sum_workload();
         let steps = vec![vec![3], vec![5], vec![-2], vec![10]];
         let trace = TassadarAlmEvaluator::evaluate(&graph, &steps).expect("evaluates");
         assert_eq!(
@@ -651,7 +921,7 @@ mod tests {
 
     #[test]
     fn trace_digest_is_deterministic_and_input_sensitive() {
-        let graph = running_sum_graph();
+        let graph = tassadar_alm_running_sum_workload();
         let a = TassadarAlmEvaluator::evaluate(&graph, &[vec![1], vec![2]]).expect("evaluates");
         let b = TassadarAlmEvaluator::evaluate(&graph, &[vec![1], vec![2]]).expect("evaluates");
         let c = TassadarAlmEvaluator::evaluate(&graph, &[vec![1], vec![3]]).expect("evaluates");
@@ -659,77 +929,9 @@ mod tests {
         assert_ne!(a.trace_digest, c.trace_digest);
     }
 
-    /// The Percepta post's toy: track whether the count of verbs so far is
-    /// odd or even. Each step reads the previous parity from a keyed channel
-    /// (seeded for step zero), XORs it with the current indicator via the
-    /// identity `a ^ b = a + b - 2ab`, and writes the new parity back under
-    /// the current position key.
-    fn verb_parity_graph() -> TassadarAlmGraph {
-        TassadarAlmGraph {
-            schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
-            graph_id: "alm.test.verb_parity".to_string(),
-            input_field_count: 1,
-            channels: vec![
-                TassadarAlmChannelDecl {
-                    channel_id: channel(0),
-                    name: "parity".to_string(),
-                    kind: TassadarAlmChannelKind::Keyed,
-                },
-                TassadarAlmChannelDecl {
-                    channel_id: channel(1),
-                    name: "position".to_string(),
-                    kind: TassadarAlmChannelKind::Accumulator,
-                },
-            ],
-            seed_writes: vec![TassadarAlmSeedWrite {
-                channel_id: channel(0),
-                key: 0,
-                value: 0,
-            }],
-            gates: vec![
-                // 0: is_verb input bit.
-                TassadarAlmGate::Input { field: 0 },
-                // 1: constant one.
-                TassadarAlmGate::Const { value: 1 },
-                // 2: position = cumsum(1) = t + 1.
-                TassadarAlmGate::CumSum {
-                    channel_id: channel(1),
-                    value: value(1),
-                },
-                // 3: previous position key = position - 1 = t.
-                TassadarAlmGate::Linear {
-                    terms: vec![(1, value(2))],
-                    bias: -1,
-                },
-                // 4: previous parity read.
-                TassadarAlmGate::ChannelRead {
-                    channel_id: channel(0),
-                    query: value(3),
-                },
-                // 5: product = is_verb * relu(prev_parity); both are 0/1 bits.
-                TassadarAlmGate::ReGlu {
-                    value: value(0),
-                    gate: value(4),
-                },
-                // 6: xor = is_verb + prev_parity - 2 * product.
-                TassadarAlmGate::Linear {
-                    terms: vec![(1, value(0)), (1, value(4)), (-2, value(5))],
-                    bias: 0,
-                },
-                // 7: write parity under the current position key.
-                TassadarAlmGate::ChannelWrite {
-                    channel_id: channel(0),
-                    key: value(2),
-                    value: value(6),
-                },
-            ],
-            outputs: vec![value(6)],
-        }
-    }
-
     #[test]
     fn verb_parity_toy_tracks_running_parity() {
-        let graph = verb_parity_graph();
+        let graph = tassadar_alm_verb_parity_workload();
         // "the cat runs and the dog jumps over fences quickly"
         let is_verb = [0_i64, 0, 1, 0, 0, 0, 1, 0, 0, 0];
         let steps: Vec<Vec<i64>> = is_verb.iter().map(|bit| vec![*bit]).collect();
@@ -740,203 +942,9 @@ mod tests {
         assert_eq!(trace.keyed_write_count, 1 + steps.len());
     }
 
-    /// A bounded three-instruction stack micro: PUSH 3, PUSH 5, ADD, OUT.
-    /// Opcodes: 0 = PUSH(operand), 1 = ADD, 2 = OUT. Stack values live in a
-    /// keyed channel keyed by depth; depth is an accumulator over per-opcode
-    /// deltas; writes are masked through indicator gates built from the ReLU
-    /// step identity `1[x >= c] = relu(x - c + 1) - relu(x - c)`.
-    fn stack_micro_graph() -> TassadarAlmGraph {
-        let mut gates: Vec<TassadarAlmGate> = Vec::new();
-        // 0: opcode, 1: operand.
-        gates.push(TassadarAlmGate::Input { field: 0 });
-        gates.push(TassadarAlmGate::Input { field: 1 });
-        // 2: constant one for relu gating.
-        gates.push(TassadarAlmGate::Const { value: 1 });
-        // Step indicators: 1[op >= c] = relu(op - c + 1) - relu(op - c).
-        // 3: op - 0 + 1, 4: relu of it, 5: op - 0, 6: relu, 7: ge0 = 4 - 6.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(0))],
-            bias: 1,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(2),
-            gate: TassadarAlmValueId(3),
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(0))],
-            bias: 0,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(2),
-            gate: TassadarAlmValueId(5),
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(4)), (-1, TassadarAlmValueId(6))],
-            bias: 0,
-        });
-        // 8..=12: ge1 indicator.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(0))],
-            bias: 0,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(2),
-            gate: TassadarAlmValueId(8),
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(0))],
-            bias: -1,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(2),
-            gate: TassadarAlmValueId(10),
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(9)), (-1, TassadarAlmValueId(11))],
-            bias: 0,
-        });
-        // 13..=17: ge2 indicator.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(0))],
-            bias: -1,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(2),
-            gate: TassadarAlmValueId(13),
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(0))],
-            bias: -2,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(2),
-            gate: TassadarAlmValueId(15),
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(14)), (-1, TassadarAlmValueId(16))],
-            bias: 0,
-        });
-        // 18: is_push = ge0 - ge1; 19: is_add = ge1 - ge2; 20: is_out = ge2.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(7)), (-1, TassadarAlmValueId(12))],
-            bias: 0,
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(12)), (-1, TassadarAlmValueId(17))],
-            bias: 0,
-        });
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(17))],
-            bias: 0,
-        });
-        // 21: delta = is_push - is_add.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(18)), (-1, TassadarAlmValueId(19))],
-            bias: 0,
-        });
-        // 22: depth = cumsum(delta); after PUSH depth is the new slot index.
-        gates.push(TassadarAlmGate::CumSum {
-            channel_id: TassadarAlmChannelId(1),
-            value: TassadarAlmValueId(21),
-        });
-        // 23: top key before this step for ADD = depth + 1 (two operands at
-        // depth+1 and depth); for OUT the top is at depth.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(22))],
-            bias: 1,
-        });
-        // 24: addend_a = is_add * read(depth + 1).
-        // Reads must always resolve, so the stack channel is seeded for the
-        // keys this bounded program can touch when the opcode masks them out.
-        gates.push(TassadarAlmGate::ChannelRead {
-            channel_id: TassadarAlmChannelId(0),
-            query: TassadarAlmValueId(23),
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(24),
-            gate: TassadarAlmValueId(19),
-        });
-        // 26: operand_b = read(depth).
-        gates.push(TassadarAlmGate::ChannelRead {
-            channel_id: TassadarAlmChannelId(0),
-            query: TassadarAlmValueId(22),
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(26),
-            gate: TassadarAlmValueId(19),
-        });
-        // 28: sum = masked_a + masked_b.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(1, TassadarAlmValueId(25)), (1, TassadarAlmValueId(27))],
-            bias: 0,
-        });
-        // 29: pushed = is_push * operand.
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(1),
-            gate: TassadarAlmValueId(18),
-        });
-        // 30: keep = (1 - is_push - is_add) * read(depth) — preserves the top
-        // for OUT steps so the unconditional write is value-neutral.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![(-1, TassadarAlmValueId(18)), (-1, TassadarAlmValueId(19))],
-            bias: 1,
-        });
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(26),
-            gate: TassadarAlmValueId(30),
-        });
-        // 32: written = pushed + sum + keep.
-        gates.push(TassadarAlmGate::Linear {
-            terms: vec![
-                (1, TassadarAlmValueId(29)),
-                (1, TassadarAlmValueId(28)),
-                (1, TassadarAlmValueId(31)),
-            ],
-            bias: 0,
-        });
-        // 33: write at the post-step depth key.
-        gates.push(TassadarAlmGate::ChannelWrite {
-            channel_id: TassadarAlmChannelId(0),
-            key: TassadarAlmValueId(22),
-            value: TassadarAlmValueId(32),
-        });
-        // 34: out = is_out * read(depth).
-        gates.push(TassadarAlmGate::ReGlu {
-            value: TassadarAlmValueId(26),
-            gate: TassadarAlmValueId(20),
-        });
-        TassadarAlmGraph {
-            schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
-            graph_id: "alm.test.stack_micro".to_string(),
-            input_field_count: 2,
-            channels: vec![
-                TassadarAlmChannelDecl {
-                    channel_id: TassadarAlmChannelId(0),
-                    name: "stack".to_string(),
-                    kind: TassadarAlmChannelKind::Keyed,
-                },
-                TassadarAlmChannelDecl {
-                    channel_id: TassadarAlmChannelId(1),
-                    name: "depth".to_string(),
-                    kind: TassadarAlmChannelKind::Accumulator,
-                },
-            ],
-            // Bounded program touches keys 0..=3 before they are written.
-            seed_writes: (0..=3)
-                .map(|key| TassadarAlmSeedWrite {
-                    channel_id: TassadarAlmChannelId(0),
-                    key,
-                    value: 0,
-                })
-                .collect(),
-            gates,
-            outputs: vec![TassadarAlmValueId(34), TassadarAlmValueId(22)],
-        }
-    }
-
     #[test]
     fn stack_micro_executes_push_push_add_out() {
-        let graph = stack_micro_graph();
+        let graph = tassadar_alm_stack_micro_workload();
         // PUSH 3, PUSH 5, ADD, OUT.
         let steps = vec![vec![0, 3], vec![0, 5], vec![1, 0], vec![2, 0]];
         let trace = TassadarAlmEvaluator::evaluate(&graph, &steps).expect("evaluates");
@@ -948,7 +956,7 @@ mod tests {
 
     #[test]
     fn forward_reference_is_rejected() {
-        let mut graph = running_sum_graph();
+        let mut graph = tassadar_alm_running_sum_workload();
         graph.gates[0] = TassadarAlmGate::Linear {
             terms: vec![(1, value(1))],
             bias: 0,
@@ -961,7 +969,7 @@ mod tests {
 
     #[test]
     fn channel_kind_mismatch_is_rejected() {
-        let mut graph = running_sum_graph();
+        let mut graph = tassadar_alm_running_sum_workload();
         graph.gates[1] = TassadarAlmGate::ChannelRead {
             channel_id: channel(0),
             query: value(0),

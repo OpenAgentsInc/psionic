@@ -2713,6 +2713,16 @@ The current scope is:
   `docs/TASSADAR_ALM_GRAPH.md`. This is reference semantics for the
   general program-to-weights compiler lane only — no scheduling, weight
   emission, Wasm intake, or served claim
+- landed executor-compiler E2 bar: `psionic-compiler` now owns the
+  feasible-first ALM backend (`tassadar_alm_backend_list_schedule` v1): a
+  list scheduler over the four-phase layer structure with strict
+  precedence and phase-kind invariants, an interval-coloring slot
+  allocator with explicit stale-slot subtraction records, and a
+  digest-pinned `TassadarAlmCompiledBundle` whose row-only executor
+  reproduces the E1 evaluator's traces digest-for-digest on the committed
+  workloads with demonstrated slot reuse; contract in
+  `docs/TASSADAR_ALM_BACKEND.md`. No MILP optimality, tensor weight
+  materialization, hull-cache decode, Wasm intake, or served claim
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
