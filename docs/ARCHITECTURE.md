@@ -2794,6 +2794,17 @@ The current scope is:
   exceeds a million comparisons while hull visits stay an order of
   magnitude lower (deterministic counts, not wall clock); the bounded
   harness now runs four legs; contract in `docs/TASSADAR_ALM_HULL.md`
+- landed executor-compiler E3 (full, bounded) bar: `psionic-compiler` now
+  owns the branch-capable ALM window interpreter
+  (`tassadar.alm_wasm_interpreter.v1`): real `TassadarProgram`s convert
+  into a static specializable program channel and execute as one gate
+  graph — pc/depth/halted in keyed state, branching as masked
+  displacement arithmetic, halting as a sticky masked bit — with outputs
+  cross-validated against the production `TassadarCpuReferenceRunner`
+  on straight-line, backward-branch-loop, conditional, memory, and
+  fall-off programs, including the full pipeline where the program
+  channel is E5-baked into gate structure and still matches the
+  production runner; contract in `docs/TASSADAR_ALM_WASM_INTERPRETER.md`
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
