@@ -2754,6 +2754,15 @@ The current scope is:
   symbolic evaluator, the E1 evaluator, and E2 compiled execution;
   contract in `docs/TASSADAR_SYMBOLIC_ALM_BRIDGE.md`. Parity is bounded
   to executions that neither saturate in i32 nor overflow i64
+- landed exact trace-replay verification class: `psionic-compiler` now
+  owns `exact_trace_replay.alm_compiled.v1`
+  (`tassadar_alm_trace_replay`): full-replay verdicts against claimed
+  bundle/trace digests and window spot-checks naming the exact first
+  mismatching step, with execution refusals carried through as typed
+  rejections and digest-stable receipt-embeddable verdicts; contract in
+  `docs/TASSADAR_ALM_TRACE_REPLAY.md`. This is the reference for the
+  OpenAgents homework epic's pluggable verification queue and grants no
+  payment or settlement authority
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 

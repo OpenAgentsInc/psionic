@@ -3,6 +3,7 @@
 mod tassadar_alm_backend;
 mod tassadar_alm_specializer;
 mod tassadar_alm_stack_isa;
+mod tassadar_alm_trace_replay;
 mod tassadar_symbolic_alm_bridge;
 mod tassadar_article_abi;
 mod tassadar_article_frontend_compiler_envelope;
@@ -57,6 +58,7 @@ use thiserror::Error;
 pub use tassadar_alm_backend::*;
 pub use tassadar_alm_specializer::*;
 pub use tassadar_alm_stack_isa::*;
+pub use tassadar_alm_trace_replay::*;
 pub use tassadar_symbolic_alm_bridge::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_article_frontend_compiler_envelope::*;
