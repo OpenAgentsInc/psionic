@@ -24,6 +24,13 @@ Claim boundary:
 - It does not promote the A1 lane into the actual `Psion` pretraining operator lane.
 - It does not claim scalable broader-pretraining backward support beyond the
   tiny finite-difference reference trainer.
+- Update 2026-06-10 (issue #1114): a bounded analytic-gradient reference
+  trainer now exists alongside the finite-difference one
+  (`docs/PSION_CS336_A1_REAL_GRADIENT_LANE.md`,
+  `psion_cs336_a1_real_gradient_reference_v1`): hand-derived backprop for
+  the A1 architecture shape, gradient-checked against central differences
+  in f64. The boundary above still holds for scale: single-head tiny
+  config only, no RoPE/multi-head backward, no operator-lane promotion.
 
 | Stanford adapter | Category | Owned `psionic` surface | Proof surface | Status |
 | --- | --- | --- | --- | --- |
