@@ -616,3 +616,69 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod fixture_dump {
+    #![allow(clippy::expect_used)]
+    use psionic_runtime::{TassadarInstruction, TassadarProgram, TassadarWasmProfile};
+
+    use super::*;
+    use crate::tassadar_alm_backend::compile_tassadar_alm_graph;
+    use crate::tassadar_alm_wasm_interpreter::tassadar_alm_wasm_interpreter;
+
+    #[test]
+    #[ignore]
+    fn dump_poc_fixture() {
+        use TassadarInstruction as I;
+        let program = TassadarProgram::new(
+            "tassadar_poc.loop_sum_v1",
+            &TassadarWasmProfile::article_i32_compute_v1(),
+            2,
+            1,
+            vec![
+                I::I32Const { value: 0 },
+                I::LocalSet { local: 0 },
+                I::I32Const { value: 1 },
+                I::LocalSet { local: 1 },
+                I::LocalGet { local: 0 },
+                I::LocalGet { local: 1 },
+                I::I32Add,
+                I::LocalSet { local: 0 },
+                I::LocalGet { local: 1 },
+                I::I32Const { value: 1 },
+                I::I32Add,
+                I::LocalSet { local: 1 },
+                I::LocalGet { local: 1 },
+                I::I32Const { value: 6 },
+                I::I32Lt,
+                I::BrIf { target_pc: 4 },
+                I::LocalGet { local: 0 },
+                I::Output,
+                I::Return,
+            ],
+        );
+        let graph = tassadar_alm_wasm_interpreter(&program).expect("builds");
+        let bundle = compile_tassadar_alm_graph(&graph).expect("compiles");
+        let model = materialize_tassadar_alm_numeric(&bundle);
+        let steps: Vec<Vec<i64>> = vec![vec![0]; 80];
+        let trace = tassadar_alm_numeric_execute(&model, &steps).expect("executes");
+        let fixture = serde_json::json!({
+            "fixtureId": "tassadar_poc.loop_sum_v1.numeric_fixture.v1",
+            "generatedBy": "psionic crates/psionic-compiler tassadar_alm_numeric fixture_dump (psionic main)",
+            "programId": "tassadar_poc.loop_sum_v1",
+            "model": model,
+            "steps": steps,
+            "expectedTraceDigest": trace.trace_digest,
+            "expectedModelDigest": model.stable_digest(),
+            "expectedFinalRow": trace.step_outputs.last(),
+            "expectedOutputs": [15],
+            "claimBoundary": TASSADAR_ALM_NUMERIC_CLAIM_BOUNDARY,
+        });
+        std::fs::write(
+            "/tmp/tassadar-poc-fixture.json",
+            serde_json::to_vec_pretty(&fixture).expect("encodes"),
+        )
+        .expect("writes");
+        eprintln!("trace_digest={}", trace.trace_digest);
+    }
+}
