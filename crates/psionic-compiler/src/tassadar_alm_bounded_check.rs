@@ -11,6 +11,7 @@ use crate::tassadar_alm_backend::{
     compile_tassadar_alm_graph, tassadar_alm_errors_match, tassadar_alm_phase_kind,
     TassadarAlmCompiledBundle, TassadarAlmCompiledExecutor, TassadarAlmPhaseKind,
 };
+use crate::tassadar_alm_geometric::tassadar_alm_geometric_execute;
 
 /// Claim boundary for the bounded differential check harness.
 pub const TASSADAR_ALM_BOUNDED_CHECK_CLAIM_BOUNDARY: &str = "the bounded check harness \
@@ -372,16 +373,21 @@ pub fn tassadar_alm_bounded_check(
         }
         let evaluated = TassadarAlmEvaluator::evaluate(&graph, &steps);
         let compiled = TassadarAlmCompiledExecutor::execute(&bundle, &steps);
-        match (evaluated, compiled) {
-            (Ok(reference), Ok(executed)) => {
-                if reference.step_outputs == executed.step_outputs {
+        let geometric = tassadar_alm_geometric_execute(&bundle, &steps);
+        match (evaluated, compiled, geometric) {
+            (Ok(reference), Ok(executed), Ok(geometric_trace)) => {
+                if reference.step_outputs == executed.step_outputs
+                    && reference.step_outputs == geometric_trace.step_outputs
+                {
                     parity_agreements += 1;
                 } else {
                     parity_failures += 1;
                 }
             }
-            (Err(reference_error), Err(executed_error)) => {
-                if tassadar_alm_errors_match(&reference_error, &executed_error) {
+            (Err(reference_error), Err(executed_error), Err(geometric_error)) => {
+                if tassadar_alm_errors_match(&reference_error, &executed_error)
+                    && tassadar_alm_errors_match(&reference_error, &geometric_error)
+                {
                     refusal_agreements += 1;
                 } else {
                     parity_failures += 1;

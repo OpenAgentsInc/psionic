@@ -2774,6 +2774,17 @@ The current scope is:
   and fixed a real scheduler bug (same-channel cumsum reordering) plus a
   latent same-step write-order hazard; contract in
   `docs/TASSADAR_ALM_BOUNDED_CHECK.md`. Bounded evidence, not a proof
+- landed executor-compiler E2b bar: `psionic-compiler` now owns the
+  geometric attention execution leg
+  (`tassadar.alm_geometric_executor.v1`): keyed reads executed as
+  parabolic-key argmax (`2qk − k²`) over append-only point lists with
+  latest-write tie-breaking and exact-match verification (near-miss
+  argmax refuses, never interpolates), accumulators as uniform-attention
+  sums — the construction's actual mechanism, in exact integers. Parity
+  with the evaluator and row executor holds digest-for-digest on every
+  committed workload, and the bounded harness now runs three legs over
+  its 400 generated graphs; contract in `docs/TASSADAR_ALM_GEOMETRIC.md`.
+  Linear-scan argmax only; the hull fast path is E2c
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
