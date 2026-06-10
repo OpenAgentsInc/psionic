@@ -68,8 +68,16 @@ IR → specialize → schedule → compiled-execution pipeline. The
 verb-parity workload's parity channel correctly refuses specialization
 (it is dynamic), as do accumulators, unknown channels, and empty seeds.
 
+## E5b: Shared Step-Function Indicators (v2, issue #1111)
+
+v2 deduplicates indicator subgraphs across reads: identical `1[q >= k]`
+constructions are built once per (remapped query, threshold) and shared
+thereafter — the construction's shared-2N-neurons accounting. The report
+carries `shared_indicator_hits`, and the landed tests pin both the hit
+count (a second same-query read reuses its entire indicator bank) and
+the size bound (a two-read specialization stays within a few gates of
+the single-read cost instead of doubling).
+
 ## What This Phase Does Not Do
 
-No tensor weight materialization, no shared-neuron deduplication across
-multiple reads (each read inlines its own indicators in v1; sharing is an
-optimization for the MILP phase), no Wasm intake, no serving.
+No tensor weight materialization, no Wasm intake, no serving.

@@ -6,7 +6,7 @@ use thiserror::Error;
 /// Stable family identifier for the ALM Futamura specializer.
 pub const TASSADAR_ALM_SPECIALIZER_FAMILY: &str = "tassadar_alm_first_futamura";
 /// Stable version identifier for the ALM Futamura specializer.
-pub const TASSADAR_ALM_SPECIALIZER_VERSION: &str = "v1";
+pub const TASSADAR_ALM_SPECIALIZER_VERSION: &str = "v2";
 /// Claim boundary for the ALM specialization lane.
 pub const TASSADAR_ALM_SPECIALIZER_CLAIM_BOUNDARY: &str = "ALM specialization rewrites reads of \
      one static seeded channel into exact ReGLU step-function fetches and removes the channel; \
@@ -31,6 +31,8 @@ pub struct TassadarAlmSpecializationReport {
     pub source_gate_count: usize,
     /// Gates in the specialized graph.
     pub specialized_gate_count: usize,
+    /// Indicator subgraphs reused across reads instead of rebuilt.
+    pub shared_indicator_hits: usize,
     /// Source graph digest.
     pub source_graph_digest: String,
     /// Specialized graph digest.
@@ -124,6 +126,12 @@ pub fn specialize_tassadar_alm_graph(
     // One shared constant-one gate for ReGLU step gating, created on first
     // rewritten read.
     let mut const_one: Option<u32> = None;
+    // Shared step-function indicators: identical `1[q >= k]` subgraphs are
+    // built once per (remapped query, threshold) and reused across reads —
+    // the construction's shared-2N-neurons accounting.
+    let mut indicator_cache: std::collections::BTreeMap<(u32, i64), u32> =
+        std::collections::BTreeMap::new();
+    let mut shared_indicator_hits = 0_usize;
     for gate in &graph.gates {
         let remap = |value: TassadarAlmValueId, id_map: &[u32]| -> TassadarAlmValueId {
             TassadarAlmValueId(id_map[value.0 as usize])
@@ -151,35 +159,46 @@ pub fn specialize_tassadar_alm_graph(
                     if delta == 0 {
                         continue;
                     }
-                    // 1[q >= key] = relu(q - key + 1) - relu(q - key).
-                    new_gates.push(TassadarAlmGate::Linear {
-                        terms: vec![(1, query)],
-                        bias: 1 - key,
-                    });
-                    let shifted_plus = (new_gates.len() - 1) as u32;
-                    new_gates.push(TassadarAlmGate::ReGlu {
-                        value: TassadarAlmValueId(one),
-                        gate: TassadarAlmValueId(shifted_plus),
-                    });
-                    let relu_plus = (new_gates.len() - 1) as u32;
-                    new_gates.push(TassadarAlmGate::Linear {
-                        terms: vec![(1, query)],
-                        bias: -key,
-                    });
-                    let shifted = (new_gates.len() - 1) as u32;
-                    new_gates.push(TassadarAlmGate::ReGlu {
-                        value: TassadarAlmValueId(one),
-                        gate: TassadarAlmValueId(shifted),
-                    });
-                    let relu = (new_gates.len() - 1) as u32;
-                    new_gates.push(TassadarAlmGate::Linear {
-                        terms: vec![
-                            (1, TassadarAlmValueId(relu_plus)),
-                            (-1, TassadarAlmValueId(relu)),
-                        ],
-                        bias: 0,
-                    });
-                    let indicator = (new_gates.len() - 1) as u32;
+                    // 1[q >= key] = relu(q - key + 1) - relu(q - key),
+                    // built once per (query, key) and shared thereafter.
+                    let indicator = match indicator_cache.get(&(query.0, key)) {
+                        Some(existing) => {
+                            shared_indicator_hits += 1;
+                            *existing
+                        }
+                        None => {
+                            new_gates.push(TassadarAlmGate::Linear {
+                                terms: vec![(1, query)],
+                                bias: 1 - key,
+                            });
+                            let shifted_plus = (new_gates.len() - 1) as u32;
+                            new_gates.push(TassadarAlmGate::ReGlu {
+                                value: TassadarAlmValueId(one),
+                                gate: TassadarAlmValueId(shifted_plus),
+                            });
+                            let relu_plus = (new_gates.len() - 1) as u32;
+                            new_gates.push(TassadarAlmGate::Linear {
+                                terms: vec![(1, query)],
+                                bias: -key,
+                            });
+                            let shifted = (new_gates.len() - 1) as u32;
+                            new_gates.push(TassadarAlmGate::ReGlu {
+                                value: TassadarAlmValueId(one),
+                                gate: TassadarAlmValueId(shifted),
+                            });
+                            let relu = (new_gates.len() - 1) as u32;
+                            new_gates.push(TassadarAlmGate::Linear {
+                                terms: vec![
+                                    (1, TassadarAlmValueId(relu_plus)),
+                                    (-1, TassadarAlmValueId(relu)),
+                                ],
+                                bias: 0,
+                            });
+                            let built = (new_gates.len() - 1) as u32;
+                            indicator_cache.insert((query.0, key), built);
+                            built
+                        }
+                    };
                     terms.push((delta, TassadarAlmValueId(indicator)));
                 }
                 new_gates.push(TassadarAlmGate::Linear { terms, bias: base });
@@ -271,6 +290,7 @@ pub fn specialize_tassadar_alm_graph(
         specialized_gate_count: specialized.gates.len(),
         source_graph_digest: graph.stable_digest(),
         specialized_graph_digest: specialized.stable_digest(),
+        shared_indicator_hits,
     };
     Ok((specialized, report))
 }
@@ -444,5 +464,114 @@ mod tests {
         let (_, b) =
             specialize_tassadar_alm_graph(&graph, TassadarAlmChannelId(0)).expect("specializes");
         assert_eq!(a.stable_digest(), b.stable_digest());
+    }
+}
+
+#[cfg(test)]
+mod shared_indicator_tests {
+    #![allow(clippy::expect_used)]
+
+    use psionic_ir::{
+        TassadarAlmChannelDecl, TassadarAlmChannelKind, TassadarAlmEvaluator, TassadarAlmSeedWrite,
+        TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+    };
+
+    use super::*;
+
+    /// Two reads of the same static channel with the same query: the second
+    /// read's indicators must be shared, not rebuilt.
+    #[test]
+    fn same_query_reads_share_indicator_subgraphs() {
+        let channel = TassadarAlmChannelId(0);
+        let graph = TassadarAlmGraph {
+            schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+            graph_id: "alm.specializer.shared".to_string(),
+            input_field_count: 1,
+            channels: vec![TassadarAlmChannelDecl {
+                channel_id: channel,
+                name: "table".to_string(),
+                kind: TassadarAlmChannelKind::Keyed,
+            }],
+            seed_writes: (0..6)
+                .map(|key| TassadarAlmSeedWrite {
+                    channel_id: channel,
+                    key,
+                    value: key * 10 + 1,
+                })
+                .collect(),
+            gates: vec![
+                TassadarAlmGate::Input { field: 0 },
+                TassadarAlmGate::ChannelRead {
+                    channel_id: channel,
+                    query: TassadarAlmValueId(0),
+                },
+                TassadarAlmGate::ChannelRead {
+                    channel_id: channel,
+                    query: TassadarAlmValueId(0),
+                },
+                TassadarAlmGate::Linear {
+                    terms: vec![(1, TassadarAlmValueId(1)), (1, TassadarAlmValueId(2))],
+                    bias: 0,
+                },
+            ],
+            outputs: vec![TassadarAlmValueId(3)],
+        };
+        let (specialized, report) =
+            specialize_tassadar_alm_graph(&graph, channel).expect("specializes");
+        assert_eq!(report.rewritten_reads, 2);
+        // Five non-zero deltas per read; the second read reuses all five.
+        assert_eq!(report.shared_indicator_hits, 5);
+        // Parity across in-range queries.
+        for query in 0..6 {
+            let original =
+                TassadarAlmEvaluator::evaluate(&graph, &[vec![query]]).expect("evaluates");
+            let rewritten =
+                TassadarAlmEvaluator::evaluate(&specialized, &[vec![query]]).expect("evaluates");
+            assert_eq!(original.step_outputs, rewritten.step_outputs);
+        }
+    }
+
+    #[test]
+    fn shared_specialization_is_smaller_than_double_single_read_cost() {
+        let channel = TassadarAlmChannelId(0);
+        let build = |reads: usize| -> TassadarAlmGraph {
+            let mut gates = vec![TassadarAlmGate::Input { field: 0 }];
+            for _ in 0..reads {
+                gates.push(TassadarAlmGate::ChannelRead {
+                    channel_id: channel,
+                    query: TassadarAlmValueId(0),
+                });
+            }
+            let outputs = vec![TassadarAlmValueId(gates.len() as u32 - 1)];
+            TassadarAlmGraph {
+                schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+                graph_id: format!("alm.specializer.size_{reads}"),
+                input_field_count: 1,
+                channels: vec![TassadarAlmChannelDecl {
+                    channel_id: channel,
+                    name: "table".to_string(),
+                    kind: TassadarAlmChannelKind::Keyed,
+                }],
+                seed_writes: (0..8)
+                    .map(|key| TassadarAlmSeedWrite {
+                        channel_id: channel,
+                        key,
+                        value: key + 1,
+                    })
+                    .collect(),
+                gates,
+                outputs,
+            }
+        };
+        let (single, _) = specialize_tassadar_alm_graph(&build(1), channel).expect("specializes");
+        let (double, _) = specialize_tassadar_alm_graph(&build(2), channel).expect("specializes");
+        // The second read adds only its fetch linear, not a fresh indicator
+        // bank, so the double graph is far below twice the single cost.
+        assert!(
+            double.gates.len() < single.gates.len() + 4,
+            "double {} vs single {}",
+            double.gates.len(),
+            single.gates.len()
+        );
     }
 }
