@@ -2746,6 +2746,14 @@ The current scope is:
   execution; contract in `docs/TASSADAR_ALM_STACK_ISA.md`. No branches,
   loops, calls, or Wasm claim — the full `core_i32_v2` frontend remains
   open
+- landed symbolic-to-ALM bridge: `psionic-compiler` now lowers the bounded
+  straight-line symbolic IR into channel-free single-step ALM graphs
+  (`tassadar_symbolic_alm_bridge` v1: SSA slot/name maps, Add/Sub as
+  linear wiring, Mul as the two-ReGLU product, Lt as the ReLU step
+  indicator), with every committed symbolic example agreeing across the
+  symbolic evaluator, the E1 evaluator, and E2 compiled execution;
+  contract in `docs/TASSADAR_SYMBOLIC_ALM_BRIDGE.md`. Parity is bounded
+  to executions that neither saturate in i32 nor overflow i64
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
