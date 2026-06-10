@@ -3,6 +3,7 @@
 mod tassadar_alm_backend;
 mod tassadar_alm_bounded_check;
 mod tassadar_alm_geometric;
+mod tassadar_alm_hull;
 mod tassadar_alm_specializer;
 mod tassadar_alm_stack_isa;
 mod tassadar_alm_trace_replay;
@@ -60,6 +61,7 @@ use thiserror::Error;
 pub use tassadar_alm_backend::*;
 pub use tassadar_alm_bounded_check::*;
 pub use tassadar_alm_geometric::*;
+pub use tassadar_alm_hull::*;
 pub use tassadar_alm_specializer::*;
 pub use tassadar_alm_stack_isa::*;
 pub use tassadar_alm_trace_replay::*;
