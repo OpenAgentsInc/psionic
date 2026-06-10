@@ -13,6 +13,10 @@ use crate::tassadar_alm_backend::{
 };
 use crate::tassadar_alm_geometric::tassadar_alm_geometric_execute;
 use crate::tassadar_alm_hull::tassadar_alm_hull_execute;
+use crate::tassadar_alm_numeric::{
+    materialize_tassadar_alm_numeric, tassadar_alm_numeric_execute,
+    TassadarAlmNumericExecutionError,
+};
 
 /// Claim boundary for the bounded differential check harness.
 pub const TASSADAR_ALM_BOUNDED_CHECK_CLAIM_BOUNDARY: &str = "the bounded check harness \
@@ -376,11 +380,31 @@ pub fn tassadar_alm_bounded_check(
         let compiled = TassadarAlmCompiledExecutor::execute(&bundle, &steps);
         let geometric = tassadar_alm_geometric_execute(&bundle, &steps);
         let hull = tassadar_alm_hull_execute(&bundle, &steps);
+        let numeric = {
+            let model = materialize_tassadar_alm_numeric(&bundle);
+            tassadar_alm_numeric_execute(&model, &steps)
+        };
+        // The numeric leg's domain is narrower by design: its 2^53 exactness
+        // window sits inside i64, so a window breach is an acceptable
+        // demotion regardless of how the integer legs fared. Inside the
+        // window it must agree exactly.
+        let numeric_consistent = match (&evaluated, &numeric) {
+            (_, Err(TassadarAlmNumericExecutionError::ExactnessWindowExceeded { .. })) => true,
+            (Ok(reference), Ok(numeric_trace)) => {
+                reference.step_outputs == numeric_trace.step_outputs
+            }
+            (
+                Err(psionic_ir::TassadarAlmEvaluationError::MissingKey { .. }),
+                Err(TassadarAlmNumericExecutionError::MissingKey { .. }),
+            ) => true,
+            _ => false,
+        };
         match (evaluated, compiled, geometric, hull) {
             (Ok(reference), Ok(executed), Ok(geometric_trace), Ok(hull_trace)) => {
                 if reference.step_outputs == executed.step_outputs
                     && reference.step_outputs == geometric_trace.step_outputs
                     && reference.step_outputs == hull_trace.step_outputs
+                    && numeric_consistent
                 {
                     parity_agreements += 1;
                 } else {
@@ -391,6 +415,7 @@ pub fn tassadar_alm_bounded_check(
                 if tassadar_alm_errors_match(&reference_error, &executed_error)
                     && tassadar_alm_errors_match(&reference_error, &geometric_error)
                     && tassadar_alm_errors_match(&reference_error, &hull_error)
+                    && numeric_consistent
                 {
                     refusal_agreements += 1;
                 } else {

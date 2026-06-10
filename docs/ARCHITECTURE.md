@@ -2805,6 +2805,17 @@ The current scope is:
   fall-off programs, including the full pipeline where the program
   channel is E5-baked into gate structure and still matches the
   production runner; contract in `docs/TASSADAR_ALM_WASM_INTERPRETER.md`
+- landed executor-compiler E6-numeric bar: `psionic-compiler` now owns
+  numeric model materialization (`TassadarAlmNumericModel` v1 +
+  `tassadar.alm_numeric_executor.v1`): compiled bundles re-encoded as
+  serde-serializable, digest-pinned f64 coefficient arrays — sparse
+  linear wiring maps, gated neurons, hard-max parabolic attention —
+  executed inside a runtime-checked 2^53 exactness window with typed
+  refusals on breach; a real runtime `TassadarProgram` runs as a
+  portable JSON data artifact matching the production CPU runner, and
+  the bounded harness now runs five legs; contract in
+  `docs/TASSADAR_ALM_NUMERIC.md`. Hard-max only, no trained weights, no
+  serving
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
