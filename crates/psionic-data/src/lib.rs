@@ -9,6 +9,7 @@
 mod apple_adapter;
 mod apple_adapter_curation;
 mod cs336_a1_bpe;
+mod cs336_a4_data_refinery;
 mod legal_benchmark_dataset_sharding;
 mod legal_benchmark_dpo_dataset;
 mod legal_benchmark_sft_dataset;
@@ -62,6 +63,7 @@ use thiserror::Error;
 pub use apple_adapter::*;
 pub use apple_adapter_curation::*;
 pub use cs336_a1_bpe::*;
+pub use cs336_a4_data_refinery::*;
 pub use legal_benchmark_dataset_sharding::*;
 pub use legal_benchmark_dpo_dataset::*;
 pub use legal_benchmark_sft_dataset::*;
