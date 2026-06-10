@@ -282,6 +282,11 @@ pub fn compile_tassadar_alm_graph(
     let mut phases: Vec<u32> = vec![0; gate_count];
     // Alias map: a ChannelWrite gate aliases its value operand's slot.
     let mut alias: Vec<Option<u32>> = vec![None; gate_count];
+    // Accumulator contributions are order-sensitive side effects: each
+    // CumSum on a channel must be scheduled strictly after the previous
+    // CumSum on the same channel so gate-order accumulation survives
+    // scheduling.
+    let mut last_cumsum_phase: BTreeMap<u16, u32> = BTreeMap::new();
     for (gate_index, gate) in graph.gates.iter().enumerate() {
         let deps: Vec<u32> = match gate {
             TassadarAlmGate::Input { .. } | TassadarAlmGate::Const { .. } => Vec::new(),
@@ -306,8 +311,18 @@ pub fn compile_tassadar_alm_graph(
             TassadarAlmGate::ReGlu { .. } => {
                 next_phase_of_kind(earliest_after_deps.max(1), TassadarAlmPhaseKind::Ffn)
             }
-            TassadarAlmGate::ChannelRead { .. } | TassadarAlmGate::CumSum { .. } => {
+            TassadarAlmGate::ChannelRead { .. } => {
                 next_phase_of_kind(earliest_after_deps.max(1), TassadarAlmPhaseKind::Attention)
+            }
+            TassadarAlmGate::CumSum { channel_id, .. } => {
+                let chained = last_cumsum_phase
+                    .get(&channel_id.0)
+                    .map_or(earliest_after_deps, |previous| {
+                        earliest_after_deps.max(previous + 1)
+                    });
+                let phase = next_phase_of_kind(chained.max(1), TassadarAlmPhaseKind::Attention);
+                last_cumsum_phase.insert(channel_id.0, phase);
+                phase
             }
             TassadarAlmGate::ChannelWrite { value, .. } => {
                 // Writes emit at end of step from materialized slots; the
@@ -448,16 +463,10 @@ pub fn compile_tassadar_alm_graph(
                     phase,
                 });
             }
-            TassadarAlmGate::ChannelWrite {
-                channel_id,
-                key,
-                value,
-            } => {
-                write_rows.push(TassadarAlmWriteRow {
-                    channel: channel_id.0,
-                    key_slot: slots[key.0 as usize],
-                    value_slot: slots[value.0 as usize],
-                });
+            TassadarAlmGate::ChannelWrite { .. } => {
+                // Write rows are emitted in source-gate order below so that
+                // same-step writes to one key keep the evaluator's
+                // latest-gate-wins semantics regardless of scheduling.
             }
             TassadarAlmGate::ChannelRead { channel_id, query } => {
                 attention_rows.push(TassadarAlmAttentionRow::KeyedRead {
@@ -475,6 +484,20 @@ pub fn compile_tassadar_alm_graph(
                     phase,
                 });
             }
+        }
+    }
+    for gate in &graph.gates {
+        if let TassadarAlmGate::ChannelWrite {
+            channel_id,
+            key,
+            value,
+        } = gate
+        {
+            write_rows.push(TassadarAlmWriteRow {
+                channel: channel_id.0,
+                key_slot: slots[key.0 as usize],
+                value_slot: slots[value.0 as usize],
+            });
         }
     }
     let layer_count = max_phase.div_ceil(4);
@@ -525,7 +548,24 @@ fn validate_schedule(
     graph: &TassadarAlmGraph,
     scheduled: &[ScheduledGate],
 ) -> Result<(), TassadarAlmBackendError> {
+    let mut last_cumsum_phase: BTreeMap<u16, u32> = BTreeMap::new();
     for (gate_index, gate) in graph.gates.iter().enumerate() {
+        if let TassadarAlmGate::CumSum { channel_id, .. } = gate {
+            let phase = scheduled[gate_index].phase;
+            if let Some(previous) = last_cumsum_phase.get(&channel_id.0) {
+                if phase <= *previous {
+                    return Err(TassadarAlmBackendError::ScheduleInvariant {
+                        gate: gate_index as u32,
+                        reason: format!(
+                            "cumsum on channel {} at phase {phase} does not follow the \
+                             previous cumsum at phase {previous}",
+                            channel_id.0
+                        ),
+                    });
+                }
+            }
+            last_cumsum_phase.insert(channel_id.0, phase);
+        }
         let placement = &scheduled[gate_index];
         let expected_kind = match gate {
             TassadarAlmGate::Input { .. } | TassadarAlmGate::Const { .. } => {
@@ -879,5 +919,59 @@ mod tests {
         let compiled_error =
             TassadarAlmCompiledExecutor::execute(&bundle, &[vec![7]]).expect_err("refuses");
         assert!(tassadar_alm_errors_match(&evaluator_error, &compiled_error));
+    }
+}
+
+#[cfg(test)]
+mod cumsum_order_regression {
+    #![allow(clippy::expect_used)]
+
+    use psionic_ir::{
+        TassadarAlmChannelDecl, TassadarAlmChannelId, TassadarAlmChannelKind, TassadarAlmEvaluator,
+        TassadarAlmGate, TassadarAlmGraph, TassadarAlmValueId, TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+    };
+
+    use super::*;
+
+    /// Regression for the bug found by the bounded differential harness:
+    /// two cumsums on one accumulator channel were reorderable by the
+    /// scheduler, breaking gate-order accumulation. The second cumsum
+    /// depends on a ReGLU (FFN phase), pushing it to a later layer than
+    /// the third gate's cumsum unless same-channel ordering is chained.
+    #[test]
+    fn same_channel_cumsums_keep_gate_order_through_scheduling() {
+        let graph = TassadarAlmGraph {
+            schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+            graph_id: "alm.regression.cumsum_order".to_string(),
+            input_field_count: 1,
+            channels: vec![TassadarAlmChannelDecl {
+                channel_id: TassadarAlmChannelId(1),
+                name: "totals".to_string(),
+                kind: TassadarAlmChannelKind::Accumulator,
+            }],
+            seed_writes: Vec::new(),
+            gates: vec![
+                TassadarAlmGate::Input { field: 0 },
+                TassadarAlmGate::ReGlu {
+                    value: TassadarAlmValueId(0),
+                    gate: TassadarAlmValueId(0),
+                },
+                TassadarAlmGate::CumSum {
+                    channel_id: TassadarAlmChannelId(1),
+                    value: TassadarAlmValueId(1),
+                },
+                TassadarAlmGate::CumSum {
+                    channel_id: TassadarAlmChannelId(1),
+                    value: TassadarAlmValueId(0),
+                },
+            ],
+            outputs: vec![TassadarAlmValueId(3)],
+        };
+        let steps = vec![vec![2], vec![2], vec![0]];
+        let reference = TassadarAlmEvaluator::evaluate(&graph, &steps).expect("evaluates");
+        let bundle = compile_tassadar_alm_graph(&graph).expect("compiles");
+        let compiled = TassadarAlmCompiledExecutor::execute(&bundle, &steps).expect("executes");
+        assert_eq!(reference.step_outputs, compiled.step_outputs);
+        assert_eq!(reference.step_outputs, vec![vec![6], vec![12], vec![12]]);
     }
 }

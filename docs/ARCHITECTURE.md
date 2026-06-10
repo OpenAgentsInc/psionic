@@ -2763,6 +2763,17 @@ The current scope is:
   `docs/TASSADAR_ALM_TRACE_REPLAY.md`. This is the reference for the
   OpenAgents homework epic's pluggable verification queue and grants no
   payment or settlement authority
+- landed bounded differential check: `psionic-compiler` now owns the
+  seeded ALM check harness (`tassadar_alm_bounded_check`): generated
+  small graphs over the full gate grammar must agree between the E1
+  evaluator and E2 compiled execution (outputs or matching refusal
+  families), and an independent invariant checker verifies precedence,
+  phase kinds, slot-lifetime disjointness, subtraction completeness, and
+  same-channel cumsum ordering against the bundle alone; the committed
+  seed runs 400 graphs with zero failures. The harness's first run found
+  and fixed a real scheduler bug (same-channel cumsum reordering) plus a
+  latent same-step write-order hazard; contract in
+  `docs/TASSADAR_ALM_BOUNDED_CHECK.md`. Bounded evidence, not a proof
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
