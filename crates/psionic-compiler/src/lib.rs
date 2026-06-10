@@ -2,6 +2,7 @@
 
 mod tassadar_alm_backend;
 mod tassadar_alm_specializer;
+mod tassadar_alm_stack_isa;
 mod tassadar_article_abi;
 mod tassadar_article_frontend_compiler_envelope;
 mod tassadar_clrs_wasm_bridge;
@@ -54,6 +55,7 @@ use thiserror::Error;
 
 pub use tassadar_alm_backend::*;
 pub use tassadar_alm_specializer::*;
+pub use tassadar_alm_stack_isa::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_article_frontend_compiler_envelope::*;
 pub use tassadar_clrs_wasm_bridge::*;

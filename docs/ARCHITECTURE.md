@@ -2734,6 +2734,18 @@ The current scope is:
   outputs; contract in `docs/TASSADAR_ALM_SPECIALIZER.md`. The
   step-function fetch totalizes the partial keyed read, so the claim is
   bounded to programs whose reads hit seeded keys
+- landed executor-compiler E3 bar (bounded): `psionic-compiler` now owns
+  the ALM stack-ISA universal interpreter
+  (`tassadar.alm_stack_isa_interpreter.v1`): a straight-line
+  push/add/sub/mul/out/halt machine as one gate graph with the program in
+  a static seeded channel, cursor and depth as accumulators, opcode
+  decode via ReLU step indicators, and masked unconditional stack writes;
+  encoder-side static stack-discipline refusals; the landed six-way
+  agreement test matches a Rust reference machine against the universal
+  and E5-specialized graphs under both the E1 evaluator and E2 compiled
+  execution; contract in `docs/TASSADAR_ALM_STACK_ISA.md`. No branches,
+  loops, calls, or Wasm claim — the full `core_i32_v2` frontend remains
+  open
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
