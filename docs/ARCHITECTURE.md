@@ -2785,6 +2785,15 @@ The current scope is:
   committed workload, and the bounded harness now runs three legs over
   its 400 generated graphs; contract in `docs/TASSADAR_ALM_GEOMETRIC.md`.
   Linear-scan argmax only; the hull fast path is E2c
+- landed executor-compiler E2c bar: `psionic-compiler` now owns the hull
+  fast path (`tassadar.alm_hull_executor.v1`): a Li Chao tree over the
+  declared query window answers the parabolic-key argmax in O(log W)
+  node visits with i128 score evaluation, latest-write value maps, the
+  same exact-match refusal, and direct/fallback posture reported per
+  read; on the committed 2,000-step chain workload the linear baseline
+  exceeds a million comparisons while hull visits stay an order of
+  magnitude lower (deterministic counts, not wall clock); the bounded
+  harness now runs four legs; contract in `docs/TASSADAR_ALM_HULL.md`
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
