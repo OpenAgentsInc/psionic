@@ -1,6 +1,7 @@
 //! Lowering and scheduling boundaries for Psionic.
 
 mod tassadar_alm_backend;
+mod tassadar_alm_specializer;
 mod tassadar_article_abi;
 mod tassadar_article_frontend_compiler_envelope;
 mod tassadar_clrs_wasm_bridge;
@@ -52,6 +53,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub use tassadar_alm_backend::*;
+pub use tassadar_alm_specializer::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_article_frontend_compiler_envelope::*;
 pub use tassadar_clrs_wasm_bridge::*;

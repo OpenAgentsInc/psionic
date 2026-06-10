@@ -2723,6 +2723,17 @@ The current scope is:
   workloads with demonstrated slot reuse; contract in
   `docs/TASSADAR_ALM_BACKEND.md`. No MILP optimality, tensor weight
   materialization, hull-cache decode, Wasm intake, or served claim
+- landed executor-compiler E5 bar: `psionic-compiler` now owns the ALM
+  first-Futamura specializer (`tassadar_alm_first_futamura` v1): reads of
+  one static seeded channel become exact ReGLU step-function fetches
+  (`fetched(q) = c0 + sum (ci - c(i-1)) * 1[q >= ki]`) and the channel
+  disappears from the graph, with typed refusals for dynamic,
+  accumulator, unknown, and empty channels and a digest-pinned
+  specialization report; specialized graphs reproduce original evaluator
+  outputs and compile through the E2 backend with identical compiled
+  outputs; contract in `docs/TASSADAR_ALM_SPECIALIZER.md`. The
+  step-function fetch totalizes the partial keyed read, so the claim is
+  bounded to programs whose reads hit seeded keys
 - strategic value: giving larger reasoning systems inner exact-computation
   ability
 
