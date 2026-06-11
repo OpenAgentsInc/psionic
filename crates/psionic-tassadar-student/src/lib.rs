@@ -8,6 +8,8 @@
 //! core) carries Tassadar-grade exactness, and it is not trained.
 //!
 //! Modules:
+//! * [`budget`] — the bounded CPU-budget guard (psionic#1123): one
+//!   core by default, explicit owner opt-in for more;
 //! * [`prep`] — `student_prep.v0.1` reader and the student token
 //!   protocol over verified trace records;
 //! * [`tensor`] — deterministic f32 math (gemm, AdamW, splitmix);
@@ -18,6 +20,7 @@
 //!   psionic numeric executor;
 //! * [`evalrun`] — first-divergence evaluation with replay acceptance.
 
+pub mod budget;
 pub mod evalrun;
 pub mod interface;
 pub mod model;
