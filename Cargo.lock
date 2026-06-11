@@ -5428,6 +5428,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "psionic-tassadar-student"
+version = "0.2.0"
+dependencies = [
+ "hex",
+ "psionic-compiler",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "psionic-train"
 version = "0.2.0"
 dependencies = [
