@@ -2,7 +2,12 @@
 //!
 //! Usage:
 //!   tassadar-student-train --prep train.tsprep --baseline a|b|c|c-random|d \
-//!     --out <dir> [--max-steps N] [--threads N] [--host <label>]
+//!     --out <dir> [--max-steps N] [--cpu-budget N] [--host <label>]
+//!
+//! CPU budget (psionic#1123): defaults to ONE core. Widening requires an
+//! explicit owner opt-in via `--cpu-budget N` (alias: legacy `--threads N`)
+//! or `PSIONIC_TRAIN_CPU_BUDGET=N`; the launch banner records the
+//! effective budget and its source.
 
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -10,6 +15,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use psionic_tassadar_student::budget::{CPU_BUDGET_ENV, resolve_cpu_budget};
 use psionic_tassadar_student::interface::{InterfaceTrainStats, train_interface};
 use psionic_tassadar_student::prep::parse_prep;
 use psionic_tassadar_student::train::{Baseline, TrainConfig, train};
@@ -41,7 +47,7 @@ fn run() -> Result<(), String> {
     let mut out_dir: Option<PathBuf> = None;
     let mut baseline: Option<String> = None;
     let mut max_steps = 0_usize;
-    let mut threads = 0_usize;
+    let mut cpu_budget_flag: Option<usize> = None;
     let mut host = String::from("unspecified");
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut index = 0;
@@ -61,10 +67,13 @@ fn run() -> Result<(), String> {
                     .parse()
                     .map_err(|error| format!("bad --max-steps: {error}"))?;
             }
-            "--threads" => {
-                threads = take_value(&mut index)?
-                    .parse()
-                    .map_err(|error| format!("bad --threads: {error}"))?;
+            // `--threads` is the legacy alias; both are explicit opt-ins.
+            flag @ ("--cpu-budget" | "--threads") => {
+                cpu_budget_flag = Some(
+                    take_value(&mut index)?
+                        .parse()
+                        .map_err(|error| format!("bad {flag}: {error}"))?,
+                );
             }
             "--host" => host = take_value(&mut index)?,
             other => return Err(format!("unknown argument {other}")),
@@ -74,12 +83,16 @@ fn run() -> Result<(), String> {
     let prep_path = prep_path.ok_or("missing --prep")?;
     let out_dir = out_dir.ok_or("missing --out")?;
     let baseline = baseline.ok_or("missing --baseline")?;
-    if threads > 0 {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(threads)
-            .build_global()
-            .map_err(|error| error.to_string())?;
+    let budget =
+        resolve_cpu_budget(cpu_budget_flag, std::env::var(CPU_BUDGET_ENV).ok().as_deref())?;
+    {
+        let mut log = std::io::stderr().lock();
+        let _ = writeln!(log, "{}", budget.banner());
     }
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(budget.cores)
+        .build_global()
+        .map_err(|error| error.to_string())?;
     let bytes = std::fs::read(&prep_path).map_err(|error| error.to_string())?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
