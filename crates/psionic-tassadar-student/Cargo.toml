@@ -1,0 +1,31 @@
+[package]
+name = "psionic-tassadar-student"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "W3 student program: four-baseline sweep over verified Tassadar trace corpora, evaluated by first divergence behind replay (openagents#4749)"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "tassadar-student-train"
+path = "src/bin/tassadar_student_train.rs"
+
+[[bin]]
+name = "tassadar-student-eval"
+path = "src/bin/tassadar_student_eval.rs"
+
+[dependencies]
+hex = { workspace = true }
+psionic-compiler = { path = "../psionic-compiler" }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
