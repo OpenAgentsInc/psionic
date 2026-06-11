@@ -94,6 +94,7 @@ publish = false
 ed25519-dalek = "2.2.0"
 hex = "0.4.3"
 rand = "0.9"
+rayon = "1"
 regex-syntax = "0.8.10"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "cookies"] }
 safetensors = "0.7.0"

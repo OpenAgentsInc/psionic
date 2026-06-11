@@ -9,3 +9,6 @@ fixtures/tassadar/runs/sudoku_v0_promotion_v1/checkpoint_state.json
 fixtures/tassadar/runs/sudoku_v0_promotion_v2/checkpoint_state.json
 fixtures/tassadar/runs/sudoku_v0_trainable_surface_ablation_v1/output_head_and_embeddings/checkpoint_state.json
 fixtures/tassadar/runs/sudoku_v0_trainable_surface_ablation_v1/output_head_embeddings_and_small_learned_mixer/checkpoint_state.json
+
+# W3 student-sweep local run artifacts (openagents#4749)
+/runs/
