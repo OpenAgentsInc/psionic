@@ -3,6 +3,8 @@
 //! This crate intentionally stays small and product-agnostic. It owns public
 //! engine-facing metadata, not backend execution logic.
 
+pub mod philox;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
