@@ -5,6 +5,21 @@
     allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)
 )]
 
+pub mod failure_semantics;
+
+pub use failure_semantics::{
+    BanEscalationPolicy, BanForRoundEvent, BanForRoundReason, ChunkExclusionReason,
+    ChunkOutcomeDisposition, ChunkTransferOutcome, ChunkTransferStatus, CollectiveBanLedger,
+    CollectiveFailureRound, CollectiveFailureSemanticsContract, CollectiveFailureSemanticsError,
+    CollectiveRoundAbortReason, CollectiveRoundConfig, CollectiveRoundReceipt,
+    CollectiveRoundVerdict, CollectiveTransferPath, ExcludedContribution,
+    FAILURE_SEMANTICS_CONTRACT_ID, FAILURE_SEMANTICS_SCHEMA_VERSION,
+    FailureSemanticsAuthorityPaths, FailureSemanticsContractWriteError, IncludedContribution,
+    StandbyPromotionDecision, StandbyPromotionReason, SwarmRemovalRecommendation, TensorChunkPlan,
+    canonical_collective_failure_semantics_contract, plan_tensor_chunks,
+    write_collective_failure_semantics_contract,
+};
+
 use std::collections::BTreeSet;
 
 use psionic_runtime::{

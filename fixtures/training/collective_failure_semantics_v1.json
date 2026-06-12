@@ -1,0 +1,966 @@
+{
+  "schema_version": "psionic.collectives.failure_semantics.v1",
+  "contract_id": "psionic.collectives.failure_semantics.v1",
+  "issue_ref": "psionic#1126",
+  "upstream_reference": "pluralis agora docs/agora-system/fault-tolerance.md (read-only reference lane projects/pluralis/repos/agora)",
+  "config": {
+    "chunk_bytes": 4194304,
+    "per_chunk_timeout_ms": 1500,
+    "reciprocal_per_chunk_timeout_ms": 2000,
+    "round_timeout_ms": 30000
+  },
+  "ban_escalation_policy": {
+    "removal_ban_threshold": 3,
+    "window_rounds": 8
+  },
+  "chunk_plan": {
+    "schema_version": "psionic.collectives.failure_semantics.v1",
+    "tensor_bytes": 31457280,
+    "chunk_bytes": 4194304,
+    "chunk_count": 8,
+    "last_chunk_bytes": 2097152,
+    "per_chunk_timeout_ms": 1500,
+    "reciprocal_per_chunk_timeout_ms": 2000,
+    "round_timeout_ms": 30000,
+    "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6"
+  },
+  "round_receipts": [
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-001",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 1,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 1000,
+      "finalized_at_ms": 2000,
+      "round_timed_out": false,
+      "verdict": {
+        "verdict": "complete"
+      },
+      "preserved_fraction_bps": 10000,
+      "included_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-b",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-c",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        }
+      ],
+      "receipt_digest": "bb11002d7a2a5b1d384c8a11ea163b75f44d6dcb8a3e2148b7a81249f6a7b59a"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-002",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 2,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 10000,
+      "finalized_at_ms": 11000,
+      "round_timed_out": false,
+      "verdict": {
+        "verdict": "partial",
+        "preserved_fraction_bps": 7500,
+        "banned_node_ids": [
+          "worker-b"
+        ]
+      },
+      "preserved_fraction_bps": 7500,
+      "included_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-b",
+          "delivered_chunk_indices": [
+            0,
+            1
+          ],
+          "delivered_bytes": 8388608,
+          "banned_after_contribution": true
+        },
+        {
+          "member_node_id": "worker-c",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        }
+      ],
+      "excluded_contributions": [
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 2,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        }
+      ],
+      "ban_events": [
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-002",
+          "round_index": 2,
+          "member_node_id": "worker-b",
+          "chunk_index": 2,
+          "path": "send",
+          "reason": "send_chunk_timed_out",
+          "detail": "member `worker-b` failed chunk 2 on the send path (1650ms elapsed against a 1500ms budget); banned for round `round-002`, no retry",
+          "banned_at_ms": 10200,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "f42fff99feedb65c007efa157488a995724c3a099a31f02e08e40a8fc4c313e4"
+        }
+      ],
+      "receipt_digest": "ff09e2b78de46392c386fac71f759db9706b4fc7a10ca86e069b74542539fda8"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-003",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 3,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 20000,
+      "finalized_at_ms": 21000,
+      "round_timed_out": false,
+      "verdict": {
+        "verdict": "partial",
+        "preserved_fraction_bps": 9166,
+        "banned_node_ids": [
+          "worker-b"
+        ]
+      },
+      "preserved_fraction_bps": 9166,
+      "included_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-b",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "delivered_bytes": 25165824,
+          "banned_after_contribution": true
+        },
+        {
+          "member_node_id": "worker-c",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        }
+      ],
+      "excluded_contributions": [
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        }
+      ],
+      "ban_events": [
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-003",
+          "round_index": 3,
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "path": "reciprocal_return",
+          "reason": "reciprocal_chunk_timed_out",
+          "detail": "member `worker-b` failed chunk 0 on the reciprocal_return path (2200ms elapsed against a 2000ms budget); banned for round `round-003`, no retry",
+          "banned_at_ms": 20400,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "11dfed1fcc5127ced0e1a3e9b8d2e330e79302542dd596c350c14506d4dabdd5"
+        }
+      ],
+      "receipt_digest": "963922bc392cfe1bce0b3e4e005b37429a0592ceddefe990fc05ecd31dfb9a4a"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-004",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 4,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 30000,
+      "finalized_at_ms": 31000,
+      "round_timed_out": false,
+      "verdict": {
+        "verdict": "partial",
+        "preserved_fraction_bps": 6666,
+        "banned_node_ids": [
+          "worker-b"
+        ]
+      },
+      "preserved_fraction_bps": 6666,
+      "included_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-c",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        }
+      ],
+      "excluded_contributions": [
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        }
+      ],
+      "ban_events": [
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-004",
+          "round_index": 4,
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-b` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-004`, no retry",
+          "banned_at_ms": 30050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "fc8fadcc0047fe95ef35b75f48eee7bc514d6160130efee65d3012c1b2c92828"
+        }
+      ],
+      "receipt_digest": "4239c057c5596c0390070cdd11b123aa2b1d9c3877da948c4dca1b0154d3d17a"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-005",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 5,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 40000,
+      "finalized_at_ms": 41000,
+      "round_timed_out": false,
+      "verdict": {
+        "verdict": "aborted",
+        "reason": "no_standby_promotable",
+        "detail": "stage `pipeline_stage_0` emptied during round `round-005` and no warm standby was promotable"
+      },
+      "preserved_fraction_bps": 0,
+      "excluded_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        }
+      ],
+      "ban_events": [
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-005",
+          "round_index": 5,
+          "member_node_id": "worker-a",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-a` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-005`, no retry",
+          "banned_at_ms": 40050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "fca3a267532a1d55070e311ab6f18e17a704ba85353c66f93ba799330a2781b0"
+        },
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-005",
+          "round_index": 5,
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-b` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-005`, no retry",
+          "banned_at_ms": 40050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "205a4062cf0bcce61b9d98f76adf4935c76b67dd9de3b5114d84b58da25e8d73"
+        },
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-005",
+          "round_index": 5,
+          "member_node_id": "worker-c",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-c` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-005`, no retry",
+          "banned_at_ms": 40050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "455101eb8e99a577273719d8c57af3688eb5f713ef6285a29d15465bbddbe485"
+        }
+      ],
+      "standby_decision": {
+        "schema_version": "psionic.collectives.failure_semantics.v1",
+        "round_id": "round-005",
+        "stage_id": "pipeline_stage_0",
+        "stage_would_empty": true,
+        "promotable": false,
+        "reason": "no_warm_standby_registered",
+        "decided_at_ms": 41000,
+        "decision_digest": "8aa2f6e6a8309ec1d48bb4a64b9d030e77a663bbdd698a7f65ec912c3dc16cc5"
+      },
+      "receipt_digest": "114d3c1538aded41f941f4be88c14bed80ae79bf6631d8d038403f77f3402309"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-006",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 6,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 50000,
+      "finalized_at_ms": 51000,
+      "round_timed_out": false,
+      "verdict": {
+        "verdict": "partial",
+        "preserved_fraction_bps": 0,
+        "banned_node_ids": [
+          "worker-a",
+          "worker-b",
+          "worker-c"
+        ],
+        "promoted_standby_node_id": "standby-w1"
+      },
+      "preserved_fraction_bps": 0,
+      "excluded_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-a",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-b",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 0,
+          "reason": "failed_transfer"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 1,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 2,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 3,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        }
+      ],
+      "ban_events": [
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-006",
+          "round_index": 6,
+          "member_node_id": "worker-a",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-a` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-006`, no retry",
+          "banned_at_ms": 50050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "c699d6723b849639de5adf814b1f975ffff8dd23ccfcf78a78e89da4df2eca3f"
+        },
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-006",
+          "round_index": 6,
+          "member_node_id": "worker-b",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-b` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-006`, no retry",
+          "banned_at_ms": 50050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "8c90c5fb029012a845e54ec25abba451522606f226a12bcaed7baf8a22f07c7d"
+        },
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-006",
+          "round_index": 6,
+          "member_node_id": "worker-c",
+          "chunk_index": 0,
+          "path": "send",
+          "reason": "send_peer_disconnected",
+          "detail": "member `worker-c` failed chunk 0 on the send path (10ms elapsed against a 1500ms budget); banned for round `round-006`, no retry",
+          "banned_at_ms": 50050,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "6acf95f9a35694ce5aa29361c0cf7077c5b4048b9d73d1ef7dec2d10daa3eed4"
+        }
+      ],
+      "standby_decision": {
+        "schema_version": "psionic.collectives.failure_semantics.v1",
+        "round_id": "round-006",
+        "stage_id": "pipeline_stage_0",
+        "stage_would_empty": true,
+        "promotable": true,
+        "promoted_node_id": "standby-w1",
+        "warm_standby_node_ids": [
+          "standby-w1"
+        ],
+        "reason": "warm_standby_available",
+        "decided_at_ms": 51000,
+        "decision_digest": "8b880e07674919cd3bd25274169c4f2b47636746579c2c632a46b2308162abc0"
+      },
+      "receipt_digest": "cdf64082fcdebc36ae5a83d110ee25ca19d6d8736bc8b165994f5badd0f9658f"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "round_id": "round-007",
+      "stage_id": "pipeline_stage_0",
+      "round_index": 7,
+      "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+      "member_node_ids": [
+        "worker-a",
+        "worker-b",
+        "worker-c"
+      ],
+      "started_at_ms": 60000,
+      "finalized_at_ms": 90001,
+      "round_timed_out": true,
+      "verdict": {
+        "verdict": "partial",
+        "preserved_fraction_bps": 8333,
+        "banned_node_ids": [
+          "worker-c"
+        ]
+      },
+      "preserved_fraction_bps": 8333,
+      "included_contributions": [
+        {
+          "member_node_id": "worker-a",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-b",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "delivered_bytes": 31457280,
+          "banned_after_contribution": false
+        },
+        {
+          "member_node_id": "worker-c",
+          "delivered_chunk_indices": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "delivered_bytes": 16777216,
+          "banned_after_contribution": true
+        }
+      ],
+      "excluded_contributions": [
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 4,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 5,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 6,
+          "reason": "excluded_after_ban"
+        },
+        {
+          "member_node_id": "worker-c",
+          "chunk_index": 7,
+          "reason": "excluded_after_ban"
+        }
+      ],
+      "ban_events": [
+        {
+          "schema_version": "psionic.collectives.failure_semantics.v1",
+          "round_id": "round-007",
+          "round_index": 7,
+          "member_node_id": "worker-c",
+          "chunk_index": 4,
+          "path": "send",
+          "reason": "full_round_timeout_stall",
+          "detail": "member `worker-c` still owed chunk 4 when the 30000ms full-round timeout fired for round `round-007`; banned for round, partial result retained",
+          "banned_at_ms": 90001,
+          "plan_digest": "5d1034fd9f8622b023bd4540a3121bdd4a9f544c2faa4bc6679a549b626ef2b6",
+          "event_digest": "87f75737b9c0f7da93df0eb325785bf1a3ffe4e25bc7e8f2371f895118fa4e41"
+        }
+      ],
+      "receipt_digest": "352ea5e333d918118da589e30ba4571a3123e91c0fe6d5b7a93ddacf1a6104b4"
+    }
+  ],
+  "removal_recommendations": [
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "member_node_id": "worker-b",
+      "ban_count_in_window": 3,
+      "removal_ban_threshold": 3,
+      "window_rounds": 8,
+      "ban_round_indices": [
+        2,
+        3,
+        4
+      ],
+      "ban_event_digests": [
+        "f42fff99feedb65c007efa157488a995724c3a099a31f02e08e40a8fc4c313e4",
+        "11dfed1fcc5127ced0e1a3e9b8d2e330e79302542dd596c350c14506d4dabdd5",
+        "fc8fadcc0047fe95ef35b75f48eee7bc514d6160130efee65d3012c1b2c92828"
+      ],
+      "recommended_at_ms": 31100,
+      "recommendation_digest": "99bb942ced0b618a0d045b45d324b7fe05d03182849d543cedc24752a3752c53"
+    },
+    {
+      "schema_version": "psionic.collectives.failure_semantics.v1",
+      "member_node_id": "worker-c",
+      "ban_count_in_window": 3,
+      "removal_ban_threshold": 3,
+      "window_rounds": 8,
+      "ban_round_indices": [
+        5,
+        6,
+        7
+      ],
+      "ban_event_digests": [
+        "455101eb8e99a577273719d8c57af3688eb5f713ef6285a29d15465bbddbe485",
+        "6acf95f9a35694ce5aa29361c0cf7077c5b4048b9d73d1ef7dec2d10daa3eed4",
+        "87f75737b9c0f7da93df0eb325785bf1a3ffe4e25bc7e8f2371f895118fa4e41"
+      ],
+      "recommended_at_ms": 90101,
+      "recommendation_digest": "d8e14004644443a08e848c98232552f11717106f1efbf31ad261e24ae4803493"
+    }
+  ],
+  "authority_paths": {
+    "generator_bin": "cargo run -p psionic-collectives --bin collective_failure_semantics_contract",
+    "check_script_path": "scripts/check-collective-failure-semantics.sh",
+    "reference_doc_path": "docs/PSIONIC_COLLECTIVE_FAILURE_SEMANTICS.md"
+  },
+  "contract_digest": "08184c0c5d701972b02b55d6f490df0e329775e728e6a6eca75e04433ca95370"
+}
