@@ -1838,6 +1838,21 @@ through RunPod over the overlay path while keeping one critical honesty
 boundary explicit: active-peer sidecars are not equivalent to full
 checkpoint-authority recovery.
 
+The repo now also owns the first shadow-window join-ramp contract in
+`crates/psionic-train/src/shadow_window_ramp.rs`, the binary
+`shadow_window_ramp_contract`, the checker
+`scripts/check-shadow-window-ramp.sh`, the focused reference doc
+`docs/PSION_SHADOW_WINDOW_RAMP.md`, and the committed fixture
+`fixtures/training/shadow_window_ramp_v1.json`. That surface adapts the
+Pluralis agora sync-phase semantics (`weight=0`: receive, contribute nothing)
+into the window vocabulary: a digest-bound phase-1 sealed-window replay, a
+phase-2 live-shadow lane whose receipts are verified but structurally
+excluded from every merge set through a type-level eligibility gate,
+config-driven ramp lengths with no default, and a divergence-comparison hook
+whose committed values are explicitly synthetic. It keeps one honesty boundary
+explicit: no live ramp has run, and measuring the ramp length that actually
+reduces post-join divergence is the hardware-gated R1 deliverable.
+
 The repo now also owns the first quantized outer-sync contract in
 `crates/psionic-train/src/quantized_outer_sync_contract.rs`, the binary
 `quantized_outer_sync_contract`, the checker

@@ -1,0 +1,185 @@
+{
+  "schema_version": "psionic.train.shadow_window_ramp.v1",
+  "contract_id": "psionic.train.shadow_window_ramp.v1",
+  "ramp_config": {
+    "phase1_shadow_replay_window_count": 3,
+    "phase2_live_shadow_window_count": 2
+  },
+  "checkpoint_binding": {
+    "checkpoint_object_digest": "523a3158416e92405c16cf2f2029ce2dd293c551c9ea91be98e9df923a093e79",
+    "manifest_digest": "b2fee731caf5667f31f69c49b3ab8e78646dab8799ddc9218c6cdddf02054621"
+  },
+  "final_ramp_state": {
+    "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+    "config": {
+      "phase1_shadow_replay_window_count": 3,
+      "phase2_live_shadow_window_count": 2
+    },
+    "checkpoint_binding": {
+      "checkpoint_object_digest": "523a3158416e92405c16cf2f2029ce2dd293c551c9ea91be98e9df923a093e79",
+      "manifest_digest": "b2fee731caf5667f31f69c49b3ab8e78646dab8799ddc9218c6cdddf02054621"
+    },
+    "phase": "active",
+    "phase1_completed_window_count": 3,
+    "phase2_completed_window_count": 2
+  },
+  "shadow_receipts": [
+    {
+      "receipt_id": "shadow_ramp_receipt.shadow_replay.000000",
+      "window_id": "window.shadow_ramp_fixture.shadow_replay.000000",
+      "window_execution_id": "window_execution.shadow_ramp_fixture.shadow_replay.000000",
+      "window_execution_schema_version": "psionic.train.window_execution.v1",
+      "contribution_receipt_schema_version": "psionic.train.contribution_receipt.v1",
+      "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+      "phase": "shadow_replay",
+      "merge_eligibility": "shadow",
+      "verified": true,
+      "detail": "Phase-1 shadow replay of a sealed window against the verified durable checkpoint; receipts are checked but never merged."
+    },
+    {
+      "receipt_id": "shadow_ramp_receipt.shadow_replay.000001",
+      "window_id": "window.shadow_ramp_fixture.shadow_replay.000001",
+      "window_execution_id": "window_execution.shadow_ramp_fixture.shadow_replay.000001",
+      "window_execution_schema_version": "psionic.train.window_execution.v1",
+      "contribution_receipt_schema_version": "psionic.train.contribution_receipt.v1",
+      "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+      "phase": "shadow_replay",
+      "merge_eligibility": "shadow",
+      "verified": true,
+      "detail": "Phase-1 shadow replay of a sealed window against the verified durable checkpoint; receipts are checked but never merged."
+    },
+    {
+      "receipt_id": "shadow_ramp_receipt.shadow_replay.000002",
+      "window_id": "window.shadow_ramp_fixture.shadow_replay.000002",
+      "window_execution_id": "window_execution.shadow_ramp_fixture.shadow_replay.000002",
+      "window_execution_schema_version": "psionic.train.window_execution.v1",
+      "contribution_receipt_schema_version": "psionic.train.contribution_receipt.v1",
+      "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+      "phase": "shadow_replay",
+      "merge_eligibility": "shadow",
+      "verified": true,
+      "detail": "Phase-1 shadow replay of a sealed window against the verified durable checkpoint; receipts are checked but never merged."
+    },
+    {
+      "receipt_id": "shadow_ramp_receipt.live_shadow.000000",
+      "window_id": "window.shadow_ramp_fixture.live_shadow.000000",
+      "window_execution_id": "window_execution.shadow_ramp_fixture.live_shadow.000000",
+      "window_execution_schema_version": "psionic.train.window_execution.v1",
+      "contribution_receipt_schema_version": "psionic.train.contribution_receipt.v1",
+      "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+      "phase": "live_shadow",
+      "merge_eligibility": "shadow",
+      "verified": true,
+      "detail": "Phase-2 live shadow window: output verified and receipted but excluded from the merge (weight=0 analogue), warming scheduler trust."
+    },
+    {
+      "receipt_id": "shadow_ramp_receipt.live_shadow.000001",
+      "window_id": "window.shadow_ramp_fixture.live_shadow.000001",
+      "window_execution_id": "window_execution.shadow_ramp_fixture.live_shadow.000001",
+      "window_execution_schema_version": "psionic.train.window_execution.v1",
+      "contribution_receipt_schema_version": "psionic.train.contribution_receipt.v1",
+      "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+      "phase": "live_shadow",
+      "merge_eligibility": "shadow",
+      "verified": true,
+      "detail": "Phase-2 live shadow window: output verified and receipted but excluded from the merge (weight=0 analogue), warming scheduler trust."
+    },
+    {
+      "receipt_id": "shadow_ramp_receipt.active.000000",
+      "window_id": "window.shadow_ramp_fixture.active.000000",
+      "window_execution_id": "window_execution.shadow_ramp_fixture.active.000000",
+      "window_execution_schema_version": "psionic.train.window_execution.v1",
+      "contribution_receipt_schema_version": "psionic.train.contribution_receipt.v1",
+      "node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+      "phase": "active",
+      "merge_eligibility": "merge_eligible",
+      "verified": true,
+      "detail": "First post-ramp active window: merged and paid at the full class rate."
+    }
+  ],
+  "merge_set_member_receipt_ids": [
+    "shadow_ramp_receipt.active.000000"
+  ],
+  "merge_excluded_receipt_ids": [
+    "shadow_ramp_receipt.shadow_replay.000000",
+    "shadow_ramp_receipt.shadow_replay.000001",
+    "shadow_ramp_receipt.shadow_replay.000002",
+    "shadow_ramp_receipt.live_shadow.000000",
+    "shadow_ramp_receipt.live_shadow.000001"
+  ],
+  "divergence_comparison": {
+    "comparison_id": "shadow_ramp_divergence_comparison.fixture.v1",
+    "divergence_metric_kind": "parameter_space_l2_distance_to_stayed_cohort_reference_at_window_seal",
+    "measurement_status": "synthetic_fixture",
+    "decision_threshold_placeholder": 0.05,
+    "cohorts": [
+      {
+        "cohort_label": "ramped_join",
+        "joining_node_pubkey": "shadow_ramp_fixture_joiner.pubkey",
+        "ramp_config": {
+          "phase1_shadow_replay_window_count": 3,
+          "phase2_live_shadow_window_count": 2
+        },
+        "per_window_divergence": [
+          {
+            "window_index_since_join": 0,
+            "window_id": "window.shadow_ramp_fixture.ramped_post_join.000000",
+            "divergence_metric_value": 0.041
+          },
+          {
+            "window_index_since_join": 1,
+            "window_id": "window.shadow_ramp_fixture.ramped_post_join.000001",
+            "divergence_metric_value": 0.028
+          },
+          {
+            "window_index_since_join": 2,
+            "window_id": "window.shadow_ramp_fixture.ramped_post_join.000002",
+            "divergence_metric_value": 0.017
+          },
+          {
+            "window_index_since_join": 3,
+            "window_id": "window.shadow_ramp_fixture.ramped_post_join.000003",
+            "divergence_metric_value": 0.011
+          }
+        ],
+        "detail": "Synthetic shape-only values for a joiner that completed the shadow ramp before merging."
+      },
+      {
+        "cohort_label": "bootstrap_and_merge",
+        "joining_node_pubkey": "bootstrap_fixture_joiner.pubkey",
+        "per_window_divergence": [
+          {
+            "window_index_since_join": 0,
+            "window_id": "window.shadow_ramp_fixture.bootstrap_post_join.000000",
+            "divergence_metric_value": 0.094
+          },
+          {
+            "window_index_since_join": 1,
+            "window_id": "window.shadow_ramp_fixture.bootstrap_post_join.000001",
+            "divergence_metric_value": 0.071
+          },
+          {
+            "window_index_since_join": 2,
+            "window_id": "window.shadow_ramp_fixture.bootstrap_post_join.000002",
+            "divergence_metric_value": 0.052
+          },
+          {
+            "window_index_since_join": 3,
+            "window_id": "window.shadow_ramp_fixture.bootstrap_post_join.000003",
+            "divergence_metric_value": 0.039
+          }
+        ],
+        "detail": "Synthetic shape-only values for a joiner that bootstrapped the checkpoint and merged immediately."
+      }
+    ],
+    "detail": "All divergence values are synthetic and demonstrate the comparison shape only. The real ramped-vs-bootstrap measurement is the R1 deliverable and requires live multi-node hardware."
+  },
+  "authority_paths": {
+    "fixture_path": "fixtures/training/shadow_window_ramp_v1.json",
+    "check_script_path": "scripts/check-shadow-window-ramp.sh",
+    "reference_doc_path": "docs/PSION_SHADOW_WINDOW_RAMP.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the shadow-window join ramp shape: config ramp lengths, digest-bound phase 1 replay, merge-excluded phase 2 live shadow windows, type-level merge-eligibility gating, and the divergence-comparison hook. The checkpoint digests and every divergence value are synthetic fixture inputs. No live ramp has run; measuring the ramp length that reduces post-join divergence is the hardware-gated R1 deliverable.",
+  "contract_digest": "f80bab889f431ac9e22076eff1a4a60534f408e44ed9a6cf6c1536c70457888e"
+}
