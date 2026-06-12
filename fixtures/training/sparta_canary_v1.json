@@ -1,0 +1,222 @@
+{
+  "schema_version": "psionic.train.sparta_canary.v1",
+  "contract_id": "psionic.train.sparta_canary.v1",
+  "preregistration": {
+    "schema_version": "psionic.train.sparta_canary_preregistration.v1",
+    "preregistration_id": "sparta_canary_preregistration.fixture.v1",
+    "standing_order": "No public gradients into the main optimizer, ever. Sparse-averaging decentralized training runs only as a side experiment with canary evals and pre-registered kill bounds; it is never the main run.",
+    "grid": [
+      {
+        "sparsity_fraction": 0.05,
+        "average_state_every_steps": 5,
+        "partition_strategy": "random_rotating_partitions"
+      },
+      {
+        "sparsity_fraction": 0.1,
+        "average_state_every_steps": 5,
+        "partition_strategy": "random_rotating_partitions"
+      },
+      {
+        "sparsity_fraction": 0.05,
+        "average_state_every_steps": 10,
+        "partition_strategy": "random_rotating_partitions"
+      }
+    ],
+    "baseline_arm": "synchronous_averaging",
+    "eval_schema": {
+      "first_divergence_step_metric": "first_step_where_sparse_arm_held_out_eval_trails_synchronous_baseline_beyond_bound",
+      "held_out_eval_families": [
+        "held_out_family.reasoning_short_answer",
+        "held_out_family.code_completion_bounded"
+      ],
+      "additional_tracked_metrics": [
+        "held_out_perplexity_tracked_never_deciding_alone",
+        "per_round_parameter_divergence_between_replicas"
+      ]
+    },
+    "kill_bound": {
+      "max_eval_degradation_fraction_vs_baseline": 0.02,
+      "min_comms_savings_fraction_floor": 0.5
+    },
+    "registered_at": "2026-06-12T00:00:00Z",
+    "preregistration_digest": "e4e99806a985da83407779475801c925c2bff51e37f7cf15a5f535acb760b6ac"
+  },
+  "comparison_artifact": {
+    "comparison_id": "sparta_canary_comparison.fixture.v1",
+    "config": {
+      "replica_count": 3,
+      "tensor_specs": [
+        {
+          "tensor_name": "toy.embedding",
+          "element_count": 24
+        },
+        {
+          "tensor_name": "toy.linear",
+          "element_count": 40
+        }
+      ],
+      "total_rounds": 10,
+      "average_state_every_rounds": 2,
+      "sparsity_fraction": 0.25,
+      "drift_scale": 0.01,
+      "seed": 4391
+    },
+    "per_round": [
+      {
+        "round_index": 0,
+        "sparse_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 63999286,
+          "simulated_bytes_communicated": 0
+        },
+        "synchronous_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 63999286,
+          "simulated_bytes_communicated": 0
+        }
+      },
+      {
+        "round_index": 1,
+        "sparse_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 73906295,
+          "simulated_bytes_communicated": 384
+        },
+        "synchronous_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 0,
+          "simulated_bytes_communicated": 1536
+        }
+      },
+      {
+        "round_index": 2,
+        "sparse_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 99171727,
+          "simulated_bytes_communicated": 0
+        },
+        "synchronous_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 63629432,
+          "simulated_bytes_communicated": 0
+        }
+      },
+      {
+        "round_index": 3,
+        "sparse_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 104331781,
+          "simulated_bytes_communicated": 384
+        },
+        "synchronous_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 0,
+          "simulated_bytes_communicated": 1536
+        }
+      },
+      {
+        "round_index": 4,
+        "sparse_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 125884927,
+          "simulated_bytes_communicated": 0
+        },
+        "synchronous_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 60594361,
+          "simulated_bytes_communicated": 0
+        }
+      },
+      {
+        "round_index": 5,
+        "sparse_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 123300450,
+          "simulated_bytes_communicated": 384
+        },
+        "synchronous_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 0,
+          "simulated_bytes_communicated": 1536
+        }
+      },
+      {
+        "round_index": 6,
+        "sparse_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 138835873,
+          "simulated_bytes_communicated": 0
+        },
+        "synchronous_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 68452953,
+          "simulated_bytes_communicated": 0
+        }
+      },
+      {
+        "round_index": 7,
+        "sparse_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 115929039,
+          "simulated_bytes_communicated": 384
+        },
+        "synchronous_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 0,
+          "simulated_bytes_communicated": 1536
+        }
+      },
+      {
+        "round_index": 8,
+        "sparse_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 126579959,
+          "simulated_bytes_communicated": 0
+        },
+        "synchronous_arm": {
+          "averaged_this_round": false,
+          "mean_pairwise_l2_divergence_nano": 65964937,
+          "simulated_bytes_communicated": 0
+        }
+      },
+      {
+        "round_index": 9,
+        "sparse_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 119678636,
+          "simulated_bytes_communicated": 384
+        },
+        "synchronous_arm": {
+          "averaged_this_round": true,
+          "mean_pairwise_l2_divergence_nano": 0,
+          "simulated_bytes_communicated": 1536
+        }
+      }
+    ],
+    "averaging_rounds_to_full_coverage": 4,
+    "total_sparse_bytes_communicated": 1920,
+    "total_synchronous_bytes_communicated": 7680,
+    "measurement_status": "synthetic_bounded",
+    "detail": "Synthetic bounded toy-scale demo: in-process replicas with seeded synthetic drift, sparse rotating-partition averaging vs synchronous full averaging. Demonstrates the harness end to end only; no claim about real convergence behavior."
+  },
+  "outcome_record": {
+    "schema_version": "psionic.train.sparta_canary_outcome.v1",
+    "outcome_id": "sparta_canary_outcome.fixture.v1",
+    "preregistration_digest": "e4e99806a985da83407779475801c925c2bff51e37f7cf15a5f535acb760b6ac",
+    "status": "pending",
+    "decided_by": null,
+    "derisking_ledger_path": "docs/PSION_DERISKING_LEDGER.md",
+    "derisking_ledger_entry": "SPARTA-class sparse parameter averaging",
+    "recorded_at": "2026-06-12T00:00:00Z",
+    "detail": "Pending: the harness exists and the pre-registered bounds are pinned, but no real gated canary run has produced a held/killed decision. The bounded synthetic demo decides nothing. A killed canary still produces this record and the ledger write-back."
+  },
+  "authority_paths": {
+    "fixture_path": "fixtures/training/sparta_canary_v1.json",
+    "check_script_path": "scripts/check-sparta-canary.sh",
+    "reference_doc_path": "docs/PSION_SPARTA_CANARY.md",
+    "derisking_ledger_path": "docs/PSION_DERISKING_LEDGER.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the SPARTA canary harness shape: a digest-pinned pre-registration (grid, synchronous baseline, eval schema that never lets perplexity decide alone, kill bound), owned rotating-partition mechanics, a bounded deterministic two-arm comparison runner, and a pending outcome record bound to the pre-registration digest. Every comparison value is synthetic toy-scale output of the in-process simulation. No real canary has run; the R1/R2-scale canary is gated and not claimed, and the W3 standing order stands: no public gradients into the main optimizer, ever.",
+  "contract_digest": "286158142c86e34291fa5ec76aaccbbc2957fe6e435abe22fe7eeb9ef775c1a7"
+}

@@ -1853,6 +1853,23 @@ whose committed values are explicitly synthetic. It keeps one honesty boundary
 explicit: no live ramp has run, and measuring the ramp length that actually
 reduces post-join divergence is the hardware-gated R1 deliverable.
 
+The repo now also owns the SPARTA sparse-averaging canary harness in
+`crates/psionic-train/src/sparta_canary.rs`, the binary
+`sparta_canary_contract`, the checker `scripts/check-sparta-canary.sh`, the
+focused reference doc `docs/PSION_SPARTA_CANARY.md`, and the committed
+fixture `fixtures/training/sparta_canary_v1.json`. The W3 standing order
+governs this surface: no public gradients into the main optimizer, ever;
+sparse averaging runs only as a side experiment with pre-registered canary
+bounds. The harness owns a digest-pinned pre-registration (grid starting from
+the Pluralis published tuning, synchronous-averaging baseline, eval schema
+that never lets perplexity decide alone, kill bound), the rotating
+partitioned-index mechanics adapted from Pluralis AsyncMesh `sparta.py`, a
+bounded deterministic two-arm comparison runner over in-process replicas with
+synthetic drift, and a typed outcome record that writes back to the derisking
+ledger. It keeps one honesty boundary explicit: this is a harness plus a
+toy-scale synthetic demonstration only; no canary has run, the outcome stays
+`pending` by typed rule, and the R1/R2-scale canary is gated and not claimed.
+
 The repo now also owns the first quantized outer-sync contract in
 `crates/psionic-train/src/quantized_outer_sync_contract.rs`, the binary
 `quantized_outer_sync_contract`, the checker
