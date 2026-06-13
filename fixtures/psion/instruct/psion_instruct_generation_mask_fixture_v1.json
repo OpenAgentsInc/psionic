@@ -1,0 +1,1156 @@
+[
+  {
+    "conversation_id": "psion_instruct_example_0001",
+    "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3",
+    "tokens": [
+      {
+        "text": "<|psion_system|>",
+        "role": "system",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "You",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "are",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "a",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "careful",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "assistant",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "that",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "answers",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "briefly",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "and",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "honestly.",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "system",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_user|>",
+        "role": "user",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "What",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "does",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "a",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "learning-rate",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "warmup",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "do?",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "user",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_assistant|>",
+        "role": "assistant",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "Warmup",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "ramps",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "the",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "learning",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "rate",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "up",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "from",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "a",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "small",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "value",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "so",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "early",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "optimizer",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "steps",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "stay",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "stable",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "before",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "the",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "schedule",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "decays",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "it.",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "assistant",
+        "segment": "turn_close",
+        "trains": true
+      },
+      {
+        "text": "<|psion_eos|>",
+        "role": "assistant",
+        "segment": "eos",
+        "trains": true
+      }
+    ],
+    "loss_mask": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "trainable_token_count": 23,
+    "masked_token_count": 21,
+    "rendered_text": "<|psion_system|> You are a careful assistant that answers briefly and honestly. <|psion_end|> <|psion_user|> What does a learning-rate warmup do? <|psion_end|> <|psion_assistant|> Warmup ramps the learning rate up from a small value so early optimizer steps stay stable before the schedule decays it. <|psion_end|> <|psion_eos|>",
+    "mask_digest": "sha256:53385cb1fc02b7c209048c0715ef02e3e8cf4ff60026763560cdf0769b3de263"
+  },
+  {
+    "conversation_id": "psion_instruct_example_0002",
+    "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3",
+    "tokens": [
+      {
+        "text": "<|psion_user|>",
+        "role": "user",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "Name",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "one",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "reason",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "to",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "mask",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "user",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "tokens",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "from",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "the",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "loss.",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "user",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_assistant|>",
+        "role": "assistant",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "Training",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "only",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "on",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "assistant",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "tokens",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "stops",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "the",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "model",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "from",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "learning",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "to",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "imitate",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "user",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "phrasing",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "instead",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "of",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "producing",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "answers.",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "assistant",
+        "segment": "turn_close",
+        "trains": true
+      },
+      {
+        "text": "<|psion_eos|>",
+        "role": "assistant",
+        "segment": "eos",
+        "trains": true
+      }
+    ],
+    "loss_mask": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "trainable_token_count": 20,
+    "masked_token_count": 13,
+    "rendered_text": "<|psion_user|> Name one reason to mask user tokens from the loss. <|psion_end|> <|psion_assistant|> Training only on assistant tokens stops the model from learning to imitate user phrasing instead of producing answers. <|psion_end|> <|psion_eos|>",
+    "mask_digest": "sha256:296fbeb4c37b1ac49506f15882791560b7551a96c0c1c5471cd6cbad31e8bea4"
+  },
+  {
+    "conversation_id": "psion_instruct_example_0003",
+    "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3",
+    "tokens": [
+      {
+        "text": "<|psion_user|>",
+        "role": "user",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "Why",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "checkpoint",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "a",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "fine-tune",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "run?",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "user",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_assistant|>",
+        "role": "assistant",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "A",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "checkpoint",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "lets",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "an",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "interrupted",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "run",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "resume",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "from",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "saved",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "optimizer",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "and",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "parameter",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "state",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "instead",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "of",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "restarting",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "from",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "scratch.",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "assistant",
+        "segment": "turn_close",
+        "trains": true
+      },
+      {
+        "text": "<|psion_user|>",
+        "role": "user",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "And",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "what",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "must",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "the",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "checkpoint",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "include?",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "user",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_assistant|>",
+        "role": "assistant",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "Parameters,",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "optimizer",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "moments,",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "scheduler",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "state,",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "and",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "the",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "completed",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "step",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "count.",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "assistant",
+        "segment": "turn_close",
+        "trains": true
+      },
+      {
+        "text": "<|psion_eos|>",
+        "role": "assistant",
+        "segment": "eos",
+        "trains": true
+      }
+    ],
+    "loss_mask": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "trainable_token_count": 31,
+    "masked_token_count": 17,
+    "rendered_text": "<|psion_user|> Why checkpoint a fine-tune run? <|psion_end|> <|psion_assistant|> A checkpoint lets an interrupted run resume from saved optimizer and parameter state instead of restarting from scratch. <|psion_end|> <|psion_user|> And what must the checkpoint include? <|psion_end|> <|psion_assistant|> Parameters, optimizer moments, scheduler state, and the completed step count. <|psion_end|> <|psion_eos|>",
+    "mask_digest": "sha256:348646b003fc34e93a3c409952fe25131382cbbad8ce4b2c357da5490e978b5a"
+  },
+  {
+    "conversation_id": "psion_instruct_example_0004",
+    "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3",
+    "tokens": [
+      {
+        "text": "<|psion_system|>",
+        "role": "system",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "Answer",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "in",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "one",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "sentence.",
+        "role": "system",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "system",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_user|>",
+        "role": "user",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "What",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "is",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "a",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "LoRA",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "adapter?",
+        "role": "user",
+        "segment": "content",
+        "trains": false
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "user",
+        "segment": "turn_close",
+        "trains": false
+      },
+      {
+        "text": "<|psion_assistant|>",
+        "role": "assistant",
+        "segment": "role_open",
+        "trains": false
+      },
+      {
+        "text": "A",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "LoRA",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "adapter",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "is",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "a",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "small",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "pair",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "of",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "low-rank",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "matrices",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "trained",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "on",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "top",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "of",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "frozen",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "base",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "weights.",
+        "role": "assistant",
+        "segment": "content",
+        "trains": true
+      },
+      {
+        "text": "<|psion_end|>",
+        "role": "assistant",
+        "segment": "turn_close",
+        "trains": true
+      },
+      {
+        "text": "<|psion_eos|>",
+        "role": "assistant",
+        "segment": "eos",
+        "trains": true
+      }
+    ],
+    "loss_mask": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "trainable_token_count": 19,
+    "masked_token_count": 14,
+    "rendered_text": "<|psion_system|> Answer in one sentence. <|psion_end|> <|psion_user|> What is a LoRA adapter? <|psion_end|> <|psion_assistant|> A LoRA adapter is a small pair of low-rank matrices trained on top of frozen base weights. <|psion_end|> <|psion_eos|>",
+    "mask_digest": "sha256:93aed8b6a16aaff8cc35639d9f602f6446905a31708d9622f951c956526e7d5f"
+  }
+]

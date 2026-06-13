@@ -1,0 +1,77 @@
+{
+  "schema_version": "psion.instruct_sft_lane_report.v1",
+  "lane_id": "psion_instruct_sft_v1",
+  "run_id": "psion-instruct-sft-smoke-001",
+  "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3",
+  "corpus_manifest_digest": "sha256:1ce60a17a18975a729fd7d9d81baab556541af6fd280c0fadfb29e09b7e18cc7",
+  "learning_rate": 0.00003,
+  "pretraining_reference_learning_rate": 0.0003,
+  "learning_rate_ratio": 0.099999994,
+  "scheduler_kind": "cosine_annealing",
+  "optimizer": "adam_w",
+  "sample_count": 93,
+  "trainable_token_count": 93,
+  "masked_token_count": 65,
+  "completed_steps": 8,
+  "initial_loss": 4.153914,
+  "final_loss": 4.203106,
+  "final_first_batch_loss": 4.153883,
+  "loss_improved": true,
+  "learning_rate_schedule": [
+    {
+      "step": 1,
+      "effective_learning_rate": 0.00003
+    },
+    {
+      "step": 2,
+      "effective_learning_rate": 0.000028663078
+    },
+    {
+      "step": 3,
+      "effective_learning_rate": 0.00002491711
+    },
+    {
+      "step": 4,
+      "effective_learning_rate": 0.00001950403
+    },
+    {
+      "step": 5,
+      "effective_learning_rate": 0.0000134959655
+    },
+    {
+      "step": 6,
+      "effective_learning_rate": 0.000008082885
+    },
+    {
+      "step": 7,
+      "effective_learning_rate": 0.0000043369196
+    },
+    {
+      "step": 8,
+      "effective_learning_rate": 0.0000029999999
+    }
+  ],
+  "step_receipt_digests": [
+    "94873f47da6abd87bbe73c4971de6a4723afac73ee9211ce36db1dd568a64379",
+    "4effaa5ae830744cbf8ac804598a26a62f62303440cf8ce73b2ffd11adac79d9",
+    "f123ddc095d0988e1818c3294e31e2e341b18c8858600e25476fa02dbd749eb7",
+    "389b9be2f670c30887fe70da5a34f41a6bb5f50ba606b79dd8590f124355b634",
+    "bba1bd440a55cdb11af1bd4dfc9d6e563f65e60c2b6dd800491b763bc67aaffd",
+    "857609e4eaa5b9f68c42642911b5c0955686938b6ee093ba6e2fd527c1f422af",
+    "6fec9dec9fa7adeb501b45eefee73b9880adbbfe7679cf178f36c07edfcf34e4",
+    "1240b0258d6287ced7a2d283751be387eb7501fb9342c892624d0dd272ce4727"
+  ],
+  "adapter_artifact_digest": "3176f9488b5cd27ce90109b43adc45976e36a1ae82c82762d3ffbc4762c0a8f3",
+  "adapter_identity_digest": "31100af8b5cc80190a46e79df80adf646a62d5c54d880c33673eac31d855979c",
+  "resume_drill": {
+    "checkpoint_at_step": 3,
+    "checkpoint_state_digest": "sha256:c126d5625428740bb4657ea9c1ad2067be65691e667f1db57151e04cd63710ae",
+    "resumed_steps": 5,
+    "resume_bit_exact": true,
+    "uninterrupted_final_parameter_digest": "sha256:9705945b61d58f8893c8a1e823a3f6d3414b30df3bce5aa784441d5b095bd4a7",
+    "resumed_final_parameter_digest": "sha256:9705945b61d58f8893c8a1e823a3f6d3414b30df3bce5aa784441d5b095bd4a7",
+    "post_resume_receipt_digests_match": true
+  },
+  "claim_boundary": "Bounded fixture-scale Psion statistical lane evidence only: deterministic smoke training over repo-owned example records. No general instruct capability claim and no real training-run claim.",
+  "report_digest": "sha256:ec81e1782daa2300965e02fe65b1edc91968d349ece4714febbba8dda0e55ef0"
+}

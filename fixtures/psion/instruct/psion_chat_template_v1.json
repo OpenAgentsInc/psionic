@@ -1,0 +1,11 @@
+{
+  "schema_version": "psion.chat_template.v1",
+  "template_id": "psion_chat_template",
+  "template_version": "v1",
+  "system_open": "<|psion_system|>",
+  "user_open": "<|psion_user|>",
+  "assistant_open": "<|psion_assistant|>",
+  "turn_close": "<|psion_end|>",
+  "eos_token": "<|psion_eos|>",
+  "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3"
+}

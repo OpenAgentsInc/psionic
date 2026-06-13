@@ -1,0 +1,65 @@
+{
+  "schema_version": "psion.instruct_corpus_manifest.v1",
+  "corpus_id": "psion_instruct_corpus_example",
+  "corpus_version": "v1",
+  "dataset_identity": "psion_instruct_corpus_example@v1",
+  "example_corpus": true,
+  "template_id": "psion_chat_template",
+  "template_version": "v1",
+  "template_digest": "sha256:7337ec749e64dbf1b23dbfeb3478788846c67e8247813f386d97b1ed1076fca3",
+  "corpus_jsonl": {
+    "path": "fixtures/psion/instruct/psion_instruct_example_corpus_v1.jsonl",
+    "sha256": "4cdd0525a93ea506a3649152fc0f8d999727e08e0a2ab0bb9ca5c5ed0a250d2f"
+  },
+  "record_count": 4,
+  "total_trainable_tokens": 93,
+  "total_masked_tokens": 65,
+  "records": [
+    {
+      "record_id": "psion_instruct_example_0001",
+      "source_id": "psion_instruct_example_0001_source",
+      "source_family_id": "psion_instruct_example_seed",
+      "rights_posture": "repo_owned_example_text",
+      "canonical_reference": "repo://fixtures/psion/instruct/psion_instruct_example_corpus_v1.jsonl#psion_instruct_example_0001",
+      "content_digest": "sha256:ada0b9562776ec7c234836d6d9d1b9f7ad3bcdf2c7d3b22e60edfa7cee7afa4b",
+      "mask_digest": "sha256:53385cb1fc02b7c209048c0715ef02e3e8cf4ff60026763560cdf0769b3de263",
+      "trainable_token_count": 23,
+      "masked_token_count": 21
+    },
+    {
+      "record_id": "psion_instruct_example_0002",
+      "source_id": "psion_instruct_example_0002_source",
+      "source_family_id": "psion_instruct_example_seed",
+      "rights_posture": "repo_owned_example_text",
+      "canonical_reference": "repo://fixtures/psion/instruct/psion_instruct_example_corpus_v1.jsonl#psion_instruct_example_0002",
+      "content_digest": "sha256:39dc612f70ee1a48e877437b90bcf97846b11f99034caeda3cf1da81cac73d79",
+      "mask_digest": "sha256:296fbeb4c37b1ac49506f15882791560b7551a96c0c1c5471cd6cbad31e8bea4",
+      "trainable_token_count": 20,
+      "masked_token_count": 13
+    },
+    {
+      "record_id": "psion_instruct_example_0003",
+      "source_id": "psion_instruct_example_0003_source",
+      "source_family_id": "psion_instruct_example_seed",
+      "rights_posture": "repo_owned_example_text",
+      "canonical_reference": "repo://fixtures/psion/instruct/psion_instruct_example_corpus_v1.jsonl#psion_instruct_example_0003",
+      "content_digest": "sha256:c183bbad061ce5c0d625130f4919fe5b3238d3a206b6e86d1b0679b18a5b440b",
+      "mask_digest": "sha256:348646b003fc34e93a3c409952fe25131382cbbad8ce4b2c357da5490e978b5a",
+      "trainable_token_count": 31,
+      "masked_token_count": 17
+    },
+    {
+      "record_id": "psion_instruct_example_0004",
+      "source_id": "psion_instruct_example_0004_source",
+      "source_family_id": "psion_instruct_example_seed",
+      "rights_posture": "repo_owned_example_text",
+      "canonical_reference": "repo://fixtures/psion/instruct/psion_instruct_example_corpus_v1.jsonl#psion_instruct_example_0004",
+      "content_digest": "sha256:cc230d0f567ad51f4b226049a7c7f21ec24e235ee34aa8095dfde76fd971df5a",
+      "mask_digest": "sha256:93aed8b6a16aaff8cc35639d9f602f6446905a31708d9622f951c956526e7d5f",
+      "trainable_token_count": 19,
+      "masked_token_count": 14
+    }
+  ],
+  "claim_boundary": "Bounded fixture-scale Psion statistical lane evidence only: deterministic smoke training over repo-owned example records. No general instruct capability claim and no real training-run claim.",
+  "manifest_digest": "sha256:1ce60a17a18975a729fd7d9d81baab556541af6fd280c0fadfb29e09b7e18cc7"
+}
