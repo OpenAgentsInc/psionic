@@ -430,6 +430,16 @@ mod tests {
     #[test]
     fn parameter_golf_record_folder_verifier_dry_runs_exported_bundle() -> Result<(), Box<dyn Error>>
     {
+        if !crate::parameter_golf_submission_runtime_payload_matches_host() {
+            eprintln!(
+                "skipping parameter_golf_record_folder_verifier_dry_runs_exported_bundle: \
+                 committed parameter_golf_submission_runtime payload targets \
+                 x86_64-unknown-linux-gnu and cannot execute on this {}-{} host",
+                std::env::consts::ARCH,
+                std::env::consts::OS,
+            );
+            return Ok(());
+        }
         let report = build_parameter_golf_record_folder_compatibility_report()?;
         let submission_dir = build_submission_bundle_dir()?;
         let parameter_golf_root = build_mock_parameter_golf_root(&report)?;

@@ -2910,14 +2910,14 @@ mod tests {
     fn compiled_agent_learning_ledger_retains_training_and_held_out_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let ledger = canonical_compiled_agent_learning_receipt_ledger()?;
-        assert_eq!(ledger.receipts.len(), 32);
+        assert_eq!(ledger.receipts.len(), 47);
         assert_eq!(
             ledger.evidence_class,
             CompiledAgentEvidenceClass::LearnedLane
         );
-        assert_eq!(ledger.training_receipt_ids.len(), 19);
-        assert_eq!(ledger.held_out_receipt_ids.len(), 13);
-        assert_eq!(ledger.correction_receipt_ids.len(), 19);
+        assert_eq!(ledger.training_receipt_ids.len(), 28);
+        assert_eq!(ledger.held_out_receipt_ids.len(), 19);
+        assert_eq!(ledger.correction_receipt_ids.len(), 33);
         assert!(ledger
             .correction_receipt_ids
             .iter()
@@ -2967,12 +2967,12 @@ mod tests {
             bundle.evidence_class,
             CompiledAgentEvidenceClass::LearnedLane
         );
-        assert_eq!(bundle.training_receipt_ids.len(), 19);
-        assert_eq!(bundle.excluded_held_out_receipt_ids.len(), 13);
-        assert_eq!(bundle.module_sample_counts.get("route"), Some(&19));
+        assert_eq!(bundle.training_receipt_ids.len(), 28);
+        assert_eq!(bundle.excluded_held_out_receipt_ids.len(), 19);
+        assert_eq!(bundle.module_sample_counts.get("route"), Some(&28));
         assert_eq!(
             bundle.module_sample_counts.get("grounded_answer"),
-            Some(&19)
+            Some(&28)
         );
         assert!(bundle.correction_sample_count >= 10);
         Ok(())

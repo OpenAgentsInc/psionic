@@ -2,11 +2,11 @@
   "schema_version": "psion.executor.failure_bundle_taxonomy.v1",
   "taxonomy_id": "psion_executor_failure_bundle_taxonomy_v1",
   "live_metrics_ref": "fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json",
-  "live_metrics_digest": "ed90d86a315b4c37427dcbc4353f6113cacc89862ffdd3ceefa8a7161c2d04c6",
+  "live_metrics_digest": "0b195604468c28f9667e3fe2b3b79ef2584db0a3d84de9a686d0331bd7ef1dec",
   "incident_policy_ref": "fixtures/psion/executor/psion_executor_continue_restart_policy_v1.json",
-  "incident_policy_digest": "40ef44b2c92651ab7e5ae3c7c039388bf472ca05467fc679054ffe4fb8413186",
+  "incident_policy_digest": "0a649849831b83ba6406a0756de19277eff93271f8c417cb52ffb116d20a884b",
   "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
-  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "review_workflow_digest": "8368c4224dbcfeda9439b824d28e29e895d70c73c79037c870ed8a24a9c693e4",
   "taxonomy_rows": [
     {
       "bundle_type_id": "optimizer_failure",
@@ -86,5 +86,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
   ],
   "summary": "The admitted executor lane now has one canonical failure-bundle taxonomy. Optimizer, batch, dataloader, memory, thermal, slow-node, and topology failures have explicit bundle types, and retained ledger rows now emit their current bundle posture into the same weekly review path.",
-  "packet_digest": "167de1726490b46baa6ab8dba39f1a10d19bec10180614bc2c72e515596ab0aa"
+  "packet_digest": "d43b2ab6e52b04955aa83c9e5d088a77906a9d75e5402b63755055e538d7516b"
 }

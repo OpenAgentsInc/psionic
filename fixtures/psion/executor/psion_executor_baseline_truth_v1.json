@@ -3,7 +3,7 @@
   "record_id": "psion_executor_baseline_truth_v1",
   "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
   "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
-  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "eval_pack_catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594",
   "report_reproductions": [
     {
       "report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
@@ -1126,5 +1126,5 @@
   ],
   "discrepancy_notes": [],
   "summary": "Reproduced `trained-v0` truth for both frozen executor packs: exactness_suites_green=true held_out_green=true adversarial_green=true committed_report_reproductions=3.",
-  "record_digest": "1cbcce5abbae31597533a62e80d5c5e1e4aa622410b883ac5a06c02f0f264784"
+  "record_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c"
 }

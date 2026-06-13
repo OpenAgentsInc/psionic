@@ -5,7 +5,7 @@
   "decision_lane_id": "psion_executor_mlx_local_decision_grade",
   "decision_question_posture": "This packet counts only for explicitly MLX-local executor-lane questions and does not claim cross-device cluster closure, remote launch authority, or promotion readiness.",
   "smoke_packet_ref": "fixtures/psion/executor/psion_executor_mlx_smoke_run_v1.json",
-  "smoke_packet_sha256": "1160de4c1439dfd220ed4d3c5f3800833b50f09ffd28888f3de03eaeec278a75",
+  "smoke_packet_sha256": "4924af6d77e4706dd432c1451d5d44dde3132405643a2b50dba9ed5ca916661e",
   "checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
   "checkpoint_packet_sha256": "ae31831fe9d325e2c91aabc87ab8626f3e76d1e489fe54bb690d6d5abee2a033",
   "retained_local_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
@@ -73,5 +73,5 @@
     "fixtures/training_visualization/psion_executor_mlx_decision_grade_remote_training_run_index_v2.json"
   ],
   "summary": "The admitted Mac MLX profile now has one retained decision-grade packet for the explicitly MLX-local executor question. Run `same-node-wallclock-retained-mlx` on `metal:0` stays anchored to the retained same-node report (steps=93184 wallclock_ms=573332 final_mean_loss=0.000000), reuses the green checkpoint/export prerequisites, and is now visible in the shared v2 dashboard bundle/index family with 7 total entries while still refusing to claim the Mac -> 4080 -> Mac roundtrip before EPIC 3.",
-  "packet_digest": "1b69444b0c1352bac9343426769bb2e3eb1d857e765bb8cd0eded6fc830ac1cd"
+  "packet_digest": "762574b54d45b80008471315bd036cc408bfc9afb120c7472a69510aa654baf0"
 }

@@ -1898,6 +1898,21 @@ mod tests {
         PARAMETER_GOLF_SUBMISSION_RUN_EVIDENCE_REPORT_REF,
     };
 
+    /// Returns true when the committed replay payload can execute here; otherwise
+    /// prints an explicit skip reason naming the architecture mismatch.
+    fn committed_runtime_payload_executes_on_host(test_name: &str) -> bool {
+        if crate::parameter_golf_submission_runtime_payload_matches_host() {
+            return true;
+        }
+        eprintln!(
+            "skipping {test_name}: committed parameter_golf_submission_runtime payload \
+             targets x86_64-unknown-linux-gnu and cannot execute on this {}-{} host",
+            std::env::consts::ARCH,
+            std::env::consts::OS,
+        );
+        false
+    }
+
     fn measured_runpod_distributed_receipt(
         posture: &ParameterGolfSubmissionChallengeExecutionPosture,
     ) -> Result<psionic_eval::ParameterGolfDistributedThroughputReceipt, Box<dyn Error>> {
@@ -1922,6 +1937,11 @@ mod tests {
     #[test]
     fn parameter_golf_submission_run_evidence_report_matches_committed_truth(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "parameter_golf_submission_run_evidence_report_matches_committed_truth",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let submission_dir = write_canonical_submission_folder(temp_dir.path())?;
         let generated = build_parameter_golf_submission_run_evidence_report(
@@ -1937,6 +1957,11 @@ mod tests {
     #[test]
     fn runpod_8xh100_posture_keeps_exported_submission_evidence_explicitly_blocked(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "runpod_8xh100_posture_keeps_exported_submission_evidence_explicitly_blocked",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let submission_dir = write_canonical_submission_folder(temp_dir.path())?;
         let generated = build_parameter_golf_submission_run_evidence_report(
@@ -1974,6 +1999,11 @@ mod tests {
     #[test]
     fn runpod_8xh100_posture_accepts_one_measured_distributed_receipt(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "runpod_8xh100_posture_accepts_one_measured_distributed_receipt",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let submission_dir = write_canonical_submission_folder(temp_dir.path())?;
         let posture = ParameterGolfSubmissionChallengeExecutionPosture::runpod_8xh100_defaults();
@@ -1997,6 +2027,11 @@ mod tests {
     #[test]
     fn parameter_golf_record_folder_replay_verification_report_matches_committed_truth(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "parameter_golf_record_folder_replay_verification_report_matches_committed_truth",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let submission_dir = write_canonical_submission_folder(temp_dir.path())?;
         let generated =
@@ -2009,6 +2044,11 @@ mod tests {
 
     #[test]
     fn write_parameter_golf_final_pr_bundle_generates_bundle_files() -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "write_parameter_golf_final_pr_bundle_generates_bundle_files",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let report = write_parameter_golf_final_pr_bundle(
             temp_dir.path(),
@@ -2029,6 +2069,11 @@ mod tests {
     #[test]
     fn write_parameter_golf_local_clone_dry_run_report_replays_into_mock_clone(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "write_parameter_golf_local_clone_dry_run_report_replays_into_mock_clone",
+        ) {
+            return Ok(());
+        }
         let clone_root = build_mock_parameter_golf_clone()?;
         let output_path = clone_root.join("dry_run_report.json");
         let report = write_parameter_golf_local_clone_dry_run_report(
@@ -2067,6 +2112,11 @@ mod tests {
     #[test]
     fn write_parameter_golf_submission_run_evidence_report_persists_current_truth(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "write_parameter_golf_submission_run_evidence_report_persists_current_truth",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let output_path = temp_dir
             .path()
@@ -2088,6 +2138,11 @@ mod tests {
     #[test]
     fn write_parameter_golf_record_folder_replay_verification_report_persists_current_truth(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "write_parameter_golf_record_folder_replay_verification_report_persists_current_truth",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let output_path = temp_dir
             .path()
@@ -2106,6 +2161,11 @@ mod tests {
     #[test]
     fn write_parameter_golf_final_pr_bundle_report_persists_current_truth(
     ) -> Result<(), Box<dyn Error>> {
+        if !committed_runtime_payload_executes_on_host(
+            "write_parameter_golf_final_pr_bundle_report_persists_current_truth",
+        ) {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir()?;
         let output_path = temp_dir.path().join("parameter_golf_final_pr_bundle.json");
         let written = write_parameter_golf_final_pr_bundle_report(

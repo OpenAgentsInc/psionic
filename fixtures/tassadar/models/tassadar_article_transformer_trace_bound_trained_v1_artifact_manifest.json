@@ -13,6 +13,6 @@
   "remote_training_visibility_ref": "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_visualization_bundle_v2.json",
   "remote_training_visibility_digest": "969bd18713eae8f2b7ee31aefc0ef842a4a6d7c9e94a4fb71b1a2715baa4cb41",
   "local_cluster_roundtrip_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
-  "local_cluster_roundtrip_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299",
-  "manifest_digest": "4915d43dc2c999a04afa17b78ef09a2bb15cf5e5b39795225f9e0e43d9bc14e9"
+  "local_cluster_roundtrip_digest": "fa9e57beefc1cc993e35f607afef96fcc90f88e31ba3c10f6ab1085d96d6867d",
+  "manifest_digest": "f4f7bc32477465dd72919db2fa0ba1b24c7673f04b12f3f1f7974e502c5cfee1"
 }

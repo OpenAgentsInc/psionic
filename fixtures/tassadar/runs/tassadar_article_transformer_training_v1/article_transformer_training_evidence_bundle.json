@@ -140,9 +140,9 @@
     {
       "global_step": 2,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 1.3300359,
+      "training_mean_loss": 1.3300352,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 2.5637472,
+      "held_out_mean_loss": 2.5637474,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.065625004,
@@ -160,9 +160,9 @@
     {
       "global_step": 3,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 1.0489533,
+      "training_mean_loss": 1.0489523,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 3.0405962,
+      "held_out_mean_loss": 3.040598,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.079687506,
@@ -180,9 +180,9 @@
     {
       "global_step": 4,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.8712051,
+      "training_mean_loss": 0.8712045,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 3.7264547,
+      "held_out_mean_loss": 3.7264595,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.09375,
@@ -200,9 +200,9 @@
     {
       "global_step": 5,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7864203,
+      "training_mean_loss": 0.7864216,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 4.5568066,
+      "held_out_mean_loss": 4.556807,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.1078125,
@@ -220,9 +220,9 @@
     {
       "global_step": 6,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.75454843,
+      "training_mean_loss": 0.7545507,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 5.4370728,
+      "held_out_mean_loss": 5.437057,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.121875,
@@ -240,9 +240,9 @@
     {
       "global_step": 7,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7458472,
+      "training_mean_loss": 0.745849,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.3086996,
+      "held_out_mean_loss": 6.3086576,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.13593751,
@@ -260,9 +260,9 @@
     {
       "global_step": 8,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74621886,
+      "training_mean_loss": 0.7462195,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.143623,
+      "held_out_mean_loss": 7.1435466,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.15,
@@ -280,9 +280,9 @@
     {
       "global_step": 9,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74906397,
+      "training_mean_loss": 0.74906343,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.816313,
+      "held_out_mean_loss": 7.8161993,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.14142136,
@@ -300,9 +300,9 @@
     {
       "global_step": 10,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7519432,
+      "training_mean_loss": 0.75194204,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 8.34973,
+      "held_out_mean_loss": 8.349525,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.13416408,
@@ -320,9 +320,9 @@
     {
       "global_step": 11,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7543745,
+      "training_mean_loss": 0.7543734,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 8.75677,
+      "held_out_mean_loss": 8.756416,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.12792043,
@@ -340,9 +340,9 @@
     {
       "global_step": 12,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.75627875,
+      "training_mean_loss": 0.7562771,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 9.043046,
+      "held_out_mean_loss": 9.042435,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.1224745,
@@ -360,9 +360,9 @@
     {
       "global_step": 13,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.75751024,
+      "training_mean_loss": 0.75750804,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 9.210081,
+      "held_out_mean_loss": 9.20919,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.11766969,
@@ -380,9 +380,9 @@
     {
       "global_step": 14,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.75789493,
+      "training_mean_loss": 0.75789136,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 9.259026,
+      "held_out_mean_loss": 9.25783,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.11338934,
@@ -400,9 +400,9 @@
     {
       "global_step": 15,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7573949,
+      "training_mean_loss": 0.75738955,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 9.1938715,
+      "held_out_mean_loss": 9.192368,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.10954452,
@@ -420,9 +420,9 @@
     {
       "global_step": 16,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7561457,
+      "training_mean_loss": 0.7561384,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 9.023331,
+      "held_out_mean_loss": 9.021562,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.10606602,
@@ -440,9 +440,9 @@
     {
       "global_step": 17,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7543558,
+      "training_mean_loss": 0.7543467,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 8.760875,
+      "held_out_mean_loss": 8.758862,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.10289916,
@@ -460,9 +460,9 @@
     {
       "global_step": 18,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7522092,
+      "training_mean_loss": 0.752199,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 8.42287,
+      "held_out_mean_loss": 8.420673,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.10000001,
@@ -480,9 +480,9 @@
     {
       "global_step": 19,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7498742,
+      "training_mean_loss": 0.74986476,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 8.026487,
+      "held_out_mean_loss": 8.024146,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.09733286,
@@ -500,9 +500,9 @@
     {
       "global_step": 20,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7475956,
+      "training_mean_loss": 0.7475887,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.5888767,
+      "held_out_mean_loss": 7.5864463,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.09486833,
@@ -520,9 +520,9 @@
     {
       "global_step": 21,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7457741,
+      "training_mean_loss": 0.74577165,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.128696,
+      "held_out_mean_loss": 7.1262865,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.09258202,
@@ -540,9 +540,9 @@
     {
       "global_step": 22,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74494845,
+      "training_mean_loss": 0.7449528,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.672678,
+      "held_out_mean_loss": 6.670467,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.09045341,
@@ -560,9 +560,9 @@
     {
       "global_step": 23,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74552184,
+      "training_mean_loss": 0.74553293,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.2666364,
+      "held_out_mean_loss": 6.2649317,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.08846518,
@@ -580,9 +580,9 @@
     {
       "global_step": 24,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.747007,
+      "training_mean_loss": 0.7470181,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 5.980879,
+      "held_out_mean_loss": 5.97999,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.08660254,
@@ -600,9 +600,9 @@
     {
       "global_step": 25,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7478794,
+      "training_mean_loss": 0.74788415,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 5.871555,
+      "held_out_mean_loss": 5.871517,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.084852815,
@@ -620,9 +620,9 @@
     {
       "global_step": 26,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.747414,
+      "training_mean_loss": 0.7474135,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 5.924802,
+      "held_out_mean_loss": 5.9253464,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.08320503,
@@ -640,9 +640,9 @@
     {
       "global_step": 27,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74628806,
+      "training_mean_loss": 0.74628747,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.0855436,
+      "held_out_mean_loss": 6.086364,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.08164966,
@@ -660,9 +660,9 @@
     {
       "global_step": 28,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7453288,
+      "training_mean_loss": 0.7453308,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.2992773,
+      "held_out_mean_loss": 6.300187,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.08017837,
@@ -680,9 +680,9 @@
     {
       "global_step": 29,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74486506,
+      "training_mean_loss": 0.7448698,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.5243163,
+      "held_out_mean_loss": 6.5251884,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.07878387,
@@ -700,9 +700,9 @@
     {
       "global_step": 30,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74483615,
+      "training_mean_loss": 0.7448423,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.732753,
+      "held_out_mean_loss": 6.7334776,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.07745967,
@@ -720,9 +720,9 @@
     {
       "global_step": 31,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7450448,
+      "training_mean_loss": 0.7450509,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.908248,
+      "held_out_mean_loss": 6.908778,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.076200075,
@@ -740,9 +740,9 @@
     {
       "global_step": 32,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7453132,
+      "training_mean_loss": 0.7453191,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.0432143,
+      "held_out_mean_loss": 7.0435677,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.075,
@@ -760,9 +760,9 @@
     {
       "global_step": 33,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74553365,
+      "training_mean_loss": 0.7455387,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.1356893,
+      "held_out_mean_loss": 7.1358414,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.0738549,
@@ -780,9 +780,9 @@
     {
       "global_step": 34,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74565905,
+      "training_mean_loss": 0.74566424,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.186922,
+      "held_out_mean_loss": 7.186904,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.07276069,
@@ -800,9 +800,9 @@
     {
       "global_step": 35,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7456781,
+      "training_mean_loss": 0.74568284,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.1999893,
+      "held_out_mean_loss": 7.1998,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.07171372,
@@ -820,9 +820,9 @@
     {
       "global_step": 36,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7455957,
+      "training_mean_loss": 0.7455996,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.179055,
+      "held_out_mean_loss": 7.1786532,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.07071068,
@@ -840,9 +840,9 @@
     {
       "global_step": 37,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7454269,
+      "training_mean_loss": 0.74543023,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.1288633,
+      "held_out_mean_loss": 7.1282787,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06974859,
@@ -860,9 +860,9 @@
     {
       "global_step": 38,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7452011,
+      "training_mean_loss": 0.74520373,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 7.054677,
+      "held_out_mean_loss": 7.0539365,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06882472,
@@ -880,9 +880,9 @@
     {
       "global_step": 39,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74496037,
+      "training_mean_loss": 0.7449632,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.9622326,
+      "held_out_mean_loss": 6.961368,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06793662,
@@ -900,9 +900,9 @@
     {
       "global_step": 40,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74475133,
+      "training_mean_loss": 0.74475443,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.8578625,
+      "held_out_mean_loss": 6.8568997,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06708204,
@@ -920,9 +920,9 @@
     {
       "global_step": 41,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7446103,
+      "training_mean_loss": 0.74461424,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.748578,
+      "held_out_mean_loss": 6.7476215,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.066258915,
@@ -940,9 +940,9 @@
     {
       "global_step": 42,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7445538,
+      "training_mean_loss": 0.7445584,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.6420727,
+      "held_out_mean_loss": 6.641136,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06546537,
@@ -960,9 +960,9 @@
     {
       "global_step": 43,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74457246,
+      "training_mean_loss": 0.74457777,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.546157,
+      "held_out_mean_loss": 6.545272,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.064699665,
@@ -980,9 +980,9 @@
     {
       "global_step": 44,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.744637,
+      "training_mean_loss": 0.74464285,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.468151,
+      "held_out_mean_loss": 6.467389,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06396022,
@@ -1000,9 +1000,9 @@
     {
       "global_step": 45,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74470586,
+      "training_mean_loss": 0.7447122,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.4139876,
+      "held_out_mean_loss": 6.413334,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06324556,
@@ -1020,9 +1020,9 @@
     {
       "global_step": 46,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7447406,
+      "training_mean_loss": 0.7447468,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.3869705,
+      "held_out_mean_loss": 6.386466,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06255433,
@@ -1040,9 +1040,9 @@
     {
       "global_step": 47,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7447207,
+      "training_mean_loss": 0.7447268,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.387251,
+      "held_out_mean_loss": 6.386928,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.061885275,
@@ -1060,9 +1060,9 @@
     {
       "global_step": 48,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74464935,
+      "training_mean_loss": 0.74465466,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.411867,
+      "held_out_mean_loss": 6.4117966,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.06123725,
@@ -1080,9 +1080,9 @@
     {
       "global_step": 49,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7445487,
+      "training_mean_loss": 0.74455374,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.455632,
+      "held_out_mean_loss": 6.45578,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.060609154,
@@ -1100,9 +1100,9 @@
     {
       "global_step": 50,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7444478,
+      "training_mean_loss": 0.7444525,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.5120926,
+      "held_out_mean_loss": 6.512453,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.060000002,
@@ -1120,9 +1120,9 @@
     {
       "global_step": 51,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7443701,
+      "training_mean_loss": 0.74437505,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.574532,
+      "held_out_mean_loss": 6.575056,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05940886,
@@ -1140,9 +1140,9 @@
     {
       "global_step": 52,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74432564,
+      "training_mean_loss": 0.7443312,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.636922,
+      "held_out_mean_loss": 6.637467,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.058834843,
@@ -1160,9 +1160,9 @@
     {
       "global_step": 53,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74431056,
+      "training_mean_loss": 0.7443162,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.6940804,
+      "held_out_mean_loss": 6.694647,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.058277152,
@@ -1180,9 +1180,9 @@
     {
       "global_step": 54,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74431205,
+      "training_mean_loss": 0.7443179,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.7421703,
+      "held_out_mean_loss": 6.7427225,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05773503,
@@ -1200,9 +1200,9 @@
     {
       "global_step": 55,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7443168,
+      "training_mean_loss": 0.74432266,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.7786455,
+      "held_out_mean_loss": 6.779129,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.057207756,
@@ -1220,9 +1220,9 @@
     {
       "global_step": 56,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74431443,
+      "training_mean_loss": 0.7443203,
       "training_exact_match_count": 1,
-      "held_out_mean_loss": 6.802184,
+      "held_out_mean_loss": 6.8025136,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05669467,
@@ -1240,9 +1240,9 @@
     {
       "global_step": 57,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7443,
+      "training_mean_loss": 0.74430573,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.8123837,
+      "held_out_mean_loss": 6.812558,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05619515,
@@ -1260,9 +1260,9 @@
     {
       "global_step": 58,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7442727,
+      "training_mean_loss": 0.74427843,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.8098364,
+      "held_out_mean_loss": 6.809862,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.055708602,
@@ -1280,9 +1280,9 @@
     {
       "global_step": 59,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7442336,
+      "training_mean_loss": 0.7442393,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.7958984,
+      "held_out_mean_loss": 6.7958097,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.055234477,
@@ -1300,9 +1300,9 @@
     {
       "global_step": 60,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7441869,
+      "training_mean_loss": 0.7441926,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.772577,
+      "held_out_mean_loss": 6.7723746,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05477226,
@@ -1320,9 +1320,9 @@
     {
       "global_step": 61,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7441384,
+      "training_mean_loss": 0.7441441,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.7422876,
+      "held_out_mean_loss": 6.741993,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05432145,
@@ -1340,9 +1340,9 @@
     {
       "global_step": 62,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7440945,
+      "training_mean_loss": 0.7441001,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.7078567,
+      "held_out_mean_loss": 6.707468,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.053881593,
@@ -1360,9 +1360,9 @@
     {
       "global_step": 63,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.7440593,
+      "training_mean_loss": 0.7440651,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.672349,
+      "held_out_mean_loss": 6.671867,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.053452253,
@@ -1380,9 +1380,9 @@
     {
       "global_step": 64,
       "batch_id": "tassadar.article_transformer.toy_tasks.v1-gradient-batch",
-      "training_mean_loss": 0.74403363,
+      "training_mean_loss": 0.7440399,
       "training_exact_match_count": 2,
-      "held_out_mean_loss": 6.638702,
+      "held_out_mean_loss": 6.6381297,
       "held_out_exact_match_count": 0,
       "effective_learning_rates": {
         "logits_projection_bias": 0.05303301,
@@ -1399,18 +1399,18 @@
     }
   ],
   "initial_training_mean_loss": 2.0288131,
-  "final_training_mean_loss": 0.74403363,
+  "final_training_mean_loss": 0.7440399,
   "initial_training_exact_match_count": 1,
   "final_training_exact_match_count": 2,
-  "final_held_out_mean_loss": 6.638702,
+  "final_held_out_mean_loss": 6.6381297,
   "final_held_out_exact_match_count": 0,
   "overfit_training_exact_match": true,
   "checkpoint": {
     "checkpoint_ref": "tassadar-article-transformer-training-run:step:64",
     "checkpoint_family": "train.tassadar.article_transformer",
     "stream_id": "tassadar.article_transformer.checkpoint.tassadar-article-transformer-training-run.64",
-    "manifest_digest": "fd47a59ec26f11cb5df78d325ca9bff2f12d6577e2ef4d7d395de643fa03263e",
-    "object_digest": "fcab06e606b2229bb5a71d905b85a28e4d055c1eb1c7dca9a3956574a7c93406",
+    "manifest_digest": "3dcbefb7b92c7c22c7d6926798a885b54b323c5426f11893a3930268dc6ba4b3",
+    "object_digest": "734049ab27b7f4c8c2c5d8c75880ba8837e90785ee097895e4bd46ba29047e9b",
     "writer_node_id": "psionic.local.cpu_reference",
     "membership_epoch": 0,
     "cluster_state_digest": "cluster.local.cpu_reference",
@@ -1419,11 +1419,11 @@
     "step": 64,
     "durable_at_ms": 1774320002560,
     "parent_checkpoint_ref": "tassadar-article-transformer-training-run:step:0",
-    "parent_manifest_digest": "3c9f48897e9860e2462c3bb21486d17b0767b73f683534458584c6133086164d",
-    "trained_trainable_parameter_digest": "b29b90c73b16de5f0a737a2eed067ba77a20aec77f6df5ee005a5253cbbfce88",
-    "restored_trainable_parameter_digest": "b29b90c73b16de5f0a737a2eed067ba77a20aec77f6df5ee005a5253cbbfce88",
+    "parent_manifest_digest": "c17f3bab734a0c8ed5216d56da87ee7436ee3a188229e075718d6dbe8c4901b8",
+    "trained_trainable_parameter_digest": "425545e05450535a16949c06819fe01009ca36fe5de085a78534f9a7cf424371",
+    "restored_trainable_parameter_digest": "425545e05450535a16949c06819fe01009ca36fe5de085a78534f9a7cf424371",
     "restore_matches_trained_state": true
   },
   "claim_boundary": "this evidence bundle covers one bounded article-Transformer training lane over two toy sequence tasks, a finite-difference optimizer loop, and deterministic checkpoint restore on the canonical owned stack. It does not claim full-parameter article training, benchmark parity, or final article-equivalence green status.",
-  "bundle_digest": "1def4c4e494164030fadecd43bc31729d85169aeb90ad6d9ae477dbdc330c013"
+  "bundle_digest": "42f87efe43eae5324e69f1ecfe8bace11af0a84be523c37b11750afe5b5e40b3"
 }

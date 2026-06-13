@@ -2,7 +2,7 @@
   "schema_version": "psion.executor.trace_native_metrics.v1",
   "packet_id": "psion_executor_trace_native_metrics_v1",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
+  "ledger_digest": "da1f2f2848646b89ced3334317f114f07efdf3f84629b9ddf4dc1b8ea2785085",
   "closeout_set_ref": "fixtures/psion/executor/psion_executor_article_closeout_set_v1.json",
   "closeout_set_digest": "2de570208df4bec06457bb0699e34f42099c9a191c4eeeb31bcd2d71b8f70734",
   "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
@@ -150,5 +150,5 @@
     "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
   ],
   "summary": "The executor lane now keeps the frozen bounded article closeout metrics visible per retained candidate row and per workload, binding trace length, exactness, and hull-cache throughput into the canonical ledger surface without pretending those benchmark facts are profile-specific when both rows still point at the same executor model.",
-  "packet_digest": "0ba90acb2a4b23c74699c55ef897eb5d9f0ef01bce05d68e03d6840538541a89"
+  "packet_digest": "1386c5a04da7b03bedc2e3cef3fbfac818fdbdb0e3e09b5e4d47551fa52c25c3"
 }

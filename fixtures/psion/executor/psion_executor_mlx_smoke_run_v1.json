@@ -7,8 +7,8 @@
   "checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
   "checkpoint_packet_sha256": "ae31831fe9d325e2c91aabc87ab8626f3e76d1e489fe54bb690d6d5abee2a033",
   "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
-  "eval_pack_catalog_sha256": "b6b4683128af9eb7d2eb901bfa4a3cba10247c21858d8f096a01fc593c679d5f",
-  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "eval_pack_catalog_sha256": "8b6bb6268d5533a6f199b37a55259b73ae29adf2160414855ee208194050e9e1",
+  "eval_pack_catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594",
   "retained_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
   "retained_report_sha256": "ba9da70b60669297e03029fdddab5606d80b4cd6c345e1d3eb1f88d537f529f6",
   "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
@@ -60,5 +60,5 @@
     "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors"
   ],
   "summary": "The admitted Mac MLX executor profile now has one smoke-run packet tied to the retained MLX same-node training/export lane. The smoke objective remains a bounded executor-lane admission surrogate on `metal:0` through run `same-node-wallclock-retained-mlx` (steps=93184 final_mean_loss=0.000000), and it now binds to the approved subset `tassadar.eval.frequent.v0::mlx_smoke_subset_v1` by keeping `artifact_packet_complete`, `checkpoint_restore_rehearsal_green`, and `export_smoke_green` green while explicitly deferring `local_cluster_roundtrip_green` to EPIC 3.",
-  "packet_digest": "ce626db0c02d4f9ea4ca7f783736b5bdfb45c076feb3113ebacc978f81ed25d8"
+  "packet_digest": "96f825af1a921571a6e5e027693443be13b5fba9de2cd8f89082552e8f76b860"
 }

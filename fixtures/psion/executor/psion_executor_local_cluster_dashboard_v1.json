@@ -4,7 +4,7 @@
   "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
   "registration_packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
+  "ledger_digest": "da1f2f2848646b89ced3334317f114f07efdf3f84629b9ddf4dc1b8ea2785085",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "baseline_card": {
@@ -133,5 +133,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md"
   ],
   "summary": "The admitted executor lane now has one canonical dashboard packet that keeps the frozen baseline, the retained current-best row, and the retained candidate row visible together. Metrics, throughput, recovery, export, and budget burn now project from the same retained ledger instead of separate packet prose, and the current-best 4080 row now shows the retained roundtrip as export-green.",
-  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28"
+  "dashboard_digest": "fa04f2a61f9572dd142b59351e595b072f674cceaf4d37600289b9193bb54373"
 }

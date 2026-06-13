@@ -2,7 +2,7 @@
   "schema_version": "psion.executor.continue_restart_policy.v1",
   "policy_id": "psion_executor_continue_restart_policy_v1",
   "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
-  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "review_workflow_digest": "8368c4224dbcfeda9439b824d28e29e895d70c73c79037c870ed8a24a9c693e4",
   "ownership_ref": "docs/PSION_EXECUTOR_OWNERSHIP.md",
   "incident_rows": [
     {
@@ -88,5 +88,5 @@
     "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md"
   ],
   "summary": "The admitted executor lane now has one continue-vs-restart incident policy packet. Launch drift, transient interruption, missing facts, throughput degradation, non-finite loss, and export failure now carry explicit default action, owner role, required evidence, and weekly-review logging requirements.",
-  "packet_digest": "40ef44b2c92651ab7e5ae3c7c039388bf472ca05467fc679054ffe4fb8413186"
+  "packet_digest": "0a649849831b83ba6406a0756de19277eff93271f8c417cb52ffb116d20a884b"
 }

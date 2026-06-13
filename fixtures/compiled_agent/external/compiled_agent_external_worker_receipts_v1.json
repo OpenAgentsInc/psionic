@@ -1,6 +1,6 @@
 {
   "schema_version": "psionic.compiled_agent.external_worker_receipts.v1",
-  "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+  "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
   "receipts": [
     {
       "role": "bounded_module_training",
@@ -18,7 +18,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "passed",
       "quarantine_status": "held",
@@ -72,7 +72,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "passed",
       "quarantine_status": "held",
@@ -123,7 +123,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "passed",
       "quarantine_status": "replay_candidate_eligible",
@@ -177,7 +177,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "failed",
       "quarantine_status": "rejected",
@@ -214,5 +214,5 @@
     }
   ],
   "summary": "Compiled-agent external worker receipts retain 4 governed outside-worker role submissions with 2 accepted, 1 rejected, and 1 review-required outcomes on the admitted family.",
-  "receipts_digest": "e9b42272444d0b0781c07ffc141a8c3642e66093dda65b17f0c4d287d971ac13"
+  "receipts_digest": "d054ccf1ba0016eb79fd5c20bc6ed6bafd5e21e6f058ef877022b8c9b6407977"
 }

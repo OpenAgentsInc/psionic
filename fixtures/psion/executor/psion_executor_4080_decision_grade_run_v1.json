@@ -10,11 +10,11 @@
   "durable_checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_4080_durable_checkpoint_v1.json",
   "durable_checkpoint_packet_sha256": "c1a983ae9eeb6bfdcd1fbd9f01cc13a3e2976c363e5d9035cc4268f84255c1f6",
   "frequent_eval_packet_ref": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
-  "frequent_eval_packet_sha256": "93db62e514bdb276426fcddea240543e1d42da077dee4756777dd0bea7f89e83",
+  "frequent_eval_packet_sha256": "0e7196b743fd16c917d013550a2d23a2b1a6cd3e2c82b2a7802bacaf3ed385be",
   "smoke_packet_ref": "fixtures/psion/executor/psion_executor_4080_smoke_run_v1.json",
-  "smoke_packet_sha256": "d32483674a6e1b35f1e1efaa8c88c3a3d2c3930ecefc423af4245b6aeded41ac",
+  "smoke_packet_sha256": "66cb5324e42c18313a75d6a47312fd9eacb9acb201d69fe2e88aeb786f98e8c5",
   "recovery_packet_ref": "fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json",
-  "recovery_packet_sha256": "2f928e9a328c37de545bfd665f333d7a36ef019dc277c7fc62816f1815373868",
+  "recovery_packet_sha256": "b0f6faed3ccff284d32b433a1e0a2398a3d9456e7ef367e6102c5dbf53436bdf",
   "retained_matrix_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
   "retained_matrix_report_sha256": "d34972dcd2c46b1a835a09c4aaaf350c37934b7a20a958f5d2d484e08b16f6ad",
   "retained_remote_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json",
@@ -141,5 +141,5 @@
     "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_run_index_v2.json"
   ],
   "summary": "The admitted 4080 profile now has one retained decision-grade packet. The baseline-comparable CUDA run `same-node-wallclock-retained-cuda` on `cuda:0` stays anchored to the retained device-matrix report (steps=47104 wallclock_ms=571633 final_mean_loss=0.000000), the supporting Tailnet cluster run `tailrun-home-admitted-20260328k` keeps checkpoint pointer `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` and one explicit frozen frequent-pack row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` machine-legible, and the packet now carries a retained registration row, weekly ablation review row, and shared v2 dashboard visibility with 7 total entries while still refusing promotion or full multi-checkpoint repetition claims.",
-  "packet_digest": "3e406cd85a6bf918fe0e219dc2e77f4801750798bc16aa28ca355457e44ae8f5"
+  "packet_digest": "cc9f37b0ddcec97e361c1e393c9b9f7c16312ff22d2e8a6b065edfc65c6285f9"
 }

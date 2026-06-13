@@ -796,6 +796,18 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// True when the committed `x86_64-unknown-linux-gnu` runtime payload can execute on this host.
+///
+/// The non-record submission package intentionally ships one committed Linux
+/// x86_64 payload (the challenge replay host target). Hosts with any other
+/// architecture or OS cannot exec that payload, so payload-executing tests
+/// skip with an explicit printed reason instead of failing on
+/// `Exec format error`.
+#[must_use]
+pub fn parameter_golf_submission_runtime_payload_matches_host() -> bool {
+    cfg!(all(target_os = "linux", target_arch = "x86_64"))
+}
+
 /// Returns the committed runtime payload path used by the current non-record package.
 #[must_use]
 pub fn parameter_golf_submission_runtime_payload_fixture_path() -> PathBuf {

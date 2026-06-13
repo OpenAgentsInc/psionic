@@ -5,11 +5,11 @@
   "lane_id": "psion_plugin_conditioned_host_native_reference",
   "capability_matrix_id": "psion_plugin_host_native_capability_matrix",
   "capability_matrix_version": "v1",
-  "capability_matrix_digest": "7af4ef8b120b92c0e97ad1994a854a84aa167274e2fbcf0d5edad58eb92e60a3",
+  "capability_matrix_digest": "2bbd85fc0012a5dbd744abaa744cc06caebfa8a3c11ffde7e6fe4c9102b66443",
   "model_artifact_id": "artifact.psion.plugin_host_native_reference.model.v1",
-  "model_artifact_digest": "28d456a924fc8ef60c9e3029ead06debad7b8b654f402770dbbe039185bc8913",
+  "model_artifact_digest": "391d3a2a0e6e9960e6fd1c3a79f5fd211861903ca0083603cc50372e3850a33e",
   "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-  "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+  "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
   "capability_doc_ref": "docs/PSION_PLUGIN_HOST_NATIVE_CAPABILITY_MATRIX_V1.md",
   "served_evidence_doc_ref": "docs/PSION_SERVED_EVIDENCE.md",
   "served_output_claim_doc_ref": "docs/PSION_SERVED_OUTPUT_CLAIMS.md",
@@ -49,5 +49,5 @@
   "execution_backed_statement_policy": "executor_backed_result requires explicit runtime receipt refs; otherwise outputs remain learned_judgment or benchmark_backed_capability_claim only",
   "benchmark_backed_statement_policy": "benchmark_backed_capability_claim may cite only supported host-native rows published in the capability matrix and may not widen plugin class or publication posture",
   "summary": "The first host-native served posture freezes an operator-internal learned-versus-executor statement policy for the bounded local-deterministic plugin lane, keeps the now-proved networked_read_only substrate outside the supported v1 learned surface, and leaves secret-backed, stateful, guest-artifact, publication, and arbitrary software claims out of scope.",
-  "posture_digest": "2cdb6ae9899bcf8d0e36faf137dc0af248acdfe4397462e6934c5adebe49a8b3"
+  "posture_digest": "f9417902353db373d60387f396ace78f7ac9a021b19ef88b45c9fc252844792f"
 }

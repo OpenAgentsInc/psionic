@@ -3,7 +3,7 @@
   "report_id": "compiled_agent.external_quarantine_report.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "evidence_class": "learned_lane",
-  "staging_ledger_digest": "035a9a3b928df3a27fed1d7770f7a9805f5774354dcbd9c5e16acb4f2252e5c2",
+  "staging_ledger_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
   "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
   "accepted_submission_ids": [
     "submission.compiled_agent.external_benchmark.alpha.v1",
@@ -146,5 +146,5 @@
     }
   ],
   "summary": "External quarantine retained 3 accepted submissions, 1 rejected submissions, 3 review-required submissions, 2 anomaly-flagged submissions, 0 trusted-signal contributors, and 4 shadow assessments while keeping outside evidence separate from runtime authority.",
-  "report_digest": "c53147143de900e4c8675cc2688bc5b17fbe8ba56fd31c2b5827ec5c62ac2e4e"
+  "report_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d"
 }

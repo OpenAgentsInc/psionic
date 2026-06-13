@@ -9,7 +9,7 @@
       "schema_version": "psionic.compiled_agent.learning_receipts.v1",
       "evidence_class": "learned_lane",
       "digest_field": "ledger_digest",
-      "artifact_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
+      "artifact_digest": "22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e",
       "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
     },
     {
@@ -17,7 +17,7 @@
       "schema_version": "psionic.compiled_agent.replay_bundle.v1",
       "evidence_class": "learned_lane",
       "digest_field": "bundle_digest",
-      "artifact_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+      "artifact_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036",
       "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
     },
     {
@@ -31,7 +31,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
       "schema_version": "psionic.compiled_agent.route_model.v1",
       "digest_field": "artifact_digest",
-      "artifact_digest": "0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f",
+      "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "identity_field": "artifact_id",
       "identity_value": "compiled_agent.route.multinomial_nb_v1",
       "detail": "Retained replay-trained route artifact consumed by validator scoring and runtime authority."
@@ -40,7 +40,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
       "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
       "digest_field": "artifact_digest",
-      "artifact_digest": "1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f",
+      "artifact_digest": "869217d751e61e52f32f1dfdd0f5dc18d3e9c0a1d15dce0f86066356075b2782",
       "identity_field": "artifact_id",
       "identity_value": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "detail": "Retained replay-trained grounded-answer artifact consumed by validator scoring and runtime authority."
@@ -65,7 +65,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_tfidf_centroid_model_v1.json",
       "schema_version": "psionic.compiled_agent.route_model.v1",
       "digest_field": "artifact_digest",
-      "artifact_digest": "bfacfe8d8cc8a5c8d77fd14fd9cd38018c02b63fcc29e3c74527bacce831e93f",
+      "artifact_digest": "4230c12f354af0cbde18f0d0f7fe128758dcb085750086f01f361b981cac5336",
       "identity_field": "artifact_id",
       "identity_value": "compiled_agent.route.tfidf_centroid_v1",
       "detail": "Retained stronger route candidate family artifact kept behind the same bounded route contract."
@@ -74,7 +74,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_tfidf_centroid_model_v1.json",
       "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
       "digest_field": "artifact_digest",
-      "artifact_digest": "8d9269dbba68b6a329c8896163d8b00d1b386b7caf1f4fbc2b79ae9e7d2e1524",
+      "artifact_digest": "47acc85795914944fec15dd706f5c553a210e8a52484b77b4ce964eafe349b1c",
       "identity_field": "artifact_id",
       "identity_value": "compiled_agent.grounded_answer.tfidf_centroid_v1",
       "detail": "Retained stronger grounded-answer candidate family artifact kept behind the same bounded synthesis contract."
@@ -100,7 +100,7 @@
       "schema_version": "psionic.compiled_agent.stronger_candidate_family_report.v1",
       "evidence_class": "learned_lane",
       "digest_field": "report_digest",
-      "artifact_digest": "19a09dba96ba7e152dea9c2604ce3e106fe98942d1d3064f481ca69aee30aec4",
+      "artifact_digest": "fc1c32a58dbc93aeddab9fb5fcc913b59809d129c44bc8b995fd1036e2375298",
       "identity_field": "report_id",
       "identity_value": "compiled_agent.stronger_candidate_family_report.v1",
       "detail": "Retained incumbent-versus-stronger bounded family comparison report for route and grounded-answer modules."
@@ -110,7 +110,7 @@
       "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
       "evidence_class": "learned_lane",
       "digest_field": "receipt_digest",
-      "artifact_digest": "5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6",
+      "artifact_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "identity_field": "cycle_id",
       "identity_value": "compiled_agent.xtrain.cycle.v1",
       "detail": "Canonical bounded XTRAIN cycle receipt for the current route and grounded candidates."
@@ -120,7 +120,7 @@
       "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
       "evidence_class": "learned_lane",
       "digest_field": "contract_digest",
-      "artifact_digest": "5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa",
+      "artifact_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
       "identity_field": "schema_version",
       "identity_value": "psionic.compiled_agent.promoted_artifact_contract.v1",
       "detail": "Runtime-consumable promoted-artifact contract retained after validator gating."
@@ -130,7 +130,7 @@
       "schema_version": "psionic.compiled_agent.confidence_policy.v1",
       "evidence_class": "learned_lane",
       "digest_field": "policy_digest",
-      "artifact_digest": "4a1e25a25f6bcc1e314e516fdadd0411181582844df9c31b68597b4558ce15b8",
+      "artifact_digest": "a38c5a52ba39e60d3b9f7d6396f4dacb9e7c641b34b1cdb9fa5d2b03490b317e",
       "identity_field": "policy_id",
       "identity_value": "compiled_agent.confidence_policy.v1",
       "detail": "Retained confidence policy for promoted-versus-candidate calibration and rollback review thresholds."
@@ -140,7 +140,7 @@
       "schema_version": "psionic.compiled_agent.shadow_disagreement_receipts.v1",
       "evidence_class": "learned_lane",
       "digest_field": "receipts_digest",
-      "artifact_digest": "7636190e5a1901e909874a670f4d71191b9cacf85214d6675042819dc2454cad",
+      "artifact_digest": "be6c101f629f8c70afa4f293c690fc50af1468f5fa43d3ccb9093ccc1095fe5d",
       "identity_field": "ledger_id",
       "identity_value": "compiled_agent.learning_receipt_ledger.v1",
       "detail": "Retained promoted-versus-candidate disagreement receipts across held-out and runtime rows."
@@ -150,7 +150,7 @@
       "schema_version": "psionic.compiled_agent.decentralized_roles_contract.v1",
       "evidence_class": "learned_lane",
       "digest_field": "contract_digest",
-      "artifact_digest": "303bf8445d4afbae4a329b2cb9d3b9be8619f77aa1113d9b96fb0b62b2ef81fc",
+      "artifact_digest": "0299d105eaca49643b61cc096ba51c1c24f2947c154f6178e2331b42fe168dc5",
       "identity_field": "contract_id",
       "identity_value": "compiled_agent.decentralized_roles.contract.v1",
       "detail": "Governed internal decentralized-role contract that the external worker beta must match."
@@ -159,7 +159,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_decentralized_role_receipts_v1.json",
       "schema_version": "psionic.compiled_agent.decentralized_role_receipts.v1",
       "digest_field": "receipts_digest",
-      "artifact_digest": "a9bcc9c0f4042c5d690b3ee99ff51bb20d6a29372dc592ba0465d7fecc634dc7",
+      "artifact_digest": "9376a26161cb0054e1083f3a66cddf31c343aba04501c08e9d569c0d6c7c14cf",
       "detail": "Governed internal decentralized-role receipts that external worker outputs must stay compatible with."
     },
     {
@@ -167,7 +167,7 @@
       "schema_version": "psionic.compiled_agent.decentralized_role_dry_run.v1",
       "evidence_class": "learned_lane",
       "digest_field": "report_digest",
-      "artifact_digest": "1895a9d50c00d49261e8e00ccf3cdbca4fa38b098407b29aca8ea5ed3810192a",
+      "artifact_digest": "5e1c13144ed22df3e4fdf3e6edb235fa8de68d750ceb91c230db05ac0f0d2087",
       "identity_field": "dry_run_id",
       "identity_value": "compiled_agent.decentralized_role_dry_run.v1",
       "detail": "Retained internal dry run proving validator and rollback discipline before outside workers join."
@@ -177,7 +177,7 @@
       "schema_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "evidence_class": "learned_lane",
       "digest_field": "contract_digest",
-      "artifact_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8",
+      "artifact_digest": "35661a111d665c7be92a4db144ccabe41627bef67b9785bfe0ab519489ec84cd",
       "identity_field": "contract_id",
       "identity_value": "compiled_agent.external_benchmark_kit.contract.v1",
       "detail": "Outside-compatible benchmark kit for the admitted compiled-agent family."
@@ -187,7 +187,7 @@
       "schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
       "evidence_class": "learned_lane",
       "digest_field": "run_digest",
-      "artifact_digest": "0d26ba6d9805902e8d0284883d1c5b79ef3299cfa14d7f8b247d40bca7af6283",
+      "artifact_digest": "5ad80e2ed89152f1666fa756438b5c4709e3d4aa4460348eb7b684ff1dfebfeb",
       "identity_field": "run_id",
       "identity_value": "compiled_agent.external_benchmark_run.v1",
       "detail": "Retained external benchmark run on the admitted compiled-agent family."
@@ -197,7 +197,7 @@
       "schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
       "evidence_class": "learned_lane",
       "digest_field": "payload_digest",
-      "artifact_digest": "49f94d8d641a0a093f3b627cefc111b8dcfdee42a87054221caa21ce821a00e8",
+      "artifact_digest": "e9f549007956ce87ec268527a44758360b500c29fc43b728b493060e24ddb38a",
       "identity_field": "submission_id",
       "identity_value": "submission.compiled_agent.external_runtime_disagreement.alpha.v1",
       "detail": "Retained external runtime disagreement receipt submission in the governed intake shape."
@@ -207,7 +207,7 @@
       "schema_version": "psionic.compiled_agent.external_replay_proposal.v1",
       "evidence_class": "learned_lane",
       "digest_field": "payload_digest",
-      "artifact_digest": "2e6536b56fe832e59d6d90fc6ade5d467e8d3c6297ca36b0d2917dda7e05370a",
+      "artifact_digest": "6dbe31249d2107b60c6cbbc27025a40e7cb59c84dd51a872b67734bd4b0c4c0b",
       "identity_field": "proposal_id",
       "identity_value": "proposal.compiled_agent.external_replay.alpha.v1",
       "detail": "Retained external replay proposal emitted from quarantined external evidence."
@@ -217,7 +217,7 @@
       "schema_version": "psionic.compiled_agent.external_submission_staging_ledger.v1",
       "evidence_class": "learned_lane",
       "digest_field": "ledger_digest",
-      "artifact_digest": "8c4830e4f9280c6d1650d50337a1769f6b197515236d1bce69cd5e5f57ad4388",
+      "artifact_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
       "identity_field": "ledger_id",
       "identity_value": "compiled_agent.external_submission_staging_ledger.v1",
       "detail": "Staging ledger that keeps accepted, rejected, and review-required external evidence separate from authority."
@@ -227,7 +227,7 @@
       "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
       "evidence_class": "learned_lane",
       "digest_field": "report_digest",
-      "artifact_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
+      "artifact_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
       "identity_field": "report_id",
       "identity_value": "compiled_agent.external_quarantine_report.v1",
       "detail": "Quarantine report that keeps shadow assessments and replay-candidate linkage explicit for external evidence."
@@ -247,7 +247,7 @@
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
+            "artifact_digest": "22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           },
           {
@@ -255,7 +255,7 @@
             "schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
             "evidence_class": "learned_lane",
             "digest_field": "run_digest",
-            "artifact_digest": "0d26ba6d9805902e8d0284883d1c5b79ef3299cfa14d7f8b247d40bca7af6283",
+            "artifact_digest": "5ad80e2ed89152f1666fa756438b5c4709e3d4aa4460348eb7b684ff1dfebfeb",
             "identity_field": "run_id",
             "identity_value": "compiled_agent.external_benchmark_run.v1",
             "detail": "Retained external benchmark run on the admitted compiled-agent family."
@@ -265,7 +265,7 @@
             "schema_version": "psionic.compiled_agent.external_submission_staging_ledger.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "8c4830e4f9280c6d1650d50337a1769f6b197515236d1bce69cd5e5f57ad4388",
+            "artifact_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
             "identity_field": "ledger_id",
             "identity_value": "compiled_agent.external_submission_staging_ledger.v1",
             "detail": "Staging ledger that keeps accepted, rejected, and review-required external evidence separate from authority."
@@ -275,7 +275,7 @@
             "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
             "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
+            "artifact_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
             "identity_field": "report_id",
             "identity_value": "compiled_agent.external_quarantine_report.v1",
             "detail": "Quarantine report that keeps shadow assessments and replay-candidate linkage explicit for external evidence."
@@ -301,7 +301,7 @@
             "schema_version": "psionic.compiled_agent.external_replay_proposal.v1",
             "evidence_class": "learned_lane",
             "digest_field": "payload_digest",
-            "artifact_digest": "2e6536b56fe832e59d6d90fc6ade5d467e8d3c6297ca36b0d2917dda7e05370a",
+            "artifact_digest": "6dbe31249d2107b60c6cbbc27025a40e7cb59c84dd51a872b67734bd4b0c4c0b",
             "identity_field": "proposal_id",
             "identity_value": "proposal.compiled_agent.external_replay.alpha.v1",
             "detail": "Retained external replay proposal emitted from quarantined external evidence."
@@ -342,7 +342,7 @@
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
+            "artifact_digest": "22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           },
           {
@@ -350,7 +350,7 @@
             "schema_version": "psionic.compiled_agent.replay_bundle.v1",
             "evidence_class": "learned_lane",
             "digest_field": "bundle_digest",
-            "artifact_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+            "artifact_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036",
             "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
           },
           {
@@ -358,7 +358,7 @@
             "schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
             "evidence_class": "learned_lane",
             "digest_field": "run_digest",
-            "artifact_digest": "0d26ba6d9805902e8d0284883d1c5b79ef3299cfa14d7f8b247d40bca7af6283",
+            "artifact_digest": "5ad80e2ed89152f1666fa756438b5c4709e3d4aa4460348eb7b684ff1dfebfeb",
             "identity_field": "run_id",
             "identity_value": "compiled_agent.external_benchmark_run.v1",
             "detail": "Retained external benchmark run on the admitted compiled-agent family."
@@ -368,7 +368,7 @@
             "schema_version": "psionic.compiled_agent.external_submission_staging_ledger.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "8c4830e4f9280c6d1650d50337a1769f6b197515236d1bce69cd5e5f57ad4388",
+            "artifact_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
             "identity_field": "ledger_id",
             "identity_value": "compiled_agent.external_submission_staging_ledger.v1",
             "detail": "Staging ledger that keeps accepted, rejected, and review-required external evidence separate from authority."
@@ -378,7 +378,7 @@
             "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
             "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
+            "artifact_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
             "identity_field": "report_id",
             "identity_value": "compiled_agent.external_quarantine_report.v1",
             "detail": "Quarantine report that keeps shadow assessments and replay-candidate linkage explicit for external evidence."
@@ -404,7 +404,7 @@
             "schema_version": "psionic.compiled_agent.external_submission_staging_ledger.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "8c4830e4f9280c6d1650d50337a1769f6b197515236d1bce69cd5e5f57ad4388",
+            "artifact_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
             "identity_field": "ledger_id",
             "identity_value": "compiled_agent.external_submission_staging_ledger.v1",
             "detail": "Staging ledger that keeps accepted, rejected, and review-required external evidence separate from authority."
@@ -414,7 +414,7 @@
             "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
             "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
+            "artifact_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
             "identity_field": "report_id",
             "identity_value": "compiled_agent.external_quarantine_report.v1",
             "detail": "Quarantine report that keeps shadow assessments and replay-candidate linkage explicit for external evidence."
@@ -454,7 +454,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
             "schema_version": "psionic.compiled_agent.route_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f",
+            "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.route.multinomial_nb_v1",
             "detail": "Retained replay-trained route artifact consumed by validator scoring and runtime authority."
@@ -463,7 +463,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
             "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f",
+            "artifact_digest": "869217d751e61e52f32f1dfdd0f5dc18d3e9c0a1d15dce0f86066356075b2782",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.grounded_answer.multinomial_nb_v1",
             "detail": "Retained replay-trained grounded-answer artifact consumed by validator scoring and runtime authority."
@@ -488,7 +488,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_tfidf_centroid_model_v1.json",
             "schema_version": "psionic.compiled_agent.route_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "bfacfe8d8cc8a5c8d77fd14fd9cd38018c02b63fcc29e3c74527bacce831e93f",
+            "artifact_digest": "4230c12f354af0cbde18f0d0f7fe128758dcb085750086f01f361b981cac5336",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.route.tfidf_centroid_v1",
             "detail": "Retained stronger route candidate family artifact kept behind the same bounded route contract."
@@ -497,7 +497,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_tfidf_centroid_model_v1.json",
             "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "8d9269dbba68b6a329c8896163d8b00d1b386b7caf1f4fbc2b79ae9e7d2e1524",
+            "artifact_digest": "47acc85795914944fec15dd706f5c553a210e8a52484b77b4ce964eafe349b1c",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.grounded_answer.tfidf_centroid_v1",
             "detail": "Retained stronger grounded-answer candidate family artifact kept behind the same bounded synthesis contract."
@@ -523,7 +523,7 @@
             "schema_version": "psionic.compiled_agent.stronger_candidate_family_report.v1",
             "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "19a09dba96ba7e152dea9c2604ce3e106fe98942d1d3064f481ca69aee30aec4",
+            "artifact_digest": "fc1c32a58dbc93aeddab9fb5fcc913b59809d129c44bc8b995fd1036e2375298",
             "identity_field": "report_id",
             "identity_value": "compiled_agent.stronger_candidate_family_report.v1",
             "detail": "Retained incumbent-versus-stronger bounded family comparison report for route and grounded-answer modules."
@@ -533,7 +533,7 @@
             "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
             "evidence_class": "learned_lane",
             "digest_field": "receipt_digest",
-            "artifact_digest": "5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6",
+            "artifact_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
             "identity_field": "cycle_id",
             "identity_value": "compiled_agent.xtrain.cycle.v1",
             "detail": "Canonical bounded XTRAIN cycle receipt for the current route and grounded candidates."
@@ -543,7 +543,7 @@
             "schema_version": "psionic.compiled_agent.confidence_policy.v1",
             "evidence_class": "learned_lane",
             "digest_field": "policy_digest",
-            "artifact_digest": "4a1e25a25f6bcc1e314e516fdadd0411181582844df9c31b68597b4558ce15b8",
+            "artifact_digest": "a38c5a52ba39e60d3b9f7d6396f4dacb9e7c641b34b1cdb9fa5d2b03490b317e",
             "identity_field": "policy_id",
             "identity_value": "compiled_agent.confidence_policy.v1",
             "detail": "Retained confidence policy for promoted-versus-candidate calibration and rollback review thresholds."
@@ -553,7 +553,7 @@
             "schema_version": "psionic.compiled_agent.shadow_disagreement_receipts.v1",
             "evidence_class": "learned_lane",
             "digest_field": "receipts_digest",
-            "artifact_digest": "7636190e5a1901e909874a670f4d71191b9cacf85214d6675042819dc2454cad",
+            "artifact_digest": "be6c101f629f8c70afa4f293c690fc50af1468f5fa43d3ccb9093ccc1095fe5d",
             "identity_field": "ledger_id",
             "identity_value": "compiled_agent.learning_receipt_ledger.v1",
             "detail": "Retained promoted-versus-candidate disagreement receipts across held-out and runtime rows."
@@ -563,7 +563,7 @@
             "schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
             "evidence_class": "learned_lane",
             "digest_field": "payload_digest",
-            "artifact_digest": "49f94d8d641a0a093f3b627cefc111b8dcfdee42a87054221caa21ce821a00e8",
+            "artifact_digest": "e9f549007956ce87ec268527a44758360b500c29fc43b728b493060e24ddb38a",
             "identity_field": "submission_id",
             "identity_value": "submission.compiled_agent.external_runtime_disagreement.alpha.v1",
             "detail": "Retained external runtime disagreement receipt submission in the governed intake shape."
@@ -573,7 +573,7 @@
             "schema_version": "psionic.compiled_agent.external_submission_staging_ledger.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "8c4830e4f9280c6d1650d50337a1769f6b197515236d1bce69cd5e5f57ad4388",
+            "artifact_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
             "identity_field": "ledger_id",
             "identity_value": "compiled_agent.external_submission_staging_ledger.v1",
             "detail": "Staging ledger that keeps accepted, rejected, and review-required external evidence separate from authority."
@@ -583,7 +583,7 @@
             "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
             "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
+            "artifact_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
             "identity_field": "report_id",
             "identity_value": "compiled_agent.external_quarantine_report.v1",
             "detail": "Quarantine report that keeps shadow assessments and replay-candidate linkage explicit for external evidence."
@@ -611,7 +611,7 @@
             "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
             "evidence_class": "learned_lane",
             "digest_field": "receipt_digest",
-            "artifact_digest": "5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6",
+            "artifact_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
             "identity_field": "cycle_id",
             "identity_value": "compiled_agent.xtrain.cycle.v1",
             "detail": "Canonical bounded XTRAIN cycle receipt for the current route and grounded candidates."
@@ -621,7 +621,7 @@
             "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
             "evidence_class": "learned_lane",
             "digest_field": "contract_digest",
-            "artifact_digest": "5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa",
+            "artifact_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
             "identity_field": "schema_version",
             "identity_value": "psionic.compiled_agent.promoted_artifact_contract.v1",
             "detail": "Runtime-consumable promoted-artifact contract retained after validator gating."
@@ -670,7 +670,7 @@
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
             "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
+            "artifact_digest": "22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           },
           {
@@ -678,7 +678,7 @@
             "schema_version": "psionic.compiled_agent.replay_bundle.v1",
             "evidence_class": "learned_lane",
             "digest_field": "bundle_digest",
-            "artifact_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+            "artifact_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036",
             "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
           },
           {
@@ -686,7 +686,7 @@
             "schema_version": "psionic.compiled_agent.external_replay_proposal.v1",
             "evidence_class": "learned_lane",
             "digest_field": "payload_digest",
-            "artifact_digest": "2e6536b56fe832e59d6d90fc6ade5d467e8d3c6297ca36b0d2917dda7e05370a",
+            "artifact_digest": "6dbe31249d2107b60c6cbbc27025a40e7cb59c84dd51a872b67734bd4b0c4c0b",
             "identity_field": "proposal_id",
             "identity_value": "proposal.compiled_agent.external_replay.alpha.v1",
             "detail": "Retained external replay proposal emitted from quarantined external evidence."
@@ -696,7 +696,7 @@
             "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
             "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
+            "artifact_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
             "identity_field": "report_id",
             "identity_value": "compiled_agent.external_quarantine_report.v1",
             "detail": "Quarantine report that keeps shadow assessments and replay-candidate linkage explicit for external evidence."
@@ -721,7 +721,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
             "schema_version": "psionic.compiled_agent.route_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f",
+            "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.route.multinomial_nb_v1",
             "detail": "Retained replay-trained route artifact consumed by validator scoring and runtime authority."
@@ -730,7 +730,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
             "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f",
+            "artifact_digest": "869217d751e61e52f32f1dfdd0f5dc18d3e9c0a1d15dce0f86066356075b2782",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.grounded_answer.multinomial_nb_v1",
             "detail": "Retained replay-trained grounded-answer artifact consumed by validator scoring and runtime authority."
@@ -739,7 +739,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_tfidf_centroid_model_v1.json",
             "schema_version": "psionic.compiled_agent.route_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "bfacfe8d8cc8a5c8d77fd14fd9cd38018c02b63fcc29e3c74527bacce831e93f",
+            "artifact_digest": "4230c12f354af0cbde18f0d0f7fe128758dcb085750086f01f361b981cac5336",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.route.tfidf_centroid_v1",
             "detail": "Retained stronger route candidate family artifact kept behind the same bounded route contract."
@@ -748,7 +748,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_tfidf_centroid_model_v1.json",
             "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "8d9269dbba68b6a329c8896163d8b00d1b386b7caf1f4fbc2b79ae9e7d2e1524",
+            "artifact_digest": "47acc85795914944fec15dd706f5c553a210e8a52484b77b4ce964eafe349b1c",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.grounded_answer.tfidf_centroid_v1",
             "detail": "Retained stronger grounded-answer candidate family artifact kept behind the same bounded synthesis contract."
@@ -788,5 +788,5 @@
     "doc_path": "docs/COMPILED_AGENT_EXTERNAL_WORKERS.md"
   },
   "claim_boundary": "This is a governed external worker beta for the admitted compiled-agent family only. Outside workers can execute bounded replay-generation, ranking, validator-scoring, and bounded-training jobs, but they do not get promotion authority, live runtime authority, task-family widening authority, or validator bypass.",
-  "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a"
+  "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b"
 }

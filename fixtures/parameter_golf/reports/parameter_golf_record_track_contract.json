@@ -13,7 +13,7 @@
   "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
   "baseline_accounting_receipt_digest": "c98b2390a3ca2eaf26933cadc8939e2139c16894d671f4db22ad8f7948ba933a",
   "baseline_submission_run_evidence_report_digest": "6714ea603ba135b01ec0776227a51cff1f16f07b0903c44c43422685439d644b",
-  "baseline_export_surface_contract_report_digest": "9e1487bc1b75a033d435dc77e2b395039e86a86218c820df044a859f0047fbf4",
+  "baseline_export_surface_contract_report_digest": "d89b16c798bf6a1591fd6604ddef0546c9cf0e0abb7033930cb01008b3b5652f",
   "baseline_record_folder_replay_verification_report_digest": "24081d70ef01c7d9ae3cd35a237e29d88152e7f38f3596e2eb84043ea0de30d0",
   "baseline_final_pr_bundle_report_digest": "0dfd41ebb44ab68a325c4835c0ced09fa2e2af26e3145409a7f514d51c7b61db",
   "baseline_local_clone_dry_run_report_digest": "f97c2bed323b94369e42401ca0692593b16e3c63248b285952039d82c13b22a0",
@@ -127,5 +127,5 @@
     }
   ],
   "claim_boundary": "record-track contract is now explicit, the shipped runtime-byte contract is defended, and the current lane remains blocked on reproducible 8xH100 challenge-speed execution",
-  "report_digest": "3f475850f5b1dfeb42954c4ccfe44969351049d8f54c5af53cf85e8df797f49f"
+  "report_digest": "03202d1a402be74ffb484b3f8785061bcd67dbf0c62d4c98dba1d3b0aba4f0e6"
 }

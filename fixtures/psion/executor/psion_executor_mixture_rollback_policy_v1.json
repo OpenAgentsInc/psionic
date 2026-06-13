@@ -5,7 +5,7 @@
   "canonical_mixture_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044",
   "active_mixture_version_id": "psion_executor_canonical_mixture_v0",
   "source_family_contribution_ref": "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
-  "source_family_contribution_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794",
+  "source_family_contribution_digest": "764eec7083327fc47e5f82894633a423f70b90421df749963d4b1e75a867091d",
   "baseline_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
   "candidate_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
   "same_budget_win_claim_present": false,
@@ -51,5 +51,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
   ],
   "summary": "The executor lane now has one canonical mixture rollback policy packet. No provisional same-budget mixture win is retained this week, but any future held-out or adversarial regression under a provisional win will trigger rollback and limit the next retry to one lever.",
-  "packet_digest": "36cd968e3dbeb3810a4da9ca8ebcb1b2b097af2077993c469f461b98dceba9cf"
+  "packet_digest": "cadf071a6a53168531e77857228a7e7b166a708a68faa680aed7fa135106b9e7"
 }

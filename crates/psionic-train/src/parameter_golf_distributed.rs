@@ -1832,6 +1832,10 @@ mod tests {
         ];
         config.memory_observation = None;
         config.validation_observed_ms = 10;
+        // Commit a0688399 made the validation batch width configurable with a
+        // challenge default of 64; this test's bespoke 4-sequence shards pin
+        // the matching local batch width explicitly.
+        config.validation_batch_sequences = 4;
         config.validation_total_sequence_count = 32;
         config.validation_shard_observations = (0..8)
             .map(|rank| ParameterGolfDistributedValidationShardObservation {
@@ -2127,6 +2131,9 @@ mod tests {
         ];
         measurements.validation_observed_ms = 10;
         measurements.validation_total_sequence_count = 32;
+        // The bridge keeps the challenge geometry (sequence_length 1024), so
+        // the NonOverlapping plan from commit a0688399 expects each rank's
+        // scored-token span to cover sequence_count * 1024 tokens.
         measurements.validation_shard_observations = (0..8)
             .map(|rank| ParameterGolfDistributedValidationShardObservation {
                 rank,
@@ -2134,11 +2141,11 @@ mod tests {
                 sequence_count: 4,
                 evaluation_unit_start: (rank * 4) as u64,
                 evaluation_unit_count: 4,
-                scored_token_start: (rank * 16) as u64,
-                scored_token_count: 16,
+                scored_token_start: (rank * 4 * 1024) as u64,
+                scored_token_count: 4 * 1024,
                 loss_sum: 8.0 + rank as f64,
-                token_count: 16,
-                byte_count: 12,
+                token_count: 4096,
+                byte_count: 3072,
                 observed_ms: 9 + rank as u64,
             })
             .collect();

@@ -6,11 +6,11 @@
   "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
   "tailnet_cadence": {
     "previous_governed_run_digest": "dc9ab99b00fa05ae990693b5e758cc728d7d06dcef36bb51b86bf769c7f18b37",
-    "current_governed_run_digest": "a6f3caf208fb510793d048fa44e8bab8f2761282f0a1c6d42d0845fe8208f2dc",
+    "current_governed_run_digest": "e4b4018c8b012127d2dcd25103c190071d27e31fa48d614ce2e169a8dd303954",
     "previous_staging_ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2",
-    "current_staging_ledger_digest": "5f4ce9b6126629220a69083eaa62f029bfd4054af38161cee52092489d0dabf8",
+    "current_staging_ledger_digest": "40e56dd19ca783b77f4cf3407dcb6418506d03aafeb567125864a539d0a58ca0",
     "previous_quarantine_report_digest": "90492578580c808d8639f7a920b641fe8e717446509c74e9126d5e0c6d91c6c4",
-    "current_quarantine_report_digest": "1b71d21d1f1f0ca2ea2b2420709c91b8f1d6012cdcd884ee91bfe1431ddf00a3",
+    "current_quarantine_report_digest": "b071c5571815239247c018e9621d08caa860cf1375ca9fbbcb22e7cfcc278be4",
     "previous_xtrain_cycle_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
     "current_xtrain_cycle_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
     "previous_route_decision": "promote",
@@ -135,8 +135,8 @@
     "new_failure_class_count": 14
   },
   "external_evidence_boundary": {
-    "staging_ledger_digest": "035a9a3b928df3a27fed1d7770f7a9805f5774354dcbd9c5e16acb4f2252e5c2",
-    "quarantine_report_digest": "c53147143de900e4c8675cc2688bc5b17fbe8ba56fd31c2b5827ec5c62ac2e4e",
+    "staging_ledger_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
+    "quarantine_report_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
     "anomaly_submission_ids": [
       "submission.compiled_agent.external_benchmark_invalid.alpha.v1",
       "submission.compiled_agent.external_runtime_disagreement.alpha.v1"
@@ -174,5 +174,5 @@
     ]
   },
   "summary": "Phase six keeps the Tailnet-first compiled-agent loop repeatable with route decision=Promote, grounded decision=Promote, 13 permanent route traps, and 2 anomaly-gated external submissions.",
-  "report_digest": "b0d4061de01e35a21b83ff6c2f57fb5737905420cfb110d031c0116c3fabad86"
+  "report_digest": "3a04cb7bf0adb904ea04c4f586074bf93064cbc15911594eb57263097370f66e"
 }

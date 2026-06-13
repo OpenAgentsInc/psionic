@@ -11,9 +11,9 @@
   "decision_threshold_ref": "fixtures/psion/executor/psion_executor_decision_thresholds_v1.json",
   "decision_threshold_digest": "01be6e718c71781c82fb2ee7472485c8cafcfa9d2ed265c331988235edca47bc",
   "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
-  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "review_workflow_digest": "8368c4224dbcfeda9439b824d28e29e895d70c73c79037c870ed8a24a9c693e4",
   "throughput_report_ref": "fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json",
-  "throughput_report_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7",
+  "throughput_report_digest": "ebd4acb48ed6bbe19f67fb50ac085d06c701bd66c2e12065ec670f9ac6dd983a",
   "baseline_scheduler_id": "cosine_decay_warmup_500",
   "candidate_scheduler_id": "cosine_decay_warmup_750",
   "baseline_warmup_steps": 500,
@@ -81,5 +81,5 @@
     "docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md"
   ],
   "summary": "The executor lane now has one retained scheduler/warmup ablation packet. The 4080 same-budget run kept zero exactness, held-out, and adversarial regressions, stayed directly comparable to the frozen baseline, and was logged for review without claiming a meaningful improvement outside the frozen noise band.",
-  "packet_digest": "b78acc30a3c31cafd51d70c8cf2f634605f87242f872d1f9c9ab7ba42557e167"
+  "packet_digest": "d232a285ca39d8076aee8c906d955918bfd3daf5269f9a3e30d940dcaceb42d5"
 }

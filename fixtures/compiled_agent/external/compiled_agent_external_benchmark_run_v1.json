@@ -14,7 +14,7 @@
     "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
     "attested_at_epoch_ms": 1774800000000
   },
-  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
+  "contract_digest": "35661a111d665c7be92a4db144ccabe41627bef67b9785bfe0ab519489ec84cd",
   "evidence_class": "learned_lane",
   "externally_sourced": true,
   "accepted_row_ids": [
@@ -52,9 +52,9 @@
                 "manifest": {
                   "module_name": "intent_route",
                   "signature_name": "intent_route",
-                  "implementation_family": "psionic_rule_revision",
-                  "implementation_label": "promoted",
-                  "version": "2026-03-28",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
                   "promotion_state": "promoted",
                   "confidence_floor": 0.8
                 },
@@ -68,8 +68,8 @@
                 },
                 "confidence": 0.93,
                 "trace": {
-                  "artifact_id": "compiled_agent.baseline.rule_v1.route",
-                  "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
                   "source": "external_benchmark_kit"
                 }
               },
@@ -184,7 +184,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  "artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2"
                 }
               },
               {
@@ -255,7 +255,7 @@
               "response": "Provider is ready to go online."
             },
             "authority_manifest_ids": [
-              "intent_route:psionic_rule_revision:promoted:2026-03-28",
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
               "tool_policy:psionic_rule_revision:promoted:2026-03-28",
               "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
               "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
@@ -277,13 +277,13 @@
         "provider",
         "training"
       ],
-      "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "route_artifact_id": "compiled_agent.route.multinomial_nb_v1",
       "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "primary_confidence": 0.9,
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for the canonical supported provider-ready path.",
-      "row_digest": "b2fbe2c79dfc8b94fe2365749e9a7a8111f5c34454069fadf0bb54561612726a"
+      "row_digest": "6a29bc8675dc8f52919d9e95a87fede844c7effc486ab54d980b2dfedee689f6"
     },
     {
       "row_id": "external.provider_blocked.v1",
@@ -311,9 +311,9 @@
                 "manifest": {
                   "module_name": "intent_route",
                   "signature_name": "intent_route",
-                  "implementation_family": "psionic_rule_revision",
-                  "implementation_label": "promoted",
-                  "version": "2026-03-28",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
                   "promotion_state": "promoted",
                   "confidence_floor": 0.8
                 },
@@ -327,8 +327,8 @@
                 },
                 "confidence": 0.93,
                 "trace": {
-                  "artifact_id": "compiled_agent.baseline.rule_v1.route",
-                  "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
                   "source": "external_benchmark_kit"
                 }
               },
@@ -445,7 +445,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  "artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2"
                 }
               },
               {
@@ -520,7 +520,7 @@
               "response": "Provider is not ready to go online."
             },
             "authority_manifest_ids": [
-              "intent_route:psionic_rule_revision:promoted:2026-03-28",
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
               "tool_policy:psionic_rule_revision:promoted:2026-03-28",
               "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
               "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
@@ -542,13 +542,13 @@
         "provider",
         "held_out"
       ],
-      "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "route_artifact_id": "compiled_agent.route.multinomial_nb_v1",
       "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "primary_confidence": 0.9,
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for provider-blocked grounding without widening into blocker summaries.",
-      "row_digest": "1ffbfefedef7f1e845aa24a20749c5f96c088ebb033f4670302ed73f9c4b783e"
+      "row_digest": "e2a33f72104456c79f09d01970eea62b097ae2426c2123a5db1a8daeeb037de7"
     },
     {
       "row_id": "external.wallet_balance.v1",
@@ -574,9 +574,9 @@
                 "manifest": {
                   "module_name": "intent_route",
                   "signature_name": "intent_route",
-                  "implementation_family": "psionic_rule_revision",
-                  "implementation_label": "promoted",
-                  "version": "2026-03-28",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
                   "promotion_state": "promoted",
                   "confidence_floor": 0.8
                 },
@@ -590,8 +590,8 @@
                 },
                 "confidence": 0.93,
                 "trace": {
-                  "artifact_id": "compiled_agent.baseline.rule_v1.route",
-                  "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
                   "source": "external_benchmark_kit"
                 }
               },
@@ -706,7 +706,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  "artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2"
                 }
               },
               {
@@ -777,7 +777,7 @@
               "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
             },
             "authority_manifest_ids": [
-              "intent_route:psionic_rule_revision:promoted:2026-03-28",
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
               "tool_policy:psionic_rule_revision:promoted:2026-03-28",
               "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
               "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
@@ -799,13 +799,13 @@
         "wallet",
         "training"
       ],
-      "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "route_artifact_id": "compiled_agent.route.multinomial_nb_v1",
       "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "primary_confidence": 0.9,
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for the admitted wallet-balance path under the promoted grounded model.",
-      "row_digest": "46faf91c2db77d5f0af25bfc546e767acd9e33fbe70ea6af5456a4480ccbfb76"
+      "row_digest": "074fe3fc99243a46274ec36fa03277853f05453849a557af6a7bd0e836cdad9d"
     },
     {
       "row_id": "external.wallet_variant.v1",
@@ -831,9 +831,9 @@
                 "manifest": {
                   "module_name": "intent_route",
                   "signature_name": "intent_route",
-                  "implementation_family": "psionic_rule_revision",
-                  "implementation_label": "promoted",
-                  "version": "2026-03-28",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
                   "promotion_state": "promoted",
                   "confidence_floor": 0.8
                 },
@@ -847,8 +847,8 @@
                 },
                 "confidence": 0.93,
                 "trace": {
-                  "artifact_id": "compiled_agent.baseline.rule_v1.route",
-                  "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
                   "source": "external_benchmark_kit"
                 }
               },
@@ -963,7 +963,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  "artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2"
                 }
               },
               {
@@ -1034,7 +1034,7 @@
               "response": "Wallet balance is 3400 sats, with 180 sats of recent earnings."
             },
             "authority_manifest_ids": [
-              "intent_route:psionic_rule_revision:promoted:2026-03-28",
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
               "tool_policy:psionic_rule_revision:promoted:2026-03-28",
               "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
               "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
@@ -1056,13 +1056,13 @@
         "wallet",
         "held_out"
       ],
-      "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "route_artifact_id": "compiled_agent.route.multinomial_nb_v1",
       "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "primary_confidence": 0.9,
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for a held-out wallet phrasing variation.",
-      "row_digest": "60175cf08e22c812ca37a2ceb5e7638c53df7a11e853b6140640264d67328dfe"
+      "row_digest": "5600ce8833711ade12a87bcc2ad74007e4be25967abb8f9d01e5ce8001865805"
     },
     {
       "row_id": "external.unsupported_gpu_poem.v1",
@@ -1088,9 +1088,9 @@
                 "manifest": {
                   "module_name": "intent_route",
                   "signature_name": "intent_route",
-                  "implementation_family": "psionic_rule_revision",
-                  "implementation_label": "promoted",
-                  "version": "2026-03-28",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
                   "promotion_state": "promoted",
                   "confidence_floor": 0.8
                 },
@@ -1104,8 +1104,8 @@
                 },
                 "confidence": 0.88,
                 "trace": {
-                  "artifact_id": "compiled_agent.baseline.rule_v1.route",
-                  "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
                   "source": "external_benchmark_kit"
                 }
               },
@@ -1197,7 +1197,7 @@
                 "confidence": 0.95,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  "artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2"
                 }
               },
               {
@@ -1242,7 +1242,7 @@
               "response": "I can currently answer only provider readiness and wallet balance questions."
             },
             "authority_manifest_ids": [
-              "intent_route:psionic_rule_revision:promoted:2026-03-28",
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
               "tool_policy:psionic_rule_revision:promoted:2026-03-28",
               "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
               "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
@@ -1264,13 +1264,13 @@
         "unsupported",
         "training"
       ],
-      "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "route_artifact_id": "compiled_agent.route.multinomial_nb_v1",
       "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "primary_confidence": 0.88,
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for a clean unsupported refusal outside the admitted family.",
-      "row_digest": "6d99c432ceeb67ae1fc4ec128ac5568ca99146b994f13813dfd8d58b09e5cf77"
+      "row_digest": "f7c740f74d4a3d9a527d1daacf53b8c913769db44dccb413c8538898d4748701"
     },
     {
       "row_id": "external.negated_wallet.v1",
@@ -1296,9 +1296,9 @@
                 "manifest": {
                   "module_name": "intent_route",
                   "signature_name": "intent_route",
-                  "implementation_family": "psionic_rule_revision",
-                  "implementation_label": "promoted",
-                  "version": "2026-03-28",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
                   "promotion_state": "promoted",
                   "confidence_floor": 0.8
                 },
@@ -1312,8 +1312,8 @@
                 },
                 "confidence": 0.79,
                 "trace": {
-                  "artifact_id": "compiled_agent.baseline.rule_v1.route",
-                  "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
                   "source": "external_benchmark_kit"
                 }
               },
@@ -1428,7 +1428,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  "artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2"
                 }
               },
               {
@@ -1499,7 +1499,7 @@
               "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
             },
             "authority_manifest_ids": [
-              "intent_route:psionic_rule_revision:promoted:2026-03-28",
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
               "tool_policy:psionic_rule_revision:promoted:2026-03-28",
               "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
               "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
@@ -1522,7 +1522,7 @@
         "negated",
         "held_out"
       ],
-      "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "route_artifact_id": "compiled_agent.route.multinomial_nb_v1",
       "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "primary_confidence": 0.79,
       "validator_outcome": "review_required",
@@ -1534,9 +1534,9 @@
         "unsafe_final_outcome"
       ],
       "operator_note": "External benchmark row that should stay unsupported and expose the retained negated-wallet weakness if it regresses.",
-      "row_digest": "1f8b4b68929863709fdb708ba437e536267c1d9d4a30a08ab44c10ca3a896645"
+      "row_digest": "d80355499b9f5686d27b249ba36067e5bd24c481ed4ba1d8affe6c8d550bf5b8"
     }
   ],
   "summary": "External benchmark run retained 6 rows for contributor `contrib.external.alpha` with 5 accepted rows and 1 review-required rows on the admitted compiled-agent family.",
-  "run_digest": "c0f9b4344d94ea41b2134d5ab0e55287675f4c6abe76cd7478a5a96bdaa6694f"
+  "run_digest": "5ad80e2ed89152f1666fa756438b5c4709e3d4aa4460348eb7b684ff1dfebfeb"
 }

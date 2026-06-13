@@ -4,9 +4,9 @@
   "matrix_version": "v1",
   "lane_id": "psion_plugin_conditioned_host_native_reference",
   "model_artifact_id": "artifact.psion.plugin_host_native_reference.model.v1",
-  "model_artifact_digest": "28d456a924fc8ef60c9e3029ead06debad7b8b654f402770dbbe039185bc8913",
+  "model_artifact_digest": "391d3a2a0e6e9960e6fd1c3a79f5fd211861903ca0083603cc50372e3850a33e",
   "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-  "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+  "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
   "claim_boundary_doc_ref": "docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md",
   "served_evidence_doc_ref": "docs/PSION_SERVED_EVIDENCE.md",
   "served_output_claim_doc_ref": "docs/PSION_SERVED_OUTPUT_CLAIMS.md",
@@ -36,12 +36,13 @@
       "admitted_plugin_ids": [
         "plugin.feed.rss_atom_parse",
         "plugin.html.extract_readable",
+        "plugin.text.stats",
         "plugin.text.url_extract"
       ],
       "benchmark_evidence": {
         "benchmark_family": "argument_construction",
         "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-        "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+        "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
         "eligible_item_count": 2,
         "out_of_scope_item_count": 4,
         "baseline_score_bps": 0,
@@ -63,12 +64,13 @@
       "admitted_plugin_ids": [
         "plugin.feed.rss_atom_parse",
         "plugin.html.extract_readable",
+        "plugin.text.stats",
         "plugin.text.url_extract"
       ],
       "benchmark_evidence": {
         "benchmark_family": "discovery_selection",
         "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-        "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+        "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
         "eligible_item_count": 3,
         "out_of_scope_item_count": 2,
         "baseline_score_bps": 6666,
@@ -90,12 +92,13 @@
       "admitted_plugin_ids": [
         "plugin.feed.rss_atom_parse",
         "plugin.html.extract_readable",
+        "plugin.text.stats",
         "plugin.text.url_extract"
       ],
       "benchmark_evidence": {
         "benchmark_family": "refusal_request_structure",
         "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-        "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+        "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
         "eligible_item_count": 5,
         "out_of_scope_item_count": 0,
         "baseline_score_bps": 6000,
@@ -115,12 +118,13 @@
       "admitted_plugin_ids": [
         "plugin.feed.rss_atom_parse",
         "plugin.html.extract_readable",
+        "plugin.text.stats",
         "plugin.text.url_extract"
       ],
       "benchmark_evidence": {
         "benchmark_family": "result_interpretation",
         "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-        "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+        "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
         "eligible_item_count": 1,
         "out_of_scope_item_count": 2,
         "baseline_score_bps": 0,
@@ -140,12 +144,13 @@
       "admitted_plugin_ids": [
         "plugin.feed.rss_atom_parse",
         "plugin.html.extract_readable",
+        "plugin.text.stats",
         "plugin.text.url_extract"
       ],
       "benchmark_evidence": {
         "benchmark_family": "sequencing_multi_call",
         "evaluation_receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-        "evaluation_receipt_digest": "dd3b8ce598afbf986f76103120c8cca4640aafacf3497f41544d5b2f326bc1b3",
+        "evaluation_receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1",
         "eligible_item_count": 0,
         "out_of_scope_item_count": 5,
         "baseline_score_bps": 0,
@@ -182,5 +187,5 @@
     }
   ],
   "summary": "The first host-native plugin-conditioned capability matrix publishes only the proved local-deterministic plugin-use regions, keeps the newly proved networked_read_only substrate outside supported v1, and blocks publication or arbitrary software overread.",
-  "matrix_digest": "7af4ef8b120b92c0e97ad1994a854a84aa167274e2fbcf0d5edad58eb92e60a3"
+  "matrix_digest": "2bbd85fc0012a5dbd744abaa744cc06caebfa8a3c11ffde7e6fe4c9102b66443"
 }

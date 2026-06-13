@@ -2,17 +2,17 @@
   "schema_version": "psionic.compiled_agent.external_worker_dry_run.v1",
   "dry_run_id": "compiled_agent.external_worker_beta.dry_run.v1",
   "evidence_class": "learned_lane",
-  "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
-  "receipts_digest": "e9b42272444d0b0781c07ffc141a8c3642e66093dda65b17f0c4d287d971ac13",
-  "benchmark_contract_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8",
-  "staging_ledger_digest": "8c4830e4f9280c6d1650d50337a1769f6b197515236d1bce69cd5e5f57ad4388",
-  "quarantine_report_digest": "3cd45f6609595c891fc8c8bb390257e81e898c65827a12c7414a85453011cb30",
-  "internal_decentralized_dry_run_digest": "1895a9d50c00d49261e8e00ccf3cdbca4fa38b098407b29aca8ea5ed3810192a",
-  "promoted_contract_digest": "5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa",
-  "xtrain_receipt_digest": "5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6",
-  "stronger_candidate_family_report_digest": "19a09dba96ba7e152dea9c2604ce3e106fe98942d1d3064f481ca69aee30aec4",
-  "confidence_policy_digest": "4a1e25a25f6bcc1e314e516fdadd0411181582844df9c31b68597b4558ce15b8",
-  "shadow_disagreement_receipts_digest": "7636190e5a1901e909874a670f4d71191b9cacf85214d6675042819dc2454cad",
+  "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
+  "receipts_digest": "d054ccf1ba0016eb79fd5c20bc6ed6bafd5e21e6f058ef877022b8c9b6407977",
+  "benchmark_contract_digest": "35661a111d665c7be92a4db144ccabe41627bef67b9785bfe0ab519489ec84cd",
+  "staging_ledger_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675",
+  "quarantine_report_digest": "65ad396b1ee2551a23fa58d27f0f42a2fe52eae920abd3d91b2ae59be361067d",
+  "internal_decentralized_dry_run_digest": "5e1c13144ed22df3e4fdf3e6edb235fa8de68d750ceb91c230db05ac0f0d2087",
+  "promoted_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+  "xtrain_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
+  "stronger_candidate_family_report_digest": "fc1c32a58dbc93aeddab9fb5fcc913b59809d129c44bc8b995fd1036e2375298",
+  "confidence_policy_digest": "a38c5a52ba39e60d3b9f7d6396f4dacb9e7c641b34b1cdb9fa5d2b03490b317e",
+  "shadow_disagreement_receipts_digest": "be6c101f629f8c70afa4f293c690fc50af1468f5fa43d3ccb9093ccc1095fe5d",
   "accepted_submission_count": 2,
   "rejected_submission_count": 1,
   "review_required_submission_count": 1,
@@ -35,7 +35,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "passed",
       "quarantine_status": "held",
@@ -89,7 +89,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "passed",
       "quarantine_status": "held",
@@ -140,7 +140,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "passed",
       "quarantine_status": "replay_candidate_eligible",
@@ -194,7 +194,7 @@
         "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
         "attested_at_epoch_ms": 1774800000000
       },
-      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "contract_digest": "54d7b816cf60e2c59cc10db79fd4ed64855a9f9c1e07823eb7d1321b614b284b",
       "evidence_class": "learned_lane",
       "validator_status": "failed",
       "quarantine_status": "rejected",
@@ -231,5 +231,5 @@
     }
   ],
   "summary": "External governed worker-role execution now reruns the same narrow replay, labeling, validator-scoring, and bounded-training contracts through accepted, rejected, and review-required outcomes without granting outside promotion or runtime authority.",
-  "report_digest": "e576a14307d2149312d2dcd3dca92b35b39e4fc1750e0c52d85cdb82336a8fce"
+  "report_digest": "89898b894c34894abe981fae32dbd4b40fb9a2ab57a2196f32c66447e68dbba3"
 }

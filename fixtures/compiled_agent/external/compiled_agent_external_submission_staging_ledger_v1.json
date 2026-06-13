@@ -28,7 +28,7 @@
         "schema_conformant": true,
         "digest_integrity": true,
         "contract_version_match": true,
-        "benchmark_consistency": false,
+        "benchmark_consistency": true,
         "environment_metadata_present": true,
         "contributor_identity_linked": true,
         "shadow_scored": false
@@ -117,7 +117,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/external/compiled_agent_external_runtime_receipt_submission_v1.json",
       "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
-      "payload_digest": "ece45ca4e2c3c3e04e2470e68d940be662d1bf9ff6605c06eee6db47356dd8b1",
+      "payload_digest": "e9f549007956ce87ec268527a44758360b500c29fc43b728b493060e24ddb38a",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -166,7 +166,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/external/compiled_agent_external_replay_proposal_v1.json",
       "payload_schema_version": "psionic.compiled_agent.external_replay_proposal.v1",
-      "payload_digest": "99bc488cec3c16b69a51dbaab4c5e314a3d8a5ed9a88132f7502bbbc04dbc50b",
+      "payload_digest": "6dbe31249d2107b60c6cbbc27025a40e7cb59c84dd51a872b67734bd4b0c4c0b",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -219,5 +219,5 @@
     }
   ],
   "summary": "External intake staging ledger retained 4 submissions on the admitted compiled-agent family: 3 accepted into quarantine, 1 rejected before quarantine, 3 marked review-required, 2 carrying anomaly flags, and 5 replay-candidate receipt ids held behind the same governance boundary.",
-  "ledger_digest": "035a9a3b928df3a27fed1d7770f7a9805f5774354dcbd9c5e16acb4f2252e5c2"
+  "ledger_digest": "f88cb1e691a2ab272075f892c32f41b4ffb718cd8331ff92c8ecb0d62a2c1675"
 }

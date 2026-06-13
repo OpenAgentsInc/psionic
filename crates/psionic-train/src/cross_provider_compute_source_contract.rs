@@ -1769,7 +1769,10 @@ mod tests {
     #[test]
     fn cross_provider_planner_input_tracks_admitted_and_refused_roles() {
         let planner = canonical_cross_provider_planner_input().expect("planner");
-        let refused = planner
+        // Since commit b8056a78 (MLX dense rank runtime contract), the local
+        // MLX Mac workstation admits one bounded single-rank
+        // DenseFullModelRank lane, so this candidate is Admitted.
+        let admitted = planner
             .candidates
             .iter()
             .find(|candidate| {
@@ -1777,17 +1780,28 @@ mod tests {
                     && candidate.requested_execution_class
                         == CrossProviderExecutionClass::DenseFullModelRank
             })
-            .expect("refused candidate");
+            .expect("admitted candidate");
         assert_eq!(
-            refused.expected_disposition,
-            CrossProviderPlannerCandidateDisposition::Refused
+            admitted.expected_disposition,
+            CrossProviderPlannerCandidateDisposition::Admitted
         );
+        assert!(admitted.expected_refusal.is_none());
+        // The refused-role tracking survives at the contract boundary: the
+        // same MLX source still refuses CheckpointWriter authority.
+        let contracts = canonical_cross_provider_compute_source_contracts().expect("contracts");
+        let mlx_contract = contracts
+            .iter()
+            .find(|contract| contract.source_id == "local_mlx_mac_workstation")
+            .expect("mlx contract");
+        let checkpoint_refusal = mlx_contract
+            .refusal_examples
+            .iter()
+            .find(|refusal| {
+                refusal.requested_execution_class == CrossProviderExecutionClass::CheckpointWriter
+            })
+            .expect("checkpoint writer refusal");
         assert_eq!(
-            refused
-                .expected_refusal
-                .as_ref()
-                .expect("refusal")
-                .refusal_kind,
+            checkpoint_refusal.refusal_kind,
             CrossProviderExecutionClassAdmissionRefusalKind::SourceExecutionClassNotAdmitted
         );
     }

@@ -7,15 +7,15 @@
   "baseline_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
   "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v0-supervision-density-candidate-v1",
   "source_family_contribution_ref": "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
-  "source_family_contribution_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794",
+  "source_family_contribution_digest": "764eec7083327fc47e5f82894633a423f70b90421df749963d4b1e75a867091d",
   "throughput_report_ref": "fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json",
-  "throughput_report_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7",
+  "throughput_report_digest": "ebd4acb48ed6bbe19f67fb50ac085d06c701bd66c2e12065ec670f9ac6dd983a",
   "long_run_rehearsal_ref": "fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json",
-  "long_run_rehearsal_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2",
+  "long_run_rehearsal_digest": "94eb8bf5d3c90866e19673fdb6f81448ab31b96d935bdebc13858669db5d4983",
   "failure_bundle_taxonomy_ref": "fixtures/psion/executor/psion_executor_failure_bundle_taxonomy_v1.json",
-  "failure_bundle_taxonomy_digest": "167de1726490b46baa6ab8dba39f1a10d19bec10180614bc2c72e515596ab0aa",
+  "failure_bundle_taxonomy_digest": "d43b2ab6e52b04955aa83c9e5d088a77906a9d75e5402b63755055e538d7516b",
   "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
-  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "review_workflow_digest": "8368c4224dbcfeda9439b824d28e29e895d70c73c79037c870ed8a24a9c693e4",
   "verdict_rows": [
     {
       "dimension_id": "exactness",
@@ -70,5 +70,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
   ],
   "summary": "The executor lane now has one retained supervision-density ablation packet. The same-budget 4080 variant is judged on exactness, held-out, throughput, and stability together, stays green on all four dimensions, and therefore remains eligible for the later trained-v1 candidate packet.",
-  "packet_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe"
+  "packet_digest": "80c2f52b0916186e077d447214d0472fbc9a11e44ad244133a0a9d42cf3ed23a"
 }

@@ -283,15 +283,19 @@ mod tests {
     };
 
     #[test]
-    fn homegolf_artifact_accounting_keeps_refused_over_cap_truth() {
+    fn homegolf_artifact_accounting_keeps_within_cap_truth() {
+        // Commit e7168d38 upgraded HOMEGOLF to the live dense mixed-device
+        // surface whose retained int8+zlib dense export fits inside the
+        // 16,000,000-byte contest cap, replacing the earlier refused
+        // over-cap posture.
         let report =
             build_parameter_golf_homegolf_artifact_accounting_report().expect("build report");
         assert_eq!(
             report.budget_status,
-            ParameterGolfHomegolfArtifactBudgetStatus::RefusedExceedsArtifactCap
+            ParameterGolfHomegolfArtifactBudgetStatus::WithinArtifactCap
         );
-        assert!(report.total_counted_bytes > report.artifact_cap_bytes);
-        assert!(report.cap_delta_bytes > 0);
+        assert!(report.total_counted_bytes <= report.artifact_cap_bytes);
+        assert!(report.cap_delta_bytes <= 0);
     }
 
     #[test]

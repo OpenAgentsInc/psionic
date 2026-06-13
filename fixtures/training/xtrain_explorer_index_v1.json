@@ -13,10 +13,10 @@
       "held_checkpoint_count": 1,
       "published_settlement_count": 1,
       "snapshot_artifact_uri": "fixtures/training/xtrain_explorer_snapshot_v1.json",
-      "snapshot_digest": "9c0ca9854cbb5d1d6992ae1a2968054cd940766cc3cb3114650fc175597f3d89",
+      "snapshot_digest": "68134aed8582acc06378e712088831bd8fa6e504f5111c46d37458224fa06f26",
       "semantic_summary": "The first XTRAIN explorer snapshot exposes participant graph state, held checkpoint promotion, settlement publication, and one sibling bounded XTRAIN score lane link."
     }
   ],
   "detail": "The XTRAIN explorer index is the dedicated discovery surface for decentralized explorer snapshots. It stays separate from the run-centric remote-training index while linking to the bounded XTRAIN run lane where relevant.",
-  "index_digest": "8dc1b4357f14cee9b1834018cf598bc25fe12f2cc9d1a224b92b97395807806a"
+  "index_digest": "7683a43e1c0626ca627a3ce2b6fad9dfd5d729db2acf8e29d854878db049ebd6"
 }

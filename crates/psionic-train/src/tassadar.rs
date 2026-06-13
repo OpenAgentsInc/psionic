@@ -1039,7 +1039,9 @@ mod tests {
         );
         assert!(receipt.evaluation.full_envelope_exact);
         assert_eq!(receipt.evaluation.aggregate_score_bps, 10_000);
-        assert_eq!(receipt.evaluation.case_reports.len(), 3);
+        // Four validation-corpus cases since commit b542c479 (TAS-002) added
+        // shortest_path_case to tassadar_validation_corpus.
+        assert_eq!(receipt.evaluation.case_reports.len(), 4);
         assert!(!receipt.receipt_digest.is_empty());
         Ok(())
     }

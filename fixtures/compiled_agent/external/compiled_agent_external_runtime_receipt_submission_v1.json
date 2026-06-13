@@ -14,7 +14,7 @@
     "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
     "attested_at_epoch_ms": 1774800000000
   },
-  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
+  "contract_digest": "35661a111d665c7be92a4db144ccabe41627bef67b9785bfe0ab519489ec84cd",
   "evidence_class": "learned_lane",
   "source_receipt": {
     "schema_version": 1,
@@ -458,5 +458,5 @@
     "operator_note": "External runtime disagreement receipt that keeps the promoted baseline route and the shadow learned route side by side on the admitted negated-wallet regression row. It remains review-required, but it is staged as a replay-training candidate instead of a held-out benchmark row."
   },
   "detail": "This retained external runtime receipt keeps one real admitted-family disagreement in the governed source-receipt shape so it can be shadow-scored before any replay admission.",
-  "payload_digest": "ece45ca4e2c3c3e04e2470e68d940be662d1bf9ff6605c06eee6db47356dd8b1"
+  "payload_digest": "e9f549007956ce87ec268527a44758360b500c29fc43b728b493060e24ddb38a"
 }

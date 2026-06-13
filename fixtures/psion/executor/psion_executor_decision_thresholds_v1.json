@@ -2,9 +2,9 @@
   "schema_version": "psion.executor_decision_thresholds.v1",
   "record_id": "psion_executor_decision_thresholds_v1",
   "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
-  "eval_pack_catalog_digest": "21cb825b3135feda7ef12037a7b1dcc6de8ccffcda3328e981d9e26fe41e4e04",
+  "eval_pack_catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
-  "baseline_truth_digest": "6277cd804fb00e402ff0434243dbb87d4824abff95bb871043fe71ca1d99a76f",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "replay_passes": [
     {
       "pass_id": "baseline_replay_pass_01",
@@ -346,5 +346,5 @@
     }
   ],
   "summary": "Replayed the retained executor baseline 3 times; observed zero retained noise on 9 promotion aggregates and froze conservative decision floors for exactness, held-out, adversarial, runtime, serving, anchor throughput, and fast-route throughput.",
-  "record_digest": "fd669205c6874d107162ac82f760fcc4b2e95de803cb39a6fdb267dd5e751ec0"
+  "record_digest": "01be6e718c71781c82fb2ee7472485c8cafcfa9d2ed265c331988235edca47bc"
 }

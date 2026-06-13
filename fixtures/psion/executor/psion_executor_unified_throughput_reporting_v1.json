@@ -2,9 +2,9 @@
   "schema_version": "psion.executor.unified_throughput_reporting.v1",
   "report_id": "psion_executor_unified_throughput_reporting_v1",
   "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
-  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28",
+  "dashboard_digest": "fa04f2a61f9572dd142b59351e595b072f674cceaf4d37600289b9193bb54373",
   "export_inspection_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
-  "export_inspection_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+  "export_inspection_digest": "f281369bc57001f97c3d1cf5456b873cecf671cf2d47980110b217b435110174",
   "current_best_training_row": {
     "panel_id": "psion_executor_local_cluster_dashboard_current_best_v1",
     "row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
@@ -61,5 +61,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md"
   ],
   "summary": "The admitted executor lane now has one canonical throughput surface that keeps training throughput and fast-route serving throughput in the same retained packet. The current-best 4080 row, the candidate MLX row, and the admitted `hull_cache` serving floor are now compared together, and replacement stays blocked automatically if serving throughput truth regresses.",
-  "report_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7"
+  "report_digest": "ebd4acb48ed6bbe19f67fb50ac085d06c701bd66c2e12065ec670f9ac6dd983a"
 }

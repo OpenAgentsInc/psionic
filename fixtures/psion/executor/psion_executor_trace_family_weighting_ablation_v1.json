@@ -11,9 +11,9 @@
   "baseline_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
   "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v0-trace-weighting-candidate-v1",
   "source_family_contribution_ref": "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
-  "source_family_contribution_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794",
+  "source_family_contribution_digest": "764eec7083327fc47e5f82894633a423f70b90421df749963d4b1e75a867091d",
   "rollback_policy_ref": "fixtures/psion/executor/psion_executor_mixture_rollback_policy_v1.json",
-  "rollback_policy_digest": "36cd968e3dbeb3810a4da9ca8ebcb1b2b097af2077993c469f461b98dceba9cf",
+  "rollback_policy_digest": "cadf071a6a53168531e77857228a7e7b166a708a68faa680aed7fa135106b9e7",
   "changed_weight_rows": [
     {
       "source_family_id": "executor.boundary_prefix_traces",
@@ -101,5 +101,5 @@
     "docs/PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY.md"
   ],
   "summary": "The executor lane now has one retained trace-family weighting ablation packet. The same-budget mixture run rebalanced one weight class across boundary-prefix, route-direct, and refusal-negative traces, reported explicit per-slice deltas, and kept the rollback guard inactive because held-out slices improved rather than regressed.",
-  "packet_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d"
+  "packet_digest": "4fa191ff07c32d52c588afeed5c710cddc165ceb2032095eb2347ad0b11a68a9"
 }

@@ -1385,7 +1385,7 @@ fn validator_discipline_is_unchanged(
     .all(|(role, status)| role_statuses.get(&role) == Some(&status));
 
     let xtrain_gate_intact = xtrain_receipt.route_outcome.decision
-        == CompiledAgentPromotionDecision::Hold
+        == CompiledAgentPromotionDecision::Promote
         && xtrain_receipt.grounded_answer_outcome.decision
             == CompiledAgentPromotionDecision::Promote;
     let stronger_gate_intact = stronger_family_report.comparisons.iter().all(|comparison| {
@@ -1410,8 +1410,8 @@ fn rollback_discipline_is_unchanged(
     confidence_policy: &crate::CompiledAgentConfidencePolicy,
     shadow_disagreements: &crate::CompiledAgentShadowDisagreementReceipts,
 ) -> bool {
-    let route_candidate_has_rollback = promoted_contract
-        .candidate_entry(CompiledAgentModuleKind::Route, "psionic_candidate")
+    let route_promoted_has_rollback = promoted_contract
+        .promoted_entry(CompiledAgentModuleKind::Route)
         .and_then(|entry| entry.rollback_artifact_id.as_ref())
         .is_some();
     let route_policy = confidence_policy
@@ -1423,7 +1423,7 @@ fn rollback_discipline_is_unchanged(
         .iter()
         .find(|policy| policy.module == CompiledAgentModuleKind::GroundedAnswer);
 
-    route_candidate_has_rollback
+    route_promoted_has_rollback
         && route_policy.is_some_and(|policy| {
             policy.thresholds.rollback_on_heldout_regression_count == 1
                 && policy.thresholds.rollback_on_runtime_regression_count == 1

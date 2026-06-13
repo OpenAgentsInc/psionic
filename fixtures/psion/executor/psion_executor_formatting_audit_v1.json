@@ -2,9 +2,9 @@
   "schema_version": "psion.executor_formatting_audit.v1",
   "audit_id": "psion_executor_formatting_audit_v1",
   "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
-  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "eval_pack_catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
-  "baseline_truth_digest": "1cbcce5abbae31597533a62e80d5c5e1e4aa622410b883ac5a06c02f0f264784",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "entries": [
     {
       "pack_id": "tassadar.eval.frequent.v0",
@@ -282,5 +282,5 @@
   ],
   "unchecked_suite_ids": [],
   "summary": "Audited prompt formatting, normalization, and post-processing across 11 frozen executor suites; checked_count=11 manual_review_boundaries=6.",
-  "audit_digest": "328076155f7050a1eaab2f0ae10b17bd0c2dcaa4504b3d1359468f6acd1f255d"
+  "audit_digest": "64e0ae83c73547de50148c52313b051e35ad8206cebb7bc61247150d6d548978"
 }

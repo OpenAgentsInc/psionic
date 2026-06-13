@@ -28,7 +28,7 @@ use psionic_models::{
     ParameterGolfPromotedTokenizerTokenKind, ParameterGolfReferenceModel,
 };
 use psionic_runtime::TrainingCheckpointReference;
-use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
+use safetensors::{Dtype as SafeTensorsDType, SafeTensors, tensor::TensorView};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -4387,6 +4387,11 @@ fn serialize_tensors(
     metadata: Option<HashMap<String, String>>,
     context: &'static str,
 ) -> Result<Vec<u8>, ParameterGolfReferenceTrainingError> {
+    // Upstream `safetensors::serialize` writes `__metadata__` in `HashMap`
+    // iteration order, which is non-deterministic across processes and even
+    // across map instances. Parameter Golf exports are digest-bearing
+    // replay-safe artifacts, so build the exact safetensors byte layout here
+    // with sorted metadata keys and insertion-ordered tensors instead.
     let mut views = Vec::with_capacity(tensors.len());
     for (name, dtype, shape, bytes) in &tensors {
         let view = TensorView::new(*dtype, shape.clone(), bytes.as_slice()).map_err(|error| {
@@ -4397,16 +4402,55 @@ fn serialize_tensors(
         })?;
         views.push((name.clone(), view));
     }
-    serialize(
-        views
-            .iter()
-            .map(|(name, view)| (name.as_str(), view.clone())),
-        metadata,
-    )
-    .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
-        context,
-        message: error.to_string(),
-    })
+
+    let serialization_error =
+        |message: String| ParameterGolfReferenceTrainingError::Serialization { context, message };
+    let mut header = String::from("{");
+    if let Some(metadata) = &metadata {
+        let sorted_metadata = metadata.iter().collect::<BTreeMap<_, _>>();
+        header.push_str("\"__metadata__\":");
+        header.push_str(
+            &serde_json::to_string(&sorted_metadata)
+                .map_err(|error| serialization_error(error.to_string()))?,
+        );
+        if !views.is_empty() {
+            header.push(',');
+        }
+    }
+    let mut data_offset = 0_usize;
+    for (index, (name, view)) in views.iter().enumerate() {
+        let data_len = view.data().len();
+        let entry = serde_json::json!({
+            "dtype": view.dtype(),
+            "shape": view.shape(),
+            "data_offsets": [data_offset, data_offset + data_len],
+        });
+        header.push_str(
+            &serde_json::to_string(name).map_err(|error| serialization_error(error.to_string()))?,
+        );
+        header.push(':');
+        header.push_str(
+            &serde_json::to_string(&entry)
+                .map_err(|error| serialization_error(error.to_string()))?,
+        );
+        if index + 1 != views.len() {
+            header.push(',');
+        }
+        data_offset += data_len;
+    }
+    header.push('}');
+
+    let mut header_bytes = header.into_bytes();
+    let aligned_header_len = header_bytes.len().next_multiple_of(8);
+    header_bytes.resize(aligned_header_len, b' ');
+
+    let mut output = Vec::with_capacity(8 + header_bytes.len() + data_offset);
+    output.extend_from_slice(&(header_bytes.len() as u64).to_le_bytes());
+    output.extend_from_slice(header_bytes.as_slice());
+    for (_, view) in &views {
+        output.extend_from_slice(view.data());
+    }
+    Ok(output)
 }
 
 fn keep_float_tensor(parameter_id: &str, parameter_len: usize) -> bool {
@@ -5390,10 +5434,10 @@ mod tests {
             greedy.termination,
             ParameterGolfPromotedGenerationTermination::MaxNewTokens
         );
-        assert_eq!(
-            greedy.text,
-            "<reserved_0952><reserved_1005><reserved_0951><reserved_0900>"
-        );
+        // Commit 504f63df gated promoted decode to admitted tokenizer ids,
+        // so generation now refuses Unused/<reserved_*> ids and emits the
+        // best admitted pieces instead.
+        assert_eq!(greedy.text, "gbgb");
 
         let mut sample_options = bundle.default_seeded_sampling_options(42);
         sample_options.max_new_tokens = 4;
@@ -5404,10 +5448,7 @@ mod tests {
             sample_left.termination,
             ParameterGolfPromotedGenerationTermination::MaxNewTokens
         );
-        assert_eq!(
-            sample_left.text,
-            "<reserved_0952><reserved_0422><reserved_0711><reserved_0491>"
-        );
+        assert_eq!(sample_left.text, "gcgc");
         Ok(())
     }
 

@@ -4,7 +4,7 @@
   "admitted_profile_id": "local_mac_mlx_aarch64",
   "local_cpu_machine_class_id": "host_cpu_aarch64",
   "decision_grade_packet_ref": "fixtures/psion/executor/psion_executor_mlx_decision_grade_run_v1.json",
-  "decision_grade_packet_sha256": "4d48cfa95de64cd6f148825da97508d8cd7bd55e991088dad8cafac49d228eb3",
+  "decision_grade_packet_sha256": "d1d4751efdd4edb281dbd06bb0b43ee3c17981c9d1b20a0f88e7391528d8c1fc",
   "portable_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
   "portable_bundle_sha256": "4a345019512aae63c517c3261439e0dbd3a1a113745c80ae4244250abfff3e91",
   "deferred_import_plan_digest": "8932fc2305dd3cf091902e163bb70a74c0e380f707af56a3c53718ad43cb2ccd",
@@ -73,5 +73,5 @@
     "fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json"
   ],
   "summary": "The admitted Mac profile now owns one explicit export-inspection packet. It imports the retained MLX portable bundle locally, emits a torch-style compatibility export roundtrip, keeps `host_cpu_aarch64` inside the admitted CPU route-validation set, and rechecks the current claim boundary that `reference_linear` stays the truth anchor while `hull_cache` stays the fast-route target (min speedup 1.690978, max CPU gap 2.683604) before any broader promotion story is told.",
-  "packet_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a"
+  "packet_digest": "f281369bc57001f97c3d1cf5456b873cecf671cf2d47980110b217b435110174"
 }

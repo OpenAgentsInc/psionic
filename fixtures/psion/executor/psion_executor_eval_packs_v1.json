@@ -28,7 +28,7 @@
         },
         {
           "path": "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
-          "sha256": "392005dc09dc73a972c4bb727ff97c9fe43bbf2dfe72db30265cde1228c7a303",
+          "sha256": "1722c9bd19fd280cffe7fb176c1dd684205b063cfeeb7732c3daff46a1143756",
           "detail": "Retained local-profile reference proving the operator review packet still depends on admitted machine and control-plane profiles instead of a second launcher story."
         }
       ],
@@ -103,7 +103,7 @@
       "thresholds": [],
       "acceptance_profile_ref": null,
       "claim_boundary": "This pack freezes the checkpoint-time executor review surface only: admitted exactness cases, the held-out exclusion boundary, explicit operator review cases, and throughput blockers. It does not by itself decide promotion.",
-      "pack_digest": "aa61897f9b4731421865a9cb38f2633ccbbd2fc60dcb140fb567ae21d14c73e8"
+      "pack_digest": "13c574df2868865abad3d286d18315ecfd5475c9413a15c290e397a2d9a6a73b"
     },
     {
       "pack_id": "tassadar.eval.promotion.v0",
@@ -126,7 +126,7 @@
         },
         {
           "path": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
-          "sha256": "b8d6120147af32505cfee8b76dd334b89da7bbceb0176a16864f7cfd9dc663e7",
+          "sha256": "10d586482f5862f10369a895c1102c1cb4ed80c52ae209a24aec5634f384e98e",
           "detail": "Retained acceptance profile defining the executor promotion gates that this pack must satisfy."
         },
         {
@@ -269,9 +269,9 @@
       ],
       "acceptance_profile_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
       "claim_boundary": "This pack freezes the first executor promotion review surface: exactness, held-out and adversarial suites, runtime and serving blockers, `reference_linear` anchor truth, admitted-workload `hull_cache` fast-route checks, and the first frozen throughput thresholds. It does not widen the workload family beyond the retained executor lane.",
-      "pack_digest": "2ba64d8486bc1c051a54e3da0518ec41ca9b33d16d49871256411e61ac3ffc94"
+      "pack_digest": "22a4070fbf6046198974bd9fab24fceaf21e3da520ff87c198660b0c70a4ce52"
     }
   ],
   "summary": "Phase-one executor eval-pack catalog freezing the checkpoint-time frequent pack and the promotion pack on top of the retained article benchmark, isolation, and acceptance surfaces.",
-  "catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d"
+  "catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594"
 }

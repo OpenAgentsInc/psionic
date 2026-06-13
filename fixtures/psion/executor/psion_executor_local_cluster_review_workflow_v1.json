@@ -3,15 +3,15 @@
   "workflow_id": "psion_executor_local_cluster_review_workflow_v1",
   "ownership_ref": "docs/PSION_EXECUTOR_OWNERSHIP.md",
   "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
-  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28",
+  "dashboard_digest": "fa04f2a61f9572dd142b59351e595b072f674cceaf4d37600289b9193bb54373",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
+  "ledger_digest": "da1f2f2848646b89ced3334317f114f07efdf3f84629b9ddf4dc1b8ea2785085",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "autoblocks_ref": "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json",
-  "autoblocks_digest": "f5e86eff4633b2710aac7c0e65ffd9a517d23be2574fe53890bcdf13ba4e8bbc",
+  "autoblocks_digest": "038e385619da254157ad83bbfb2a7f9fa19773e28d603351156eac58fad584a3",
   "mixture_rollback_policy_ref": "fixtures/psion/executor/psion_executor_mixture_rollback_policy_v1.json",
-  "mixture_rollback_policy_digest": "36cd968e3dbeb3810a4da9ca8ebcb1b2b097af2077993c469f461b98dceba9cf",
+  "mixture_rollback_policy_digest": "cadf071a6a53168531e77857228a7e7b166a708a68faa680aed7fa135106b9e7",
   "baseline_review_template": {
     "template_id": "psion_executor_weekly_baseline_review_template_v1",
     "review_kind": "baseline_review",
@@ -151,5 +151,5 @@
     "docs/PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY.md"
   ],
   "summary": "The admitted executor lane now has one canonical weekly review workflow. Baseline, ablation, and mixture-rollback decisions all cite frozen-pack ids, retained ledger rows, active auto-block ids, and the canonical rollback policy instead of informal review prose.",
-  "workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf"
+  "workflow_digest": "8368c4224dbcfeda9439b824d28e29e895d70c73c79037c870ed8a24a9c693e4"
 }

@@ -6,9 +6,9 @@
   "durable_checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_4080_durable_checkpoint_v1.json",
   "durable_checkpoint_packet_sha256": "c1a983ae9eeb6bfdcd1fbd9f01cc13a3e2976c363e5d9035cc4268f84255c1f6",
   "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
-  "eval_pack_catalog_sha256": "b6b4683128af9eb7d2eb901bfa4a3cba10247c21858d8f096a01fc593c679d5f",
-  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
-  "frequent_pack_digest": "aa61897f9b4731421865a9cb38f2633ccbbd2fc60dcb140fb567ae21d14c73e8",
+  "eval_pack_catalog_sha256": "8b6bb6268d5533a6f199b37a55259b73ae29adf2160414855ee208194050e9e1",
+  "eval_pack_catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594",
+  "frequent_pack_digest": "13c574df2868865abad3d286d18315ecfd5475c9413a15c290e397a2d9a6a73b",
   "retained_run_bundle_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/first_swarm_real_run_bundle.json",
   "retained_run_bundle_sha256": "35c4cdaba64e5b4b235e3d1f77cc506cc74ec6bcf9a8f8eb9309bf9441e0bc83",
   "run_id": "tailrun-home-admitted-20260328k",
@@ -91,5 +91,5 @@
     "fixtures/swarm/runs/tailrun-home-admitted-20260328k/first_swarm_real_run_bundle.json"
   ],
   "summary": "The admitted 4080 lane now has one automatic frequent-pack attachment packet. The retained rerun at checkpoint pointer digest `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` stores one per-checkpoint ledger row keyed to `tassadar.eval.frequent.v0`, keeps the operator-review suite green, and makes missing or unscored frequent-pack coverage a hard promotion blocker instead of a silent omission.",
-  "packet_digest": "b61245ffc124b3a8fd9ec3e15bee20782fe4538f30a4595829e735bdbc360fb7"
+  "packet_digest": "2c2f2bd423ff64f7056ca1157dbfdb6d2bce308e45dc6b16a6e38cde3287d2a8"
 }
