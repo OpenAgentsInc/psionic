@@ -171,6 +171,11 @@ Default to:
 - Before any full-model Apple Metal benchmark on an interactive macOS host,
   verify there is no competing local model workload and do not launch multiple
   benchmark variants in parallel.
+- Training launches inherit the bounded default CPU budget of one core and
+  one worker enforced by the `psionic-train` binary. Do not set
+  `PSIONIC_TRAIN_CPU_BUDGET` to widen a run unless the user explicitly opts
+  into a higher allocation (psionic#1123;
+  `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`, Bounded CPU Budget).
 - Do not use `multi_tool_use.parallel` for full-model local Metal benchmark
   sweeps on the active desktop. Run variants serially or move the sweep to a
   remote Tailnet machine.

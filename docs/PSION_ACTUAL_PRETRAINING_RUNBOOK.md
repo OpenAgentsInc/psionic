@@ -275,6 +275,31 @@ It does not yet claim:
 Those come later in the roadmap. This launcher is the operator contract, not
 the full hardening pass.
 
+## Bounded CPU Budget
+
+Every `psionic-train` invocation runs under a bounded default CPU budget of
+one core (~100% CPU) and one parallel worker. The binary pins the rayon and
+common BLAS/OpenMP thread-pool environment variables (`RAYON_NUM_THREADS`,
+`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`,
+`VECLIB_MAXIMUM_THREADS`) to the effective budget at process start and prints
+the effective budget plus its source on stderr, so transcripts show whether a
+run was authorized to go wide.
+
+A wider allocation requires the explicit owner opt-in:
+
+```bash
+PSIONIC_TRAIN_CPU_BUDGET=6 ./TRAIN start ...     # six cores
+PSIONIC_TRAIN_CPU_BUDGET=400% ./TRAIN start ...  # four cores
+```
+
+Unset or empty means the bounded single-core default. An unparseable or zero
+value is refused (`bad_config`) instead of silently falling back. Agents
+launching training as part of issue work must treat the bounded default as
+binding and must never set `PSIONIC_TRAIN_CPU_BUDGET` without explicit owner
+direction: the owner's machine is a shared interactive workstation, not a
+dedicated trainer. The typed contract lives in
+`crates/psionic-train/src/training_cpu_budget.rs` (psionic#1123).
+
 ## Start Command
 
 Dry-run materialization:

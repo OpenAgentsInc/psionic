@@ -37,6 +37,9 @@ use psionic_train::{
     run_qwen_legal_hillclimb_cli, run_qwen_legal_rl_rollout_cli, runtime_build_digest,
     validate_psionic_train_grouped_stage_input_transport,
 };
+use psionic_train::{
+    PSIONIC_TRAIN_CPU_BUDGET_ENV, psionic_train_cpu_budget_banner, resolve_psionic_train_cpu_budget,
+};
 
 #[allow(dead_code)]
 #[path = "../examples/psion_actual_pretraining_operator.rs"]
@@ -73,6 +76,13 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    // Machine `manifest` mode reserves stdout and stderr for single JSON
+    // status packets, so the budget is enforced silently there.
+    let print_cpu_budget_banner = args[0].as_str() != "manifest";
+    if let Err(exit_code) = apply_bounded_cpu_budget(print_cpu_budget_banner) {
+        return exit_code;
+    }
+
     match args[0].as_str() {
         "manifest" => run_manifest_mode(&args[1..]),
         "sft" => run_sft_passthrough(&args[1..]),
@@ -94,6 +104,29 @@ fn main() -> ExitCode {
             ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
         }
     }
+}
+
+/// Applies the bounded CPU budget before any training work begins
+/// (psionic#1123). The bounded single-core default is binding unless the
+/// owner set `PSIONIC_TRAIN_CPU_BUDGET` as an explicit opt-in; an invalid
+/// value is refused instead of silently widening or narrowing the budget.
+fn apply_bounded_cpu_budget(print_banner: bool) -> Result<(), ExitCode> {
+    let env_value = env::var(PSIONIC_TRAIN_CPU_BUDGET_ENV).ok();
+    let resolution = resolve_psionic_train_cpu_budget(env_value.as_deref()).map_err(|error| {
+        eprintln!("error: {error}");
+        ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
+    })?;
+    for (name, value) in resolution.budget.thread_cap_env_assignments() {
+        // SAFETY: called at process start, before any threads are spawned,
+        // so mutating the process environment cannot race other threads.
+        unsafe {
+            env::set_var(name, value);
+        }
+    }
+    if print_banner {
+        eprintln!("{}", psionic_train_cpu_budget_banner(&resolution));
+    }
+    Ok(())
 }
 
 fn run_legal_ft_passthrough(args: &[String]) -> ExitCode {
