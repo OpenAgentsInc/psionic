@@ -1,0 +1,119 @@
+{
+  "schema_version": "psionic.core.ternary_tq_formats.v1",
+  "contract_id": "psionic.core.ternary_tq_formats.v1",
+  "issue": "psionic#1115",
+  "module": "crates/psionic-core/src/ternary.rs",
+  "doc": "docs/PSIONIC_TERNARY_TQ_FORMATS.md",
+  "check_script": "scripts/check-ternary-tq-formats.sh",
+  "layout": {
+    "block_elements": 256,
+    "tq1_0": {
+      "bytes_per_block": 54,
+      "qs_bytes": 48,
+      "qh_bytes": 4,
+      "scale_offset": 52,
+      "scale_encoding": "fp16 little-endian",
+      "field_order": "qs[48] | qh[4] | d",
+      "bits_per_weight": "1.6875"
+    },
+    "tq2_0": {
+      "bytes_per_block": 66,
+      "qs_bytes": 64,
+      "qh_bytes": 0,
+      "scale_offset": 64,
+      "scale_encoding": "fp16 little-endian",
+      "field_order": "qs[64] | d",
+      "bits_per_weight": "2.0625"
+    },
+    "wire_compatibility": "byte-compatible with ggml block_tq1_0 / block_tq2_0 (QK_K = 256) as specified by llama.cpp ggml/src/ggml-common.h and the quantize_row_tq{1,2}_0_ref / dequantize_row_tq{1,2}_0 reference algorithms in ggml/src/ggml-quants.c"
+  },
+  "reference_sources": {
+    "read_only_reference_implementations": [
+      "projects/repos/llama.cpp/ggml/src/ggml-common.h (block_tq1_0, block_tq2_0)",
+      "projects/repos/llama.cpp/ggml/src/ggml-quants.c (quantize_row_tq{1,2}_0_ref, dequantize_row_tq{1,2}_0)",
+      "projects/tether/repos/qvac-rnd-fabric-llm-bitnet (Tether QVAC BitNet lane)"
+    ],
+    "external_reference_claims": "the QVAC BitNet lane publishes 99.04% same-top-token rate, mean KL divergence < 0.0003, and claimed bit-exact Vulkan-vs-CPU TQ kernels; those are external reference claims that motivated this lane, not assertions made by this fixture"
+  },
+  "known_answer_blocks": [
+    {
+      "id": "all_zero",
+      "input_rule": "x[i] = 0.0 for i in 0..256",
+      "tq1_0_packed_hex": "8080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080807f7f7f7f0000",
+      "tq2_0_packed_hex": "555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555550000"
+    },
+    {
+      "id": "unit_cycle",
+      "input_rule": "x[i] = [1.0, -1.0, 0.0, 1.0, -1.0][i % 5] for i in 0..256",
+      "tq1_0_packed_hex": "ca505eee1bca505eee1bca505eee1bca505eee1bca505eee1bca505eee1bca50bb3295bf3fbb3295bf3fbb3295bf3fbbc14069ce003c",
+      "tq2_0_packed_hex": "0668811aa00668811aa00668811aa00668811aa00668811aa00668811aa006681aa00668811aa00668811aa00668811aa00668811aa00668811aa00668811aa0003c"
+    },
+    {
+      "id": "half_cycle",
+      "input_rule": "x[i] = ((i % 3) as f32 - 1.0) * 0.5 for i in 0..256",
+      "tq1_0_packed_hex": "456ccf456ccf456ccf456ccf456ccf456ccf456ccf456ccf456ccf456ccf456c94bb3194bb3194bb3194bb3194bb31943092bb300038",
+      "tq2_0_packed_hex": "186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186186180038"
+    }
+  ],
+  "workload": {
+    "seed": "0x11157E40C0DE2026",
+    "rows": 4,
+    "row_elements": 1024,
+    "input_rule": "row r element i = (2*u - 1) as f32 with u = PhiloxStream::new(seed, r).unit_f64_at(i) (psionic#1116 Philox 4x32-10)",
+    "activation_rule": "row r element i = ((PhiloxStream::new(seed, 256 + r).u32_at(i) >> 8) % 255) - 127 as i8",
+    "activation_scale": "2^-6 (0.015625, exactly representable in f32)",
+    "digest_rule": "per format, rows ascending: packed = sha256(row packed bytes); dequantized = sha256(little-endian f32 outputs); dot = sha256(per-block i32 isums little-endian, then the row f32 dot little-endian)",
+    "tq1_0_packed_hex": "5267e211379d7d0bf5e5489d2b67e488b3830ff28251eb58d6df9adf72d52fea945ecc802f2a648b8bdc5289276c956ca5202a40fa3ba360f99faccf90c72dd5e71b420667cfb376997e417b8d2b78dcb982c9c10ed5332ac987762b2a37761de77142625882989b9f88f43b7864a6aa2081893bf2e1d139849c75e92183a0e39c2a806f2ec8d3d383c27a059c3f96ba2bc95147d57d05c48bdfdfb8ee7fd7d4fb3bf5d57f92359faf578b5d9c204789340e6038802ae7be645d186ea1ae5b6c57d8f26ee03965e25919efc87d6405516758852a7c5cf83b82e7f3479847cf82806488119d6467af5c31cd803e8fc03320b6d175782e7f6883a900bfb998cdee34b53483a605a970e7db2a5cfc3ba0c9664a7f4480027beffd81662e628eb480aa6ce72b210b80db2783d09c83819ca527506b9b45deb7808b6727de2b0f69c12aeef93b216a9cf1832cc8989cb732605480abbb34ee75a1a5d2c944f4512afe62032e67bde8ddd2b972935a845f03be880a37827f7ff179fd3b827c80b74c93d61bb42f66bb2d5a4749cc625df8da2b80f133b942fb7a0b73566827ef2bc29b1f292b97ba806960bd755c0d66cef93bda6cafb9a3f38e5fdd64a9af092f9de2f47d2b8d05f299a6d8a92f9c8d988995cd3465e08b04a0bea9e27dfb45bca3337546bb43fe3b218764ddf59730a16e9bdc78a5dec80e18da1f892b1ac181df327376a0512c867864f2898981b6b08cd22bc9648096b9a87f6c39f33b657c7de8de2e5fa1bf803751fa7f64bcb670735a292781889c7ffb0e86b5462b767a232a9ca693430fd575b89ccd9d5b6c858220f43b336ea96a6f004737bd0381a680272a7a44bc1d60bcd5d6736286b63d7c87c97cf8362be8a37fa5afeb5e4b89f05a739b823d1de1fd3b9af57a653f2ef2aed692117b999c2b5ccc59ba47b611567d7fba241711e67dd49c4864daccbe7d6ed56e647e7887dc482d66857ff23bbc97d31074d2f52ab8f2687f61113e8b648d8bf5da751f57df2e477f83176976f69959d67f0f3eb0ce648176c386cc8c1d3626f4fc3b76b37399d566a6a31950dcf40e0b8490603064894b37b584d6bc88039c2790fac689470c3da59b83af279bb0cc44f167922a0d2afc3b5e4c7e9c862bb67f5b10602e997ceee808d72dd3c8f234842f747e672d662b9c210dcc88ef119932ff89817c5b96749db817f482f23b",
+    "tq2_0_packed_hex": "6891a690a45915109a0a585954910a658295505a95688a01566619660556948a86854955911255a5a569a2665125042459211615a455519696055a1544516a90fa3b29112a99028609a294564aa088409186824519158885a554452652950662505621114aa445511162440108a5821685155555454695969565564559a029508165f43b455169a9445565085aa616089559454a449599a6595455a194061616956285405681459a504a615259544028a669681a9959a992954459585544526215559551fb3b9a56554964994201658159445865645011a455544a225181606199424161019659a5a800966805a15a0955544161558559125548506451118946461012582181f83b954a5a581958869555516590595191428124465548092264441216454594559154640269581589186119605566416565a4a9024191485608148154245a1168a2fc3b9906919855185500851aaa55919451a58255a9614a544410552614958659955555255021a41591299a55a456502950925a990698001949958194556106555512f93b4421595a9554061959122411a8550292641a4599691606189a6854aa510094919949a958590644449516822925116014615884465045995164414001544265a5fd3b95155512284956a082949192944158984651812a9654555a6452886a85100501945059526815829152869854245599046104499512190544146952158141a194f93b96614252295aa5112651a942809459a69a1554a5405a196996a99459a51965898a6095a9a502562866695569925a662154159115559129812965465949608914fe3b442551269a89249961592645696606506096046554a062556624054599685425855659666596588a2658514a5454445955525a1595540092a546950591556a11f33b5115154a669411992255a4686a55519212a105411414556559556a502512585446440111546544129159051954889585556565151a595a489194551159149851f43b6461a921a10058a492005569551454851892041192565605512512481525061568225149641425494a869265994544154925149949955a516821299488520598fd3b199a855148945a425649908519595481464152581290011555528460900a15565691559a4a2955a45aa4559685a5699019585265550144515452914495860558f23b9289169005169a54525a91551190486551a5659a964504016694585595602145995606981691418808559644aa6549262909129556505a9125915554118414a5fc3b45820519569169296068269a501095091124516598a41295569265005914096a69655191012415554a50158849511a55611419019a5918661245585255495960fc3b81281559255412554190119419151a4a80969416065a6495940515919491545942104a25595155a0aa6495158544849595109456082189466a96564550688599f23b",
+    "digests": {
+      "tq1_0_packed_sha256": "383a0236f3e9e39af5cfd3c0c0d58dbd3de862dfe82cffce1d54d87b5b6f8216",
+      "tq1_0_dequantized_sha256": "cb03951af1841cb688954f020fbd1f87e9171f707bef52b7c8735703fdf78770",
+      "tq1_0_dot_sha256": "f6e10e00863ad33e943d4e31677bce10f01287dc7819efcd5131ed163485ac69",
+      "tq2_0_packed_sha256": "d1cfd501516d50938bb5f7d5744cddbc5a233849afa05d4c4cfdf1a20fb83174",
+      "tq2_0_dequantized_sha256": "cb03951af1841cb688954f020fbd1f87e9171f707bef52b7c8735703fdf78770",
+      "tq2_0_dot_sha256": "f6e10e00863ad33e943d4e31677bce10f01287dc7819efcd5131ed163485ac69"
+    }
+  },
+  "determinism_receipts": [
+    {
+      "schema_version": "psionic.core.ternary_tq_determinism_receipt.v1",
+      "contract_id": "psionic.core.ternary_tq_formats.v1",
+      "backend": "cpu",
+      "status": "recorded",
+      "workload": "4 rows of 1024 f32 inputs; row r element i = (2*u - 1) as f32 with u = PhiloxStream::new(0x11157E40C0DE2026, r).unit_f64_at(i); i8 activations: row r element i = ((PhiloxStream::new(seed, 256 + r).u32_at(i) >> 8) % 255) - 127, block scale 2^-6; per format: sha256 over the packed row bytes (row-major), sha256 over the little-endian f32 dequantized outputs (row-major), and sha256 over per-block i32 isums (little-endian) followed by the per-row f32 dot output (little-endian), rows ascending",
+      "digests": {
+        "tq1_0_packed_sha256": "383a0236f3e9e39af5cfd3c0c0d58dbd3de862dfe82cffce1d54d87b5b6f8216",
+        "tq1_0_dequantized_sha256": "cb03951af1841cb688954f020fbd1f87e9171f707bef52b7c8735703fdf78770",
+        "tq1_0_dot_sha256": "f6e10e00863ad33e943d4e31677bce10f01287dc7819efcd5131ed163485ac69",
+        "tq2_0_packed_sha256": "d1cfd501516d50938bb5f7d5744cddbc5a233849afa05d4c4cfdf1a20fb83174",
+        "tq2_0_dequantized_sha256": "cb03951af1841cb688954f020fbd1f87e9171f707bef52b7c8735703fdf78770",
+        "tq2_0_dot_sha256": "f6e10e00863ad33e943d4e31677bce10f01287dc7819efcd5131ed163485ac69"
+      }
+    },
+    {
+      "schema_version": "psionic.core.ternary_tq_determinism_receipt.v1",
+      "contract_id": "psionic.core.ternary_tq_formats.v1",
+      "backend": "metal",
+      "status": "pending",
+      "workload": "4 rows of 1024 f32 inputs; row r element i = (2*u - 1) as f32 with u = PhiloxStream::new(0x11157E40C0DE2026, r).unit_f64_at(i); i8 activations: row r element i = ((PhiloxStream::new(seed, 256 + r).u32_at(i) >> 8) % 255) - 127, block scale 2^-6; per format: sha256 over the packed row bytes (row-major), sha256 over the little-endian f32 dequantized outputs (row-major), and sha256 over per-block i32 isums (little-endian) followed by the per-row f32 dot output (little-endian), rows ascending",
+      "pending_reason": "no metal ternary kernel run exists yet; this receipt records the typed contract only and claims nothing about metal until the committed workload executes through a psionic metal backend kernel and its digests are pinned here from that run"
+    },
+    {
+      "schema_version": "psionic.core.ternary_tq_determinism_receipt.v1",
+      "contract_id": "psionic.core.ternary_tq_formats.v1",
+      "backend": "cuda",
+      "status": "pending",
+      "workload": "4 rows of 1024 f32 inputs; row r element i = (2*u - 1) as f32 with u = PhiloxStream::new(0x11157E40C0DE2026, r).unit_f64_at(i); i8 activations: row r element i = ((PhiloxStream::new(seed, 256 + r).u32_at(i) >> 8) % 255) - 127, block scale 2^-6; per format: sha256 over the packed row bytes (row-major), sha256 over the little-endian f32 dequantized outputs (row-major), and sha256 over per-block i32 isums (little-endian) followed by the per-row f32 dot output (little-endian), rows ascending",
+      "pending_reason": "no cuda ternary kernel run exists yet; this receipt records the typed contract only and claims nothing about cuda until the committed workload executes through a psionic cuda backend kernel and its digests are pinned here from that run"
+    },
+    {
+      "schema_version": "psionic.core.ternary_tq_determinism_receipt.v1",
+      "contract_id": "psionic.core.ternary_tq_formats.v1",
+      "backend": "vulkan",
+      "status": "pending",
+      "workload": "4 rows of 1024 f32 inputs; row r element i = (2*u - 1) as f32 with u = PhiloxStream::new(0x11157E40C0DE2026, r).unit_f64_at(i); i8 activations: row r element i = ((PhiloxStream::new(seed, 256 + r).u32_at(i) >> 8) % 255) - 127, block scale 2^-6; per format: sha256 over the packed row bytes (row-major), sha256 over the little-endian f32 dequantized outputs (row-major), and sha256 over per-block i32 isums (little-endian) followed by the per-row f32 dot output (little-endian), rows ascending",
+      "pending_reason": "no vulkan ternary kernel run exists yet; this receipt records the typed contract only and claims nothing about vulkan until the committed workload executes through a psionic vulkan backend kernel and its digests are pinned here from that run"
+    }
+  ],
+  "claim_boundary": "quantization-fidelity metrics are not correctness proofs; this lane records reproducibility of the quantized forward path per backend and never borrows Tassadar exact-lane language (openagents docs/training/2026-06-10-qvac-edge-stack-analysis.md section 5). A backend without a recorded run stays pending; recorded digests come only from real runs."
+}

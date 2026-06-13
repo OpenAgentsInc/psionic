@@ -4,6 +4,7 @@
 //! engine-facing metadata, not backend execution logic.
 
 pub mod philox;
+pub mod ternary;
 
 use std::fmt;
 
