@@ -1423,7 +1423,6 @@ mod tests {
     fn builtin_executor_trained_v1_promotion_packet_is_valid(
     ) -> Result<(), PsionExecutorTrainedV1PromotionError> {
         let root = workspace_root();
-        std::env::set_current_dir(&root).expect("set cwd to workspace root");
         let descriptor = builtin_executor_trained_v1_descriptor()?;
         let manifest = builtin_executor_trained_v1_artifact_manifest(root.as_path())?;
         let lineage = builtin_executor_trained_v1_lineage_contract(root.as_path())?;
@@ -1442,7 +1441,6 @@ mod tests {
     fn trained_v1_promotion_fixture_matches_committed_truth(
     ) -> Result<(), PsionExecutorTrainedV1PromotionError> {
         let root = workspace_root();
-        std::env::set_current_dir(&root).expect("set cwd to workspace root");
         let expected_packet: PsionExecutorTrainedV1PromotionPacket = read_json(
             root.as_path(),
             PSION_EXECUTOR_TRAINED_V1_PROMOTION_FIXTURE_PATH,

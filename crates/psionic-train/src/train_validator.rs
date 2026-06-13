@@ -1845,13 +1845,41 @@ mod tests {
     }
 
     fn artifact_binding(path: &str) -> PsionicTrainArtifactBinding {
-        let artifact_role = match Path::new(path).file_name().and_then(|value| value.to_str()) {
-            Some("artifact_manifest.json") => "contribution_artifact_manifest",
-            Some("contribution_receipt.json") => "contribution_receipt",
-            Some("peer_checkpoint_handoff_receipt.json") => "checkpoint_handoff_receipt",
+        let source = Path::new(path);
+        let file_name = source
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("validator_test_artifact.json");
+        let artifact_role = match file_name {
+            "artifact_manifest.json" => "contribution_artifact_manifest",
+            "contribution_receipt.json" => "contribution_receipt",
+            "peer_checkpoint_handoff_receipt.json" => "checkpoint_handoff_receipt",
             _ => "validator_test_artifact",
         };
-        build_psionic_train_artifact_binding_from_path(artifact_role, Path::new(path))
+        let resolved = if source.exists() {
+            source.to_path_buf()
+        } else {
+            // Fabricate the artifact in a per-test temp file instead of
+            // depending on stray absolute files such as
+            // `/tmp/artifact_manifest.json` existing on the machine.
+            static FABRICATED_ARTIFACT_COUNTER: std::sync::atomic::AtomicU64 =
+                std::sync::atomic::AtomicU64::new(0);
+            let unique = FABRICATED_ARTIFACT_COUNTER
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let root = env::temp_dir().join(format!(
+                "psionic-validator-fabricated-{}-{unique}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&root).expect("fabricated artifact dir should create");
+            let fabricated = root.join(file_name);
+            fs::write(
+                &fabricated,
+                format!("psionic validator test artifact placeholder for `{path}`\n"),
+            )
+            .expect("fabricated artifact should write");
+            fabricated
+        };
+        build_psionic_train_artifact_binding_from_path(artifact_role, resolved.as_path())
             .expect("artifact binding should build from path")
     }
 

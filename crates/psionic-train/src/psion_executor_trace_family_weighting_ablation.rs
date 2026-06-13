@@ -351,7 +351,9 @@ impl PsionExecutorTraceFamilyWeightingAblationPacket {
             });
         }
 
-        let mixture = builtin_executor_canonical_mixture_packet(Path::new("."))?;
+        let mixture = builtin_executor_canonical_mixture_packet(
+            crate::training_execution_evidence_bundle::workspace_root(),
+        )?;
         if self.baseline_mixture_id != mixture.mixture_id
             || self.baseline_model_id != mixture.model_id
             || self.baseline_mixture_digest != mixture.packet_digest

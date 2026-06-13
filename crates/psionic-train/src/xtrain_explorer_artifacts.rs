@@ -900,34 +900,6 @@ fn write_json<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        path::{Path, PathBuf},
-        sync::{Mutex, OnceLock},
-    };
-
-    fn workspace_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(Path::parent)
-            .expect("psionic workspace root should exist")
-            .to_path_buf()
-    }
-
-    fn cwd_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn with_workspace_root<T>(
-        f: impl FnOnce() -> Result<T, XtrainExplorerArtifactsError>,
-    ) -> Result<T, XtrainExplorerArtifactsError> {
-        let _guard = cwd_lock().lock().expect("cwd lock should not be poisoned");
-        let original = std::env::current_dir().expect("current dir should resolve");
-        std::env::set_current_dir(workspace_root()).expect("workspace root should be reachable");
-        let result = f();
-        std::env::set_current_dir(original).expect("original cwd should be restorable");
-        result
-    }
 
     fn sample_snapshot() -> XtrainExplorerSnapshot {
         serde_json::from_str(include_str!(
@@ -945,31 +917,23 @@ mod tests {
 
     #[test]
     fn xtrain_explorer_snapshot_stays_valid() -> Result<(), XtrainExplorerArtifactsError> {
-        with_workspace_root(|| sample_snapshot().validate())?;
-        Ok(())
+        sample_snapshot().validate()
     }
 
     #[test]
     fn xtrain_explorer_index_stays_valid() -> Result<(), XtrainExplorerArtifactsError> {
-        with_workspace_root(|| sample_index().validate())?;
-        Ok(())
+        sample_index().validate()
     }
 
     #[test]
     fn canonical_snapshot_matches_fixture() -> Result<(), XtrainExplorerArtifactsError> {
-        with_workspace_root(|| {
-            assert_eq!(canonical_xtrain_explorer_snapshot()?, sample_snapshot());
-            Ok(())
-        })?;
+        assert_eq!(canonical_xtrain_explorer_snapshot()?, sample_snapshot());
         Ok(())
     }
 
     #[test]
     fn canonical_index_matches_fixture() -> Result<(), XtrainExplorerArtifactsError> {
-        with_workspace_root(|| {
-            assert_eq!(canonical_xtrain_explorer_index()?, sample_index());
-            Ok(())
-        })?;
+        assert_eq!(canonical_xtrain_explorer_index()?, sample_index());
         Ok(())
     }
 }

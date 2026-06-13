@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
@@ -1445,11 +1445,34 @@ fn declared_visualization_surface_link(
 }
 
 fn sha256_file(path: &str) -> Result<String, TrainingExecutionEvidenceBundleError> {
-    let bytes = fs::read(path).map_err(|error| TrainingExecutionEvidenceBundleError::Read {
-        path: String::from(path),
-        error,
+    let bytes = fs::read(resolve_repo_path(path)).map_err(|error| {
+        TrainingExecutionEvidenceBundleError::Read {
+            path: String::from(path),
+            error,
+        }
     })?;
     Ok(hex::encode(Sha256::digest(bytes)))
+}
+
+/// Resolves a repo-relative artifact path against the psionic workspace root so
+/// fixture reads do not depend on the process working directory. Absolute paths
+/// are returned unchanged, and recorded `artifact_path` strings stay repo-relative.
+pub(crate) fn resolve_repo_path(path: &str) -> PathBuf {
+    let raw = Path::new(path);
+    if raw.is_absolute() {
+        return raw.to_path_buf();
+    }
+    workspace_root().join(raw)
+}
+
+/// Returns the psionic workspace root derived from this crate's manifest dir,
+/// so repo-relative fixture paths resolve independently of the process cwd.
+pub(crate) fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("psionic workspace root should resolve from the psionic-train crate dir")
+        .to_path_buf()
 }
 
 fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
@@ -1462,11 +1485,7 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::BTreeSet,
-        path::{Path, PathBuf},
-        sync::{Mutex, OnceLock},
-    };
+    use std::collections::BTreeSet;
 
     use super::{
         canonical_training_execution_evidence_bundle, TrainingExecutionDisposition,
@@ -1474,129 +1493,88 @@ mod tests {
         TrainingExecutionVisualizationSurfaceKind,
     };
 
-    fn workspace_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(Path::parent)
-            .expect("psionic workspace root should exist")
-            .to_path_buf()
-    }
-
-    fn cwd_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn with_workspace_root<T>(
-        f: impl FnOnce() -> Result<T, Box<dyn std::error::Error>>,
-    ) -> Result<T, Box<dyn std::error::Error>> {
-        let _guard = cwd_lock().lock().expect("cwd lock should not be poisoned");
-        let original = std::env::current_dir().expect("current dir should resolve");
-        std::env::set_current_dir(workspace_root()).expect("workspace root should be reachable");
-        let result = f();
-        std::env::set_current_dir(original).expect("original cwd should be restorable");
-        result
-    }
-
     #[test]
     fn canonical_bundle_covers_all_topology_kinds() -> Result<(), Box<dyn std::error::Error>> {
-        with_workspace_root(|| {
-            let bundle = canonical_training_execution_evidence_bundle()?;
-            let topology_kinds = bundle
-                .segment_evidence
-                .iter()
-                .map(|segment| segment.topology_kind)
-                .collect::<BTreeSet<_>>();
-            assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::Hybrid));
-            assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::SingleNode));
-            Ok(())
-        })?;
+        let bundle = canonical_training_execution_evidence_bundle()?;
+        let topology_kinds = bundle
+            .segment_evidence
+            .iter()
+            .map(|segment| segment.topology_kind)
+            .collect::<BTreeSet<_>>();
+        assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::Hybrid));
+        assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::SingleNode));
         Ok(())
     }
 
     #[test]
     fn canonical_bundle_rejects_missing_final_artifact_refs(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        with_workspace_root(|| {
-            let mut bundle = canonical_training_execution_evidence_bundle()?;
-            bundle.final_artifact_refs.clear();
-            let manifest = crate::cross_provider_training_program_manifest()?;
-            let sources = crate::canonical_cross_provider_compute_source_contracts()?;
-            let err = bundle
-                .validate(&manifest, &sources)
-                .expect_err("missing final artifact refs must be rejected");
-            assert!(matches!(
-                err,
-                TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
-            ));
-            Ok(())
-        })?;
+        let mut bundle = canonical_training_execution_evidence_bundle()?;
+        bundle.final_artifact_refs.clear();
+        let manifest = crate::cross_provider_training_program_manifest()?;
+        let sources = crate::canonical_cross_provider_compute_source_contracts()?;
+        let err = bundle
+            .validate(&manifest, &sources)
+            .expect_err("missing final artifact refs must be rejected");
+        assert!(matches!(
+            err,
+            TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
+        ));
         Ok(())
     }
 
     #[test]
     fn canonical_bundle_stays_degraded_until_all_segments_are_green(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        with_workspace_root(|| {
-            let bundle = canonical_training_execution_evidence_bundle()?;
-            assert_eq!(
-                bundle.final_disposition.disposition,
-                TrainingExecutionDisposition::DegradedSuccess
-            );
-            Ok(())
-        })?;
+        let bundle = canonical_training_execution_evidence_bundle()?;
+        assert_eq!(
+            bundle.final_disposition.disposition,
+            TrainingExecutionDisposition::DegradedSuccess
+        );
         Ok(())
     }
 
     #[test]
     fn canonical_bundle_links_track_aware_and_explorer_surfaces(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        with_workspace_root(|| {
-            let bundle = canonical_training_execution_evidence_bundle()?;
-            let surface_kinds = bundle
-                .visualization_surface_links
-                .iter()
-                .map(|link| link.surface_kind)
-                .collect::<BTreeSet<_>>();
-            assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunBundle));
-            assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunIndex));
-            assert!(surface_kinds
-                .contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot));
-            assert!(
-                surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerIndex)
-            );
-            assert!(bundle.visualization_surface_links.iter().any(|link| {
-                link.surface_ref.artifact_path
-                    == "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json"
-            }));
-            assert!(bundle.visualization_surface_links.iter().any(|link| {
-                link.surface_ref.artifact_path
-                    == "fixtures/training/xtrain_explorer_snapshot_v1.json"
-            }));
-            Ok(())
-        })?;
+        let bundle = canonical_training_execution_evidence_bundle()?;
+        let surface_kinds = bundle
+            .visualization_surface_links
+            .iter()
+            .map(|link| link.surface_kind)
+            .collect::<BTreeSet<_>>();
+        assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunBundle));
+        assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunIndex));
+        assert!(
+            surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot)
+        );
+        assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerIndex));
+        assert!(bundle.visualization_surface_links.iter().any(|link| {
+            link.surface_ref.artifact_path
+                == "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json"
+        }));
+        assert!(bundle.visualization_surface_links.iter().any(|link| {
+            link.surface_ref.artifact_path == "fixtures/training/xtrain_explorer_snapshot_v1.json"
+        }));
         Ok(())
     }
 
     #[test]
     fn canonical_bundle_rejects_unknown_surface_supporting_path(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        with_workspace_root(|| {
-            let mut bundle = canonical_training_execution_evidence_bundle()?;
-            bundle.visualization_surface_links[0]
-                .supporting_evidence_paths
-                .push(String::from("fixtures/training/does_not_exist.json"));
-            let manifest = crate::cross_provider_training_program_manifest()?;
-            let sources = crate::canonical_cross_provider_compute_source_contracts()?;
-            let err = bundle
-                .validate(&manifest, &sources)
-                .expect_err("unknown supporting evidence path must be rejected");
-            assert!(matches!(
-                err,
-                TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
-            ));
-            Ok(())
-        })?;
+        let mut bundle = canonical_training_execution_evidence_bundle()?;
+        bundle.visualization_surface_links[0]
+            .supporting_evidence_paths
+            .push(String::from("fixtures/training/does_not_exist.json"));
+        let manifest = crate::cross_provider_training_program_manifest()?;
+        let sources = crate::canonical_cross_provider_compute_source_contracts()?;
+        let err = bundle
+            .validate(&manifest, &sources)
+            .expect_err("unknown supporting evidence path must be rejected");
+        assert!(matches!(
+            err,
+            TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
+        ));
         Ok(())
     }
 }

@@ -693,7 +693,9 @@ fn artifact_ref(
 }
 
 fn sha256_file(path: &str) -> Result<String, std::io::Error> {
-    let bytes = fs::read(path)?;
+    let bytes = fs::read(crate::training_execution_evidence_bundle::resolve_repo_path(
+        path,
+    ))?;
     Ok(hex::encode(Sha256::digest(bytes)))
 }
 

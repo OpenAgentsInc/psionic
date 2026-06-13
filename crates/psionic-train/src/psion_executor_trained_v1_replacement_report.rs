@@ -962,7 +962,6 @@ mod tests {
     fn builtin_executor_trained_v1_replacement_report_is_valid(
     ) -> Result<(), PsionExecutorTrainedV1ReplacementReportError> {
         let root = workspace_root();
-        std::env::set_current_dir(&root).expect("set cwd to workspace root");
         let promotion = builtin_executor_trained_v1_promotion_packet(root.as_path())?;
         let long_run = builtin_executor_long_run_rehearsal_packet(root.as_path())?;
         let throughput = builtin_executor_unified_throughput_reporting_packet(root.as_path())?;
@@ -982,7 +981,6 @@ mod tests {
     fn trained_v1_replacement_report_fixture_matches_committed_truth(
     ) -> Result<(), PsionExecutorTrainedV1ReplacementReportError> {
         let root = workspace_root();
-        std::env::set_current_dir(&root).expect("set cwd to workspace root");
         let expected: PsionExecutorTrainedV1ReplacementReport = read_json(
             root.as_path(),
             PSION_EXECUTOR_TRAINED_V1_REPLACEMENT_REPORT_FIXTURE_PATH,
