@@ -1,0 +1,18 @@
+{
+  "receipt_version": "tassadar_student_interface_receipt.v0.1",
+  "baseline": "baseline_d_frozen_executor_learned_interface",
+  "corpus_id": "corpus.tassadar_trace.v0_2.w3_100m",
+  "dataset_snapshot_digest": "d045a53d0cecbe6ffb1b4f0c1522ab76b02014491842f1770d34c12a885c8c3a",
+  "train_prep_sha256": "8095588b05ff1bc3b8a723431c35015882a25566f74d895b514071f5e1734350",
+  "interface_digest": "9eb153e360f576770a6de0e50abd07fbb6ece1237c80b08d2bf6c4ffbb6d0217",
+  "learning_rate": 0.5,
+  "stats": {
+    "assembly_instances": 136448000,
+    "routing_instances": 21376000,
+    "corpus_tokens_seen": 85504000,
+    "assembly_ce": 0.5752526319804969,
+    "routing_ce": 0.17400235498096453
+  },
+  "wall_seconds": 6.493499709,
+  "host": "Apple-M5-Max-18c-128GB"
+}

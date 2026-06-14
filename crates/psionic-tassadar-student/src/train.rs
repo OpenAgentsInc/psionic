@@ -176,11 +176,13 @@ pub fn chunks_of_record(record: &StudentRecord, cfg: &TrainConfig) -> Vec<Chunk>
         Vec::new()
     };
     let digest_prefix: Option<[u8; DIGEST_BYTES]> = hex_bytes(&record.final_output_digest)
-        .and_then(|bytes| bytes.get(..DIGEST_BYTES).map(|head| {
-            let mut prefix = [0_u8; DIGEST_BYTES];
-            prefix.copy_from_slice(head);
-            prefix
-        }));
+        .and_then(|bytes| {
+            bytes.get(..DIGEST_BYTES).map(|head| {
+                let mut prefix = [0_u8; DIGEST_BYTES];
+                prefix.copy_from_slice(head);
+                prefix
+            })
+        });
     let mut chunks = Vec::with_capacity(total.div_ceil(t));
     let mut start = 0_usize;
     while start < total {
@@ -246,9 +248,8 @@ pub fn chunks_of_record(record: &StudentRecord, cfg: &TrainConfig) -> Vec<Chunk>
                 // Query row: last limb of the query input value.
                 let spec_read = spec.read;
                 let Some(read) = spec_read else { continue };
-                let qpos = seq.step_starts[instance.step]
-                    + (read.query_input + 1) * LIMBS_PER_VALUE
-                    - 1;
+                let qpos =
+                    seq.step_starts[instance.step] + (read.query_input + 1) * LIMBS_PER_VALUE - 1;
                 if qpos < start || qpos >= end {
                     continue;
                 }
@@ -386,8 +387,7 @@ fn head_losses_and_backward(
             let width = AUX_VALUES * AUX_BYTES * 256;
             let mut h_sel = vec![0.0_f32; a * d];
             for (sel, row) in aux_rows.iter().enumerate() {
-                h_sel[sel * d..(sel + 1) * d]
-                    .copy_from_slice(&acts.hidden[row * d..(row + 1) * d]);
+                h_sel[sel * d..(sel + 1) * d].copy_from_slice(&acts.hidden[row * d..(row + 1) * d]);
             }
             let mut logits = vec![0.0_f32; a * width];
             gemm(a, d, width, &h_sel, &model.w_aux.w, &mut logits);
@@ -455,8 +455,7 @@ fn head_losses_and_backward(
             let width = DIGEST_BYTES * 256;
             let mut h_sel = vec![0.0_f32; g * d];
             for (sel, row) in dig_rows.iter().enumerate() {
-                h_sel[sel * d..(sel + 1) * d]
-                    .copy_from_slice(&acts.hidden[row * d..(row + 1) * d]);
+                h_sel[sel * d..(sel + 1) * d].copy_from_slice(&acts.hidden[row * d..(row + 1) * d]);
             }
             let mut logits = vec![0.0_f32; g * width];
             gemm(g, d, width, &h_sel, &model.w_dig.w, &mut logits);
@@ -550,8 +549,7 @@ fn head_losses_and_backward(
                 if best_wrong_idx == usize::MAX {
                     continue;
                 }
-                let violation =
-                    f64::from(cfg.lookup_margin) - s_correct + best_wrong;
+                let violation = f64::from(cfg.lookup_margin) - s_correct + best_wrong;
                 if violation > 0.0 {
                     total += violation;
                     // dV/ds_correct = -1, dV/ds_wrong = +1, with
@@ -574,8 +572,7 @@ fn head_losses_and_backward(
                         model.lk_scalars.g[0] += (w * ds_ddelta * -query) as f32;
                         model.lk_scalars.g[1] += -(w * ds_ddelta) as f32;
                         for (col, h_val) in h_row_vec.iter().enumerate() {
-                            model.lk_wq.g[col] +=
-                                (w * ds_ddelta * -f64::from(*h_val)) as f32;
+                            model.lk_wq.g[col] += (w * ds_ddelta * -f64::from(*h_val)) as f32;
                         }
                         dh_coeff += -(w * ds_ddelta);
                     }
@@ -658,9 +655,8 @@ pub fn train(
     let mut total_chunks = 0_usize;
     for index in &order {
         let record = &prep.records[*index];
-        let seq_len =
-            (record.seed_writes.len() * 2 + (record.f + record.s) * record.step_count)
-                * LIMBS_PER_VALUE;
+        let seq_len = (record.seed_writes.len() * 2 + (record.f + record.s) * record.step_count)
+            * LIMBS_PER_VALUE;
         total_chunks += seq_len.div_ceil(t);
     }
     let total_steps = ((total_chunks * cfg.epochs) / cfg.batch_size).max(1) as u64;
@@ -732,8 +728,7 @@ pub fn train(
     let mut hasher = Sha256::new();
     hasher.update(&weights);
     let weights_sha256 = hex::encode(hasher.finalize());
-    std::fs::write(out_dir.join("weights.bin"), &weights)
-        .map_err(|error| error.to_string())?;
+    std::fs::write(out_dir.join("weights.bin"), &weights).map_err(|error| error.to_string())?;
     let receipt = TrainReceipt {
         baseline: cfg.baseline.label().to_string(),
         config: cfg.clone(),
@@ -751,8 +746,7 @@ pub fn train(
         wall_seconds,
         weights_sha256,
     };
-    let receipt_json =
-        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?;
+    let receipt_json = serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?;
     std::fs::write(out_dir.join("receipt.json"), format!("{receipt_json}\n"))
         .map_err(|error| error.to_string())?;
     Ok(receipt)
@@ -795,8 +789,7 @@ fn lr_at(cfg: &TrainConfig, step: u64, total_steps: u64) -> f32 {
     }
     let progress =
         ((step - warm) as f32 / (total_steps.saturating_sub(warm)).max(1) as f32).min(1.0);
-    cfg.lr_min
-        + 0.5 * (cfg.lr_max - cfg.lr_min) * (1.0 + (std::f32::consts::PI * progress).cos())
+    cfg.lr_min + 0.5 * (cfg.lr_max - cfg.lr_min) * (1.0 + (std::f32::consts::PI * progress).cos())
 }
 
 fn train_step(
@@ -834,12 +827,7 @@ fn train_step(
         // Lookup scalars: no weight decay (analytic-geometry maintenance
         // is part of the H3 experiment) and their own gradient clip.
         let (wd, scale) = if is_lookup {
-            let lk_norm: f32 = param
-                .g
-                .iter()
-                .map(|g| g * g)
-                .sum::<f32>()
-                .sqrt();
+            let lk_norm: f32 = param.g.iter().map(|g| g * g).sum::<f32>().sqrt();
             let lk_scale = if lk_norm > 1.0 { 1.0 / lk_norm } else { 1.0 };
             (0.0, lk_scale)
         } else {
@@ -946,7 +934,11 @@ mod tests {
         let losses = head_losses_and_backward(&mut model, &acts, &chunks, &cfg, &mut d_hidden);
         // Analytic init: scores are exact; margin 1.0 between the
         // correct key (score 0) and nearest distinct key (<= -1).
-        assert!(losses.lookup_acc > 0.999, "lookup_acc {}", losses.lookup_acc);
+        assert!(
+            losses.lookup_acc > 0.999,
+            "lookup_acc {}",
+            losses.lookup_acc
+        );
         assert!(losses.lookup.abs() < 1e-9, "lookup loss {}", losses.lookup);
     }
 }

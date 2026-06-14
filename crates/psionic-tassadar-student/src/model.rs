@@ -357,8 +357,7 @@ fn layer_norm_forward(
         .for_each(|(row, (y_row, (mean_val, rstd_val)))| {
             let x_row = &x[row * d..(row + 1) * d];
             let mean = x_row.iter().sum::<f32>() / d as f32;
-            let var =
-                x_row.iter().map(|v| (v - mean) * (v - mean)).sum::<f32>() / d as f32;
+            let var = x_row.iter().map(|v| (v - mean) * (v - mean)).sum::<f32>() / d as f32;
             let rstd = 1.0 / (var + 1e-5).sqrt();
             for col in 0..d {
                 y_row[col] = (x_row[col] - mean) * rstd * gain[col] + bias[col];
@@ -406,8 +405,7 @@ fn layer_norm_backward(
         for col in 0..d {
             let xhat = (x_row[col] - mean[row]) * rstd[row];
             let dxhat = dy_row[col] * gain[col];
-            dx_row[col] +=
-                rstd[row] * (dxhat - inv_d * sum_dxhat - xhat * inv_d * sum_dxhat_xhat);
+            dx_row[col] += rstd[row] * (dxhat - inv_d * sum_dxhat - xhat * inv_d * sum_dxhat_xhat);
         }
     });
 }
@@ -545,8 +543,7 @@ impl Backbone {
                     let q_row = &q[(base + i) * d + col0..(base + i) * d + col0 + dh];
                     let mut max = f32::NEG_INFINITY;
                     for j in 0..=i {
-                        let k_row =
-                            &k[(base + j) * d + col0..(base + j) * d + col0 + dh];
+                        let k_row = &k[(base + j) * d + col0..(base + j) * d + col0 + dh];
                         let mut dot = 0.0_f32;
                         for c in 0..dh {
                             dot = q_row[c].mul_add(k_row[c], dot);
@@ -564,16 +561,14 @@ impl Backbone {
                         total += e;
                     }
                     let inv = 1.0 / total;
-                    let out_row = &mut ao_slice
-                        [(base + i) * d + col0..(base + i) * d + col0 + dh];
+                    let out_row = &mut ao_slice[(base + i) * d + col0..(base + i) * d + col0 + dh];
                     for c in 0..dh {
                         out_row[c] = 0.0;
                     }
                     for j in 0..=i {
                         let p = pblock[i * t + j] * inv;
                         pblock[i * t + j] = p;
-                        let v_row =
-                            &v[(base + j) * d + col0..(base + j) * d + col0 + dh];
+                        let v_row = &v[(base + j) * d + col0..(base + j) * d + col0 + dh];
                         for c in 0..dh {
                             out_row[c] = p.mul_add(v_row[c], out_row[c]);
                         }
@@ -583,7 +578,8 @@ impl Backbone {
             let mut attn_out = vec![0.0_f32; m * d];
             gemm(m, d, d, &ao, &layer.wo.w, &mut attn_out);
             let mut x_mid = x_in.clone();
-            x_mid.par_iter_mut()
+            x_mid
+                .par_iter_mut()
                 .zip(attn_out.par_iter())
                 .for_each(|(x_val, a_val)| *x_val += *a_val);
             let mut y2 = vec![0.0_f32; m * d];
@@ -661,12 +657,7 @@ impl Backbone {
 
     /// Full backward from `d_hidden` (gradient at the final-LN output).
     /// Accumulates into parameter `.g` buffers.
-    pub fn backward(
-        &mut self,
-        features: &[TokenFeatures],
-        acts: &Acts,
-        d_hidden: &[f32],
-    ) {
+    pub fn backward(&mut self, features: &[TokenFeatures], acts: &Acts, d_hidden: &[f32]) {
         let d = self.cfg.d_model;
         let m = acts.b * acts.t;
         let mut dx = vec![0.0_f32; m * d];
@@ -691,7 +682,14 @@ impl Backbone {
             bias_grad(&d_ffn_out, d, &mut layer.b2.g);
             let mut d_h_act = vec![0.0_f32; m * self.cfg.d_ff];
             gemm_bt(m, self.cfg.d_ff, d, &d_ffn_out, &layer.w2.w, &mut d_h_act);
-            gemm_at(m, self.cfg.d_ff, d, &layer_acts.h_act, &d_ffn_out, &mut layer.w2.g);
+            gemm_at(
+                m,
+                self.cfg.d_ff,
+                d,
+                &layer_acts.h_act,
+                &d_ffn_out,
+                &mut layer.w2.g,
+            );
             d_h_act
                 .par_iter_mut()
                 .zip(layer_acts.h_pre.par_iter())
@@ -703,7 +701,14 @@ impl Backbone {
             bias_grad(&d_h_act, self.cfg.d_ff, &mut layer.b1.g);
             let mut d_y2 = vec![0.0_f32; m * d];
             gemm_bt(m, d, self.cfg.d_ff, &d_h_act, &layer.w1.w, &mut d_y2);
-            gemm_at(m, d, self.cfg.d_ff, &layer_acts.y2, &d_h_act, &mut layer.w1.g);
+            gemm_at(
+                m,
+                d,
+                self.cfg.d_ff,
+                &layer_acts.y2,
+                &d_h_act,
+                &mut layer.w1.g,
+            );
             // dx currently holds gradient at x_next; LN2 backward adds
             // the FFN path's contribution at x_mid.
             let mut d_x_mid = dx.clone();
@@ -741,8 +746,7 @@ impl Backbone {
                 let dk_s = unsafe { std::slice::from_raw_parts_mut(dk_ptr.get(), m * d) };
                 let dv_s = unsafe { std::slice::from_raw_parts_mut(dv_ptr.get(), m * d) };
                 for i in 0..t {
-                    let d_out =
-                        &d_ao[(base + i) * d + col0..(base + i) * d + col0 + dh];
+                    let d_out = &d_ao[(base + i) * d + col0..(base + i) * d + col0 + dh];
                     // dprobs and dscores for row i.
                     let mut dot_sum = 0.0_f32;
                     let mut dprob = vec![0.0_f32; i + 1];
@@ -756,25 +760,21 @@ impl Backbone {
                         dprob[j] = dot;
                         dot_sum += dot * pblock[i * t + j];
                     }
-                    let q_row =
-                        &layer_acts.q[(base + i) * d + col0..(base + i) * d + col0 + dh];
+                    let q_row = &layer_acts.q[(base + i) * d + col0..(base + i) * d + col0 + dh];
                     for j in 0..=i {
                         let p = pblock[i * t + j];
                         let dscore = p * (dprob[j] - dot_sum) * scale;
-                        let k_row = &layer_acts.k
-                            [(base + j) * d + col0..(base + j) * d + col0 + dh];
-                        let dq_row = &mut dq_s
-                            [(base + i) * d + col0..(base + i) * d + col0 + dh];
+                        let k_row =
+                            &layer_acts.k[(base + j) * d + col0..(base + j) * d + col0 + dh];
+                        let dq_row = &mut dq_s[(base + i) * d + col0..(base + i) * d + col0 + dh];
                         for c in 0..dh {
                             dq_row[c] = dscore.mul_add(k_row[c], dq_row[c]);
                         }
-                        let dk_row = &mut dk_s
-                            [(base + j) * d + col0..(base + j) * d + col0 + dh];
+                        let dk_row = &mut dk_s[(base + j) * d + col0..(base + j) * d + col0 + dh];
                         for c in 0..dh {
                             dk_row[c] = dscore.mul_add(q_row[c], dk_row[c]);
                         }
-                        let dv_row = &mut dv_s
-                            [(base + j) * d + col0..(base + j) * d + col0 + dh];
+                        let dv_row = &mut dv_s[(base + j) * d + col0..(base + j) * d + col0 + dh];
                         for c in 0..dh {
                             dv_row[c] = p.mul_add(d_out[c], dv_row[c]);
                         }
@@ -901,9 +901,7 @@ impl Backbone {
         let mut x = vec![0.0_f32; d];
         embed_into(self, features, &mut x);
         let slot = state.pos % state.window;
-        for (layer, (k_ring, v_ring, pos_ring)) in
-            self.layers.iter().zip(state.layers.iter_mut())
-        {
+        for (layer, (k_ring, v_ring, pos_ring)) in self.layers.iter().zip(state.layers.iter_mut()) {
             let mut y1 = vec![0.0_f32; d];
             ln_row(&x, &layer.ln1_g.w, &layer.ln1_b.w, &mut y1);
             let mut q = vec![0.0_f32; d];
@@ -1095,8 +1093,7 @@ mod tests {
             // Relative agreement, with an absolute floor for gradients
             // near the f32 finite-difference noise floor.
             assert!(
-                (analytic - numeric).abs() / denom < 0.08
-                    || (analytic - numeric).abs() < 5e-4,
+                (analytic - numeric).abs() / denom < 0.08 || (analytic - numeric).abs() < 5e-4,
                 "param {param_idx} weight {weight_idx}: analytic {analytic} vs numeric {numeric}"
             );
         }

@@ -6448,3 +6448,35 @@ The missing center of gravity is now:
 
 That is the path Psionic still has to build from its now-real early train
 system.
+
+## W3 Tassadar Student Sweep
+
+Status: implemented on 2026-06-14 for OpenAgents issue `#4749`.
+
+`psionic-tassadar-student` owns the W3 student-program harness:
+
+- `tassadar-student-train` trains baselines A/B/C and the frozen-interface
+  baseline D from `student_prep.v0.1` data.
+- `tassadar-student-eval` evaluates checkpoints by first divergence behind
+  replay, not perplexity.
+- CPU budget is bounded by default through the `psionic#1123` guard: one core
+  unless the operator explicitly passes `--cpu-budget` or
+  `PSIONIC_TRAIN_CPU_BUDGET`.
+
+The completed W3 sweep artifacts are committed under
+`fixtures/tassadar/w3_student_sweep_20260612/`. They preserve the A/B/C
+checkpoints, D interface, training receipts, eval reports, and a manifest tying
+the 103.6M-token verified corpus snapshot to the published replay metrics.
+
+Result boundary:
+
+- baseline A, pure next-token distillation, fails replay at rollout step zero;
+- baseline B, auxiliary state losses, also fails replay at rollout step zero;
+- baseline C, lookup-analytic variant, solves the lookup auxiliary during
+  training but still fails replay at rollout step zero;
+- baseline D, frozen analytic executor plus learned interface, reaches
+  pass@1 `1.0` and replay acceptance `1.0`.
+
+This is a W3 research/evaluation result. It does not turn learned students into
+Tassadar-grade proof executors. The successful route is the frozen analytic
+executor with a learned interface.

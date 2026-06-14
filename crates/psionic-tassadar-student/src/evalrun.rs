@@ -232,12 +232,8 @@ fn eval_record(student: &Student, record: &StudentRecord) -> RecordEval {
                     if out_idx == read.result_out_idx {
                         if limb == 0 {
                             let query = record.inputs[step * record.f + read.query_input];
-                            pending_lookup = lookup_select(
-                                model,
-                                &hidden,
-                                query as f64,
-                                &tf_lookup,
-                            );
+                            pending_lookup =
+                                lookup_select(model, &hidden, query as f64, &tf_lookup);
                         }
                         if let Some(value_limbs) = pending_lookup {
                             predicted = value_limbs[limb];
@@ -302,10 +298,8 @@ fn eval_record(student: &Student, record: &StudentRecord) -> RecordEval {
                 };
                 hidden = model.decode_step(&mut state, &feat);
             }
-            let mut last_completed: i64 = record
-                .seed_writes
-                .last()
-                .map_or(0, |(_, _, value)| *value);
+            let mut last_completed: i64 =
+                record.seed_writes.last().map_or(0, |(_, _, value)| *value);
             for step in 0..record.step_count {
                 // Inputs: teacher-forced.
                 for field in 0..record.f {
@@ -401,26 +395,28 @@ fn eval_record(student: &Student, record: &StudentRecord) -> RecordEval {
                 .as_deref()
                 .map(serde_json::from_str)
                 .unwrap_or_else(|| serde_json::from_str(""));
-            if let Ok(model) = model { match tassadar_alm_numeric_execute(&model, &steps) {
-                Ok(trace) => {
-                    for row in &trace.step_outputs {
-                        let mut stream_row = Vec::with_capacity(record.s);
-                        for stream_idx in 0..record.s {
-                            let executor_idx = routing[stream_idx].min(row.len() - 1);
-                            let value = row[executor_idx];
-                            let limbs = interface.emit(value, &output_assign);
-                            emitted.extend_from_slice(&limbs);
-                            stream_row.push(value_of_limbs(&limbs));
+            if let Ok(model) = model {
+                match tassadar_alm_numeric_execute(&model, &steps) {
+                    Ok(trace) => {
+                        for row in &trace.step_outputs {
+                            let mut stream_row = Vec::with_capacity(record.s);
+                            for stream_idx in 0..record.s {
+                                let executor_idx = routing[stream_idx].min(row.len() - 1);
+                                let value = row[executor_idx];
+                                let limbs = interface.emit(value, &output_assign);
+                                emitted.extend_from_slice(&limbs);
+                                stream_row.push(value_of_limbs(&limbs));
+                            }
+                            student_rows.push(stream_row);
                         }
-                        student_rows.push(stream_row);
+                    }
+                    Err(error) => {
+                        // Typed executor refusal: rollout ends with no
+                        // emissions beyond this point.
+                        let _ = error;
                     }
                 }
-                Err(error) => {
-                    // Typed executor refusal: rollout ends with no
-                    // emissions beyond this point.
-                    let _ = error;
-                }
-            } }
+            }
         }
     }
     let rollout_seconds = started.elapsed().as_secs_f64().max(1e-9);
@@ -430,8 +426,7 @@ fn eval_record(student: &Student, record: &StudentRecord) -> RecordEval {
         let step = index / (record.s * LIMBS_PER_VALUE);
         let within = index % (record.s * LIMBS_PER_VALUE);
         let out_idx = within / LIMBS_PER_VALUE;
-        let truth = limbs_of(record.outputs[step * record.s + out_idx])
-            [within % LIMBS_PER_VALUE];
+        let truth = limbs_of(record.outputs[step * record.s + out_idx])[within % LIMBS_PER_VALUE];
         if *token != truth {
             first_div_token = Some(index);
             break;
@@ -446,8 +441,7 @@ fn eval_record(student: &Student, record: &StudentRecord) -> RecordEval {
             None => (true, record.step_count, output_tokens, None),
             Some(token_index) => {
                 let step = token_index / (record.s * LIMBS_PER_VALUE);
-                let out_idx =
-                    (token_index % (record.s * LIMBS_PER_VALUE)) / LIMBS_PER_VALUE;
+                let out_idx = (token_index % (record.s * LIMBS_PER_VALUE)) / LIMBS_PER_VALUE;
                 let cause = spec
                     .causes
                     .get(out_idx)
@@ -472,10 +466,8 @@ fn eval_record(student: &Student, record: &StudentRecord) -> RecordEval {
         replay_detail,
         step_count: record.step_count,
         suite,
-        tf_branch_accuracy: (tf_branch.1 > 0)
-            .then(|| tf_branch.0 as f64 / tf_branch.1 as f64),
-        tf_memory_read_accuracy: (tf_read.1 > 0)
-            .then(|| tf_read.0 as f64 / tf_read.1 as f64),
+        tf_branch_accuracy: (tf_branch.1 > 0).then(|| tf_branch.0 as f64 / tf_branch.1 as f64),
+        tf_memory_read_accuracy: (tf_read.1 > 0).then(|| tf_read.0 as f64 / tf_read.1 as f64),
         tf_token_accuracy: if output_tokens > 0 {
             tf_correct as f64 / output_tokens as f64
         } else {
@@ -561,10 +553,7 @@ fn lookup_select(
 /// Replay acceptance: re-execute the digest-pinned model on the true
 /// inputs with the shipped psionic executor and compare the student's
 /// rows bitwise.
-fn replay_acceptance(
-    record: &StudentRecord,
-    student_rows: &[Vec<i64>],
-) -> (bool, Option<String>) {
+fn replay_acceptance(record: &StudentRecord, student_rows: &[Vec<i64>]) -> (bool, Option<String>) {
     let Some(model_json) = record.model_json.as_deref() else {
         return (false, Some(String::from("missing model json")));
     };
@@ -601,10 +590,7 @@ fn replay_acceptance(
                 .enumerate()
             {
                 if replay_row != student_row {
-                    return (
-                        false,
-                        Some(format!("first row mismatch at step {step}")),
-                    );
+                    return (false, Some(format!("first row mismatch at step {step}")));
                 }
             }
             (true, None)
@@ -643,15 +629,9 @@ fn aggregate(suite: &str, evals: &[&RecordEval]) -> SuiteReport {
         .map(|e| e.first_divergence_step as f64)
         .collect();
     diverged.sort_by(f64::total_cmp);
-    let mut prefixes: Vec<f64> = evals
-        .iter()
-        .map(|e| e.valid_prefix_tokens as f64)
-        .collect();
+    let mut prefixes: Vec<f64> = evals.iter().map(|e| e.valid_prefix_tokens as f64).collect();
     prefixes.sort_by(f64::total_cmp);
-    let branch: Vec<f64> = evals
-        .iter()
-        .filter_map(|e| e.tf_branch_accuracy)
-        .collect();
+    let branch: Vec<f64> = evals.iter().filter_map(|e| e.tf_branch_accuracy).collect();
     let reads: Vec<f64> = evals
         .iter()
         .filter_map(|e| e.tf_memory_read_accuracy)
@@ -682,12 +662,10 @@ fn aggregate(suite: &str, evals: &[&RecordEval]) -> SuiteReport {
         output_digest_match_rate: evals.iter().filter(|e| e.digest_match).count() as f64
             / records.max(1) as f64,
         records,
-        replay_verifier_acceptance_rate: evals.iter().filter(|e| e.replay_accepted).count()
-            as f64
+        replay_verifier_acceptance_rate: evals.iter().filter(|e| e.replay_accepted).count() as f64
             / records.max(1) as f64,
         suite: suite.to_string(),
-        tokens_per_sec: evals.iter().map(|e| e.tokens_per_sec).sum::<f64>()
-            / records.max(1) as f64,
+        tokens_per_sec: evals.iter().map(|e| e.tokens_per_sec).sum::<f64>() / records.max(1) as f64,
         valid_prefix_tokens_median: percentile(&prefixes, 0.5),
     }
 }

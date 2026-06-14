@@ -83,8 +83,10 @@ fn run() -> Result<(), String> {
     let prep_path = prep_path.ok_or("missing --prep")?;
     let out_dir = out_dir.ok_or("missing --out")?;
     let baseline = baseline.ok_or("missing --baseline")?;
-    let budget =
-        resolve_cpu_budget(cpu_budget_flag, std::env::var(CPU_BUDGET_ENV).ok().as_deref())?;
+    let budget = resolve_cpu_budget(
+        cpu_budget_flag,
+        std::env::var(CPU_BUDGET_ENV).ok().as_deref(),
+    )?;
     {
         let mut log = std::io::stderr().lock();
         let _ = writeln!(log, "{}", budget.banner());
@@ -116,8 +118,11 @@ fn run() -> Result<(), String> {
         std::fs::create_dir_all(&out_dir).map_err(|error| error.to_string())?;
         let interface_json =
             serde_json::to_string_pretty(&interface).map_err(|error| error.to_string())?;
-        std::fs::write(out_dir.join("interface.json"), format!("{interface_json}\n"))
-            .map_err(|error| error.to_string())?;
+        std::fs::write(
+            out_dir.join("interface.json"),
+            format!("{interface_json}\n"),
+        )
+        .map_err(|error| error.to_string())?;
         let receipt = InterfaceReceipt {
             baseline: String::from("baseline_d_frozen_executor_learned_interface"),
             corpus_id: prep.corpus_id.clone(),
@@ -148,8 +153,7 @@ fn run() -> Result<(), String> {
     let mut cfg = TrainConfig::w3_default(kind);
     cfg.max_steps = max_steps;
     let receipt = train(&prep, &prep_sha256, &cfg, &out_dir, &host)?;
-    let receipt_json =
-        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?;
+    let receipt_json = serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?;
     let mut out = std::io::stdout().lock();
     let _ = writeln!(out, "{receipt_json}");
     Ok(())

@@ -69,7 +69,10 @@ pub fn resolve_cpu_budget(
         if cores == 0 {
             return Err(String::from("--cpu-budget must be >= 1 core"));
         }
-        return Ok(CpuBudget { cores, source: BudgetSource::Flag });
+        return Ok(CpuBudget {
+            cores,
+            source: BudgetSource::Flag,
+        });
     }
     if let Some(raw) = env_value {
         let trimmed = raw.trim();
@@ -80,10 +83,16 @@ pub fn resolve_cpu_budget(
             if cores == 0 {
                 return Err(format!("{CPU_BUDGET_ENV} must be >= 1 core"));
             }
-            return Ok(CpuBudget { cores, source: BudgetSource::EnvVar });
+            return Ok(CpuBudget {
+                cores,
+                source: BudgetSource::EnvVar,
+            });
         }
     }
-    Ok(CpuBudget { cores: DEFAULT_CPU_BUDGET_CORES, source: BudgetSource::Default })
+    Ok(CpuBudget {
+        cores: DEFAULT_CPU_BUDGET_CORES,
+        source: BudgetSource::Default,
+    })
 }
 
 #[cfg(test)]

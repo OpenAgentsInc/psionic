@@ -1,0 +1,405 @@
+{
+  "report_version": "tassadar_student_eval_report.v0.1",
+  "baseline": "baseline_c_lookup_analytic",
+  "corpus_id": "corpus.tassadar_trace.v0_2.w3_100m",
+  "dataset_snapshot_digest": "d045a53d0cecbe6ffb1b4f0c1522ab76b02014491842f1770d34c12a885c8c3a",
+  "eval_prep_sha256": "512830dcbdd4f8e4842adbf1960522c70e8609475581aa4936f6424b4981102b",
+  "checkpoint_sha256": "961764732aefd74b8a019c804cb47a3d23b725fe528c55110170c6a93ae9dbf2",
+  "config_digest": "fcfdd1374627db3147669fd6a979ebca50e58170f4210b33627e1eed3f627375",
+  "suites": [
+    {
+      "suite": "adversarial_2x",
+      "records": 16,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 8.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 685.914973860386,
+      "divergence_causes": {
+        "output": 5,
+        "wrong_fetch": 11
+      },
+      "divergence_step_histogram": {
+        "<1": 16
+      }
+    },
+    {
+      "suite": "adversarial_4x",
+      "records": 16,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 8.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 683.3865301796043,
+      "divergence_causes": {
+        "output": 4,
+        "wrong_fetch": 12
+      },
+      "divergence_step_histogram": {
+        "<1": 16
+      }
+    },
+    {
+      "suite": "adversarial_8x",
+      "records": 16,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 8.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 678.0232223345948,
+      "divergence_causes": {
+        "output": 4,
+        "wrong_fetch": 12
+      },
+      "divergence_step_histogram": {
+        "<1": 16
+      }
+    },
+    {
+      "suite": "adversarial_short",
+      "records": 192,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 8.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 665.2676671824065,
+      "divergence_causes": {
+        "output": 52,
+        "wrong_fetch": 140
+      },
+      "divergence_step_histogram": {
+        "<1": 192
+      }
+    },
+    {
+      "suite": "heldout_anchor",
+      "records": 6,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 8.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 777.1921886411856,
+      "divergence_causes": {
+        "stack_depth": 6
+      },
+      "divergence_step_histogram": {
+        "<1": 6
+      }
+    },
+    {
+      "suite": "heldout_economic_2x",
+      "records": 22,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 747.2111197913617,
+      "divergence_causes": {
+        "wrong_fetch": 22
+      },
+      "divergence_step_histogram": {
+        "<1": 22
+      }
+    },
+    {
+      "suite": "heldout_economic_4x",
+      "records": 22,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 751.3316436839069,
+      "divergence_causes": {
+        "wrong_fetch": 22
+      },
+      "divergence_step_histogram": {
+        "<1": 22
+      }
+    },
+    {
+      "suite": "heldout_economic_8x",
+      "records": 22,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 749.6504780827416,
+      "divergence_causes": {
+        "wrong_fetch": 22
+      },
+      "divergence_step_histogram": {
+        "<1": 22
+      }
+    },
+    {
+      "suite": "heldout_economic_short",
+      "records": 256,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 749.2071747069376,
+      "divergence_causes": {
+        "wrong_fetch": 256
+      },
+      "divergence_step_histogram": {
+        "<1": 256
+      }
+    },
+    {
+      "suite": "long_arithmetic_2x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 659.3937134487969,
+      "divergence_causes": {
+        "output": 20
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "long_arithmetic_4x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 658.8120097144763,
+      "divergence_causes": {
+        "output": 20
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "long_arithmetic_8x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 0.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 654.1181054361352,
+      "divergence_causes": {
+        "output": 20
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "stress_branch_2x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 12.0,
+      "branch_accuracy": 0.9993896484375,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 708.3252518742286,
+      "divergence_causes": {
+        "branch": 1,
+        "carry": 19
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "stress_branch_4x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 12.0,
+      "branch_accuracy": 0.9956013997395832,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 703.0229881010272,
+      "divergence_causes": {
+        "branch": 2,
+        "carry": 18
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "stress_branch_8x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 12.0,
+      "branch_accuracy": 0.9942738850911461,
+      "memory_read_accuracy": null,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 707.3522228830027,
+      "divergence_causes": {
+        "branch": 1,
+        "carry": 19
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "stress_memory_2x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 16.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 666.2114100075839,
+      "divergence_causes": {
+        "output": 20
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "stress_memory_4x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 16.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 667.3498743236809,
+      "divergence_causes": {
+        "output": 18,
+        "wrong_fetch": 2
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    },
+    {
+      "suite": "stress_memory_8x",
+      "records": 20,
+      "exact_rollout_pass_at_1": 0.0,
+      "first_divergence_step_median": 0.0,
+      "first_divergence_step_p90": 0.0,
+      "first_divergence_step_median_diverged": 0.0,
+      "valid_prefix_tokens_median": 16.0,
+      "branch_accuracy": null,
+      "memory_read_accuracy": 1.0,
+      "output_digest_match_rate": 0.0,
+      "replay_verifier_acceptance_rate": 0.0,
+      "tokens_per_sec": 664.2329440482479,
+      "divergence_causes": {
+        "output": 20
+      },
+      "divergence_step_histogram": {
+        "<1": 20
+      }
+    }
+  ],
+  "overall": {
+    "suite": "overall",
+    "records": 748,
+    "exact_rollout_pass_at_1": 0.0,
+    "first_divergence_step_median": 0.0,
+    "first_divergence_step_p90": 0.0,
+    "first_divergence_step_median_diverged": 0.0,
+    "valid_prefix_tokens_median": 0.0,
+    "branch_accuracy": 0.9964216444227432,
+    "memory_read_accuracy": 1.0,
+    "output_digest_match_rate": 0.0,
+    "replay_verifier_acceptance_rate": 0.0,
+    "tokens_per_sec": 706.130212953019,
+    "divergence_causes": {
+      "branch": 4,
+      "carry": 56,
+      "output": 183,
+      "stack_depth": 6,
+      "wrong_fetch": 499
+    },
+    "divergence_step_histogram": {
+      "<1": 748
+    }
+  },
+  "wall_seconds": 10546.872225815,
+  "threads": 5
+}

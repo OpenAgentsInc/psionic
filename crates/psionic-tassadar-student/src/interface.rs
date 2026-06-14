@@ -100,7 +100,11 @@ impl InterfaceModel {
     }
 
     /// Emits the limb tokens of one value under the learned assignment.
-    pub fn emit(&self, value: i64, assignment: &[usize; LIMBS_PER_VALUE]) -> [u16; LIMBS_PER_VALUE] {
+    pub fn emit(
+        &self,
+        value: i64,
+        assignment: &[usize; LIMBS_PER_VALUE],
+    ) -> [u16; LIMBS_PER_VALUE] {
         let canonical = limbs_of(value);
         let mut out = [0_u16; LIMBS_PER_VALUE];
         for (pos, exp_slot) in assignment.iter().enumerate() {
@@ -218,10 +222,10 @@ pub fn train_interface(
                 let canonical = limbs_of(value);
                 for pos in 0..LIMBS_PER_VALUE {
                     let observed = canonical[pos]; // stream is LE order
-                    let matches: Vec<bool> =
-                        (0..LIMBS_PER_VALUE).map(|e| canonical[e] == observed).collect();
-                    assembly_loss +=
-                        softmax_grad_step(&mut model.a_logits[pos], &matches, lr);
+                    let matches: Vec<bool> = (0..LIMBS_PER_VALUE)
+                        .map(|e| canonical[e] == observed)
+                        .collect();
+                    assembly_loss += softmax_grad_step(&mut model.a_logits[pos], &matches, lr);
                     stats.assembly_instances += 1;
                 }
             }
@@ -230,10 +234,10 @@ pub fn train_interface(
                 let canonical = limbs_of(value);
                 for pos in 0..LIMBS_PER_VALUE {
                     let observed = canonical[pos];
-                    let matches: Vec<bool> =
-                        (0..LIMBS_PER_VALUE).map(|e| canonical[e] == observed).collect();
-                    assembly_loss +=
-                        softmax_grad_step(&mut model.b_logits[pos], &matches, lr);
+                    let matches: Vec<bool> = (0..LIMBS_PER_VALUE)
+                        .map(|e| canonical[e] == observed)
+                        .collect();
+                    assembly_loss += softmax_grad_step(&mut model.b_logits[pos], &matches, lr);
                     stats.assembly_instances += 1;
                 }
                 stats.corpus_tokens_seen += LIMBS_PER_VALUE as u64;

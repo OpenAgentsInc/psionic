@@ -500,12 +500,12 @@ pub fn build_sequence(record: &StudentRecord) -> StudentSequence {
     };
     let mut last_completed: i64 = 0;
     let push_value = |seq: &mut StudentSequence,
-                          value: i64,
-                          role: TokenRole,
-                          value_idx: u8,
-                          step: usize,
-                          out_idx: u8,
-                          last_completed: &mut i64| {
+                      value: i64,
+                      role: TokenRole,
+                      value_idx: u8,
+                      step: usize,
+                      out_idx: u8,
+                      last_completed: &mut i64| {
         let limbs = limbs_of(value);
         for (limb_idx, limb) in limbs.iter().enumerate() {
             seq.tokens.push(*limb);
@@ -613,8 +613,7 @@ pub fn lookup_instances(record: &StudentRecord, seq: &StudentSequence) -> Vec<Lo
                 candidate_values: values.clone(),
                 correct,
                 query,
-                result_pos: seq.first_output_pos[step]
-                    + read.result_out_idx * LIMBS_PER_VALUE,
+                result_pos: seq.first_output_pos[step] + read.result_out_idx * LIMBS_PER_VALUE,
                 step,
             });
         }
@@ -654,7 +653,17 @@ mod tests {
 
     #[test]
     fn limb_roundtrip_matches_trace_token_v01() {
-        for value in [0_i64, 1, -1, 65_535, 65_536, -65_536, i64::MAX, i64::MIN, 123_456_789_012] {
+        for value in [
+            0_i64,
+            1,
+            -1,
+            65_535,
+            65_536,
+            -65_536,
+            i64::MAX,
+            i64::MIN,
+            123_456_789_012,
+        ] {
             let limbs = limbs_of(value);
             assert_eq!(value_of_limbs(&limbs), value);
         }

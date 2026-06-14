@@ -1,0 +1,51 @@
+{
+  "receipt_version": "tassadar_student_train_receipt.v0.1",
+  "baseline": "baseline_a_next_token",
+  "config": {
+    "baseline": "a",
+    "model": {
+      "d_model": 64,
+      "n_heads": 4,
+      "n_layers": 2,
+      "d_ff": 256,
+      "context": 512,
+      "use_aux": false,
+      "use_lookup": false
+    },
+    "batch_size": 8,
+    "epochs": 1,
+    "lr_max": 0.003,
+    "lr_min": 0.0003,
+    "warmup_steps": 200,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "weight_decay": 0.01,
+    "grad_clip": 1.0,
+    "aux_weight": 0.0,
+    "digest_weight": 0.0,
+    "lookup_margin": 1.0,
+    "lookup_weight": 0.0,
+    "seed": 18249,
+    "max_steps": 0
+  },
+  "config_digest": "40fdd266ea84b22626d21d7c61503b98eae332a624c313d78a9ed466d9a5dbaf",
+  "corpus_id": "corpus.tassadar_trace.v0_2.w3_100m",
+  "dataset_snapshot_digest": "d045a53d0cecbe6ffb1b4f0c1522ab76b02014491842f1770d34c12a885c8c3a",
+  "train_prep_sha256": "8095588b05ff1bc3b8a723431c35015882a25566f74d895b514071f5e1734350",
+  "weights_sha256": "961764732aefd74b8a019c804cb47a3d23b725fe528c55110170c6a93ae9dbf2",
+  "steps": 33813,
+  "positions_seen": 136960000,
+  "corpus_tokens_seen": 85504000,
+  "wall_seconds": 52803.906108103,
+  "final_losses": {
+    "ce": 1.1500944908618764,
+    "aux": 0.0,
+    "digest": 0.0,
+    "lookup": 0.0,
+    "lookup_acc": 0.0,
+    "lookup_count": 0,
+    "targets": 506479
+  },
+  "host": "shc-16vcpu-62GB",
+  "threads": 5
+}

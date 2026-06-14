@@ -72,8 +72,10 @@ fn run() -> Result<(), String> {
     let prep_path = prep_path.ok_or("missing --prep")?;
     let checkpoint = checkpoint.ok_or("missing --checkpoint")?;
     let out_path = out_path.ok_or("missing --out")?;
-    let budget =
-        resolve_cpu_budget(cpu_budget_flag, std::env::var(CPU_BUDGET_ENV).ok().as_deref())?;
+    let budget = resolve_cpu_budget(
+        cpu_budget_flag,
+        std::env::var(CPU_BUDGET_ENV).ok().as_deref(),
+    )?;
     {
         let mut log = std::io::stderr().lock();
         let _ = writeln!(log, "{}", budget.banner());
@@ -143,10 +145,8 @@ fn run() -> Result<(), String> {
         &checkpoint_sha256,
         &config_digest,
     );
-    let report_json =
-        serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
-    std::fs::write(&out_path, format!("{report_json}\n"))
-        .map_err(|error| error.to_string())?;
+    let report_json = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
+    std::fs::write(&out_path, format!("{report_json}\n")).map_err(|error| error.to_string())?;
     let mut out = std::io::stdout().lock();
     let _ = writeln!(out, "{report_json}");
     Ok(())
