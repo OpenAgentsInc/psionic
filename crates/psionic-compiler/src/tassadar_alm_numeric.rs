@@ -10,11 +10,11 @@ use psionic_runtime::{
 };
 
 use crate::tassadar_alm_backend::{
-    compile_tassadar_alm_graph, TassadarAlmAttentionRow, TassadarAlmBackendError,
-    TassadarAlmCompiledBundle, TassadarAlmWiringRow,
+    TassadarAlmAttentionRow, TassadarAlmBackendError, TassadarAlmCompiledBundle,
+    TassadarAlmWiringRow, compile_tassadar_alm_graph,
 };
 use crate::tassadar_alm_wasm_interpreter::{
-    tassadar_alm_wasm_collect, tassadar_alm_wasm_interpreter, TassadarAlmWasmInterpreterError,
+    TassadarAlmWasmInterpreterError, tassadar_alm_wasm_collect, tassadar_alm_wasm_interpreter,
 };
 
 /// Stable schema version for the numeric model artifact.
@@ -398,7 +398,9 @@ pub enum TassadarAlmNumericProgramCorpusError {
     #[error(transparent)]
     NumericExecution(#[from] TassadarAlmNumericExecutionError),
     /// The numeric executor output diverged from the CPU reference runner.
-    #[error("program {program_id} numeric outputs {numeric_outputs:?} diverged from reference outputs {reference_outputs:?}")]
+    #[error(
+        "program {program_id} numeric outputs {numeric_outputs:?} diverged from reference outputs {reference_outputs:?}"
+    )]
     ReferenceOutputMismatch {
         /// Program id that diverged.
         program_id: String,
@@ -433,8 +435,8 @@ impl TassadarAlmNumericProgramCorpusFixture {
 }
 
 /// Builds the first compiled-program corpus used by the OpenAgents run dispatcher.
-pub fn build_tassadar_alm_numeric_program_corpus_fixture_v1(
-) -> Result<TassadarAlmNumericProgramCorpusFixture, TassadarAlmNumericProgramCorpusError> {
+pub fn build_tassadar_alm_numeric_program_corpus_fixture_v1()
+-> Result<TassadarAlmNumericProgramCorpusFixture, TassadarAlmNumericProgramCorpusError> {
     let fixtures = tassadar_alm_numeric_program_corpus_specs_v1()
         .into_iter()
         .map(build_tassadar_alm_numeric_program_fixture)
@@ -448,6 +450,7 @@ pub fn tassadar_alm_numeric_program_corpus_specs_v1() -> Vec<TassadarAlmNumericP
     use TassadarInstruction as I;
     let article_profile = TassadarWasmProfile::article_i32_compute_v1();
     let core_profile = TassadarWasmProfile::core_i32_v2();
+    let w1_1_profile = TassadarWasmProfile::core_i32_w1_1_v1();
 
     let loop_sum = TassadarProgram::new(
         "tassadar_corpus.loop_sum_v1",
@@ -538,6 +541,35 @@ pub fn tassadar_alm_numeric_program_corpus_specs_v1() -> Vec<TassadarAlmNumericP
         ],
     );
 
+    let w1_1_window = TassadarProgram::new(
+        "tassadar_corpus.w1_1_window_v1",
+        &w1_1_profile,
+        1,
+        1,
+        vec![
+            I::Nop,
+            I::I32Const { value: 5 },
+            I::LocalTee { local: 0 },
+            I::Drop,
+            I::LocalGet { local: 0 },
+            I::I32Eqz,
+            I::I32Const { value: 0 },
+            I::I32Eq,
+            I::I32Const { value: 7 },
+            I::I32Const { value: 3 },
+            I::I32Gt,
+            I::I32Add,
+            I::I32Const { value: 2 },
+            I::I32Le,
+            I::I32Const { value: 1 },
+            I::I32Ge,
+            I::I32Const { value: 0 },
+            I::I32Ne,
+            I::Output,
+            I::Return,
+        ],
+    );
+
     vec![
         TassadarAlmNumericProgramSpec {
             fixture_id: String::from("tassadar_corpus.loop_sum_v1.numeric_fixture.v1"),
@@ -562,6 +594,12 @@ pub fn tassadar_alm_numeric_program_corpus_specs_v1() -> Vec<TassadarAlmNumericP
             workload_kind: String::from("state_machine.factorial_countdown"),
             program: factorial_loop,
             steps: vec![vec![0]; 96],
+        },
+        TassadarAlmNumericProgramSpec {
+            fixture_id: String::from("tassadar_corpus.w1_1_window_v1.numeric_fixture.v1"),
+            workload_kind: String::from("wasm_window.w1_1_stack_comparison_ladder"),
+            program: w1_1_window,
+            steps: vec![vec![0]; 32],
         },
     ]
 }
@@ -831,8 +869,8 @@ mod tests {
     #![allow(clippy::expect_used)]
 
     use psionic_ir::{
-        tassadar_alm_running_sum_workload, tassadar_alm_stack_micro_workload,
-        tassadar_alm_verb_parity_workload, TassadarAlmEvaluator,
+        TassadarAlmEvaluator, tassadar_alm_running_sum_workload, tassadar_alm_stack_micro_workload,
+        tassadar_alm_verb_parity_workload,
     };
     use psionic_runtime::{
         TassadarCpuReferenceRunner, TassadarInstruction, TassadarProgram, TassadarWasmProfile,
@@ -941,8 +979,8 @@ mod tests {
     #[test]
     fn values_outside_the_exactness_window_refuse() {
         use psionic_ir::{
-            TassadarAlmGate, TassadarAlmGraph, TassadarAlmValueId,
-            TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+            TASSADAR_ALM_GRAPH_SCHEMA_VERSION, TassadarAlmGate, TassadarAlmGraph,
+            TassadarAlmValueId,
         };
         let graph = TassadarAlmGraph {
             schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
@@ -982,7 +1020,7 @@ mod tests {
         assert_eq!(corpus, rebuilt);
         assert_eq!(corpus.schema_version, 1);
         assert_eq!(corpus.corpus_id, TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_ID);
-        assert_eq!(corpus.program_count, 4);
+        assert_eq!(corpus.program_count, 5);
         assert_eq!(corpus.fixtures.len(), corpus.program_count);
 
         let mut program_ids = std::collections::BTreeSet::new();
@@ -996,10 +1034,12 @@ mod tests {
             assert!(kinds.insert(fixture.workload_kind.clone()));
             assert_eq!(fixture.expected_model_digest, fixture.model.stable_digest());
             assert_eq!(fixture.compile_receipt_refs.len(), 5);
-            assert!(fixture
-                .compile_receipt_refs
-                .iter()
-                .all(|receipt| receipt.starts_with("receipt.psionic.tassadar_")));
+            assert!(
+                fixture
+                    .compile_receipt_refs
+                    .iter()
+                    .all(|receipt| receipt.starts_with("receipt.psionic.tassadar_"))
+            );
 
             let trace = tassadar_alm_numeric_execute(&fixture.model, &fixture.steps)
                 .expect("fixture executes");
@@ -1008,23 +1048,36 @@ mod tests {
             assert_eq!(trace.trace_digest, fixture.expected_trace_digest);
             assert_eq!(outputs, fixture.expected_outputs);
         }
-        assert_eq!(kinds.len(), 4);
-        assert!(corpus
-            .fixtures
-            .iter()
-            .any(|fixture| fixture.expected_outputs == vec![15]));
-        assert!(corpus
-            .fixtures
-            .iter()
-            .any(|fixture| fixture.expected_outputs == vec![47]));
-        assert!(corpus
-            .fixtures
-            .iter()
-            .any(|fixture| fixture.expected_outputs == vec![42]));
-        assert!(corpus
-            .fixtures
-            .iter()
-            .any(|fixture| fixture.expected_outputs == vec![24]));
+        assert_eq!(kinds.len(), 5);
+        assert!(
+            corpus
+                .fixtures
+                .iter()
+                .any(|fixture| fixture.expected_outputs == vec![15])
+        );
+        assert!(
+            corpus
+                .fixtures
+                .iter()
+                .any(|fixture| fixture.expected_outputs == vec![47])
+        );
+        assert!(
+            corpus
+                .fixtures
+                .iter()
+                .any(|fixture| fixture.expected_outputs == vec![42])
+        );
+        assert!(
+            corpus
+                .fixtures
+                .iter()
+                .any(|fixture| fixture.expected_outputs == vec![24])
+        );
+        assert!(corpus.fixtures.iter().any(|fixture| {
+            fixture.program_id == "tassadar_corpus.w1_1_window_v1"
+                && fixture.profile_id == "tassadar.wasm.core_i32_w1_1.v1"
+                && fixture.expected_outputs == vec![1]
+        }));
     }
 }
 

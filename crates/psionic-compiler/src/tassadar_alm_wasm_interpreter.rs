@@ -1,6 +1,7 @@
 use psionic_ir::{
-    TassadarAlmChannelDecl, TassadarAlmChannelId, TassadarAlmChannelKind, TassadarAlmGate,
-    TassadarAlmGraph, TassadarAlmSeedWrite, TassadarAlmValueId, TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+    TASSADAR_ALM_GRAPH_SCHEMA_VERSION, TassadarAlmChannelDecl, TassadarAlmChannelId,
+    TassadarAlmChannelKind, TassadarAlmGate, TassadarAlmGraph, TassadarAlmSeedWrite,
+    TassadarAlmValueId,
 };
 use psionic_runtime::{TassadarInstruction, TassadarProgram};
 use thiserror::Error;
@@ -9,8 +10,9 @@ use thiserror::Error;
 pub const TASSADAR_ALM_WASM_INTERPRETER_LANE_ID: &str = "tassadar.alm_wasm_interpreter.v1";
 /// Claim boundary for the branch-capable ALM window interpreter.
 pub const TASSADAR_ALM_WASM_INTERPRETER_CLAIM_BOUNDARY: &str = "the ALM window interpreter \
-     executes the bounded twelve-opcode Tassadar i32 window (const, local get/set, add, sub, \
-     mul, lt, load, store, br_if, output, return) under a fixed step budget with the program in \
+     executes the bounded W1.1 twenty-one-opcode Tassadar i32 window (const, local get/set/tee, \
+     drop, add, sub, mul, lt, eqz, eq, ne, gt, le, ge, load, store, br_if, output, return, nop) \
+     under a fixed step budget with the program in \
      a static specializable channel; parity is claimed only for programs the CPU reference \
      runner accepts, because the gate graph yields seeded zeros where the runner refuses \
      malformed stack discipline; integer-exact, no f32, no serving";
@@ -26,6 +28,7 @@ const STATE_KEY_PC: i64 = 0;
 const STATE_KEY_DEPTH: i64 = 1;
 const STATE_KEY_HALTED: i64 = 2;
 const SINK_BIAS: i64 = -1_000;
+const MAX_W1_1_OPCODE: usize = 20;
 
 /// Conversion failure for one Tassadar program.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -64,13 +67,22 @@ pub enum TassadarAlmWasmInterpreterError {
 
 fn encode(instruction: &TassadarInstruction) -> (i64, i64) {
     match instruction {
+        TassadarInstruction::Nop => (12, 0),
         TassadarInstruction::I32Const { value } => (0, i64::from(*value)),
         TassadarInstruction::LocalGet { local } => (1, i64::from(*local)),
         TassadarInstruction::LocalSet { local } => (2, i64::from(*local)),
+        TassadarInstruction::LocalTee { local } => (13, i64::from(*local)),
+        TassadarInstruction::Drop => (14, 0),
         TassadarInstruction::I32Add => (3, 0),
         TassadarInstruction::I32Sub => (4, 0),
         TassadarInstruction::I32Mul => (5, 0),
         TassadarInstruction::I32Lt => (6, 0),
+        TassadarInstruction::I32Eqz => (15, 0),
+        TassadarInstruction::I32Eq => (16, 0),
+        TassadarInstruction::I32Ne => (17, 0),
+        TassadarInstruction::I32Gt => (18, 0),
+        TassadarInstruction::I32Le => (19, 0),
+        TassadarInstruction::I32Ge => (20, 0),
         TassadarInstruction::I32Load { slot } => (7, i64::from(*slot)),
         TassadarInstruction::I32Store { slot } => (8, i64::from(*slot)),
         TassadarInstruction::BrIf { target_pc } => (9, i64::from(*target_pc)),
@@ -170,7 +182,9 @@ pub fn tassadar_alm_wasm_interpreter(
                     });
                 }
             }
-            TassadarInstruction::LocalGet { local } | TassadarInstruction::LocalSet { local } => {
+            TassadarInstruction::LocalGet { local }
+            | TassadarInstruction::LocalSet { local }
+            | TassadarInstruction::LocalTee { local } => {
                 if usize::from(*local) >= program.local_count {
                     return Err(TassadarAlmWasmInterpreterError::LocalOutOfRange {
                         index,
@@ -205,23 +219,23 @@ pub fn tassadar_alm_wasm_interpreter(
     let arg_key = b.linear(vec![(2, pc)], 1);
     let op = b.read(TASSADAR_ALM_WASM_PROGRAM_CHANNEL, op_key);
     let arg = b.read(TASSADAR_ALM_WASM_PROGRAM_CHANNEL, arg_key);
-    // Decode: ge thresholds 1..=11 then one-hot differences.
-    let ge: Vec<TassadarAlmValueId> = (1..=11).map(|k| b.ge(op, k)).collect();
+    // Decode: ge thresholds 1..=MAX_W1_1_OPCODE then one-hot differences.
+    let ge: Vec<TassadarAlmValueId> = (1..=MAX_W1_1_OPCODE).map(|k| b.ge(op, k as i64)).collect();
     let is_const = b.linear(vec![(-1, ge[0])], 1);
     let mut is: Vec<TassadarAlmValueId> = vec![is_const];
-    for k in 1..11 {
+    for k in 1..MAX_W1_1_OPCODE {
         is.push(b.linear(vec![(1, ge[k - 1]), (-1, ge[k])], 0));
     }
-    is.push(b.linear(vec![(1, ge[10])], 0));
+    is.push(b.linear(vec![(1, ge[MAX_W1_1_OPCODE - 1])], 0));
     // Stack reads from prior-step state.
     let top = b.read(STACK_CHANNEL, depth);
     let second_key = b.linear(vec![(1, depth)], -1);
     let second = b.read(STACK_CHANNEL, second_key);
     // Masked locals/memory reads (key 0 when inactive; key 0 is seeded).
-    let local_read_gate = b.linear(vec![(1, is[1]), (1, is[2])], 0);
+    let local_read_gate = b.linear(vec![(1, is[1])], 0);
     let local_key = b.reglu(arg, local_read_gate);
     let local_value = b.read(LOCALS_CHANNEL, local_key);
-    let memory_read_gate = b.linear(vec![(1, is[7]), (1, is[8])], 0);
+    let memory_read_gate = b.linear(vec![(1, is[7])], 0);
     let memory_key = b.reglu(arg, memory_read_gate);
     let memory_value = b.read(MEMORY_CHANNEL, memory_key);
     // Arithmetic over (second = left, top = right).
@@ -234,10 +248,20 @@ pub fn tassadar_alm_wasm_interpreter(
     // i32.lt: 1[left < right] = 1[top - second >= 1].
     let lt_input = b.linear(vec![(1, top), (-1, second)], 0);
     let lt_value = b.ge(lt_input, 1);
+    let neg_diff = b.linear(vec![(-1, diff)], 0);
+    let diff_nz_pos = b.ge(diff, 1);
+    let diff_nz_neg = b.ge(neg_diff, 1);
+    let diff_nonzero = b.linear(vec![(1, diff_nz_pos), (1, diff_nz_neg)], 0);
+    let eq_value = b.linear(vec![(-1, diff_nonzero)], 1);
+    let ne_value = diff_nonzero;
+    let gt_value = b.ge(diff, 1);
+    let le_value = b.linear(vec![(-1, gt_value)], 1);
+    let ge_value = b.ge(diff, 0);
     // Branch condition: top != 0.
     let nz_pos = b.ge(top, 1);
     let nz_neg = b.ge(neg_top, 1);
     let nonzero = b.linear(vec![(1, nz_pos), (1, nz_neg)], 0);
+    let eqz_value = b.linear(vec![(-1, nonzero)], 1);
     let taken = b.reglu(nonzero, is[9]);
     // Stack-depth bookkeeping.
     let delta_raw = b.linear(
@@ -249,10 +273,16 @@ pub fn tassadar_alm_wasm_interpreter(
             (-1, is[8]),
             (-1, is[9]),
             (-1, is[10]),
+            (-1, is[14]),
             (-1, is[3]),
             (-1, is[4]),
             (-1, is[5]),
             (-1, is[6]),
+            (-1, is[16]),
+            (-1, is[17]),
+            (-1, is[18]),
+            (-1, is[19]),
+            (-1, is[20]),
         ],
         0,
     );
@@ -277,6 +307,12 @@ pub fn tassadar_alm_wasm_interpreter(
             (1, is[4]),
             (1, is[5]),
             (1, is[6]),
+            (1, is[15]),
+            (1, is[16]),
+            (1, is[17]),
+            (1, is[18]),
+            (1, is[19]),
+            (1, is[20]),
         ],
         0,
     );
@@ -288,6 +324,12 @@ pub fn tassadar_alm_wasm_interpreter(
     let w_sub = b.reglu(diff, is[4]);
     let w_mul = b.reglu(prod, is[5]);
     let w_lt = b.reglu(lt_value, is[6]);
+    let w_eqz = b.reglu(eqz_value, is[15]);
+    let w_eq = b.reglu(eq_value, is[16]);
+    let w_ne = b.reglu(ne_value, is[17]);
+    let w_gt = b.reglu(gt_value, is[18]);
+    let w_le = b.reglu(le_value, is[19]);
+    let w_ge = b.reglu(ge_value, is[20]);
     let stack_value = b.linear(
         vec![
             (1, w_const),
@@ -297,13 +339,20 @@ pub fn tassadar_alm_wasm_interpreter(
             (1, w_sub),
             (1, w_mul),
             (1, w_lt),
+            (1, w_eqz),
+            (1, w_eq),
+            (1, w_ne),
+            (1, w_gt),
+            (1, w_le),
+            (1, w_ge),
         ],
         0,
     );
     let stack_key = b.masked_key(new_depth, stack_active);
     b.write(STACK_CHANNEL, stack_key, stack_value);
     // Locals write (local.set pops top into the local).
-    let set_active = b.reglu(is[2], not_halted);
+    let set_active_raw = b.linear(vec![(1, is[2]), (1, is[13])], 0);
+    let set_active = b.reglu(set_active_raw, not_halted);
     let set_key_raw = b.reglu(arg, set_active);
     let set_key = b.masked_key(set_key_raw, set_active);
     let set_value = b.reglu(top, set_active);
@@ -450,7 +499,7 @@ mod tests {
     use psionic_runtime::{TassadarCpuReferenceRunner, TassadarWasmProfile};
 
     use super::*;
-    use crate::tassadar_alm_backend::{compile_tassadar_alm_graph, TassadarAlmCompiledExecutor};
+    use crate::tassadar_alm_backend::{TassadarAlmCompiledExecutor, compile_tassadar_alm_graph};
     use crate::tassadar_alm_specializer::specialize_tassadar_alm_graph;
 
     fn run_interpreter(graph: &TassadarAlmGraph, budget: usize) -> (Vec<i64>, bool) {
@@ -514,6 +563,38 @@ mod tests {
         )
     }
 
+    fn w1_1_window_program() -> TassadarProgram {
+        use TassadarInstruction as I;
+        TassadarProgram::new(
+            "alm_wasm.w1_1_window",
+            &TassadarWasmProfile::core_i32_w1_1_v1(),
+            1,
+            1,
+            vec![
+                I::Nop,
+                I::I32Const { value: 5 },
+                I::LocalTee { local: 0 },
+                I::Drop,
+                I::LocalGet { local: 0 },
+                I::I32Eqz,
+                I::I32Const { value: 0 },
+                I::I32Eq,
+                I::I32Const { value: 7 },
+                I::I32Const { value: 3 },
+                I::I32Gt,
+                I::I32Add,
+                I::I32Const { value: 2 },
+                I::I32Le,
+                I::I32Const { value: 1 },
+                I::I32Ge,
+                I::I32Const { value: 0 },
+                I::I32Ne,
+                I::Output,
+                I::Return,
+            ],
+        )
+    }
+
     #[test]
     fn straight_line_matches_the_cpu_reference_runner() {
         let program = straight_line_program();
@@ -532,6 +613,22 @@ mod tests {
         assert!(halted);
         assert_eq!(outputs, vec![15]);
         assert_eq!(outputs, reference_outputs(&program));
+    }
+
+    #[test]
+    fn w1_1_opcode_window_matches_the_cpu_reference_runner() {
+        let program = w1_1_window_program();
+        let graph = tassadar_alm_wasm_interpreter(&program).expect("builds");
+        let (outputs, halted) = run_interpreter(&graph, 32);
+        assert!(halted);
+        assert_eq!(outputs, vec![1]);
+        assert_eq!(outputs, reference_outputs(&program));
+        assert_eq!(
+            TassadarWasmProfile::core_i32_w1_1_v1()
+                .allowed_opcodes
+                .len(),
+            21
+        );
     }
 
     #[test]
@@ -619,6 +716,32 @@ mod tests {
         assert!(compiled_halted);
         assert_eq!(compiled_outputs, expected);
         // Program channel baked into gate structure, then compiled again.
+        let (specialized, report) =
+            specialize_tassadar_alm_graph(&graph, TASSADAR_ALM_WASM_PROGRAM_CHANNEL)
+                .expect("specializes");
+        assert_eq!(report.rewritten_reads, 2);
+        let specialized_bundle = compile_tassadar_alm_graph(&specialized).expect("compiles");
+        let specialized_run =
+            TassadarAlmCompiledExecutor::execute(&specialized_bundle, &inputs).expect("executes");
+        let (specialized_outputs, specialized_halted) =
+            tassadar_alm_wasm_collect(&specialized_run.step_outputs);
+        assert!(specialized_halted);
+        assert_eq!(specialized_outputs, expected);
+    }
+
+    #[test]
+    fn compiled_and_specialized_legs_match_the_runner_on_w1_1_window() {
+        let program = w1_1_window_program();
+        let graph = tassadar_alm_wasm_interpreter(&program).expect("builds");
+        let expected = reference_outputs(&program);
+        let budget = 32;
+        let inputs = vec![vec![0_i64]; budget];
+        let bundle = compile_tassadar_alm_graph(&graph).expect("compiles");
+        let compiled = TassadarAlmCompiledExecutor::execute(&bundle, &inputs).expect("executes");
+        let (compiled_outputs, compiled_halted) = tassadar_alm_wasm_collect(&compiled.step_outputs);
+        assert!(compiled_halted);
+        assert_eq!(compiled_outputs, expected);
+
         let (specialized, report) =
             specialize_tassadar_alm_graph(&graph, TASSADAR_ALM_WASM_PROGRAM_CHANNEL)
                 .expect("specializes");

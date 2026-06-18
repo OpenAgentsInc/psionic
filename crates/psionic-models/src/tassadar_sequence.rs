@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use psionic_runtime::{
     TassadarArithmeticOp, TassadarExecution, TassadarHaltReason, TassadarInstruction,
-    TassadarProgram, TassadarTraceEvent, TassadarTraceStep,
+    TassadarProgram, TassadarTraceEvent, TassadarTraceStep, TassadarUnaryOp,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -47,6 +47,15 @@ const OP_I32_STORE: &str = "<op_i32_store>";
 const OP_BR_IF: &str = "<op_br_if>";
 const OP_OUTPUT: &str = "<op_output>";
 const OP_RETURN: &str = "<op_return>";
+const OP_NOP: &str = "<op_nop>";
+const OP_LOCAL_TEE: &str = "<op_local_tee>";
+const OP_DROP: &str = "<op_drop>";
+const OP_I32_EQZ: &str = "<op_i32_eqz>";
+const OP_I32_EQ: &str = "<op_i32_eq>";
+const OP_I32_NE: &str = "<op_i32_ne>";
+const OP_I32_GT: &str = "<op_i32_gt>";
+const OP_I32_LE: &str = "<op_i32_le>";
+const OP_I32_GE: &str = "<op_i32_ge>";
 
 const EVENT_CONST_PUSH: &str = "<event_const_push>";
 const EVENT_LOCAL_GET: &str = "<event_local_get>";
@@ -60,6 +69,15 @@ const EVENT_STORE: &str = "<event_store>";
 const EVENT_BRANCH: &str = "<event_branch>";
 const EVENT_OUTPUT: &str = "<event_output>";
 const EVENT_RETURN: &str = "<event_return>";
+const EVENT_NOP: &str = "<event_nop>";
+const EVENT_LOCAL_TEE: &str = "<event_local_tee>";
+const EVENT_DROP: &str = "<event_drop>";
+const EVENT_UNARY_EQZ: &str = "<event_unary_eqz>";
+const EVENT_BINARY_EQ: &str = "<event_binary_eq>";
+const EVENT_BINARY_NE: &str = "<event_binary_ne>";
+const EVENT_BINARY_GT: &str = "<event_binary_gt>";
+const EVENT_BINARY_LE: &str = "<event_binary_le>";
+const EVENT_BINARY_GE: &str = "<event_binary_ge>";
 
 const HALT_RETURNED: &str = "<halt_returned>";
 const HALT_FELL_OFF_END: &str = "<halt_fell_off_end>";
@@ -483,6 +501,26 @@ impl TassadarTraceTokenizer {
         for value in 0_u16..=255 {
             tokens.push(format!("<byte_{value:02x}>"));
         }
+        tokens.extend([
+            String::from(OP_NOP),
+            String::from(OP_LOCAL_TEE),
+            String::from(OP_DROP),
+            String::from(OP_I32_EQZ),
+            String::from(OP_I32_EQ),
+            String::from(OP_I32_NE),
+            String::from(OP_I32_GT),
+            String::from(OP_I32_LE),
+            String::from(OP_I32_GE),
+            String::from(EVENT_NOP),
+            String::from(EVENT_LOCAL_TEE),
+            String::from(EVENT_DROP),
+            String::from(EVENT_UNARY_EQZ),
+            String::from(EVENT_BINARY_EQ),
+            String::from(EVENT_BINARY_NE),
+            String::from(EVENT_BINARY_GT),
+            String::from(EVENT_BINARY_LE),
+            String::from(EVENT_BINARY_GE),
+        ]);
 
         let vocabulary = TokenVocabulary::new(
             tokens.clone(),
@@ -966,6 +1004,7 @@ impl TassadarTraceTokenizer {
 
     fn push_instruction(&self, tokens: &mut Vec<TokenId>, instruction: &TassadarInstruction) {
         match instruction {
+            TassadarInstruction::Nop => tokens.push(self.token_id(OP_NOP)),
             TassadarInstruction::I32Const { value } => {
                 tokens.push(self.token_id(OP_I32_CONST));
                 self.push_i32(tokens, *value);
@@ -978,10 +1017,21 @@ impl TassadarTraceTokenizer {
                 tokens.push(self.token_id(OP_LOCAL_SET));
                 self.push_u32(tokens, u32::from(*local));
             }
+            TassadarInstruction::LocalTee { local } => {
+                tokens.push(self.token_id(OP_LOCAL_TEE));
+                self.push_u32(tokens, u32::from(*local));
+            }
+            TassadarInstruction::Drop => tokens.push(self.token_id(OP_DROP)),
             TassadarInstruction::I32Add => tokens.push(self.token_id(OP_I32_ADD)),
             TassadarInstruction::I32Sub => tokens.push(self.token_id(OP_I32_SUB)),
             TassadarInstruction::I32Mul => tokens.push(self.token_id(OP_I32_MUL)),
             TassadarInstruction::I32Lt => tokens.push(self.token_id(OP_I32_LT)),
+            TassadarInstruction::I32Eqz => tokens.push(self.token_id(OP_I32_EQZ)),
+            TassadarInstruction::I32Eq => tokens.push(self.token_id(OP_I32_EQ)),
+            TassadarInstruction::I32Ne => tokens.push(self.token_id(OP_I32_NE)),
+            TassadarInstruction::I32Gt => tokens.push(self.token_id(OP_I32_GT)),
+            TassadarInstruction::I32Le => tokens.push(self.token_id(OP_I32_LE)),
+            TassadarInstruction::I32Ge => tokens.push(self.token_id(OP_I32_GE)),
             TassadarInstruction::I32Load { slot } => {
                 tokens.push(self.token_id(OP_I32_LOAD));
                 self.push_u32(tokens, u32::from(*slot));
@@ -1001,6 +1051,7 @@ impl TassadarTraceTokenizer {
 
     fn push_event(&self, tokens: &mut Vec<TokenId>, event: &TassadarTraceEvent) {
         match event {
+            TassadarTraceEvent::Nop => tokens.push(self.token_id(EVENT_NOP)),
             TassadarTraceEvent::ConstPush { value } => {
                 tokens.push(self.token_id(EVENT_CONST_PUSH));
                 self.push_i32(tokens, *value);
@@ -1014,6 +1065,26 @@ impl TassadarTraceTokenizer {
                 tokens.push(self.token_id(EVENT_LOCAL_SET));
                 self.push_u32(tokens, u32::from(*local));
                 self.push_i32(tokens, *value);
+            }
+            TassadarTraceEvent::LocalTee { local, value } => {
+                tokens.push(self.token_id(EVENT_LOCAL_TEE));
+                self.push_u32(tokens, u32::from(*local));
+                self.push_i32(tokens, *value);
+            }
+            TassadarTraceEvent::Drop { value } => {
+                tokens.push(self.token_id(EVENT_DROP));
+                self.push_i32(tokens, *value);
+            }
+            TassadarTraceEvent::UnaryOp {
+                op,
+                operand,
+                result,
+            } => {
+                tokens.push(match op {
+                    TassadarUnaryOp::Eqz => self.token_id(EVENT_UNARY_EQZ),
+                });
+                self.push_i32(tokens, *operand);
+                self.push_i32(tokens, *result);
             }
             TassadarTraceEvent::BinaryOp {
                 op,
@@ -1103,6 +1174,11 @@ impl TassadarTraceTokenizer {
             TassadarArithmeticOp::Sub => self.token_id(EVENT_BINARY_SUB),
             TassadarArithmeticOp::Mul => self.token_id(EVENT_BINARY_MUL),
             TassadarArithmeticOp::Lt => self.token_id(EVENT_BINARY_LT),
+            TassadarArithmeticOp::Eq => self.token_id(EVENT_BINARY_EQ),
+            TassadarArithmeticOp::Ne => self.token_id(EVENT_BINARY_NE),
+            TassadarArithmeticOp::Gt => self.token_id(EVENT_BINARY_GT),
+            TassadarArithmeticOp::Le => self.token_id(EVENT_BINARY_LE),
+            TassadarArithmeticOp::Ge => self.token_id(EVENT_BINARY_GE),
         }
     }
 
@@ -1259,6 +1335,9 @@ impl TassadarTraceTokenizer {
                 context: String::from("instruction"),
             }
         })?;
+        if token == self.token_id(OP_NOP) {
+            return Ok((TassadarInstruction::Nop, index.saturating_add(1)));
+        }
         if token == self.token_id(OP_I32_CONST) {
             return Ok((
                 TassadarInstruction::I32Const {
@@ -1283,6 +1362,17 @@ impl TassadarTraceTokenizer {
                 index.saturating_add(5),
             ));
         }
+        if token == self.token_id(OP_LOCAL_TEE) {
+            return Ok((
+                TassadarInstruction::LocalTee {
+                    local: self.parse_u8_required(tokens, index + 1, "instruction.local_tee")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_DROP) {
+            return Ok((TassadarInstruction::Drop, index.saturating_add(1)));
+        }
         if token == self.token_id(OP_I32_ADD) {
             return Ok((TassadarInstruction::I32Add, index.saturating_add(1)));
         }
@@ -1294,6 +1384,24 @@ impl TassadarTraceTokenizer {
         }
         if token == self.token_id(OP_I32_LT) {
             return Ok((TassadarInstruction::I32Lt, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_EQZ) {
+            return Ok((TassadarInstruction::I32Eqz, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_EQ) {
+            return Ok((TassadarInstruction::I32Eq, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_NE) {
+            return Ok((TassadarInstruction::I32Ne, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_GT) {
+            return Ok((TassadarInstruction::I32Gt, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_LE) {
+            return Ok((TassadarInstruction::I32Le, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_GE) {
+            return Ok((TassadarInstruction::I32Ge, index.saturating_add(1)));
         }
         if token == self.token_id(OP_I32_LOAD) {
             return Ok((
@@ -1339,6 +1447,9 @@ impl TassadarTraceTokenizer {
                 context: String::from("event"),
             }
         })?;
+        if token == self.token_id(EVENT_NOP) {
+            return Ok((TassadarTraceEvent::Nop, index.saturating_add(1)));
+        }
         if token == self.token_id(EVENT_CONST_PUSH) {
             return Ok((
                 TassadarTraceEvent::ConstPush {
@@ -1361,6 +1472,33 @@ impl TassadarTraceTokenizer {
                 TassadarTraceEvent::LocalSet {
                     local: self.parse_u8_required(tokens, index + 1, "event.local_set.local")?,
                     value: self.parse_i32_required(tokens, index + 5, "event.local_set.value")?,
+                },
+                index.saturating_add(9),
+            ));
+        }
+        if token == self.token_id(EVENT_LOCAL_TEE) {
+            return Ok((
+                TassadarTraceEvent::LocalTee {
+                    local: self.parse_u8_required(tokens, index + 1, "event.local_tee.local")?,
+                    value: self.parse_i32_required(tokens, index + 5, "event.local_tee.value")?,
+                },
+                index.saturating_add(9),
+            ));
+        }
+        if token == self.token_id(EVENT_DROP) {
+            return Ok((
+                TassadarTraceEvent::Drop {
+                    value: self.parse_i32_required(tokens, index + 1, "event.drop.value")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(EVENT_UNARY_EQZ) {
+            return Ok((
+                TassadarTraceEvent::UnaryOp {
+                    op: TassadarUnaryOp::Eqz,
+                    operand: self.parse_i32_required(tokens, index + 1, "event.eqz.operand")?,
+                    result: self.parse_i32_required(tokens, index + 5, "event.eqz.result")?,
                 },
                 index.saturating_add(9),
             ));
@@ -1417,6 +1555,61 @@ impl TassadarTraceTokenizer {
                     left: self.parse_i32_required(tokens, index + 1, "event.binary_lt.left")?,
                     right: self.parse_i32_required(tokens, index + 5, "event.binary_lt.right")?,
                     result: self.parse_i32_required(tokens, index + 9, "event.binary_lt.result")?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_EQ) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Eq,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_eq.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_eq.right")?,
+                    result: self.parse_i32_required(tokens, index + 9, "event.binary_eq.result")?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_NE) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Ne,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_ne.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_ne.right")?,
+                    result: self.parse_i32_required(tokens, index + 9, "event.binary_ne.result")?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_GT) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Gt,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_gt.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_gt.right")?,
+                    result: self.parse_i32_required(tokens, index + 9, "event.binary_gt.result")?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_LE) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Le,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_le.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_le.right")?,
+                    result: self.parse_i32_required(tokens, index + 9, "event.binary_le.result")?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_GE) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Ge,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_ge.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_ge.right")?,
+                    result: self.parse_i32_required(tokens, index + 9, "event.binary_ge.result")?,
                 },
                 index.saturating_add(13),
             ));
@@ -1633,6 +1826,7 @@ impl TassadarTraceTokenizer {
             self.token_id(OP_I32_CONST),
             self.token_id(OP_LOCAL_GET),
             self.token_id(OP_LOCAL_SET),
+            self.token_id(OP_LOCAL_TEE),
             self.token_id(OP_I32_LOAD),
             self.token_id(OP_I32_STORE),
             self.token_id(OP_BR_IF),
@@ -1655,10 +1849,22 @@ impl TassadarTraceTokenizer {
             return (index, None);
         }
         let token = tokens[index];
+        if token == self.token_id(EVENT_NOP) {
+            return (index.saturating_add(1).min(tokens.len()), None);
+        }
         if token == self.token_id(EVENT_CONST_PUSH) {
             return (index.saturating_add(5).min(tokens.len()), None);
         }
-        if token == self.token_id(EVENT_LOCAL_GET) || token == self.token_id(EVENT_LOCAL_SET) {
+        if token == self.token_id(EVENT_LOCAL_GET)
+            || token == self.token_id(EVENT_LOCAL_SET)
+            || token == self.token_id(EVENT_LOCAL_TEE)
+        {
+            return (index.saturating_add(9).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_DROP) {
+            return (index.saturating_add(5).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_UNARY_EQZ) {
             return (index.saturating_add(9).min(tokens.len()), None);
         }
         if [
@@ -1666,6 +1872,11 @@ impl TassadarTraceTokenizer {
             self.token_id(EVENT_BINARY_SUB),
             self.token_id(EVENT_BINARY_MUL),
             self.token_id(EVENT_BINARY_LT),
+            self.token_id(EVENT_BINARY_EQ),
+            self.token_id(EVENT_BINARY_NE),
+            self.token_id(EVENT_BINARY_GT),
+            self.token_id(EVENT_BINARY_LE),
+            self.token_id(EVENT_BINARY_GE),
         ]
         .contains(&token)
         {

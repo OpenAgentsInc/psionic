@@ -58,13 +58,14 @@ failures.
 ## Run-Facing Program Corpus
 
 `build_tassadar_alm_numeric_program_corpus_fixture_v1` emits the first
-run-facing compiled-program corpus for OpenAgents C1. It compiles four
+run-facing compiled-program corpus for OpenAgents C1. It compiles five
 distinct `TassadarProgram`s through the same owned path:
 
 - backward-branch loop sum,
 - straight-line arithmetic,
 - memory load/store roundtrip,
-- factorial countdown state machine.
+- factorial countdown state machine,
+- W1.1 stack/comparison opcode-window ladder.
 
 For each program, the builder validates CPU-reference outputs, lowers
 through the ALM Wasm interpreter, schedules the graph, materializes the
@@ -76,9 +77,11 @@ The committed fixture can be regenerated with the ignored
 
 ## What This Phase Does Not Do
 
-Hard-max attention only — no softmax, no temperature, no approximation
-error analysis (that is the post's carry-over-bounds territory and a
-later phase). No trained weights, no learning, no d_model packing of
+Hard-max attention only — no softmax execution and no temperature inside
+the replay executor. W1.4 softmax approximation bounds are documented
+separately in `docs/TASSADAR_ALM_SOFTMAX_BOUNDS.md`; they are analytic
+certificates for comparing hard-max to a hypothetical softmax, not a
+runtime semantic change. No trained weights, no learning, no d_model packing of
 slots into dense matrices (slots remain scalar lanes), no serving.
 
 Dense W1.2 materialization is layered on top of this numeric contract in

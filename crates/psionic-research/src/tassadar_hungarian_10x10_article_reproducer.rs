@@ -4,15 +4,13 @@ use std::{
 };
 
 use psionic_eval::{
-    TassadarHungarian10x10CompiledExecutorExactnessReport,
-    TassadarRustSourceCanonCaseStatus,
-    TassadarRustSourceCanonReport,
-    build_tassadar_hungarian_10x10_compiled_executor_corpus,
+    TassadarHungarian10x10CompiledExecutorExactnessReport, TassadarRustSourceCanonCaseStatus,
+    TassadarRustSourceCanonReport, build_tassadar_hungarian_10x10_compiled_executor_corpus,
 };
 use psionic_models::{TassadarTraceTokenizer, TokenizerBoundary};
 use psionic_runtime::{
-    TassadarExecution, TassadarExecutorDecodeMode, TassadarInstruction, TassadarSudokuV0CorpusSplit,
-    TassadarTraceEvent,
+    TassadarExecution, TassadarExecutorDecodeMode, TassadarInstruction,
+    TassadarSudokuV0CorpusSplit, TassadarTraceEvent,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -25,8 +23,7 @@ const SOURCE_CANON_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_rust_source_canon_report.json";
 const EXISTING_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json";
-const EXACTNESS_REPORT_REF: &str =
-    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
+const EXACTNESS_REPORT_REF: &str = "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
 const CANONICAL_CASE_ID: &str = "hungarian_10x10_test_a";
 const ROOT_BUNDLE_FILE: &str = "reproducer_bundle.json";
 const COMPILE_EVIDENCE_BUNDLE_FILE: &str = "compile_evidence_bundle.json";
@@ -236,8 +233,10 @@ impl TassadarHungarian10x10ArticleReproducerReport {
             ),
             report_digest: String::new(),
         };
-        report.report_digest =
-            stable_digest(b"psionic_tassadar_hungarian_10x10_article_reproducer_report|", &report);
+        report.report_digest = stable_digest(
+            b"psionic_tassadar_hungarian_10x10_article_reproducer_report|",
+            &report,
+        );
         report
     }
 }
@@ -276,9 +275,10 @@ pub fn tassadar_hungarian_10x10_article_reproducer_root_path() -> PathBuf {
     repo_root().join(TASSADAR_HUNGARIAN_10X10_ARTICLE_REPRODUCER_ROOT_REF)
 }
 
-pub fn build_tassadar_hungarian_10x10_article_reproducer_report(
-) -> Result<TassadarHungarian10x10ArticleReproducerReport, TassadarHungarian10x10ArticleReproducerError>
-{
+pub fn build_tassadar_hungarian_10x10_article_reproducer_report() -> Result<
+    TassadarHungarian10x10ArticleReproducerReport,
+    TassadarHungarian10x10ArticleReproducerError,
+> {
     let source_report: TassadarRustSourceCanonReport =
         read_repo_json(SOURCE_CANON_REPORT_REF, "tassadar_rust_source_canon_report")?;
     let source_case = source_report
@@ -290,25 +290,30 @@ pub fn build_tassadar_hungarian_10x10_article_reproducer_report(
         return Err(TassadarHungarian10x10ArticleReproducerError::SourceCanonNotCompiled);
     }
 
-    let exactness_report: TassadarHungarian10x10CompiledExecutorExactnessReport =
-        read_repo_json(
-            EXACTNESS_REPORT_REF,
-            "tassadar_hungarian_10x10_compiled_executor_exactness_report",
-        )?;
+    let exactness_report: TassadarHungarian10x10CompiledExecutorExactnessReport = read_repo_json(
+        EXACTNESS_REPORT_REF,
+        "tassadar_hungarian_10x10_compiled_executor_exactness_report",
+    )?;
     let exactness_case = exactness_report
         .case_reports
         .iter()
         .find(|case| case.case_id == CANONICAL_CASE_ID)
-        .ok_or_else(|| TassadarHungarian10x10ArticleReproducerError::MissingExactnessCase {
-            case_id: String::from(CANONICAL_CASE_ID),
-        })?;
+        .ok_or_else(
+            || TassadarHungarian10x10ArticleReproducerError::MissingExactnessCase {
+                case_id: String::from(CANONICAL_CASE_ID),
+            },
+        )?;
 
     let reproducer_bundle: TassadarHungarian10x10ArticleReproducerBundle = read_json(
         tassadar_hungarian_10x10_article_reproducer_root_path().join(ROOT_BUNDLE_FILE),
         "tassadar_hungarian_10x10_article_reproducer_bundle",
     )?;
     let runtime_execution_proof_bundle: serde_json::Value = read_json(
-        repo_root().join(&reproducer_bundle.runtime_execution_proof_bundle.artifact_ref),
+        repo_root().join(
+            &reproducer_bundle
+                .runtime_execution_proof_bundle
+                .artifact_ref,
+        ),
         "execution_proof_bundle",
     )?;
     let runtime_backend = runtime_execution_proof_bundle["runtime_identity"]["runtime_backend"]
@@ -322,9 +327,9 @@ pub fn build_tassadar_hungarian_10x10_article_reproducer_report(
         .flatten()
         .filter_map(|value| value.as_str().map(String::from))
         .collect::<Vec<_>>();
-    let external_tool_surface_observed = compiled_backend_features.iter().any(|feature| {
-        feature.contains("external_tool") || feature.contains("tool_call")
-    });
+    let external_tool_surface_observed = compiled_backend_features
+        .iter()
+        .any(|feature| feature.contains("external_tool") || feature.contains("tool_call"));
 
     Ok(TassadarHungarian10x10ArticleReproducerReport::new(
         source_case,
@@ -348,8 +353,10 @@ pub fn build_tassadar_hungarian_10x10_article_reproducer_report(
 
 pub fn write_tassadar_hungarian_10x10_article_reproducer_report(
     output_path: impl AsRef<Path>,
-) -> Result<TassadarHungarian10x10ArticleReproducerReport, TassadarHungarian10x10ArticleReproducerError>
-{
+) -> Result<
+    TassadarHungarian10x10ArticleReproducerReport,
+    TassadarHungarian10x10ArticleReproducerError,
+> {
     let root_bundle = write_tassadar_hungarian_10x10_article_reproducer_root(
         tassadar_hungarian_10x10_article_reproducer_root_path(),
     )?;
@@ -377,8 +384,10 @@ pub fn write_tassadar_hungarian_10x10_article_reproducer_report(
 
 pub fn write_tassadar_hungarian_10x10_article_reproducer_root(
     output_root: impl AsRef<Path>,
-) -> Result<TassadarHungarian10x10ArticleReproducerBundle, TassadarHungarian10x10ArticleReproducerError>
-{
+) -> Result<
+    TassadarHungarian10x10ArticleReproducerBundle,
+    TassadarHungarian10x10ArticleReproducerError,
+> {
     let output_root = output_root.as_ref();
     fs::create_dir_all(output_root).map_err(|error| {
         TassadarHungarian10x10ArticleReproducerError::CreateDir {
@@ -390,26 +399,35 @@ pub fn write_tassadar_hungarian_10x10_article_reproducer_root(
     let corpus = build_tassadar_hungarian_10x10_compiled_executor_corpus(Some(
         TassadarSudokuV0CorpusSplit::Test,
     ))
-    .map_err(|error| TassadarHungarian10x10ArticleReproducerError::Decode {
-        path: String::from("in_memory"),
-        artifact_kind: String::from("tassadar_hungarian_10x10_compiled_executor_corpus"),
-        error: serde_json::Error::io(std::io::Error::other(error.to_string())),
-    })?;
+    .map_err(
+        |error| TassadarHungarian10x10ArticleReproducerError::Decode {
+            path: String::from("in_memory"),
+            artifact_kind: String::from("tassadar_hungarian_10x10_compiled_executor_corpus"),
+            error: serde_json::Error::io(std::io::Error::other(error.to_string())),
+        },
+    )?;
     let case = corpus
         .cases
         .iter()
         .find(|case| case.case_id == CANONICAL_CASE_ID)
-        .ok_or_else(|| TassadarHungarian10x10ArticleReproducerError::MissingCompiledCorpusCase {
-            case_id: String::from(CANONICAL_CASE_ID),
-        })?;
+        .ok_or_else(
+            || TassadarHungarian10x10ArticleReproducerError::MissingCompiledCorpusCase {
+                case_id: String::from(CANONICAL_CASE_ID),
+            },
+        )?;
     let compiled_execution = case
         .compiled_executor
-        .execute(&case.program_artifact, TassadarExecutorDecodeMode::ReferenceLinear)
-        .map_err(|error| TassadarHungarian10x10ArticleReproducerError::Decode {
-            path: String::from("in_memory"),
-            artifact_kind: String::from("tassadar_hungarian_10x10_compiled_execution"),
-            error: serde_json::Error::io(std::io::Error::other(error.to_string())),
-        })?;
+        .execute(
+            &case.program_artifact,
+            TassadarExecutorDecodeMode::ReferenceLinear,
+        )
+        .map_err(
+            |error| TassadarHungarian10x10ArticleReproducerError::Decode {
+                path: String::from("in_memory"),
+                artifact_kind: String::from("tassadar_hungarian_10x10_compiled_execution"),
+                error: serde_json::Error::io(std::io::Error::other(error.to_string())),
+            },
+        )?;
     let tokenizer = TassadarTraceTokenizer::new();
     let token_trace_summary = TassadarHungarian10x10ArticleTokenTraceSummary::new(
         CANONICAL_CASE_ID,
@@ -417,11 +435,19 @@ pub fn write_tassadar_hungarian_10x10_article_reproducer_root(
         &case.program_artifact.validated_program,
         &compiled_execution.execution_report.execution,
     );
-    let readable_log =
-        render_readable_log(CANONICAL_CASE_ID, &compiled_execution.execution_report.execution);
+    let readable_log = render_readable_log(
+        CANONICAL_CASE_ID,
+        &compiled_execution.execution_report.execution,
+    );
 
-    write_json(output_root.join(COMPILE_EVIDENCE_BUNDLE_FILE), case.compiled_executor.compile_evidence_bundle())?;
-    write_json(output_root.join(PROGRAM_ARTIFACT_FILE), &case.program_artifact)?;
+    write_json(
+        output_root.join(COMPILE_EVIDENCE_BUNDLE_FILE),
+        case.compiled_executor.compile_evidence_bundle(),
+    )?;
+    write_json(
+        output_root.join(PROGRAM_ARTIFACT_FILE),
+        &case.program_artifact,
+    )?;
     write_json(
         output_root.join(COMPILED_WEIGHT_ARTIFACT_FILE),
         case.compiled_executor.compiled_weight_artifact(),
@@ -464,7 +490,10 @@ pub fn write_tassadar_hungarian_10x10_article_reproducer_root(
 fn artifact_ref(
     output_root: &Path,
     file_name: &str,
-) -> Result<TassadarHungarian10x10ArticleDeploymentArtifactRef, TassadarHungarian10x10ArticleReproducerError> {
+) -> Result<
+    TassadarHungarian10x10ArticleDeploymentArtifactRef,
+    TassadarHungarian10x10ArticleReproducerError,
+> {
     let path = output_root.join(file_name);
     Ok(TassadarHungarian10x10ArticleDeploymentArtifactRef {
         artifact_ref: canonical_repo_relative_path(&path),
@@ -494,13 +523,22 @@ fn render_readable_log(case_id: &str, execution: &TassadarExecution) -> String {
 
 fn format_instruction(instruction: &TassadarInstruction) -> String {
     match instruction {
+        TassadarInstruction::Nop => String::from("nop"),
         TassadarInstruction::I32Const { value } => format!("i32.const {value}"),
         TassadarInstruction::LocalGet { local } => format!("local.get {local}"),
         TassadarInstruction::LocalSet { local } => format!("local.set {local}"),
+        TassadarInstruction::LocalTee { local } => format!("local.tee {local}"),
+        TassadarInstruction::Drop => String::from("drop"),
         TassadarInstruction::I32Add => String::from("i32.add"),
         TassadarInstruction::I32Sub => String::from("i32.sub"),
         TassadarInstruction::I32Mul => String::from("i32.mul"),
         TassadarInstruction::I32Lt => String::from("i32.lt"),
+        TassadarInstruction::I32Eqz => String::from("i32.eqz"),
+        TassadarInstruction::I32Eq => String::from("i32.eq"),
+        TassadarInstruction::I32Ne => String::from("i32.ne"),
+        TassadarInstruction::I32Gt => String::from("i32.gt"),
+        TassadarInstruction::I32Le => String::from("i32.le"),
+        TassadarInstruction::I32Ge => String::from("i32.ge"),
         TassadarInstruction::I32Load { slot } => format!("i32.load {slot}"),
         TassadarInstruction::I32Store { slot } => format!("i32.store {slot}"),
         TassadarInstruction::BrIf { target_pc } => format!("br_if {target_pc}"),
@@ -511,6 +549,7 @@ fn format_instruction(instruction: &TassadarInstruction) -> String {
 
 fn format_event(event: &TassadarTraceEvent) -> String {
     match event {
+        TassadarTraceEvent::Nop => String::from("nop"),
         TassadarTraceEvent::ConstPush { value } => format!("const_push value={value}"),
         TassadarTraceEvent::LocalGet { local, value } => {
             format!("local_get local={local} value={value}")
@@ -518,6 +557,15 @@ fn format_event(event: &TassadarTraceEvent) -> String {
         TassadarTraceEvent::LocalSet { local, value } => {
             format!("local_set local={local} value={value}")
         }
+        TassadarTraceEvent::LocalTee { local, value } => {
+            format!("local_tee local={local} value={value}")
+        }
+        TassadarTraceEvent::Drop { value } => format!("drop value={value}"),
+        TassadarTraceEvent::UnaryOp {
+            op,
+            operand,
+            result,
+        } => format!("unary_{op:?} operand={operand} result={result}"),
         TassadarTraceEvent::BinaryOp {
             op,
             left,
@@ -530,9 +578,7 @@ fn format_event(event: &TassadarTraceEvent) -> String {
             condition,
             taken,
             target_pc,
-        } => format!(
-            "branch condition={condition} taken={taken} target_pc={target_pc}"
-        ),
+        } => format!("branch condition={condition} taken={taken} target_pc={target_pc}"),
         TassadarTraceEvent::Output { value } => format!("output value={value}"),
         TassadarTraceEvent::Return => String::from("return"),
     }
@@ -548,10 +594,12 @@ where
     let path = path.as_ref();
     let bytes = serde_json::to_vec_pretty(value)
         .expect("Hungarian article reproducer artifact should serialize");
-    fs::write(path, &bytes).map_err(|error| TassadarHungarian10x10ArticleReproducerError::Write {
-        path: path.display().to_string(),
-        error,
-    })
+    fs::write(path, &bytes).map_err(
+        |error| TassadarHungarian10x10ArticleReproducerError::Write {
+            path: path.display().to_string(),
+            error,
+        },
+    )
 }
 
 fn write_text(
@@ -568,10 +616,11 @@ fn write_text(
 }
 
 fn file_digest(path: &Path) -> Result<String, TassadarHungarian10x10ArticleReproducerError> {
-    let bytes = fs::read(path).map_err(|error| TassadarHungarian10x10ArticleReproducerError::Read {
-        path: path.display().to_string(),
-        error,
-    })?;
+    let bytes =
+        fs::read(path).map_err(|error| TassadarHungarian10x10ArticleReproducerError::Read {
+            path: path.display().to_string(),
+            error,
+        })?;
     Ok(stable_bytes_digest(&bytes))
 }
 
@@ -599,10 +648,11 @@ where
     T: DeserializeOwned,
 {
     let path = path.as_ref();
-    let bytes = fs::read(path).map_err(|error| TassadarHungarian10x10ArticleReproducerError::Read {
-        path: path.display().to_string(),
-        error,
-    })?;
+    let bytes =
+        fs::read(path).map_err(|error| TassadarHungarian10x10ArticleReproducerError::Read {
+            path: path.display().to_string(),
+            error,
+        })?;
     serde_json::from_slice(&bytes).map_err(|error| {
         TassadarHungarian10x10ArticleReproducerError::Decode {
             path: path.display().to_string(),
@@ -642,16 +692,16 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         TASSADAR_HUNGARIAN_10X10_ARTICLE_REPRODUCER_REPORT_REF,
-        build_tassadar_hungarian_10x10_article_reproducer_report,
-        repo_root, tassadar_hungarian_10x10_article_reproducer_report_path,
+        build_tassadar_hungarian_10x10_article_reproducer_report, repo_root,
+        tassadar_hungarian_10x10_article_reproducer_report_path,
         write_tassadar_hungarian_10x10_article_reproducer_report,
         write_tassadar_hungarian_10x10_article_reproducer_root,
     };
     use crate::TassadarHungarian10x10ArticleReproducerReport;
 
     #[test]
-    fn hungarian_10x10_article_reproducer_root_and_report_are_machine_legible(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn hungarian_10x10_article_reproducer_root_and_report_are_machine_legible()
+    -> Result<(), Box<dyn std::error::Error>> {
         let root = write_tassadar_hungarian_10x10_article_reproducer_root(
             super::tassadar_hungarian_10x10_article_reproducer_root_path(),
         )?;
@@ -661,17 +711,23 @@ mod tests {
         assert!(report.final_output_match);
         assert!(report.halt_match);
         assert!(!report.direct_execution_posture.fallback_observed);
-        assert!(!report
-            .direct_execution_posture
-            .external_tool_surface_observed);
+        assert!(
+            !report
+                .direct_execution_posture
+                .external_tool_surface_observed
+        );
         assert!(repo_root().join(&root.readable_log.artifact_ref).exists());
-        assert!(repo_root().join(&root.token_trace_summary.artifact_ref).exists());
+        assert!(
+            repo_root()
+                .join(&root.token_trace_summary.artifact_ref)
+                .exists()
+        );
         Ok(())
     }
 
     #[test]
-    fn hungarian_10x10_article_reproducer_report_matches_committed_truth(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn hungarian_10x10_article_reproducer_report_matches_committed_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
         let expected = write_tassadar_hungarian_10x10_article_reproducer_report(
             tassadar_hungarian_10x10_article_reproducer_report_path(),
         )?;

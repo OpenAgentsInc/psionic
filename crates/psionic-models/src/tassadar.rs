@@ -1,12 +1,12 @@
 use psionic_core::{DType, QuantizationMode, Shape};
 use psionic_runtime::{
-    build_tassadar_execution_evidence_bundle, diagnose_tassadar_executor_request,
-    execute_tassadar_executor_request, tassadar_runtime_capability_report,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
     TassadarExecutionEvidenceBundle, TassadarExecutorDecodeMode, TassadarExecutorExecutionReport,
     TassadarExecutorSelectionDiagnostic, TassadarFixtureWeights as RuntimeTassadarFixtureWeights,
     TassadarProgram, TassadarProgramArtifact, TassadarRuntimeCapabilityReport, TassadarTraceAbi,
-    TassadarWasmProfile, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
-    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    TassadarWasmProfile, build_tassadar_execution_evidence_bundle,
+    diagnose_tassadar_executor_request, execute_tassadar_executor_request,
+    tassadar_runtime_capability_report,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -14,9 +14,8 @@ use thiserror::Error;
 
 use crate::{
     ModelArtifactGovernance, ModelDescriptor, ModelIngressSurface, ModelInteropBoundary,
-    ModelRuntimeSurface, ModelServingSurface, TassadarArticleTransformer,
-    WeightArtifactMetadata, WeightBundleMetadata, WeightFormat, WeightSource,
-    WeightTensorMetadata,
+    ModelRuntimeSurface, ModelServingSurface, TassadarArticleTransformer, WeightArtifactMetadata,
+    WeightBundleMetadata, WeightFormat, WeightSource, WeightTensorMetadata,
 };
 
 const TASSADAR_WORKLOAD_CAPABILITY_MATRIX_SCHEMA_VERSION: u16 = 1;
@@ -26,8 +25,7 @@ const TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json";
 const TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF: &str =
     "benchmark://openagents/tassadar/reference_fixture/validation_corpus";
-pub const TASSADAR_ARTICLE_TRANSFORMER_TRAINED_EXECUTOR_DESCRIPTOR_REF: &str =
-    "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_executor_descriptor.json";
+pub const TASSADAR_ARTICLE_TRANSFORMER_TRAINED_EXECUTOR_DESCRIPTOR_REF: &str = "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_executor_descriptor.json";
 
 /// Stable executor-family identity distinct from ordinary decoder families.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,8 +135,8 @@ impl TassadarExecutorCompatibility {
 
 /// Builds the served executor-facing descriptor for the trained trace-bound
 /// article Transformer route.
-pub fn build_tassadar_article_transformer_trained_executor_descriptor(
-) -> Result<TassadarExecutorModelDescriptor, crate::TassadarArticleTransformerError> {
+pub fn build_tassadar_article_transformer_trained_executor_descriptor()
+-> Result<TassadarExecutorModelDescriptor, crate::TassadarArticleTransformerError> {
     let model = TassadarArticleTransformer::trained_trace_domain_reference()?;
     Ok(tassadar_article_transformer_executor_descriptor(&model))
 }
@@ -785,8 +783,7 @@ impl TassadarExecutorFixture {
     /// Stable model identifier for the honest 9x9 Sudoku-class search fixture.
     pub const SUDOKU_9X9_SEARCH_MODEL_ID: &str = "tassadar-executor-sudoku-9x9-search-v0";
     /// Stable model identifier for the named hard 9x9 Sudoku-class search fixture.
-    pub const SUDOKU_9X9_HARD_SEARCH_MODEL_ID: &str =
-        "tassadar-executor-sudoku-9x9-hard-search-v0";
+    pub const SUDOKU_9X9_HARD_SEARCH_MODEL_ID: &str = "tassadar-executor-sudoku-9x9-hard-search-v0";
     /// Stable model family for the Phase 1 fixture.
     pub const MODEL_FAMILY: &str = "tassadar_executor";
 
@@ -2227,17 +2224,25 @@ fn encode_compiled_instruction(
 
     let (immediate_kind, immediate_value) = match instruction {
         TassadarInstruction::I32Const { value } => (1.0, *value as f32),
-        TassadarInstruction::LocalGet { local } | TassadarInstruction::LocalSet { local } => {
-            (2.0, f32::from(*local))
-        }
+        TassadarInstruction::LocalGet { local }
+        | TassadarInstruction::LocalSet { local }
+        | TassadarInstruction::LocalTee { local } => (2.0, f32::from(*local)),
         TassadarInstruction::I32Load { slot } | TassadarInstruction::I32Store { slot } => {
             (3.0, f32::from(*slot))
         }
         TassadarInstruction::BrIf { target_pc } => (4.0, f32::from(*target_pc)),
-        TassadarInstruction::I32Add
+        TassadarInstruction::Nop
+        | TassadarInstruction::Drop
+        | TassadarInstruction::I32Add
         | TassadarInstruction::I32Sub
         | TassadarInstruction::I32Mul
         | TassadarInstruction::I32Lt
+        | TassadarInstruction::I32Eqz
+        | TassadarInstruction::I32Eq
+        | TassadarInstruction::I32Ne
+        | TassadarInstruction::I32Gt
+        | TassadarInstruction::I32Le
+        | TassadarInstruction::I32Ge
         | TassadarInstruction::Output
         | TassadarInstruction::Return => (0.0, 0.0),
     };
@@ -2292,17 +2297,17 @@ struct CompiledWeightArtifactEncoding<'a> {
 #[cfg(test)]
 mod tests {
     use psionic_runtime::{
-        run_tassadar_exact_parity, tassadar_article_class_corpus,
-        tassadar_sudoku_v0_search_program, tassadar_validation_corpus, TassadarExecutorDecodeMode,
-        TassadarFixtureRunner, TassadarProgramArtifact, TassadarTraceAbi,
+        TassadarExecutorDecodeMode, TassadarFixtureRunner, TassadarProgramArtifact,
+        TassadarTraceAbi, run_tassadar_exact_parity, tassadar_article_class_corpus,
+        tassadar_sudoku_v0_search_program, tassadar_validation_corpus,
     };
 
     use super::{
-        build_tassadar_article_transformer_trained_executor_descriptor,
         TassadarCompiledProgramError, TassadarCompiledProgramSuiteArtifact,
         TassadarExecutorContractError, TassadarExecutorFixture, TassadarWasmProfile,
         TassadarWorkloadCapabilityMatrixError, TassadarWorkloadCapabilityRefusalReason,
         TassadarWorkloadClass, TassadarWorkloadSupportPosture,
+        build_tassadar_article_transformer_trained_executor_descriptor,
     };
     use crate::{
         ModelIngressSurface, ModelRuntimeSurface, ModelServingSurface, WeightFormat, WeightSource,
@@ -2662,7 +2667,12 @@ mod tests {
             descriptor.compatibility.attention_mode,
             super::TassadarExecutorAttentionMode::StandardSoftmax
         );
-        assert!(descriptor.compatibility.attention_geometry.hull_cache_eligible);
+        assert!(
+            descriptor
+                .compatibility
+                .attention_geometry
+                .hull_cache_eligible
+        );
         assert_eq!(
             descriptor.profile.profile_id,
             TassadarWasmProfile::article_i32_compute_v1().profile_id
@@ -2814,11 +2824,13 @@ mod tests {
             execution.execution_report.execution.outputs,
             expected.outputs
         );
-        assert!(!execution
-            .evidence_bundle
-            .trace_proof
-            .proof_digest
-            .is_empty());
+        assert!(
+            !execution
+                .evidence_bundle
+                .trace_proof
+                .proof_digest
+                .is_empty()
+        );
         assert_eq!(
             execution
                 .evidence_bundle

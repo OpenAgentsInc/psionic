@@ -543,6 +543,8 @@ pub enum TassadarWasmProfileId {
     CoreI32V1,
     /// Widened i32-only profile for article-class exact executor benchmarks.
     CoreI32V2,
+    /// W1.1 opcode-window ladder profile with stack and comparison opcodes.
+    CoreI32W1_1V1,
     /// General article-shaped i32 profile spanning the current micro, Sudoku, and matching suite.
     ArticleI32ComputeV1,
     /// Larger i32-only profile for real 4x4 Sudoku-v0 search programs.
@@ -564,6 +566,7 @@ impl TassadarWasmProfileId {
         match self {
             Self::CoreI32V1 => "tassadar.wasm.core_i32.v1",
             Self::CoreI32V2 => "tassadar.wasm.core_i32.v2",
+            Self::CoreI32W1_1V1 => "tassadar.wasm.core_i32_w1_1.v1",
             Self::ArticleI32ComputeV1 => "tassadar.wasm.article_i32_compute.v1",
             Self::SudokuV0SearchV1 => "tassadar.wasm.sudoku_v0_search.v1",
             Self::HungarianV0MatchingV1 => "tassadar.wasm.hungarian_v0_matching.v1",
@@ -610,6 +613,24 @@ pub enum TassadarOpcode {
     Output,
     /// Halt execution successfully.
     Return,
+    /// No-op instruction.
+    Nop,
+    /// Copy the top stack value into a local without popping it.
+    LocalTee,
+    /// Pop and discard one stack value.
+    Drop,
+    /// Pop one `i32` value and push `1` when it is zero, otherwise `0`.
+    I32Eqz,
+    /// Pop two `i32` values and push `1` when `left == right`, otherwise `0`.
+    I32Eq,
+    /// Pop two `i32` values and push `1` when `left != right`, otherwise `0`.
+    I32Ne,
+    /// Pop two `i32` values and push `1` when `left > right`, otherwise `0`.
+    I32Gt,
+    /// Pop two `i32` values and push `1` when `left <= right`, otherwise `0`.
+    I32Le,
+    /// Pop two `i32` values and push `1` when `left >= right`, otherwise `0`.
+    I32Ge,
 }
 
 impl TassadarOpcode {
@@ -627,6 +648,31 @@ impl TassadarOpcode {
         Self::BrIf,
         Self::Output,
         Self::Return,
+    ];
+
+    /// Stable opcode ordering for the W1.1 Wasm window ladder profile.
+    pub const CORE_I32_W1_1_V1: [Self; 21] = [
+        Self::I32Const,
+        Self::LocalGet,
+        Self::LocalSet,
+        Self::I32Add,
+        Self::I32Sub,
+        Self::I32Mul,
+        Self::I32Lt,
+        Self::I32Load,
+        Self::I32Store,
+        Self::BrIf,
+        Self::Output,
+        Self::Return,
+        Self::Nop,
+        Self::LocalTee,
+        Self::Drop,
+        Self::I32Eqz,
+        Self::I32Eq,
+        Self::I32Ne,
+        Self::I32Gt,
+        Self::I32Le,
+        Self::I32Ge,
     ];
 
     /// Stable opcode ordering used by fixtures and metadata digests.
@@ -651,13 +697,22 @@ impl TassadarOpcode {
     #[must_use]
     pub const fn mnemonic(self) -> &'static str {
         match self {
+            Self::Nop => "nop",
             Self::I32Const => "i32.const",
             Self::LocalGet => "local.get",
             Self::LocalSet => "local.set",
+            Self::LocalTee => "local.tee",
+            Self::Drop => "drop",
             Self::I32Add => "i32.add",
             Self::I32Sub => "i32.sub",
             Self::I32Mul => "i32.mul",
             Self::I32Lt => "i32.lt",
+            Self::I32Eqz => "i32.eqz",
+            Self::I32Eq => "i32.eq",
+            Self::I32Ne => "i32.ne",
+            Self::I32Gt => "i32.gt",
+            Self::I32Le => "i32.le",
+            Self::I32Ge => "i32.ge",
             Self::I32Load => "i32.load",
             Self::I32Store => "i32.store",
             Self::BrIf => "br_if",
@@ -670,13 +725,22 @@ impl TassadarOpcode {
     #[must_use]
     pub const fn ordinal(self) -> u8 {
         match self {
+            Self::Nop => 12,
             Self::I32Const => 0,
             Self::LocalGet => 1,
             Self::LocalSet => 2,
+            Self::LocalTee => 13,
+            Self::Drop => 14,
             Self::I32Add => 3,
             Self::I32Sub => 4,
             Self::I32Mul => 5,
             Self::I32Lt => 6,
+            Self::I32Eqz => 15,
+            Self::I32Eq => 16,
+            Self::I32Ne => 17,
+            Self::I32Gt => 18,
+            Self::I32Le => 19,
+            Self::I32Ge => 20,
             Self::I32Load => 7,
             Self::I32Store => 8,
             Self::BrIf => 9,
@@ -750,6 +814,16 @@ pub enum TassadarArithmeticOp {
     Mul,
     /// Less-than comparison returning `1` or `0`.
     Lt,
+    /// Equality comparison returning `1` or `0`.
+    Eq,
+    /// Inequality comparison returning `1` or `0`.
+    Ne,
+    /// Greater-than comparison returning `1` or `0`.
+    Gt,
+    /// Less-than-or-equal comparison returning `1` or `0`.
+    Le,
+    /// Greater-than-or-equal comparison returning `1` or `0`.
+    Ge,
 }
 
 impl TassadarArithmeticOp {
@@ -760,6 +834,28 @@ impl TassadarArithmeticOp {
             Self::Sub => 2,
             Self::Mul => 3,
             Self::Lt => 4,
+            Self::Eq => 5,
+            Self::Ne => 6,
+            Self::Gt => 7,
+            Self::Le => 8,
+            Self::Ge => 9,
+        }
+    }
+}
+
+/// Unary class encoded by one opcode rule when applicable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarUnaryOp {
+    /// Zero comparison returning `1` or `0`.
+    Eqz,
+}
+
+impl TassadarUnaryOp {
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        match self {
+            Self::Eqz => 1,
         }
     }
 }
@@ -840,6 +936,21 @@ impl TassadarWasmProfile {
             max_memory_slots: 16,
             max_program_len: 128,
             max_steps: 512,
+            branch_mode: TassadarBranchMode::BrIfNonZero,
+            host_output_opcode: true,
+        }
+    }
+
+    /// Returns the W1.1 opcode-window ladder profile.
+    #[must_use]
+    pub fn core_i32_w1_1_v1() -> Self {
+        Self {
+            profile_id: String::from(TassadarWasmProfileId::CoreI32W1_1V1.as_str()),
+            allowed_opcodes: TassadarOpcode::CORE_I32_W1_1_V1.to_vec(),
+            max_locals: 8,
+            max_memory_slots: 16,
+            max_program_len: 256,
+            max_steps: 1_024,
             branch_mode: TassadarBranchMode::BrIfNonZero,
             host_output_opcode: true,
         }
@@ -974,6 +1085,9 @@ pub fn tassadar_wasm_profile_for_id(profile_id: &str) -> Option<TassadarWasmProf
         value if value == TassadarWasmProfileId::CoreI32V2.as_str() => {
             Some(TassadarWasmProfile::core_i32_v2())
         }
+        value if value == TassadarWasmProfileId::CoreI32W1_1V1.as_str() => {
+            Some(TassadarWasmProfile::core_i32_w1_1_v1())
+        }
         value if value == TassadarWasmProfileId::ArticleI32ComputeV1.as_str() => {
             Some(TassadarWasmProfile::article_i32_compute_v1())
         }
@@ -1037,6 +1151,20 @@ impl TassadarTraceAbi {
             abi_id: String::from("tassadar.trace.v1"),
             schema_version: TASSADAR_TRACE_ABI_VERSION,
             profile_id: String::from(TassadarWasmProfileId::CoreI32V2.as_str()),
+            append_only: true,
+            includes_stack_snapshots: true,
+            includes_local_snapshots: true,
+            includes_memory_snapshots: true,
+        }
+    }
+
+    /// Returns the W1.1 opcode-window ladder trace ABI.
+    #[must_use]
+    pub fn core_i32_w1_1_v1() -> Self {
+        Self {
+            abi_id: String::from("tassadar.trace.v1"),
+            schema_version: TASSADAR_TRACE_ABI_VERSION,
+            profile_id: String::from(TassadarWasmProfileId::CoreI32W1_1V1.as_str()),
             append_only: true,
             includes_stack_snapshots: true,
             includes_local_snapshots: true,
@@ -1163,6 +1291,9 @@ pub fn tassadar_trace_abi_for_profile_id(profile_id: &str) -> Option<TassadarTra
         }
         value if value == TassadarWasmProfileId::CoreI32V2.as_str() => {
             Some(TassadarTraceAbi::core_i32_v2())
+        }
+        value if value == TassadarWasmProfileId::CoreI32W1_1V1.as_str() => {
+            Some(TassadarTraceAbi::core_i32_w1_1_v1())
         }
         value if value == TassadarWasmProfileId::ArticleI32ComputeV1.as_str() => {
             Some(TassadarTraceAbi::article_i32_compute_v1())
@@ -1856,8 +1987,8 @@ where
 }
 
 /// Builds the canonical million-step decode benchmark bundle.
-pub fn build_tassadar_million_step_decode_benchmark_bundle(
-) -> Result<TassadarMillionStepDecodeBenchmarkBundle, TassadarMillionStepBenchmarkError> {
+pub fn build_tassadar_million_step_decode_benchmark_bundle()
+-> Result<TassadarMillionStepDecodeBenchmarkBundle, TassadarMillionStepBenchmarkError> {
     let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
     let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
     let program = tassadar_million_step_loop_program();
@@ -2031,8 +2162,8 @@ pub fn write_tassadar_million_step_decode_benchmark_bundle(
     Ok(bundle)
 }
 
-fn canonical_long_horizon_trace_case(
-) -> Result<TassadarValidationCase, TassadarTraceAbiArtifactError> {
+fn canonical_long_horizon_trace_case()
+-> Result<TassadarValidationCase, TassadarTraceAbiArtifactError> {
     tassadar_article_class_corpus()
         .into_iter()
         .find(|case| case.case_id == TASSADAR_LONG_HORIZON_TRACE_CASE_ID)
@@ -2043,8 +2174,8 @@ fn canonical_long_horizon_trace_case(
 
 /// Builds the canonical long-horizon execution evidence bundle used to anchor
 /// the trace-ABI decision report.
-pub fn build_tassadar_long_horizon_trace_evidence_bundle(
-) -> Result<TassadarExecutionEvidenceBundle, TassadarTraceAbiArtifactError> {
+pub fn build_tassadar_long_horizon_trace_evidence_bundle()
+-> Result<TassadarExecutionEvidenceBundle, TassadarTraceAbiArtifactError> {
     let case = canonical_long_horizon_trace_case()?;
     let profile =
         tassadar_wasm_profile_for_id(case.program.profile_id.as_str()).ok_or_else(|| {
@@ -2138,8 +2269,8 @@ fn build_tassadar_trace_abi_decision_report_for_refs(
 }
 
 /// Builds the canonical long-horizon trace-ABI decision report.
-pub fn build_tassadar_trace_abi_decision_report(
-) -> Result<TassadarTraceAbiDecisionReport, TassadarTraceAbiArtifactError> {
+pub fn build_tassadar_trace_abi_decision_report()
+-> Result<TassadarTraceAbiDecisionReport, TassadarTraceAbiArtifactError> {
     let evidence_bundle = build_tassadar_long_horizon_trace_evidence_bundle()?;
     Ok(build_tassadar_trace_abi_decision_report_for_refs(
         TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF,
@@ -2186,6 +2317,7 @@ pub fn tassadar_supported_wasm_profiles() -> Vec<TassadarWasmProfile> {
     vec![
         TassadarWasmProfile::core_i32_v1(),
         TassadarWasmProfile::core_i32_v2(),
+        TassadarWasmProfile::core_i32_w1_1_v1(),
         TassadarWasmProfile::article_i32_compute_v1(),
         TassadarWasmProfile::sudoku_v0_search_v1(),
         TassadarWasmProfile::hungarian_v0_matching_v1(),
@@ -2248,6 +2380,8 @@ pub fn tassadar_wasm_instruction_coverage_report() -> TassadarWasmInstructionCov
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "opcode", rename_all = "snake_case")]
 pub enum TassadarInstruction {
+    /// Execute no stack, local, memory, or control effect.
+    Nop,
     /// Push one constant `i32`.
     I32Const {
         /// Literal immediate value.
@@ -2263,6 +2397,13 @@ pub enum TassadarInstruction {
         /// Local slot index.
         local: u8,
     },
+    /// Copy the current top stack value into one local without popping it.
+    LocalTee {
+        /// Local slot index.
+        local: u8,
+    },
+    /// Pop and discard one stack value.
+    Drop,
     /// Pop two `i32` values and push the sum.
     I32Add,
     /// Pop two `i32` values and push the difference.
@@ -2271,6 +2412,18 @@ pub enum TassadarInstruction {
     I32Mul,
     /// Pop two `i32` values and push `1` when `left < right`, otherwise `0`.
     I32Lt,
+    /// Pop one `i32` value and push `1` when it is zero, otherwise `0`.
+    I32Eqz,
+    /// Pop two `i32` values and push `1` when `left == right`, otherwise `0`.
+    I32Eq,
+    /// Pop two `i32` values and push `1` when `left != right`, otherwise `0`.
+    I32Ne,
+    /// Pop two `i32` values and push `1` when `left > right`, otherwise `0`.
+    I32Gt,
+    /// Pop two `i32` values and push `1` when `left <= right`, otherwise `0`.
+    I32Le,
+    /// Pop two `i32` values and push `1` when `left >= right`, otherwise `0`.
+    I32Ge,
     /// Push one memory slot onto the stack.
     I32Load {
         /// Memory slot index.
@@ -2297,13 +2450,22 @@ impl TassadarInstruction {
     #[must_use]
     pub const fn opcode(&self) -> TassadarOpcode {
         match self {
+            Self::Nop => TassadarOpcode::Nop,
             Self::I32Const { .. } => TassadarOpcode::I32Const,
             Self::LocalGet { .. } => TassadarOpcode::LocalGet,
             Self::LocalSet { .. } => TassadarOpcode::LocalSet,
+            Self::LocalTee { .. } => TassadarOpcode::LocalTee,
+            Self::Drop => TassadarOpcode::Drop,
             Self::I32Add => TassadarOpcode::I32Add,
             Self::I32Sub => TassadarOpcode::I32Sub,
             Self::I32Mul => TassadarOpcode::I32Mul,
             Self::I32Lt => TassadarOpcode::I32Lt,
+            Self::I32Eqz => TassadarOpcode::I32Eqz,
+            Self::I32Eq => TassadarOpcode::I32Eq,
+            Self::I32Ne => TassadarOpcode::I32Ne,
+            Self::I32Gt => TassadarOpcode::I32Gt,
+            Self::I32Le => TassadarOpcode::I32Le,
+            Self::I32Ge => TassadarOpcode::I32Ge,
             Self::I32Load { .. } => TassadarOpcode::I32Load,
             Self::I32Store { .. } => TassadarOpcode::I32Store,
             Self::BrIf { .. } => TassadarOpcode::BrIf,
@@ -2408,6 +2570,7 @@ impl TassadarProgram {
             match instruction {
                 TassadarInstruction::LocalGet { local }
                 | TassadarInstruction::LocalSet { local }
+                | TassadarInstruction::LocalTee { local }
                     if usize::from(*local) >= self.local_count =>
                 {
                     return Err(TassadarExecutionRefusal::LocalOutOfRange {
@@ -4631,6 +4794,8 @@ pub fn tassadar_fixture_weights_for_profile_id(profile_id: &str) -> Option<Tassa
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TassadarTraceEvent {
+    /// One no-op executed.
+    Nop,
     /// One constant was pushed.
     ConstPush {
         /// Value that was pushed.
@@ -4649,6 +4814,27 @@ pub enum TassadarTraceEvent {
         local: u8,
         /// Value written into the local.
         value: i32,
+    },
+    /// One local was written while preserving the stack top.
+    LocalTee {
+        /// Local index written.
+        local: u8,
+        /// Value written into the local.
+        value: i32,
+    },
+    /// One stack value was discarded.
+    Drop {
+        /// Value discarded from the stack.
+        value: i32,
+    },
+    /// One unary op was applied.
+    UnaryOp {
+        /// Unary family.
+        op: TassadarUnaryOp,
+        /// Operand value.
+        operand: i32,
+        /// Result value.
+        result: i32,
     },
     /// One arithmetic op was applied.
     BinaryOp {
@@ -8100,9 +8286,11 @@ fn build_tassadar_sudoku_search_program_with_stage_cells(
     let given_offset = cell_count;
     let memory_slots = cell_count * 2;
     debug_assert_eq!(cell_count, puzzle_cells.len());
-    debug_assert!(puzzle_cells
-        .iter()
-        .all(|value| (0..=max_value).contains(value)));
+    debug_assert!(
+        puzzle_cells
+            .iter()
+            .all(|value| (0..=max_value).contains(value))
+    );
     debug_assert!(stage_cells.iter().all(|cell| *cell < cell_count));
 
     let mut initial_memory = vec![0; memory_slots];
@@ -8500,6 +8688,9 @@ fn claim_boundary_for_profile(profile_id: &str) -> String {
         value if value == TassadarWasmProfileId::CoreI32V2.as_str() => String::from(
             "widened core i32 benchmark profile with bounded resources and no comparison opcode",
         ),
+        value if value == TassadarWasmProfileId::CoreI32W1_1V1.as_str() => String::from(
+            "W1.1 opcode-window ladder profile with 21 bounded i32 opcodes; CPU and ALM parity only for accepted stack-disciplined programs",
+        ),
         value if value == TassadarWasmProfileId::ArticleI32ComputeV1.as_str() => String::from(
             "current article-shaped mixed-workload i32 profile for the committed article-class benchmark suite; still only the enumerated opcodes",
         ),
@@ -8567,6 +8758,9 @@ fn workload_targets_for_profile(profile_id: &str) -> Vec<String> {
             vec![String::from("validation_microprograms")]
         }
         value if value == TassadarWasmProfileId::CoreI32V2.as_str() => Vec::new(),
+        value if value == TassadarWasmProfileId::CoreI32W1_1V1.as_str() => {
+            vec![String::from("w1_1_opcode_window_ladder")]
+        }
         value if value == TassadarWasmProfileId::ArticleI32ComputeV1.as_str() => vec![
             String::from("micro_wasm_kernel"),
             String::from("branch_heavy_kernel"),
@@ -8662,6 +8856,7 @@ fn execute_program_direct(
         };
         let mut next_pc = pc + 1;
         let event = match instruction.clone() {
+            TassadarInstruction::Nop => TassadarTraceEvent::Nop,
             TassadarInstruction::I32Const { value } => {
                 stack.push(value);
                 TassadarTraceEvent::ConstPush { value }
@@ -8675,6 +8870,15 @@ fn execute_program_direct(
                 let value = pop_value(&mut stack, pc, 1)?;
                 locals[usize::from(local)] = value;
                 TassadarTraceEvent::LocalSet { local, value }
+            }
+            TassadarInstruction::LocalTee { local } => {
+                let value = peek_value(&stack, pc, 1)?;
+                locals[usize::from(local)] = value;
+                TassadarTraceEvent::LocalTee { local, value }
+            }
+            TassadarInstruction::Drop => {
+                let value = pop_value(&mut stack, pc, 1)?;
+                TassadarTraceEvent::Drop { value }
             }
             TassadarInstruction::I32Add => {
                 let (left, right) = pop_binary_operands(&mut stack, pc)?;
@@ -8715,6 +8919,71 @@ fn execute_program_direct(
                 stack.push(result);
                 TassadarTraceEvent::BinaryOp {
                     op: TassadarArithmeticOp::Lt,
+                    left,
+                    right,
+                    result,
+                }
+            }
+            TassadarInstruction::I32Eqz => {
+                let operand = pop_value(&mut stack, pc, 1)?;
+                let result = i32::from(operand == 0);
+                stack.push(result);
+                TassadarTraceEvent::UnaryOp {
+                    op: TassadarUnaryOp::Eqz,
+                    operand,
+                    result,
+                }
+            }
+            TassadarInstruction::I32Eq => {
+                let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                let result = i32::from(left == right);
+                stack.push(result);
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Eq,
+                    left,
+                    right,
+                    result,
+                }
+            }
+            TassadarInstruction::I32Ne => {
+                let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                let result = i32::from(left != right);
+                stack.push(result);
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Ne,
+                    left,
+                    right,
+                    result,
+                }
+            }
+            TassadarInstruction::I32Gt => {
+                let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                let result = i32::from(left > right);
+                stack.push(result);
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Gt,
+                    left,
+                    right,
+                    result,
+                }
+            }
+            TassadarInstruction::I32Le => {
+                let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                let result = i32::from(left <= right);
+                stack.push(result);
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Le,
+                    left,
+                    right,
+                    result,
+                }
+            }
+            TassadarInstruction::I32Ge => {
+                let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                let result = i32::from(left >= right);
+                stack.push(result);
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Ge,
                     left,
                     right,
                     result,
@@ -9913,6 +10182,7 @@ fn execute_instruction(
     halt_reason: &mut TassadarHaltReason,
 ) -> Result<TassadarTraceEvent, TassadarExecutionRefusal> {
     Ok(match instruction.clone() {
+        TassadarInstruction::Nop => TassadarTraceEvent::Nop,
         TassadarInstruction::I32Const { value } => {
             stack.push(value);
             TassadarTraceEvent::ConstPush { value }
@@ -9926,6 +10196,15 @@ fn execute_instruction(
             let value = pop_value(stack, pc, 1)?;
             locals[usize::from(local)] = value;
             TassadarTraceEvent::LocalSet { local, value }
+        }
+        TassadarInstruction::LocalTee { local } => {
+            let value = peek_value(stack, pc, 1)?;
+            locals[usize::from(local)] = value;
+            TassadarTraceEvent::LocalTee { local, value }
+        }
+        TassadarInstruction::Drop => {
+            let value = pop_value(stack, pc, 1)?;
+            TassadarTraceEvent::Drop { value }
         }
         TassadarInstruction::I32Add => {
             let (left, right) = pop_binary_operands(stack, pc)?;
@@ -9966,6 +10245,71 @@ fn execute_instruction(
             stack.push(result);
             TassadarTraceEvent::BinaryOp {
                 op: TassadarArithmeticOp::Lt,
+                left,
+                right,
+                result,
+            }
+        }
+        TassadarInstruction::I32Eqz => {
+            let operand = pop_value(stack, pc, 1)?;
+            let result = i32::from(operand == 0);
+            stack.push(result);
+            TassadarTraceEvent::UnaryOp {
+                op: TassadarUnaryOp::Eqz,
+                operand,
+                result,
+            }
+        }
+        TassadarInstruction::I32Eq => {
+            let (left, right) = pop_binary_operands(stack, pc)?;
+            let result = i32::from(left == right);
+            stack.push(result);
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Eq,
+                left,
+                right,
+                result,
+            }
+        }
+        TassadarInstruction::I32Ne => {
+            let (left, right) = pop_binary_operands(stack, pc)?;
+            let result = i32::from(left != right);
+            stack.push(result);
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Ne,
+                left,
+                right,
+                result,
+            }
+        }
+        TassadarInstruction::I32Gt => {
+            let (left, right) = pop_binary_operands(stack, pc)?;
+            let result = i32::from(left > right);
+            stack.push(result);
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Gt,
+                left,
+                right,
+                result,
+            }
+        }
+        TassadarInstruction::I32Le => {
+            let (left, right) = pop_binary_operands(stack, pc)?;
+            let result = i32::from(left <= right);
+            stack.push(result);
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Le,
+                left,
+                right,
+                result,
+            }
+        }
+        TassadarInstruction::I32Ge => {
+            let (left, right) = pop_binary_operands(stack, pc)?;
+            let result = i32::from(left >= right);
+            stack.push(result);
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Ge,
                 left,
                 right,
                 result,
@@ -10031,6 +10375,17 @@ fn pop_value(
         needed,
         available: 0,
     })
+}
+
+fn peek_value(stack: &[i32], pc: usize, needed: usize) -> Result<i32, TassadarExecutionRefusal> {
+    stack
+        .last()
+        .copied()
+        .ok_or(TassadarExecutionRefusal::StackUnderflow {
+            pc,
+            needed,
+            available: stack.len(),
+        })
 }
 
 fn locals_add_case() -> TassadarValidationCase {
@@ -10789,6 +11144,14 @@ fn observed_rule_signature(
     event: &TassadarTraceEvent,
 ) -> TassadarOpcodeRule {
     match (instruction, event) {
+        (TassadarInstruction::Nop, TassadarTraceEvent::Nop) => TassadarOpcodeRule::new(
+            TassadarOpcode::Nop,
+            0,
+            0,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        ),
         (TassadarInstruction::I32Const { .. }, TassadarTraceEvent::ConstPush { .. }) => {
             TassadarOpcodeRule::new(
                 TassadarOpcode::I32Const,
@@ -10819,6 +11182,24 @@ fn observed_rule_signature(
                 TassadarControlClass::Linear,
             )
         }
+        (TassadarInstruction::LocalTee { .. }, TassadarTraceEvent::LocalTee { .. }) => {
+            TassadarOpcodeRule::new(
+                TassadarOpcode::LocalTee,
+                0,
+                0,
+                TassadarImmediateKind::LocalIndex,
+                TassadarAccessClass::LocalWrite,
+                TassadarControlClass::Linear,
+            )
+        }
+        (TassadarInstruction::Drop, TassadarTraceEvent::Drop { .. }) => TassadarOpcodeRule::new(
+            TassadarOpcode::Drop,
+            1,
+            0,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        ),
         (
             TassadarInstruction::I32Add,
             TassadarTraceEvent::BinaryOp {
@@ -10879,6 +11260,95 @@ fn observed_rule_signature(
             TassadarControlClass::Linear,
         )
         .with_arithmetic(TassadarArithmeticOp::Lt),
+        (
+            TassadarInstruction::I32Eqz,
+            TassadarTraceEvent::UnaryOp {
+                op: TassadarUnaryOp::Eqz,
+                ..
+            },
+        ) => TassadarOpcodeRule::new(
+            TassadarOpcode::I32Eqz,
+            1,
+            1,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        ),
+        (
+            TassadarInstruction::I32Eq,
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Eq,
+                ..
+            },
+        ) => TassadarOpcodeRule::new(
+            TassadarOpcode::I32Eq,
+            2,
+            1,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        )
+        .with_arithmetic(TassadarArithmeticOp::Eq),
+        (
+            TassadarInstruction::I32Ne,
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Ne,
+                ..
+            },
+        ) => TassadarOpcodeRule::new(
+            TassadarOpcode::I32Ne,
+            2,
+            1,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        )
+        .with_arithmetic(TassadarArithmeticOp::Ne),
+        (
+            TassadarInstruction::I32Gt,
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Gt,
+                ..
+            },
+        ) => TassadarOpcodeRule::new(
+            TassadarOpcode::I32Gt,
+            2,
+            1,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        )
+        .with_arithmetic(TassadarArithmeticOp::Gt),
+        (
+            TassadarInstruction::I32Le,
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Le,
+                ..
+            },
+        ) => TassadarOpcodeRule::new(
+            TassadarOpcode::I32Le,
+            2,
+            1,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        )
+        .with_arithmetic(TassadarArithmeticOp::Le),
+        (
+            TassadarInstruction::I32Ge,
+            TassadarTraceEvent::BinaryOp {
+                op: TassadarArithmeticOp::Ge,
+                ..
+            },
+        ) => TassadarOpcodeRule::new(
+            TassadarOpcode::I32Ge,
+            2,
+            1,
+            TassadarImmediateKind::None,
+            TassadarAccessClass::None,
+            TassadarControlClass::Linear,
+        )
+        .with_arithmetic(TassadarArithmeticOp::Ge),
         (TassadarInstruction::I32Load { .. }, TassadarTraceEvent::Load { .. }) => {
             TassadarOpcodeRule::new(
                 TassadarOpcode::I32Load,
@@ -10956,6 +11426,25 @@ mod tests {
     use crate::TassadarClaimClass;
 
     use super::{
+        TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF, TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF,
+        TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID, TASSADAR_CANONICAL_C_SOURCE_REF,
+        TASSADAR_FIXTURE_RUNNER_ID, TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
+        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF,
+        TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE, TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF,
+        TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF, TASSADAR_PARAM_ABI_RUST_SOURCE_REF,
+        TASSADAR_RUNTIME_BACKEND_ID, TASSADAR_TRACE_ABI_DECISION_REPORT_REF,
+        TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF, TassadarCToWasmCompileConfig,
+        TassadarCToWasmCompileReceipt, TassadarCompileRefusal, TassadarCompilerToolchainIdentity,
+        TassadarCpuReferenceRunner, TassadarExactnessPosture, TassadarExactnessRefusalReport,
+        TassadarExecutionRefusal, TassadarExecutorDecodeMode, TassadarExecutorSelectionReason,
+        TassadarExecutorSelectionState, TassadarFixtureRunner, TassadarHullCacheRunner,
+        TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
+        TassadarMillionStepMeasurementPosture, TassadarMismatchClass, TassadarProgram,
+        TassadarProgramArtifact, TassadarProgramArtifactError, TassadarProgramSourceIdentity,
+        TassadarProgramSourceKind, TassadarRustToWasmCompileConfig, TassadarSparseTopKRunner,
+        TassadarSudokuV0CorpusSplit, TassadarTraceAbi, TassadarTraceAbiDecisionReport,
+        TassadarTraceArtifact, TassadarTraceDiffKind, TassadarTraceDiffReport, TassadarTraceEvent,
+        TassadarWasmInstructionCoverageReport, TassadarWasmProfile, TassadarWasmProfileId,
         build_tassadar_execution_evidence_bundle,
         build_tassadar_long_horizon_trace_evidence_bundle,
         build_tassadar_million_step_decode_benchmark_bundle,
@@ -10974,26 +11463,7 @@ mod tests {
         write_tassadar_c_to_wasm_compile_receipt,
         write_tassadar_million_step_decode_benchmark_bundle,
         write_tassadar_trace_abi_decision_artifacts,
-        write_tassadar_wasm_instruction_coverage_report, TassadarCToWasmCompileConfig,
-        TassadarCToWasmCompileReceipt, TassadarCompileRefusal, TassadarCompilerToolchainIdentity,
-        TassadarCpuReferenceRunner, TassadarExactnessPosture, TassadarExactnessRefusalReport,
-        TassadarExecutionRefusal, TassadarExecutorDecodeMode, TassadarExecutorSelectionReason,
-        TassadarExecutorSelectionState, TassadarFixtureRunner, TassadarHullCacheRunner,
-        TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
-        TassadarMillionStepMeasurementPosture, TassadarMismatchClass, TassadarProgram,
-        TassadarProgramArtifact, TassadarProgramArtifactError, TassadarProgramSourceIdentity,
-        TassadarProgramSourceKind, TassadarRustToWasmCompileConfig, TassadarSparseTopKRunner,
-        TassadarSudokuV0CorpusSplit, TassadarTraceAbi, TassadarTraceAbiDecisionReport,
-        TassadarTraceArtifact, TassadarTraceDiffKind, TassadarTraceDiffReport, TassadarTraceEvent,
-        TassadarWasmInstructionCoverageReport, TassadarWasmProfile, TassadarWasmProfileId,
-        TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF, TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID,
-        TASSADAR_CANONICAL_C_SOURCE_REF, TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF,
-        TASSADAR_FIXTURE_RUNNER_ID, TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
-        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF,
-        TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE, TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF,
-        TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF, TASSADAR_PARAM_ABI_RUST_SOURCE_REF,
-        TASSADAR_RUNTIME_BACKEND_ID, TASSADAR_TRACE_ABI_DECISION_REPORT_REF,
-        TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
+        write_tassadar_wasm_instruction_coverage_report,
     };
 
     fn read_repo_json<T: serde::de::DeserializeOwned>(
@@ -11575,9 +12045,11 @@ mod tests {
             .expect("canonical Wasm summary should parse");
         assert_eq!(summary.byte_len, wasm_bytes.len());
         assert!(summary.function_count >= 1);
-        assert!(summary
-            .exported_functions
-            .contains(&String::from("micro_wasm_kernel")));
+        assert!(
+            summary
+                .exported_functions
+                .contains(&String::from("micro_wasm_kernel"))
+        );
     }
 
     #[test]
@@ -11738,10 +12210,12 @@ mod tests {
             &TassadarRustToWasmCompileConfig::canonical_param_abi_kernel(),
         );
         if receipt.succeeded() {
-            assert!(receipt
-                .wasm_binary_ref()
-                .expect("successful compile should publish an output ref")
-                .ends_with("param.wasm"));
+            assert!(
+                receipt
+                    .wasm_binary_ref()
+                    .expect("successful compile should publish an output ref")
+                    .ends_with("param.wasm")
+            );
             assert_eq!(
                 receipt
                     .wasm_binary_summary()
@@ -11794,12 +12268,16 @@ mod tests {
                 .count(),
             2
         );
-        assert!(corpus
-            .iter()
-            .all(|case| !case.validation_case.expected_trace.is_empty()));
-        assert!(corpus
-            .iter()
-            .all(|case| case.validation_case.expected_outputs.len() == 16));
+        assert!(
+            corpus
+                .iter()
+                .all(|case| !case.validation_case.expected_trace.is_empty())
+        );
+        assert!(
+            corpus
+                .iter()
+                .all(|case| case.validation_case.expected_outputs.len() == 16)
+        );
     }
 
     #[test]
@@ -11827,12 +12305,16 @@ mod tests {
                 .count(),
             1
         );
-        assert!(corpus
-            .iter()
-            .all(|case| !case.validation_case.expected_trace.is_empty()));
-        assert!(corpus
-            .iter()
-            .all(|case| case.validation_case.expected_outputs.len() == 81));
+        assert!(
+            corpus
+                .iter()
+                .all(|case| !case.validation_case.expected_trace.is_empty())
+        );
+        assert!(
+            corpus
+                .iter()
+                .all(|case| case.validation_case.expected_outputs.len() == 81)
+        );
     }
 
     #[test]
@@ -11847,12 +12329,16 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["sudoku_9x9_test_a", "sudoku_9x9_arto_inkala"]
         );
-        assert!(suite
-            .iter()
-            .all(|case| case.split == TassadarSudokuV0CorpusSplit::Test));
-        assert!(suite
-            .iter()
-            .all(|case| case.validation_case.expected_outputs.len() == 81));
+        assert!(
+            suite
+                .iter()
+                .all(|case| case.split == TassadarSudokuV0CorpusSplit::Test)
+        );
+        assert!(
+            suite
+                .iter()
+                .all(|case| case.validation_case.expected_outputs.len() == 81)
+        );
     }
 
     #[test]
@@ -12719,17 +13205,29 @@ mod tests {
 
     #[test]
     fn tassadar_claim_class_transitions_preserve_lane_separation() {
-        assert!(TassadarClaimClass::ResearchOnly
-            .allows_transition_to(TassadarClaimClass::CompiledExact));
-        assert!(TassadarClaimClass::ResearchOnly
-            .allows_transition_to(TassadarClaimClass::LearnedBounded));
-        assert!(TassadarClaimClass::CompiledExact
-            .allows_transition_to(TassadarClaimClass::CompiledArticleClass));
-        assert!(TassadarClaimClass::LearnedBounded
-            .allows_transition_to(TassadarClaimClass::LearnedArticleClass));
-        assert!(!TassadarClaimClass::CompiledExact
-            .allows_transition_to(TassadarClaimClass::LearnedArticleClass));
-        assert!(!TassadarClaimClass::LearnedBounded
-            .allows_transition_to(TassadarClaimClass::CompiledArticleClass));
+        assert!(
+            TassadarClaimClass::ResearchOnly
+                .allows_transition_to(TassadarClaimClass::CompiledExact)
+        );
+        assert!(
+            TassadarClaimClass::ResearchOnly
+                .allows_transition_to(TassadarClaimClass::LearnedBounded)
+        );
+        assert!(
+            TassadarClaimClass::CompiledExact
+                .allows_transition_to(TassadarClaimClass::CompiledArticleClass)
+        );
+        assert!(
+            TassadarClaimClass::LearnedBounded
+                .allows_transition_to(TassadarClaimClass::LearnedArticleClass)
+        );
+        assert!(
+            !TassadarClaimClass::CompiledExact
+                .allows_transition_to(TassadarClaimClass::LearnedArticleClass)
+        );
+        assert!(
+            !TassadarClaimClass::LearnedBounded
+                .allows_transition_to(TassadarClaimClass::CompiledArticleClass)
+        );
     }
 }

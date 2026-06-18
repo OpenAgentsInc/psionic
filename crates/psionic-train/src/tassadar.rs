@@ -2,17 +2,16 @@ use std::collections::BTreeMap;
 
 use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
 use psionic_eval::{
-    build_tassadar_reference_fixture_suite, run_tassadar_reference_fixture_benchmark,
-    TassadarBenchmarkError, TassadarBenchmarkReport, TassadarReferenceFixtureSuite,
     TASSADAR_BENCHMARK_ENVIRONMENT_REF, TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF,
+    TassadarBenchmarkError, TassadarBenchmarkReport, TassadarReferenceFixtureSuite,
+    build_tassadar_reference_fixture_suite, run_tassadar_reference_fixture_benchmark,
 };
 use psionic_models::TassadarExecutorFixture;
 use psionic_runtime::{
-    build_tassadar_execution_evidence_bundle, tassadar_validation_corpus,
-    tassadar_wasm_profile_for_id, TassadarArithmeticOp, TassadarExecution,
-    TassadarExecutionRefusal, TassadarExecutorDecodeMode, TassadarFixtureRunner,
-    TassadarHaltReason, TassadarInstruction, TassadarProgram, TassadarTraceEvent,
-    TassadarTraceStep,
+    TassadarArithmeticOp, TassadarExecution, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
+    TassadarFixtureRunner, TassadarHaltReason, TassadarInstruction, TassadarProgram,
+    TassadarTraceEvent, TassadarTraceStep, build_tassadar_execution_evidence_bundle,
+    tassadar_validation_corpus, tassadar_wasm_profile_for_id,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -38,6 +37,11 @@ enum ArithmeticKernelKind {
     Sub,
     Mul,
     Lt,
+    Eq,
+    Ne,
+    Gt,
+    Le,
+    Ge,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -218,6 +222,7 @@ impl TassadarSmallExecutorModel {
             let instruction = program.instructions[pc].clone();
             let stack_before = stack.clone();
             let (event, next_pc) = match instruction.clone() {
+                TassadarInstruction::Nop => (TassadarTraceEvent::Nop, pc + 1),
                 TassadarInstruction::I32Const { value } => {
                     stack.push(value);
                     (TassadarTraceEvent::ConstPush { value }, pc + 1)
@@ -252,6 +257,35 @@ impl TassadarSmallExecutorModel {
                     )?;
                     *destination = value;
                     (TassadarTraceEvent::LocalSet { local, value }, pc + 1)
+                }
+                TassadarInstruction::LocalTee { local } => {
+                    let local_index = usize::from(local);
+                    let value = *stack
+                        .last()
+                        .ok_or(TassadarExecutionRefusal::StackUnderflow {
+                            pc,
+                            needed: 1,
+                            available: stack.len(),
+                        })?;
+                    let destination = locals.get_mut(local_index).ok_or(
+                        TassadarExecutionRefusal::LocalOutOfRange {
+                            pc,
+                            local: local_index,
+                            local_count: program.local_count,
+                        },
+                    )?;
+                    *destination = value;
+                    (TassadarTraceEvent::LocalTee { local, value }, pc + 1)
+                }
+                TassadarInstruction::Drop => {
+                    let value = stack
+                        .pop()
+                        .ok_or(TassadarExecutionRefusal::StackUnderflow {
+                            pc,
+                            needed: 1,
+                            available: 0,
+                        })?;
+                    (TassadarTraceEvent::Drop { value }, pc + 1)
                 }
                 TassadarInstruction::I32Add => {
                     let (left, right) = pop_binary_operands(&mut stack, pc)?;
@@ -302,6 +336,95 @@ impl TassadarSmallExecutorModel {
                     (
                         TassadarTraceEvent::BinaryOp {
                             op: TassadarArithmeticOp::Lt,
+                            left,
+                            right,
+                            result,
+                        },
+                        pc + 1,
+                    )
+                }
+                TassadarInstruction::I32Eqz => {
+                    let operand = stack
+                        .pop()
+                        .ok_or(TassadarExecutionRefusal::StackUnderflow {
+                            pc,
+                            needed: 1,
+                            available: 0,
+                        })?;
+                    let result = i32::from(operand == 0);
+                    stack.push(result);
+                    (
+                        TassadarTraceEvent::UnaryOp {
+                            op: psionic_runtime::TassadarUnaryOp::Eqz,
+                            operand,
+                            result,
+                        },
+                        pc + 1,
+                    )
+                }
+                TassadarInstruction::I32Eq => {
+                    let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                    let result = self.apply_kernel(ArithmeticKernelKind::Eq, left, right);
+                    stack.push(result);
+                    (
+                        TassadarTraceEvent::BinaryOp {
+                            op: TassadarArithmeticOp::Eq,
+                            left,
+                            right,
+                            result,
+                        },
+                        pc + 1,
+                    )
+                }
+                TassadarInstruction::I32Ne => {
+                    let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                    let result = self.apply_kernel(ArithmeticKernelKind::Ne, left, right);
+                    stack.push(result);
+                    (
+                        TassadarTraceEvent::BinaryOp {
+                            op: TassadarArithmeticOp::Ne,
+                            left,
+                            right,
+                            result,
+                        },
+                        pc + 1,
+                    )
+                }
+                TassadarInstruction::I32Gt => {
+                    let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                    let result = self.apply_kernel(ArithmeticKernelKind::Gt, left, right);
+                    stack.push(result);
+                    (
+                        TassadarTraceEvent::BinaryOp {
+                            op: TassadarArithmeticOp::Gt,
+                            left,
+                            right,
+                            result,
+                        },
+                        pc + 1,
+                    )
+                }
+                TassadarInstruction::I32Le => {
+                    let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                    let result = self.apply_kernel(ArithmeticKernelKind::Le, left, right);
+                    stack.push(result);
+                    (
+                        TassadarTraceEvent::BinaryOp {
+                            op: TassadarArithmeticOp::Le,
+                            left,
+                            right,
+                            result,
+                        },
+                        pc + 1,
+                    )
+                }
+                TassadarInstruction::I32Ge => {
+                    let (left, right) = pop_binary_operands(&mut stack, pc)?;
+                    let result = self.apply_kernel(ArithmeticKernelKind::Ge, left, right);
+                    stack.push(result);
+                    (
+                        TassadarTraceEvent::BinaryOp {
+                            op: TassadarArithmeticOp::Ge,
                             left,
                             right,
                             result,
@@ -432,6 +555,11 @@ impl TassadarSmallExecutorModel {
             }
             ArithmeticKernelKind::Mul => self.mul_kernel[0] * (left * right) as f32,
             ArithmeticKernelKind::Lt => f32::from(left < right),
+            ArithmeticKernelKind::Eq => f32::from(left == right),
+            ArithmeticKernelKind::Ne => f32::from(left != right),
+            ArithmeticKernelKind::Gt => f32::from(left > right),
+            ArithmeticKernelKind::Le => f32::from(left <= right),
+            ArithmeticKernelKind::Ge => f32::from(left >= right),
         };
         prediction.round() as i32
     }
@@ -724,8 +852,8 @@ pub fn evaluate_tassadar_small_executor(
     })
 }
 
-fn collect_supervision_examples(
-) -> Result<ArithmeticSupervisionSet, TassadarSmallExecutorTrainingError> {
+fn collect_supervision_examples()
+-> Result<ArithmeticSupervisionSet, TassadarSmallExecutorTrainingError> {
     let runner = TassadarFixtureRunner::new();
     let mut add = Vec::new();
     let mut sub = Vec::new();
@@ -756,13 +884,23 @@ fn collect_supervision_examples(
                         features: vec![(left * right) as f32],
                         target: result as f32,
                     },
-                    TassadarArithmeticOp::Lt => continue,
+                    TassadarArithmeticOp::Lt
+                    | TassadarArithmeticOp::Eq
+                    | TassadarArithmeticOp::Ne
+                    | TassadarArithmeticOp::Gt
+                    | TassadarArithmeticOp::Le
+                    | TassadarArithmeticOp::Ge => continue,
                 };
                 match op {
                     TassadarArithmeticOp::Add => add.push(example),
                     TassadarArithmeticOp::Sub => sub.push(example),
                     TassadarArithmeticOp::Mul => mul.push(example),
-                    TassadarArithmeticOp::Lt => {}
+                    TassadarArithmeticOp::Lt
+                    | TassadarArithmeticOp::Eq
+                    | TassadarArithmeticOp::Ne
+                    | TassadarArithmeticOp::Gt
+                    | TassadarArithmeticOp::Le
+                    | TassadarArithmeticOp::Ge => {}
                 }
             }
         }
@@ -1013,17 +1151,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        evaluate_tassadar_small_executor, train_tassadar_small_executor,
-        TassadarSmallExecutorExactnessFailure, TassadarSmallExecutorTrainingConfig,
         TASSADAR_BENCHMARK_ENVIRONMENT_REF, TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF,
+        TassadarSmallExecutorExactnessFailure, TassadarSmallExecutorTrainingConfig,
+        evaluate_tassadar_small_executor, train_tassadar_small_executor,
     };
     use psionic_eval::{
         build_tassadar_reference_fixture_suite, run_tassadar_reference_fixture_benchmark,
     };
 
     #[test]
-    fn small_executor_training_runs_against_tassadar_benchmark_suite(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn small_executor_training_runs_against_tassadar_benchmark_suite()
+    -> Result<(), Box<dyn std::error::Error>> {
         let receipt =
             train_tassadar_small_executor(&TassadarSmallExecutorTrainingConfig::reference())?;
 
@@ -1047,8 +1185,8 @@ mod tests {
     }
 
     #[test]
-    fn trained_model_eval_surfaces_exactness_failures_explicitly(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn trained_model_eval_surfaces_exactness_failures_explicitly()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut receipt =
             train_tassadar_small_executor(&TassadarSmallExecutorTrainingConfig::reference())?;
         receipt.trained_model.add_kernel = vec![0.0, 0.0];
@@ -1061,12 +1199,16 @@ mod tests {
             .find(|case| case.case_id == "locals_add")
             .expect("locals_add report");
 
-        assert!(locals_add
-            .exactness_failures
-            .contains(&TassadarSmallExecutorExactnessFailure::FinalOutputMismatch));
-        assert!(locals_add
-            .exactness_failures
-            .contains(&TassadarSmallExecutorExactnessFailure::TraceMismatch));
+        assert!(
+            locals_add
+                .exactness_failures
+                .contains(&TassadarSmallExecutorExactnessFailure::FinalOutputMismatch)
+        );
+        assert!(
+            locals_add
+                .exactness_failures
+                .contains(&TassadarSmallExecutorExactnessFailure::TraceMismatch)
+        );
         Ok(())
     }
 }

@@ -6,13 +6,12 @@ use std::{
 
 use psionic_eval::{
     TassadarReferenceFixtureSuite, TassadarSudoku9x9CompiledExecutorBenchmarkReceipt,
-    TassadarSudoku9x9CompiledExecutorCompatibilityReport,
-    TassadarSudoku9x9CompiledExecutorCorpus, TassadarSudoku9x9CompiledExecutorEvalError,
-    TassadarSudoku9x9CompiledExecutorExactnessReport, build_tassadar_sudoku_9x9_suite,
+    TassadarSudoku9x9CompiledExecutorCompatibilityReport, TassadarSudoku9x9CompiledExecutorCorpus,
+    TassadarSudoku9x9CompiledExecutorEvalError, TassadarSudoku9x9CompiledExecutorExactnessReport,
     build_tassadar_sudoku_9x9_compiled_executor_benchmark_receipt,
     build_tassadar_sudoku_9x9_compiled_executor_compatibility_report,
     build_tassadar_sudoku_9x9_compiled_executor_corpus,
-    build_tassadar_sudoku_9x9_compiled_executor_exactness_report,
+    build_tassadar_sudoku_9x9_compiled_executor_exactness_report, build_tassadar_sudoku_9x9_suite,
 };
 use psionic_models::{TassadarTraceTokenizer, TokenizerBoundary};
 use psionic_runtime::{
@@ -106,7 +105,8 @@ impl TassadarSudoku9x9TokenTraceSummary {
         let token_slice = tokenized.sequence.as_slice();
         let prompt_window_len = tokenized.prompt_token_count.min(TOKEN_TRACE_WINDOW_TOKENS);
         let trace_start = tokenized.prompt_token_count.min(token_slice.len());
-        let trace_window_start = trace_start.max(token_slice.len().saturating_sub(TOKEN_TRACE_WINDOW_TOKENS));
+        let trace_window_start =
+            trace_start.max(token_slice.len().saturating_sub(TOKEN_TRACE_WINDOW_TOKENS));
         let first_prompt_tokens = &token_slice[..prompt_window_len];
         let last_trace_tokens = &token_slice[trace_window_start..];
 
@@ -132,8 +132,10 @@ impl TassadarSudoku9x9TokenTraceSummary {
             last_trace_symbolic_window: tokenizer.decode(last_trace_tokens),
             summary_digest: String::new(),
         };
-        summary.summary_digest =
-            stable_digest(b"psionic_tassadar_sudoku_9x9_token_trace_summary|", &summary);
+        summary.summary_digest = stable_digest(
+            b"psionic_tassadar_sudoku_9x9_token_trace_summary|",
+            &summary,
+        );
         summary
     }
 }
@@ -206,9 +208,7 @@ impl TassadarSudoku9x9CompiledExecutorDeploymentBundle {
             compiled_weight_bundle_file: String::from(COMPILED_WEIGHT_BUNDLE_FILE),
             compile_evidence_bundle_file: String::from(COMPILE_EVIDENCE_BUNDLE_FILE),
             model_descriptor_file: String::from(MODEL_DESCRIPTOR_FILE),
-            runtime_execution_proof_bundle_file: String::from(
-                RUNTIME_EXECUTION_PROOF_BUNDLE_FILE,
-            ),
+            runtime_execution_proof_bundle_file: String::from(RUNTIME_EXECUTION_PROOF_BUNDLE_FILE),
             runtime_trace_proof_file: String::from(RUNTIME_TRACE_PROOF_FILE),
             token_trace_summary_file: String::from(TOKEN_TRACE_SUMMARY_FILE),
             readable_log_file: String::from(READABLE_LOG_FILE),
@@ -371,10 +371,8 @@ pub enum TassadarSudoku9x9CompiledExecutorPersistError {
 /// Executes the exact compiled Sudoku-9x9 lane and writes the resulting bundle.
 pub fn run_tassadar_sudoku_9x9_compiled_executor_bundle(
     output_dir: &Path,
-) -> Result<
-    TassadarSudoku9x9CompiledExecutorRunBundle,
-    TassadarSudoku9x9CompiledExecutorPersistError,
-> {
+) -> Result<TassadarSudoku9x9CompiledExecutorRunBundle, TassadarSudoku9x9CompiledExecutorPersistError>
+{
     fs::create_dir_all(output_dir).map_err(|error| {
         TassadarSudoku9x9CompiledExecutorPersistError::CreateDir {
             path: output_dir.display().to_string(),
@@ -514,9 +512,10 @@ fn persist_deployments(
             }
         })?;
 
-        let compiled_execution = case
-            .compiled_executor
-            .execute(&case.program_artifact, TassadarExecutorDecodeMode::ReferenceLinear)?;
+        let compiled_execution = case.compiled_executor.execute(
+            &case.program_artifact,
+            TassadarExecutorDecodeMode::ReferenceLinear,
+        )?;
         let token_trace_summary = TassadarSudoku9x9TokenTraceSummary::new(
             case.case_id.as_str(),
             &tokenizer,
@@ -582,8 +581,15 @@ fn persist_deployments(
                 .compile_evidence_bundle()
                 .proof_bundle
                 .stable_digest(),
-            compiled_execution.evidence_bundle.proof_bundle.stable_digest(),
-            compiled_execution.evidence_bundle.trace_proof.proof_digest.clone(),
+            compiled_execution
+                .evidence_bundle
+                .proof_bundle
+                .stable_digest(),
+            compiled_execution
+                .evidence_bundle
+                .trace_proof
+                .proof_digest
+                .clone(),
             token_trace_summary.summary_digest,
         ));
     }
@@ -612,13 +618,22 @@ fn render_readable_log(case_id: &str, execution: &TassadarExecution) -> String {
 
 fn format_instruction(instruction: &TassadarInstruction) -> String {
     match instruction {
+        TassadarInstruction::Nop => String::from("nop"),
         TassadarInstruction::I32Const { value } => format!("i32.const {value}"),
         TassadarInstruction::LocalGet { local } => format!("local.get {local}"),
         TassadarInstruction::LocalSet { local } => format!("local.set {local}"),
+        TassadarInstruction::LocalTee { local } => format!("local.tee {local}"),
+        TassadarInstruction::Drop => String::from("drop"),
         TassadarInstruction::I32Add => String::from("i32.add"),
         TassadarInstruction::I32Sub => String::from("i32.sub"),
         TassadarInstruction::I32Mul => String::from("i32.mul"),
         TassadarInstruction::I32Lt => String::from("i32.lt"),
+        TassadarInstruction::I32Eqz => String::from("i32.eqz"),
+        TassadarInstruction::I32Eq => String::from("i32.eq"),
+        TassadarInstruction::I32Ne => String::from("i32.ne"),
+        TassadarInstruction::I32Gt => String::from("i32.gt"),
+        TassadarInstruction::I32Le => String::from("i32.le"),
+        TassadarInstruction::I32Ge => String::from("i32.ge"),
         TassadarInstruction::I32Load { slot } => format!("i32.load {slot}"),
         TassadarInstruction::I32Store { slot } => format!("i32.store {slot}"),
         TassadarInstruction::BrIf { target_pc } => format!("br_if {target_pc}"),
@@ -629,6 +644,7 @@ fn format_instruction(instruction: &TassadarInstruction) -> String {
 
 fn format_event(event: &TassadarTraceEvent) -> String {
     match event {
+        TassadarTraceEvent::Nop => String::from("nop"),
         TassadarTraceEvent::ConstPush { value } => format!("const_push value={value}"),
         TassadarTraceEvent::LocalGet { local, value } => {
             format!("local_get local={local} value={value}")
@@ -636,6 +652,15 @@ fn format_event(event: &TassadarTraceEvent) -> String {
         TassadarTraceEvent::LocalSet { local, value } => {
             format!("local_set local={local} value={value}")
         }
+        TassadarTraceEvent::LocalTee { local, value } => {
+            format!("local_tee local={local} value={value}")
+        }
+        TassadarTraceEvent::Drop { value } => format!("drop value={value}"),
+        TassadarTraceEvent::UnaryOp {
+            op,
+            operand,
+            result,
+        } => format!("unary_{op:?} operand={operand} result={result}"),
         TassadarTraceEvent::BinaryOp {
             op,
             left,
@@ -648,9 +673,7 @@ fn format_event(event: &TassadarTraceEvent) -> String {
             condition,
             taken,
             target_pc,
-        } => format!(
-            "branch condition={condition} taken={taken} target_pc={target_pc}"
-        ),
+        } => format!("branch condition={condition} taken={taken} target_pc={target_pc}"),
         TassadarTraceEvent::Output { value } => format!("output value={value}"),
         TassadarTraceEvent::Return => String::from("return"),
     }
@@ -679,12 +702,12 @@ fn write_text(
     value: &str,
 ) -> Result<(), TassadarSudoku9x9CompiledExecutorPersistError> {
     let path = path.as_ref();
-    fs::write(path, value).map_err(|error| {
-        TassadarSudoku9x9CompiledExecutorPersistError::Write {
+    fs::write(path, value).map_err(
+        |error| TassadarSudoku9x9CompiledExecutorPersistError::Write {
             path: path.display().to_string(),
             error,
-        }
-    })
+        },
+    )
 }
 
 fn stable_digest<T>(prefix: &[u8], value: &T) -> String
