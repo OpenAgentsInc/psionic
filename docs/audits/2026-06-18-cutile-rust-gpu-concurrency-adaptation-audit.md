@@ -16,9 +16,21 @@ Psionic acceptance matrix or any OpenAgents product promise.
 
 Yes. The paper is useful for Psionic.
 
-It is mainly useful as a design reference for a future CUDA kernel-authoring
-lane inside `psionic-array`, `psionic-compiler`, `psionic-ir`,
-`psionic-runtime`, and `psionic-backend-cuda`.
+The paper's concrete system is CUDA and NVIDIA-centered. It uses NVIDIA GPU
+hardware, CUDA graph replay, and Tile IR/PTX-oriented assumptions. Direct
+implementation lessons therefore start in `psionic-backend-cuda`.
+
+The durable Psionic lesson is broader than CUDA. The useful abstraction is a
+backend-independent device execution contract: partitioned mutable tensors,
+shared read-only tensors, typed launch boundaries, replayable execution plans,
+and explicit unsafe proof boundaries. CUDA is the first paper-backed target,
+not the limit of the design.
+
+This is mainly useful as a design reference for a future device-kernel contract
+inside `psionic-array`, `psionic-compiler`, `psionic-ir`, and
+`psionic-runtime`, with backend-specific implementations in
+`psionic-backend-cuda`, `psionic-backend-metal`, AMD backends, CPU task-graph
+execution, and eventually distributed collectives.
 
 It should not be adopted directly into OpenAgents product surfaces. OpenAgents
 should consume this work only after Psionic has implementation evidence:
@@ -57,6 +69,12 @@ replay. The generated host launch code prevents host access while GPU work is
 in flight and returns ownership only after the relevant synchronization or
 graph boundary.
 
+That exact replay mechanism is CUDA-specific in the paper. The shape of the
+contract is not. Metal command buffers, HIP graphs, Vulkan/WebGPU command
+buffers, CPU task graphs, and distributed collective schedules can all expose
+similar lifecycle states: built, submitted, in flight, synchronized, replayed,
+or refused.
+
 The evaluation matters because it argues that safety did not obviously destroy
 performance. The paper reports B200 elementwise throughput around 7 TB/s and
 GEMM around 2 PFlop/s, about 96% of cuBLAS for the measured case. It also
@@ -91,14 +109,48 @@ bounded CUDA eval surface. `psionic-backend-cuda` exists, but Psionic should not
 pretend that a cuTile-class safe kernel authoring model has landed there.
 
 The paper is therefore a good direction-of-travel reference, not an immediate
-drop-in.
+drop-in. Psionic should use it to define a backend-neutral contract first, then
+map that contract onto CUDA, Metal, AMD, CPU, and distributed backends only
+where each backend can support the claim honestly.
+
+## Generalized Psionic Contract
+
+The generalized contract should be backend-neutral.
+
+The shared concepts are:
+
+- partitioned mutable tensors: one writer owns one disjoint output region
+- shared read-only tensors: many tasks or kernels can read the same buffer
+- typed launch boundaries: host code records which buffers are borrowed, which
+  partitions are mutable, and when ownership returns
+- execution lifecycle states: build, submit, in flight, synchronize, replay,
+  recover, invalidate, or refuse
+- unsafe escape hatches: hot paths can bypass the safe surface only with
+  reason-coded proof-boundary labels
+- receipts: Psionic records partition geometry, backend identity, replay
+  identity, unsafe labels, and parity evidence
+
+The backend mappings can differ:
+
+- CUDA maps replay to CUDA graphs and stream-ordered execution
+- Metal maps replay to command buffers, encoders, heaps, and pipeline-state
+  reuse where the semantics fit
+- AMD maps replay to HIP graphs or ROCm/HSA queue semantics where available
+- CPU maps the same ownership contract to Rayon or Tokio task graphs
+- distributed execution maps partitions to rank-owned tensor shards,
+  collectives, peer copies, checkpoint barriers, and per-rank receipt
+  fragments
+
+This keeps the safety claim above any one vendor API. A backend can implement a
+subset, report that subset, and refuse unsupported modes without weakening the
+common Psionic contract.
 
 ## What Psionic Should Learn
 
-### 1. Treat host-to-device launch as a typed contract
+### 1. Treat host-to-backend launch as a typed contract
 
-Psionic should model GPU launch as a machine-legible runtime contract, not only
-as a backend implementation detail.
+Psionic should model device launch as a machine-legible runtime contract, not
+only as a backend implementation detail.
 
 The contract should name:
 
@@ -106,7 +158,7 @@ The contract should name:
 - mutable output tensor identities
 - partition geometry
 - disjointness proof posture
-- stream identity
+- stream, queue, command-buffer, or task-graph identity
 - graph-capture identity when applicable
 - synchronization or replay boundary
 - ownership recovery point
@@ -118,9 +170,9 @@ eventual surface is not a prose claim that a kernel was safe. The useful surface
 is a typed launch record that validators can inspect and replay against bounded
 fixtures.
 
-### 2. Add partitioned mutable tensors before broad custom CUDA kernels
+### 2. Add partitioned mutable tensors before broad custom device kernels
 
-Psionic should not rush into a pile of custom CUDA kernels with ordinary raw
+Psionic should not rush into a pile of custom backend kernels with ordinary raw
 pointer launch wrappers.
 
 The first useful substrate work is a partition API for mutable device tensors:
@@ -154,27 +206,33 @@ kernel that bypasses partition proof should carry a reason-coded label such as:
 Those labels should flow into capability reports and receipts. A fast path can
 be valid while still saying which proof boundary it skipped.
 
-### 4. Make CUDA graph replay a typed execution mode
+### 4. Make replay a typed execution mode
 
 The paper's CUDA graph treatment maps well to Psionic's existing graph and
-receipt vocabulary.
+receipt vocabulary. Psionic should generalize the contract instead of making
+the concept CUDA-only.
 
-Psionic should treat CUDA graph capture and replay as a runtime execution mode
-with its own contract:
+Psionic should treat captured replay as a runtime execution mode with its own
+contract:
 
 - capture input shape contract
-- non-allocating node restriction
+- non-allocating or allocation-stable node restriction
 - pointer-stability requirement
-- stream-order dependency record
+- stream, queue, command-buffer, or task-graph dependency record
 - replay count
 - graph digest
 - invalidation reasons
 - fallback/refusal reasons
 
-That is especially relevant for batch-1 decode and other repeated low-latency
-paths. It is also relevant for fixed-shape training inner loops. The important
-rule is that graph replay must remain a typed mode with receipts, not an
-opaque optimization hidden behind a backend flag.
+CUDA graphs are one implementation. Metal command-buffer reuse, HIP graphs,
+Vulkan/WebGPU command-buffer replay, CPU task-graph replay, and distributed
+collective schedules can implement smaller or different subsets of the same
+contract.
+
+Captured replay is especially relevant for batch-1 decode and other repeated
+low-latency paths. It is also relevant for fixed-shape training inner loops.
+The important rule is that replay must remain a typed mode with receipts, not
+an opaque optimization hidden behind a backend flag.
 
 ### 5. Use async host/device orchestration only where it pays
 
@@ -239,7 +297,8 @@ Psionic should not treat Grout as covering:
 
 Keep this as an audit only. Do not change user-facing OpenAgents claims.
 
-Record one planned Psionic work item: a CUDA tile-safety experiment that proves
+Record one planned Psionic work item: a backend-neutral partitioned-tensor
+launch contract, plus a first CUDA tile-safety experiment that proves
 partitioned mutable tensors, typed launch records, and unsafe escape labels on
 a tiny kernel set.
 
@@ -252,19 +311,22 @@ Good first kernels:
 - one small matmul case if it can be compared against cuBLAS without claiming
   full GEMM coverage
 
-Acceptance should require CPU parity, CUDA parity, deterministic receipt
-generation, and explicit refusal for unsupported aliasing or shape patterns.
+Acceptance should require CPU parity, CUDA parity for the first backend slice,
+deterministic receipt generation, and explicit refusal for unsupported aliasing
+or shape patterns. The contract should be written so Metal, AMD, CPU, and
+distributed backends can later implement honest subsets without rewriting the
+receipt vocabulary.
 
 ### Short Term
 
-Add a design doc or issue program for a Psionic CUDA launch contract.
+Add a design doc or issue program for a Psionic device launch contract.
 
 The design should cover:
 
 - partitioned mutable tensors
 - read-only tensor sharing
-- typed stream execution
-- typed CUDA graph capture and replay
+- typed stream, queue, command-buffer, and task-graph execution
+- typed capture and replay, with CUDA graph capture as the first concrete lane
 - unsafe escape-hatch labeling
 - launch receipts
 - compile-fail tests where possible
@@ -272,12 +334,13 @@ The design should cover:
 
 This belongs in Psionic docs first. Implementation should stay scoped to
 `psionic-array`, `psionic-ir`, `psionic-compiler`, `psionic-runtime`, and
-`psionic-backend-cuda`.
+backend crates, starting with `psionic-backend-cuda`.
 
 ### Medium Term
 
-Build one benchmarked CUDA graph replay lane for a fixed-shape decode or train
-inner loop.
+Build one benchmarked captured-replay lane for a fixed-shape decode or train
+inner loop. CUDA graph replay is the best first target because the paper gives
+direct evidence for that path.
 
 The target should not be "beat vLLM" on the first pass. The target should be:
 
@@ -324,6 +387,9 @@ Required validation:
   unavailable CUDA devices, and unsupported architecture features
 - benchmark reports that separate launch overhead, kernel time, graph replay
   time, and end-to-end throughput
+- backend-subset reports that distinguish CUDA, Metal, AMD, CPU, and
+  distributed support instead of collapsing them into one generic "safe GPU"
+  claim
 
 Useful formal or model notes:
 
@@ -344,6 +410,8 @@ The main risks are concrete:
 - the paper's system is CUDA-specific and NVIDIA-centered
 - the results may depend on B200 or RTX 5090 behavior that does not transfer
   to Psionic's other backends
+- backend-independent wording could overstate what non-CUDA backends support
+  if each backend does not emit precise subset reports
 - the safe surface does not yet cover all performance-critical LLM kernels
 - unchecked code remains necessary for some attention and fused paths
 - Grout's batch-1 Qwen specialization does not prove broad serving maturity
@@ -364,10 +432,12 @@ Kill direct adoption if any of the following are true:
 
 Adopt the ideas, not the product claim.
 
-Psionic should use the paper to guide a Rust-native CUDA launch-contract lane:
-partitioned mutable tensors, typed host-to-device launch, explicit unsafe
-escape hatches, CUDA graph replay as a typed mode, and receipt-backed
-validation.
+Psionic should use the paper to guide a Rust-native device launch-contract
+lane: partitioned mutable tensors, typed host-to-backend launch, explicit
+unsafe escape hatches, captured replay as a typed mode, and receipt-backed
+validation. CUDA should be the first concrete backend target because the paper
+is CUDA-centered. The contract should be general enough for Metal, AMD, CPU,
+and distributed backends to implement honest subsets.
 
 OpenAgents should wait. It should expose this only after Psionic lands retained
 evidence and emits bounded capability reports. The near-term OpenAgents action
