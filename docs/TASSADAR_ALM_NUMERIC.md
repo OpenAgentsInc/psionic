@@ -55,6 +55,25 @@ differential harness now runs **five legs** (evaluator / row /
 geometric / hull / numeric) over its 400 generated graphs with zero
 failures.
 
+## Run-Facing Program Corpus
+
+`build_tassadar_alm_numeric_program_corpus_fixture_v1` emits the first
+run-facing compiled-program corpus for OpenAgents C1. It compiles four
+distinct `TassadarProgram`s through the same owned path:
+
+- backward-branch loop sum,
+- straight-line arithmetic,
+- memory load/store roundtrip,
+- factorial countdown state machine.
+
+For each program, the builder validates CPU-reference outputs, lowers
+through the ALM Wasm interpreter, schedules the graph, materializes the
+numeric model, executes it, and stores the program digest, model digest,
+trace digest, expected outputs, and public-safe compile receipt refs.
+The committed fixture can be regenerated with the ignored
+`dump_numeric_program_corpus_fixture` test in
+`crates/psionic-compiler/src/tassadar_alm_numeric.rs`.
+
 ## What This Phase Does Not Do
 
 Hard-max attention only — no softmax, no temperature, no approximation

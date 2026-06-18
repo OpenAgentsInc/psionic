@@ -4,8 +4,17 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+use psionic_runtime::{
+    TassadarCpuReferenceRunner, TassadarExecutionRefusal, TassadarInstruction, TassadarProgram,
+    TassadarWasmProfile,
+};
+
 use crate::tassadar_alm_backend::{
-    TassadarAlmAttentionRow, TassadarAlmCompiledBundle, TassadarAlmWiringRow,
+    compile_tassadar_alm_graph, TassadarAlmAttentionRow, TassadarAlmBackendError,
+    TassadarAlmCompiledBundle, TassadarAlmWiringRow,
+};
+use crate::tassadar_alm_wasm_interpreter::{
+    tassadar_alm_wasm_collect, tassadar_alm_wasm_interpreter, TassadarAlmWasmInterpreterError,
 };
 
 /// Stable schema version for the numeric model artifact.
@@ -296,6 +305,354 @@ pub struct TassadarAlmNumericTrace {
     pub step_outputs: Vec<Vec<i64>>,
     /// Stable digest over the output rows, comparable with the evaluator's.
     pub trace_digest: String,
+}
+
+/// Stable schema version for the generated numeric program corpus fixture.
+pub const TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_SCHEMA_VERSION: u16 = 1;
+/// Stable corpus identifier for the first run-facing compiled-program set.
+pub const TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_ID: &str = "tassadar_alm.numeric_program_corpus.v1";
+/// Generator identity embedded in committed corpus fixtures.
+pub const TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_GENERATED_BY: &str =
+    "psionic crates/psionic-compiler tassadar_alm_numeric_program_corpus_v1";
+
+/// One source program specification before compilation into a numeric fixture.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TassadarAlmNumericProgramSpec {
+    /// Stable fixture identifier emitted into the corpus artifact.
+    pub fixture_id: String,
+    /// Human-readable workload family label.
+    pub workload_kind: String,
+    /// Program to compile through the ALM Wasm interpreter.
+    pub program: TassadarProgram,
+    /// Per-step inputs used by the numeric executor.
+    pub steps: Vec<Vec<i64>>,
+}
+
+/// One digest-pinned compiled-program fixture derived from the psionic pipeline.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TassadarAlmNumericProgramFixture {
+    /// Stable fixture identifier.
+    pub fixture_id: String,
+    /// Stable program identifier.
+    pub program_id: String,
+    /// Stable digest of the source program payload.
+    pub program_digest: String,
+    /// Human-readable workload family label.
+    pub workload_kind: String,
+    /// Runtime profile id targeted by the program.
+    pub profile_id: String,
+    /// Source program used to regenerate this fixture.
+    pub program: TassadarProgram,
+    /// Numeric model produced by interpreter -> backend -> numeric materializer.
+    pub model: TassadarAlmNumericModel,
+    /// Per-step input rows.
+    pub steps: Vec<Vec<i64>>,
+    /// Trace digest produced by executing the numeric model.
+    pub expected_trace_digest: String,
+    /// Model digest produced by the numeric materializer.
+    pub expected_model_digest: String,
+    /// Final numeric trace row, if the run emitted any step.
+    pub expected_final_row: Option<Vec<i64>>,
+    /// Outputs collected from the ALM interpreter row convention.
+    pub expected_outputs: Vec<i64>,
+    /// Whether the interpreter halted under the chosen step budget.
+    pub halted: bool,
+    /// Public-safe receipt refs proving the pipeline stages used to derive this fixture.
+    pub compile_receipt_refs: Vec<String>,
+}
+
+/// Corpus artifact consumed by OpenAgents dispatch.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TassadarAlmNumericProgramCorpusFixture {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable corpus id.
+    pub corpus_id: String,
+    /// Generator identity.
+    pub generated_by: String,
+    /// Claim boundary inherited from the numeric materialization lane.
+    pub claim_boundary: String,
+    /// Number of fixtures.
+    pub program_count: usize,
+    /// Digest-pinned program fixtures.
+    pub fixtures: Vec<TassadarAlmNumericProgramFixture>,
+    /// Stable digest over the corpus fixture identities and derived digests.
+    pub corpus_digest: String,
+}
+
+/// Failure returned while building the numeric program corpus.
+#[derive(Debug, Error)]
+pub enum TassadarAlmNumericProgramCorpusError {
+    /// CPU reference runner refused the source program.
+    #[error(transparent)]
+    ReferenceRunner(#[from] TassadarExecutionRefusal),
+    /// ALM Wasm interpreter refused the source program.
+    #[error(transparent)]
+    WasmInterpreter(#[from] TassadarAlmWasmInterpreterError),
+    /// ALM backend refused the generated graph.
+    #[error(transparent)]
+    Backend(#[from] TassadarAlmBackendError),
+    /// Numeric execution refused the generated model.
+    #[error(transparent)]
+    NumericExecution(#[from] TassadarAlmNumericExecutionError),
+    /// The numeric executor output diverged from the CPU reference runner.
+    #[error("program {program_id} numeric outputs {numeric_outputs:?} diverged from reference outputs {reference_outputs:?}")]
+    ReferenceOutputMismatch {
+        /// Program id that diverged.
+        program_id: String,
+        /// Outputs collected from the numeric ALM row convention.
+        numeric_outputs: Vec<i64>,
+        /// Outputs produced by the CPU reference runner.
+        reference_outputs: Vec<i64>,
+    },
+    /// The program did not halt under the chosen step budget.
+    #[error("program {program_id} did not halt under the chosen step budget")]
+    DidNotHalt {
+        /// Program id that did not halt.
+        program_id: String,
+    },
+}
+
+impl TassadarAlmNumericProgramCorpusFixture {
+    /// Builds a deterministic corpus artifact from compiled fixtures.
+    #[must_use]
+    pub fn new(fixtures: Vec<TassadarAlmNumericProgramFixture>) -> Self {
+        let corpus_digest = tassadar_alm_numeric_program_corpus_digest(&fixtures);
+        Self {
+            schema_version: TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_SCHEMA_VERSION,
+            corpus_id: String::from(TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_ID),
+            generated_by: String::from(TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_GENERATED_BY),
+            claim_boundary: String::from(TASSADAR_ALM_NUMERIC_CLAIM_BOUNDARY),
+            program_count: fixtures.len(),
+            fixtures,
+            corpus_digest,
+        }
+    }
+}
+
+/// Builds the first compiled-program corpus used by the OpenAgents run dispatcher.
+pub fn build_tassadar_alm_numeric_program_corpus_fixture_v1(
+) -> Result<TassadarAlmNumericProgramCorpusFixture, TassadarAlmNumericProgramCorpusError> {
+    let fixtures = tassadar_alm_numeric_program_corpus_specs_v1()
+        .into_iter()
+        .map(build_tassadar_alm_numeric_program_fixture)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(TassadarAlmNumericProgramCorpusFixture::new(fixtures))
+}
+
+/// Source program specs for the v1 run-facing corpus.
+#[must_use]
+pub fn tassadar_alm_numeric_program_corpus_specs_v1() -> Vec<TassadarAlmNumericProgramSpec> {
+    use TassadarInstruction as I;
+    let article_profile = TassadarWasmProfile::article_i32_compute_v1();
+    let core_profile = TassadarWasmProfile::core_i32_v2();
+
+    let loop_sum = TassadarProgram::new(
+        "tassadar_corpus.loop_sum_v1",
+        &article_profile,
+        2,
+        1,
+        vec![
+            I::I32Const { value: 0 },
+            I::LocalSet { local: 0 },
+            I::I32Const { value: 1 },
+            I::LocalSet { local: 1 },
+            I::LocalGet { local: 0 },
+            I::LocalGet { local: 1 },
+            I::I32Add,
+            I::LocalSet { local: 0 },
+            I::LocalGet { local: 1 },
+            I::I32Const { value: 1 },
+            I::I32Add,
+            I::LocalSet { local: 1 },
+            I::LocalGet { local: 1 },
+            I::I32Const { value: 6 },
+            I::I32Lt,
+            I::BrIf { target_pc: 4 },
+            I::LocalGet { local: 0 },
+            I::Output,
+            I::Return,
+        ],
+    );
+
+    let straight_line = TassadarProgram::new(
+        "tassadar_corpus.mul_add_v1",
+        &core_profile,
+        1,
+        1,
+        vec![
+            I::I32Const { value: 6 },
+            I::I32Const { value: 7 },
+            I::I32Mul,
+            I::I32Const { value: 5 },
+            I::I32Add,
+            I::Output,
+            I::Return,
+        ],
+    );
+
+    let memory_roundtrip = TassadarProgram::new(
+        "tassadar_corpus.memory_roundtrip_v1",
+        &core_profile,
+        1,
+        2,
+        vec![
+            I::I32Load { slot: 0 },
+            I::I32Const { value: 5 },
+            I::I32Add,
+            I::I32Store { slot: 1 },
+            I::I32Load { slot: 1 },
+            I::Output,
+            I::Return,
+        ],
+    )
+    .with_initial_memory(vec![37, 0]);
+
+    let factorial_loop = TassadarProgram::new(
+        "tassadar_corpus.factorial_loop_v1",
+        &article_profile,
+        2,
+        1,
+        vec![
+            I::I32Const { value: 4 },
+            I::LocalSet { local: 0 },
+            I::I32Const { value: 1 },
+            I::LocalSet { local: 1 },
+            I::LocalGet { local: 1 },
+            I::LocalGet { local: 0 },
+            I::I32Mul,
+            I::LocalSet { local: 1 },
+            I::LocalGet { local: 0 },
+            I::I32Const { value: 1 },
+            I::I32Sub,
+            I::LocalSet { local: 0 },
+            I::I32Const { value: 1 },
+            I::LocalGet { local: 0 },
+            I::I32Lt,
+            I::BrIf { target_pc: 4 },
+            I::LocalGet { local: 1 },
+            I::Output,
+            I::Return,
+        ],
+    );
+
+    vec![
+        TassadarAlmNumericProgramSpec {
+            fixture_id: String::from("tassadar_corpus.loop_sum_v1.numeric_fixture.v1"),
+            workload_kind: String::from("control_flow.backward_branch_sum"),
+            program: loop_sum,
+            steps: vec![vec![0]; 80],
+        },
+        TassadarAlmNumericProgramSpec {
+            fixture_id: String::from("tassadar_corpus.mul_add_v1.numeric_fixture.v1"),
+            workload_kind: String::from("arithmetic.mul_add"),
+            program: straight_line,
+            steps: vec![vec![0]; 12],
+        },
+        TassadarAlmNumericProgramSpec {
+            fixture_id: String::from("tassadar_corpus.memory_roundtrip_v1.numeric_fixture.v1"),
+            workload_kind: String::from("memory.load_store_roundtrip"),
+            program: memory_roundtrip,
+            steps: vec![vec![0]; 12],
+        },
+        TassadarAlmNumericProgramSpec {
+            fixture_id: String::from("tassadar_corpus.factorial_loop_v1.numeric_fixture.v1"),
+            workload_kind: String::from("state_machine.factorial_countdown"),
+            program: factorial_loop,
+            steps: vec![vec![0]; 96],
+        },
+    ]
+}
+
+/// Compiles one source program through the ALM pipeline and emits a numeric fixture.
+pub fn build_tassadar_alm_numeric_program_fixture(
+    spec: TassadarAlmNumericProgramSpec,
+) -> Result<TassadarAlmNumericProgramFixture, TassadarAlmNumericProgramCorpusError> {
+    let reference_runner = TassadarCpuReferenceRunner::for_program(&spec.program)?;
+    let reference_outputs: Vec<i64> = reference_runner
+        .execute(&spec.program)?
+        .outputs
+        .iter()
+        .map(|value| i64::from(*value))
+        .collect();
+    let graph = tassadar_alm_wasm_interpreter(&spec.program)?;
+    let bundle = compile_tassadar_alm_graph(&graph)?;
+    let model = materialize_tassadar_alm_numeric(&bundle);
+    let trace = tassadar_alm_numeric_execute(&model, &spec.steps)?;
+    let (numeric_outputs, halted) = tassadar_alm_wasm_collect(&trace.step_outputs);
+    if numeric_outputs != reference_outputs {
+        return Err(
+            TassadarAlmNumericProgramCorpusError::ReferenceOutputMismatch {
+                program_id: spec.program.program_id.clone(),
+                numeric_outputs,
+                reference_outputs,
+            },
+        );
+    }
+    if !halted {
+        return Err(TassadarAlmNumericProgramCorpusError::DidNotHalt {
+            program_id: spec.program.program_id.clone(),
+        });
+    }
+
+    let expected_model_digest = model.stable_digest();
+    let bundle_digest = model.bundle_digest.clone();
+    let program_digest = spec.program.program_digest();
+    Ok(TassadarAlmNumericProgramFixture {
+        fixture_id: spec.fixture_id,
+        program_id: spec.program.program_id.clone(),
+        program_digest: program_digest.clone(),
+        workload_kind: spec.workload_kind,
+        profile_id: spec.program.profile_id.clone(),
+        program: spec.program,
+        model,
+        steps: spec.steps,
+        expected_trace_digest: trace.trace_digest.clone(),
+        expected_model_digest: expected_model_digest.clone(),
+        expected_final_row: trace.step_outputs.last().cloned(),
+        expected_outputs: reference_outputs,
+        halted,
+        compile_receipt_refs: vec![
+            format!("receipt.psionic.tassadar_program.{}", &program_digest[..16]),
+            format!(
+                "receipt.psionic.tassadar_graph.{}",
+                &trace.graph_digest[..16]
+            ),
+            format!("receipt.psionic.tassadar_bundle.{}", &bundle_digest[..16]),
+            format!(
+                "receipt.psionic.tassadar_numeric_model.{}",
+                &expected_model_digest[..16]
+            ),
+            format!(
+                "receipt.psionic.tassadar_trace.{}",
+                &trace.trace_digest[..16]
+            ),
+        ],
+    })
+}
+
+fn tassadar_alm_numeric_program_corpus_digest(
+    fixtures: &[TassadarAlmNumericProgramFixture],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"tassadar_alm_numeric_program_corpus_v1|");
+    for fixture in fixtures {
+        hasher.update(fixture.fixture_id.as_bytes());
+        hasher.update(b"|");
+        hasher.update(fixture.program_id.as_bytes());
+        hasher.update(b"|");
+        hasher.update(fixture.program_digest.as_bytes());
+        hasher.update(b"|");
+        hasher.update(fixture.expected_model_digest.as_bytes());
+        hasher.update(b"|");
+        hasher.update(fixture.expected_trace_digest.as_bytes());
+        hasher.update(b"|");
+        hasher.update(fixture.expected_outputs.len().to_string().as_bytes());
+        hasher.update(b";");
+    }
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -615,6 +972,60 @@ mod tests {
             TassadarAlmNumericExecutionError::ExactnessWindowExceeded { step: 0, .. }
         ));
     }
+
+    #[test]
+    fn program_corpus_fixture_is_pipeline_derived_and_deterministic() {
+        let corpus = build_tassadar_alm_numeric_program_corpus_fixture_v1().expect("corpus builds");
+        let rebuilt =
+            build_tassadar_alm_numeric_program_corpus_fixture_v1().expect("corpus rebuilds");
+
+        assert_eq!(corpus, rebuilt);
+        assert_eq!(corpus.schema_version, 1);
+        assert_eq!(corpus.corpus_id, TASSADAR_ALM_NUMERIC_PROGRAM_CORPUS_ID);
+        assert_eq!(corpus.program_count, 4);
+        assert_eq!(corpus.fixtures.len(), corpus.program_count);
+
+        let mut program_ids = std::collections::BTreeSet::new();
+        let mut model_digests = std::collections::BTreeSet::new();
+        let mut trace_digests = std::collections::BTreeSet::new();
+        let mut kinds = std::collections::BTreeSet::new();
+        for fixture in &corpus.fixtures {
+            assert!(program_ids.insert(fixture.program_id.clone()));
+            assert!(model_digests.insert(fixture.expected_model_digest.clone()));
+            assert!(trace_digests.insert(fixture.expected_trace_digest.clone()));
+            assert!(kinds.insert(fixture.workload_kind.clone()));
+            assert_eq!(fixture.expected_model_digest, fixture.model.stable_digest());
+            assert_eq!(fixture.compile_receipt_refs.len(), 5);
+            assert!(fixture
+                .compile_receipt_refs
+                .iter()
+                .all(|receipt| receipt.starts_with("receipt.psionic.tassadar_")));
+
+            let trace = tassadar_alm_numeric_execute(&fixture.model, &fixture.steps)
+                .expect("fixture executes");
+            let (outputs, halted) = tassadar_alm_wasm_collect(&trace.step_outputs);
+            assert!(halted);
+            assert_eq!(trace.trace_digest, fixture.expected_trace_digest);
+            assert_eq!(outputs, fixture.expected_outputs);
+        }
+        assert_eq!(kinds.len(), 4);
+        assert!(corpus
+            .fixtures
+            .iter()
+            .any(|fixture| fixture.expected_outputs == vec![15]));
+        assert!(corpus
+            .fixtures
+            .iter()
+            .any(|fixture| fixture.expected_outputs == vec![47]));
+        assert!(corpus
+            .fixtures
+            .iter()
+            .any(|fixture| fixture.expected_outputs == vec![42]));
+        assert!(corpus
+            .fixtures
+            .iter()
+            .any(|fixture| fixture.expected_outputs == vec![24]));
+    }
 }
 
 #[cfg(test)]
@@ -680,5 +1091,17 @@ mod fixture_dump {
         )
         .expect("writes");
         eprintln!("trace_digest={}", trace.trace_digest);
+    }
+
+    #[test]
+    #[ignore]
+    fn dump_numeric_program_corpus_fixture() {
+        let corpus = build_tassadar_alm_numeric_program_corpus_fixture_v1().expect("corpus builds");
+        std::fs::write(
+            "/tmp/tassadar-compiled-program-corpus-v1.json",
+            serde_json::to_vec_pretty(&corpus).expect("encodes"),
+        )
+        .expect("writes");
+        eprintln!("corpus_digest={}", corpus.corpus_digest);
     }
 }
