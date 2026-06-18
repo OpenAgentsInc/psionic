@@ -55,6 +55,26 @@ The manifest carries refs that Probe and benchmark-cloud can import:
 These are refs only. The candidate cannot grant new runtime authority, bypass
 release gates, carry raw secrets, or upgrade public benchmark claims.
 
+## StudyBench Feedback
+
+Status: implemented_early
+
+Psionic accepts OpenAgents StudyBench claim feedback as refs-only optimizer
+evidence through `psionic.studybench_gepa_feedback_refs.v1` in
+`crates/psionic-train/src/studybench_gepa_feedback.rs`.
+
+The feedback record may carry failed claim refs, missed evidence span refs,
+forbidden claim refs, skipped test refs, wrong file refs, and budget failure
+refs for the OpenAgents StudyBench target suites:
+
+- `target_suite.openagents_studybench.public_retained.v0`
+- `target_suite.openagents_studybench.private_validation.v0`
+
+The record is optimizer feedback only. It cannot include raw private holdout
+gold answers, raw rubrics, raw judge rationale, runtime-promotion authority,
+public-claim authority, model-training authority, payout authority, or
+settlement authority.
+
 ## Regeneration
 
 Regenerate the retained seed fixture with:
@@ -68,4 +88,5 @@ Verify the contract with:
 
 ```bash
 cargo test -p psionic-train probe_gepa_candidate_manifest --lib
+cargo test -p psionic-train studybench_gepa_feedback --lib
 ```
