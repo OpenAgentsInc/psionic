@@ -370,6 +370,98 @@ OpenAgents should not adopt the paper as product copy. It should not imply
 that safe Rust GPU kernels are already part of the production substrate until
 Psionic produces retained evidence.
 
+### Product Surfaces That Benefit First
+
+The first OpenAgents benefit is better evidence, not new marketing copy.
+
+The surfaces that would benefit first are:
+
+1. `/api/training/runs/...` and the public run pages. These can show a stronger
+   backend execution posture per run window: backend subset, partition
+   geometry, replay mode, unsafe labels, parity evidence, and refusal reasons.
+   The immediate value is clearer run truth for operators, contributors, and
+   public auditors.
+2. `/tassadar`, `/api/public/tassadar-run-summary`, and proof-replay bundles.
+   Tassadar already depends on digest-pinned exact replay. A Psionic
+   launch-contract lane would let the public Tassadar surface distinguish CPU
+   reference replay, CUDA replay, Metal replay, unsafe-kernel replay, and
+   refused accelerator replay without collapsing them into one green check.
+3. Pylon training commands and capability reporting. `pylon training status`,
+   `pylon training claim`, and provider capability envelopes can advertise
+   executor or training capacity with backend-specific proof posture instead of
+   vague GPU availability.
+4. Training registry and promise evidence. Records such as
+   `training.verification_classes.v1`,
+   `training.device_capability_dataset.v1`,
+   `training.public_gradient_windows.v1`,
+   `pylon.first_real_model_training_run.v1`, and
+   `compute.tassadar_executor_poc.v1` would gain better evidence fields. The
+   state of those promises should not move until real accepted work, verifier
+   receipts, and settlement evidence exist.
+5. Proof replay and social replay surfaces. The replay UI can visualize the
+   device-execution contract as part of the proof story: what ran, where it
+   ran, what replayed, which unsafe boundaries were used, and which backend
+   modes refused.
+6. Admin and Autopilot review surfaces. Operator views can use the same
+   receipts to decide whether a worker, run window, or provider claim is
+   admissible. This is later than run-page and Pylon status value because it
+   depends on the same Psionic evidence being available first.
+
+The product ordering should be:
+
+1. Psionic emits launch receipts and backend-subset capability reports.
+2. OpenAgents run APIs expose those reports without changing promise state.
+3. Pylon CLI and provider envelopes display the evidence and refusal posture.
+4. Tassadar proof pages and replay surfaces render the evidence.
+5. Product promises move only after accepted work and settlement receipts prove
+   the broader claim.
+
+### Value For Tassadar And Psion Runs
+
+This approach is valuable for Tassadar first, but it must preserve Tassadar's
+exactness boundary.
+
+Tassadar's current value is exact replay: digest-pinned compiled workloads,
+independent replay, verifier verdicts, and settlement receipts. A generalized
+device launch contract would strengthen the next accelerator-backed Tassadar
+steps by recording exactly how a compiled dense module, linked module, or
+runtime trace was executed on a backend.
+
+For Tassadar, the useful additions are:
+
+- exact CPU/reference parity before any accelerator receipt is admitted
+- backend-specific replay labels such as CPU reference, CUDA captured replay,
+  Metal command-buffer replay, or refused accelerator replay
+- partition geometry and ownership records for dense modules and linked
+  modules
+- unsafe-boundary labels when a hot kernel bypasses the safe partition surface
+- deterministic trace digest binding across worker and validator devices
+- public-safe replay metadata for `/tassadar` and proof-replay bundles
+
+The risk is also clear. Tassadar must not let an approximate GPU fast path
+weaken exact replay. If a CUDA, Metal, AMD, or CPU task-graph backend cannot
+produce deterministic parity with the reference trace, the Tassadar lane should
+refuse the accelerated mode or label it as non-authoritative. Accelerator
+throughput is useful only after exactness survives.
+
+For generic Psion training runs, the value is different. Psion is not the
+exactness-claiming lane; it needs honest training and run evidence:
+
+- rank-owned tensor partition receipts for distributed windows
+- gradient/update ownership and checkpoint recovery records
+- backend-subset reports for CUDA, Metal, AMD, CPU, and mixed-device runs
+- captured-replay receipts for fixed-shape inner loops
+- unsafe-kernel labels for fused optimizer, attention, normalization, or matmul
+  paths
+- device capability dataset rows that distinguish real accelerator support from
+  dark or refused capacity
+
+That would help the training program's verification classes, device-capability
+dataset, public run pages, and eventually `pylon.first_real_model_training_run`
+evidence. It does not by itself prove public decentralized gradient training.
+Accepted public gradient windows still need contributor devices, verified
+updates, checkpoint/promotion policy, economics gates, and settlement receipts.
+
 ## Validation Requirements
 
 The first implementation slice should include tests and fixtures that check the
