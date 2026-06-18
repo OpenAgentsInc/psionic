@@ -10,17 +10,17 @@ use psionic_ir::{
 };
 
 use crate::tassadar_alm_dense_module::{
-    TassadarAlmDenseExecutionError, TassadarAlmDenseProgramFixture, TassadarAlmDenseWeightModule,
     build_tassadar_alm_dense_program_fixture_for, materialize_tassadar_alm_dense_weight_module,
     tassadar_alm_dense_weight_module_execute, tassadar_alm_dense_weight_module_to_numeric,
+    TassadarAlmDenseExecutionError, TassadarAlmDenseProgramFixture, TassadarAlmDenseWeightModule,
 };
 use crate::tassadar_alm_numeric::{
     TassadarAlmNumericAttentionRow, TassadarAlmNumericExecutionError, TassadarAlmNumericFfnRow,
     TassadarAlmNumericModel, TassadarAlmNumericWiringRow, TassadarAlmNumericWriteRow,
 };
 use crate::tassadar_module_linker::{
-    TassadarModuleLinkError, TassadarModuleLinkRequest, TassadarModuleLinkResolution,
-    link_tassadar_module_dependency_graph,
+    link_tassadar_module_dependency_graph, TassadarModuleLinkError, TassadarModuleLinkRequest,
+    TassadarModuleLinkResolution,
 };
 
 /// Stable schema version for linked dense ALM module artifacts.
@@ -217,8 +217,8 @@ pub enum TassadarAlmLinkedDenseProgramFixtureError {
 }
 
 /// Builds the first linked dense fixture for OpenAgents compiled-module listings.
-pub fn build_tassadar_alm_linked_dense_program_fixture_v1()
--> Result<TassadarAlmLinkedDenseProgramFixture, TassadarAlmLinkedDenseProgramFixtureError> {
+pub fn build_tassadar_alm_linked_dense_program_fixture_v1(
+) -> Result<TassadarAlmLinkedDenseProgramFixture, TassadarAlmLinkedDenseProgramFixtureError> {
     let fixtures = vec![
         build_tassadar_alm_dense_program_fixture_for("tassadar_corpus.mul_add_v1")?,
         build_tassadar_alm_dense_program_fixture_for("tassadar_corpus.memory_roundtrip_v1")?,
@@ -788,15 +788,79 @@ mod tests {
                 .len(),
             1
         );
-        assert!(
-            fixture
-                .conformance_cases
-                .iter()
-                .all(|case| case.projected_rows_match_source)
-        );
+        assert!(fixture
+            .conformance_cases
+            .iter()
+            .all(|case| case.projected_rows_match_source));
         assert!(fixture.marketplace_artifact_refs.iter().any(|reference| {
             reference.starts_with("listing.public.tassadar_compiled_weight_module.")
         }));
+    }
+
+    #[test]
+    fn linked_dense_link_resolution_carries_compatibility_evidence_for_each_bank() {
+        let fixture =
+            build_tassadar_alm_linked_dense_program_fixture_v1().expect("linked fixture builds");
+        let bank_refs = fixture
+            .linked_module
+            .banks
+            .iter()
+            .map(|bank| bank.module_ref.as_str())
+            .collect::<Vec<_>>();
+        let resolution = &fixture.linked_module.link_resolution;
+
+        assert_eq!(resolution.posture, crate::TassadarModuleLinkPosture::Exact);
+        assert_eq!(resolution.requested_module_refs, bank_refs);
+        assert_eq!(resolution.selected_module_refs, bank_refs);
+        assert_eq!(
+            resolution.dependency_graph.consumer_family,
+            "tassadar_linked_dense_marketplace_v1"
+        );
+        assert_eq!(resolution.dependency_graph.nodes.len(), bank_refs.len());
+        assert!(resolution.dependency_graph.nodes.iter().all(|node| {
+            bank_refs.contains(&node.module_ref.as_str())
+                && node.trust_posture == TassadarModuleTrustPosture::BenchmarkGatedInternal
+                && node.claim_class == TASSADAR_ALM_LINKED_DENSE_MODULE_CLAIM_CLASS
+                && node.compatibility_digest.len() == 64
+        }));
+        assert!(resolution.dependency_graph.edges.iter().any(|edge| {
+            edge.provider_module_ref == bank_refs[0] && edge.importer_module_ref == bank_refs[1]
+        }));
+        assert!(fixture
+            .compile_receipt_refs
+            .iter()
+            .any(|receipt| { receipt.starts_with("receipt.psionic.tassadar_link_resolution.") }));
+    }
+
+    #[test]
+    fn linked_dense_link_resolution_refuses_injected_claim_class_incompatibility() {
+        let fixtures = vec![
+            build_tassadar_alm_dense_program_fixture_for("tassadar_corpus.mul_add_v1")
+                .expect("left fixture"),
+            build_tassadar_alm_dense_program_fixture_for("tassadar_corpus.memory_roundtrip_v1")
+                .expect("right fixture"),
+        ];
+        let manifests = dense_bank_manifests(&fixtures);
+        let request = TassadarModuleLinkRequest {
+            consumer_family: String::from("tassadar_linked_dense_marketplace_v1"),
+            requested_module_refs: manifests
+                .iter()
+                .map(|manifest| manifest.module_ref.clone())
+                .collect(),
+            rollback_module_refs: vec![],
+            minimum_trust_posture: TassadarModuleTrustPosture::BenchmarkGatedInternal,
+            allowed_claim_classes: vec![String::from("wrong claim class")],
+        };
+
+        let error = link_tassadar_module_dependency_graph(&manifests, &request)
+            .expect_err("claim-class incompatibility refuses");
+
+        assert!(matches!(
+            error,
+            TassadarModuleLinkError::Compatibility(
+                crate::TassadarModuleCompatibilityError::ClaimClassDisallowed { .. }
+            )
+        ));
     }
 
     #[test]
@@ -812,11 +876,10 @@ mod tests {
             a.linked_module.composed_dense_module.module_kind,
             TASSADAR_ALM_DENSE_WEIGHT_MODULE_KIND
         );
-        assert!(
-            a.compile_receipt_refs
-                .iter()
-                .any(|receipt| receipt.starts_with("receipt.psionic.tassadar_linked_dense_trace."))
-        );
+        assert!(a
+            .compile_receipt_refs
+            .iter()
+            .any(|receipt| receipt.starts_with("receipt.psionic.tassadar_linked_dense_trace.")));
     }
 
     #[test]
