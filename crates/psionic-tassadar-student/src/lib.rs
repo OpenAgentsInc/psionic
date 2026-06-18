@@ -18,10 +18,13 @@
 //! * [`train`] — baselines (a)/(b)/(c) training with receipts;
 //! * [`interface`] — baseline (d): learned marshaling around the frozen
 //!   psionic numeric executor;
-//! * [`evalrun`] — first-divergence evaluation with replay acceptance.
+//! * [`evalrun`] — first-divergence evaluation with replay acceptance;
+//! * [`hybrid`] — H1 frozen-core learned-interface validation over the
+//!   retained W3 Baseline D artifacts.
 
 pub mod budget;
 pub mod evalrun;
+pub mod hybrid;
 pub mod interface;
 pub mod model;
 pub mod prep;

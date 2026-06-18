@@ -6480,3 +6480,28 @@ Result boundary:
 This is a W3 research/evaluation result. It does not turn learned students into
 Tassadar-grade proof executors. The successful route is the frozen analytic
 executor with a learned interface.
+
+## H1 Tassadar Frozen-Core Hybrid Gate
+
+Status: implemented on 2026-06-18 for OpenAgents issue `#5332`.
+
+`psionic-tassadar-student::hybrid` keeps the W3 Baseline D result as a
+machine-checkable H1 contract. The validator reads the retained W3 manifest,
+Baseline D eval report, and interface receipt and checks:
+
+- Baseline D remains the frozen analytic executor plus learned interface.
+- Overall pass@1, replay acceptance, and output digest match stay at the
+  documented Baseline D value `1.0`.
+- The interface digest in the receipt matches the Baseline D checkpoint/config
+  digest recorded in the W3 manifest and eval report.
+- The compiled exact core evidence digest is identical before and after the
+  learned-interface window.
+- Trainable scopes are limited to learned marshaling: input limb assignment,
+  output limb assignment, and output routing.
+- Any attempt to mark the compiled exact core, analytic executor, or frozen
+  core as trainable fails closed.
+
+This gate does not authorize public checkpoint mutation, settlement, serving,
+or trained-weight claims. Public gradient windows still require the OpenAgents
+quarantine, recompute/replicate, canary, and promotion gate before a candidate
+update can affect a canonical checkpoint.
