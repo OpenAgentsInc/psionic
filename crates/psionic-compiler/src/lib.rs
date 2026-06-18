@@ -2,6 +2,7 @@
 
 mod tassadar_alm_backend;
 mod tassadar_alm_bounded_check;
+mod tassadar_alm_dense_module;
 mod tassadar_alm_geometric;
 mod tassadar_alm_hull;
 mod tassadar_alm_numeric;
@@ -62,6 +63,7 @@ use thiserror::Error;
 
 pub use tassadar_alm_backend::*;
 pub use tassadar_alm_bounded_check::*;
+pub use tassadar_alm_dense_module::*;
 pub use tassadar_alm_geometric::*;
 pub use tassadar_alm_hull::*;
 pub use tassadar_alm_numeric::*;

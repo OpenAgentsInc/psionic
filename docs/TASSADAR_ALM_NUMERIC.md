@@ -80,3 +80,8 @@ Hard-max attention only — no softmax, no temperature, no approximation
 error analysis (that is the post's carry-over-bounds territory and a
 later phase). No trained weights, no learning, no d_model packing of
 slots into dense matrices (slots remain scalar lanes), no serving.
+
+Dense W1.2 materialization is layered on top of this numeric contract in
+`docs/TASSADAR_ALM_DENSE_MODULE.md`: it packs one compiled numeric model
+into loadable full-width matrices while preserving this phase's hard-max,
+bounded-replay claim boundary.
