@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use psionic_ir::{
@@ -9,16 +10,24 @@ use thiserror::Error;
 
 /// Stable schema version for the compiled ALM bundle.
 pub const TASSADAR_ALM_COMPILED_BUNDLE_SCHEMA_VERSION: u16 = 1;
-/// Stable compiler family identifier for ALM backend phase 1.
-pub const TASSADAR_ALM_BACKEND_COMPILER_FAMILY: &str = "tassadar_alm_backend_list_schedule";
-/// Stable compiler version identifier for ALM backend phase 1.
-pub const TASSADAR_ALM_BACKEND_COMPILER_VERSION: &str = "v1";
+/// Stable compiler family identifier for the default E4 ALM backend.
+pub const TASSADAR_ALM_BACKEND_COMPILER_FAMILY: &str = "tassadar_alm_backend_e4_milp_schedule";
+/// Stable compiler version identifier for the default E4 ALM backend.
+pub const TASSADAR_ALM_BACKEND_COMPILER_VERSION: &str = "v2";
+/// Stable compiler family identifier for the legacy feasible-first scheduler.
+pub const TASSADAR_ALM_GREEDY_BACKEND_COMPILER_FAMILY: &str = "tassadar_alm_backend_list_schedule";
+/// Stable compiler version identifier for the legacy feasible-first scheduler.
+pub const TASSADAR_ALM_GREEDY_BACKEND_COMPILER_VERSION: &str = "v1";
 /// Claim boundary for the compiled ALM bundle lane.
 pub const TASSADAR_ALM_COMPILED_BUNDLE_CLAIM_BOUNDARY: &str = "the compiled ALM bundle executes \
-     integer-exact analytical rows produced by a feasible-first list scheduler and an \
-     interval-coloring slot allocator; it proves evaluator parity for committed workloads only \
-     and does not claim optimal scheduling, tensor weight materialization, hull-cache decode, \
-     Wasm intake, or any served-route capability";
+     integer-exact analytical rows produced by the E4 finite-horizon MILP scheduler and an \
+     interval-coloring slot allocator; it minimizes peak liveness exactly for bounded graph \
+     windows, never accepts a schedule wider than the legacy feasible-first scheduler, and \
+     does not claim tensor weight materialization, softmax approximation, Wasm-window expansion, \
+     or any served-route capability";
+
+const TASSADAR_ALM_E4_EXACT_GATE_LIMIT: usize = 12;
+const TASSADAR_ALM_E4_EXACT_NODE_LIMIT: usize = 75_000;
 
 /// Phase kinds inside the scheduled layer structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -268,14 +277,68 @@ pub struct TassadarAlmCompiledTrace {
 
 struct ScheduledGate {
     phase: u32,
-    slot: u32,
+}
+
+/// Scheduler implementation used to produce a compiled bundle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TassadarAlmSchedulerKind {
+    /// Legacy feasible-first list scheduler.
+    GreedyList,
+    /// E4 finite-horizon MILP scheduler with greedy fallback/cross-check.
+    E4Milp,
+}
+
+#[derive(Clone, Debug)]
+struct ScheduleAssignment {
+    phases: Vec<u32>,
+    alias: Vec<Option<u32>>,
+}
+
+#[derive(Clone, Debug)]
+struct SlotAllocation {
+    slots: Vec<u32>,
+    subtractions: Vec<TassadarAlmSlotSubtraction>,
+    slot_count: u32,
 }
 
 /// Compiles one validated ALM graph into a digest-pinned bundle.
 pub fn compile_tassadar_alm_graph(
     graph: &TassadarAlmGraph,
 ) -> Result<TassadarAlmCompiledBundle, TassadarAlmBackendError> {
+    compile_tassadar_alm_graph_with_scheduler(graph, TassadarAlmSchedulerKind::E4Milp)
+}
+
+/// Compiles one validated ALM graph with the legacy feasible-first scheduler.
+pub fn compile_tassadar_alm_graph_greedy(
+    graph: &TassadarAlmGraph,
+) -> Result<TassadarAlmCompiledBundle, TassadarAlmBackendError> {
+    compile_tassadar_alm_graph_with_scheduler(graph, TassadarAlmSchedulerKind::GreedyList)
+}
+
+/// Compiles one validated ALM graph with an explicit scheduler choice.
+pub fn compile_tassadar_alm_graph_with_scheduler(
+    graph: &TassadarAlmGraph,
+    scheduler: TassadarAlmSchedulerKind,
+) -> Result<TassadarAlmCompiledBundle, TassadarAlmBackendError> {
     graph.validate()?;
+    let assignment = match scheduler {
+        TassadarAlmSchedulerKind::GreedyList => greedy_phase_assignment(graph),
+        TassadarAlmSchedulerKind::E4Milp => e4_milp_phase_assignment(graph)?,
+    };
+    let (family, version) = match scheduler {
+        TassadarAlmSchedulerKind::GreedyList => (
+            TASSADAR_ALM_GREEDY_BACKEND_COMPILER_FAMILY,
+            TASSADAR_ALM_GREEDY_BACKEND_COMPILER_VERSION,
+        ),
+        TassadarAlmSchedulerKind::E4Milp => (
+            TASSADAR_ALM_BACKEND_COMPILER_FAMILY,
+            TASSADAR_ALM_BACKEND_COMPILER_VERSION,
+        ),
+    };
+    build_tassadar_alm_bundle(graph, &assignment, family, version)
+}
+
+fn greedy_phase_assignment(graph: &TassadarAlmGraph) -> ScheduleAssignment {
     let gate_count = graph.gates.len();
     // Phase scheduling: earliest feasible phase of the required kind, with
     // every dependency strictly earlier.
@@ -334,88 +397,55 @@ pub fn compile_tassadar_alm_graph(
         };
         phases[gate_index] = phase;
     }
+    ScheduleAssignment { phases, alias }
+}
+
+fn e4_milp_phase_assignment(
+    graph: &TassadarAlmGraph,
+) -> Result<ScheduleAssignment, TassadarAlmBackendError> {
+    let greedy = greedy_phase_assignment(graph);
+    let mut best = greedy.clone();
+    let mut best_key = assignment_order_key(graph, &best)?;
+    let horizon = greedy.phases.iter().copied().max().unwrap_or(0);
+
+    if let Some(alap) = alap_phase_assignment(graph, &greedy, horizon) {
+        best_key = keep_better_assignment(graph, &mut best, best_key, alap)?;
+    }
+    if let Some(local) = local_search_phase_assignment(graph, &best, horizon)? {
+        best_key = keep_better_assignment(graph, &mut best, best_key, local)?;
+    }
+    if let Some(exact) = exact_milp_phase_assignment(graph, &greedy, horizon, best_key.0)? {
+        best_key = keep_better_assignment(graph, &mut best, best_key, exact)?;
+    }
+
+    let greedy_width = assignment_order_key(graph, &greedy)?.0;
+    if best_key.0 > greedy_width {
+        return Err(TassadarAlmBackendError::ScheduleInvariant {
+            gate: 0,
+            reason: format!(
+                "E4 scheduler selected width {}, wider than greedy width {greedy_width}",
+                best_key.0
+            ),
+        });
+    }
+    Ok(best)
+}
+
+fn build_tassadar_alm_bundle(
+    graph: &TassadarAlmGraph,
+    assignment: &ScheduleAssignment,
+    compiler_family: &str,
+    compiler_version: &str,
+) -> Result<TassadarAlmCompiledBundle, TassadarAlmBackendError> {
+    let gate_count = graph.gates.len();
+    let phases = &assignment.phases;
+    let allocation = allocate_slots(graph, assignment);
+    let slots = allocation.slots;
+    let subtractions = allocation.subtractions;
     let max_phase = phases.iter().copied().max().unwrap_or(0);
-    let end_phase = max_phase + 1;
-    // Lifetimes: birth at the gate's phase, death at the last consumer phase;
-    // outputs and write operands live to end-of-step.
-    let mut deaths: Vec<u32> = phases.clone();
-    let mut record_use = |value: u32, phase: u32, deaths: &mut Vec<u32>| {
-        if deaths[value as usize] < phase {
-            deaths[value as usize] = phase;
-        }
-    };
-    for (gate_index, gate) in graph.gates.iter().enumerate() {
-        let phase = phases[gate_index];
-        match gate {
-            TassadarAlmGate::Input { .. } | TassadarAlmGate::Const { .. } => {}
-            TassadarAlmGate::Linear { terms, .. } => {
-                for (_, value) in terms {
-                    record_use(value.0, phase, &mut deaths);
-                }
-            }
-            TassadarAlmGate::ReGlu { value, gate } => {
-                record_use(value.0, phase, &mut deaths);
-                record_use(gate.0, phase, &mut deaths);
-            }
-            TassadarAlmGate::ChannelWrite { key, value, .. } => {
-                record_use(key.0, end_phase, &mut deaths);
-                record_use(value.0, end_phase, &mut deaths);
-            }
-            TassadarAlmGate::ChannelRead { query, .. } => {
-                record_use(query.0, phase, &mut deaths);
-            }
-            TassadarAlmGate::CumSum { value, .. } => {
-                record_use(value.0, phase, &mut deaths);
-            }
-        }
-    }
-    for output in &graph.outputs {
-        record_use(output.0, end_phase, &mut deaths);
-    }
-    // Interval-coloring slot allocation in birth order with greedy reuse.
-    let mut order: Vec<usize> = (0..gate_count).collect();
-    order.sort_by_key(|gate| (phases[*gate], *gate));
-    let mut slot_free_at: Vec<u32> = Vec::new();
-    let mut slots: Vec<u32> = vec![0; gate_count];
-    let mut subtractions: Vec<TassadarAlmSlotSubtraction> = Vec::new();
-    let mut slot_last_gate: Vec<u32> = Vec::new();
-    for gate_index in order {
-        if let Some(target) = alias[gate_index] {
-            slots[gate_index] = slots[target as usize];
-            continue;
-        }
-        let birth = phases[gate_index];
-        let death = deaths[gate_index];
-        let mut chosen: Option<usize> = None;
-        for (slot, free_at) in slot_free_at.iter().enumerate() {
-            // A slot freed strictly before this birth can be reused.
-            if *free_at < birth {
-                chosen = Some(slot);
-                break;
-            }
-        }
-        match chosen {
-            Some(slot) => {
-                subtractions.push(TassadarAlmSlotSubtraction {
-                    phase: birth,
-                    slot: slot as u32,
-                    stale_gate: slot_last_gate[slot],
-                });
-                slot_free_at[slot] = death;
-                slot_last_gate[slot] = gate_index as u32;
-                slots[gate_index] = slot as u32;
-            }
-            None => {
-                slots[gate_index] = slot_free_at.len() as u32;
-                slot_free_at.push(death);
-                slot_last_gate.push(gate_index as u32);
-            }
-        }
-    }
     let scheduled: Vec<ScheduledGate> = (0..gate_count)
         .map(|gate| ScheduledGate {
             phase: phases[gate],
-            slot: slots[gate],
         })
         .collect();
     validate_schedule(graph, &scheduled)?;
@@ -510,13 +540,13 @@ pub fn compile_tassadar_alm_graph(
         .collect();
     Ok(TassadarAlmCompiledBundle {
         schema_version: TASSADAR_ALM_COMPILED_BUNDLE_SCHEMA_VERSION,
-        compiler_family: TASSADAR_ALM_BACKEND_COMPILER_FAMILY.to_string(),
-        compiler_version: TASSADAR_ALM_BACKEND_COMPILER_VERSION.to_string(),
+        compiler_family: compiler_family.to_string(),
+        compiler_version: compiler_version.to_string(),
         graph_id: graph.graph_id.clone(),
         graph_digest: graph.stable_digest(),
         input_field_count: graph.input_field_count,
         layer_count,
-        slot_count: slot_free_at.len() as u32,
+        slot_count: allocation.slot_count,
         seed_writes: graph
             .seed_writes
             .iter()
@@ -534,6 +564,578 @@ pub fn compile_tassadar_alm_graph(
             .map(|output| slots[output.0 as usize])
             .collect(),
     })
+}
+
+fn gate_dependencies(gate: &TassadarAlmGate) -> Vec<u32> {
+    match gate {
+        TassadarAlmGate::Input { .. } | TassadarAlmGate::Const { .. } => Vec::new(),
+        TassadarAlmGate::Linear { terms, .. } => terms.iter().map(|(_, value)| value.0).collect(),
+        TassadarAlmGate::ReGlu { value, gate } => vec![value.0, gate.0],
+        TassadarAlmGate::ChannelWrite { key, value, .. } => vec![key.0, value.0],
+        TassadarAlmGate::ChannelRead { query, .. } => vec![query.0],
+        TassadarAlmGate::CumSum { value, .. } => vec![value.0],
+    }
+}
+
+fn required_phase_kind(gate: &TassadarAlmGate) -> Option<TassadarAlmPhaseKind> {
+    match gate {
+        TassadarAlmGate::Input { .. } | TassadarAlmGate::Const { .. } => {
+            Some(TassadarAlmPhaseKind::Embedding)
+        }
+        TassadarAlmGate::Linear { .. } => Some(TassadarAlmPhaseKind::Persist),
+        TassadarAlmGate::ReGlu { .. } => Some(TassadarAlmPhaseKind::Ffn),
+        TassadarAlmGate::ChannelRead { .. } | TassadarAlmGate::CumSum { .. } => {
+            Some(TassadarAlmPhaseKind::Attention)
+        }
+        TassadarAlmGate::ChannelWrite { .. } => None,
+    }
+}
+
+fn previous_phase_of_kind(latest: u32, kind: TassadarAlmPhaseKind) -> Option<u32> {
+    if kind == TassadarAlmPhaseKind::Embedding {
+        return (latest == 0).then_some(0);
+    }
+    let mut phase = latest;
+    while phase > 0 {
+        if tassadar_alm_phase_kind(phase) == kind {
+            return Some(phase);
+        }
+        phase -= 1;
+    }
+    None
+}
+
+fn consumer_table(graph: &TassadarAlmGraph) -> Vec<Vec<usize>> {
+    let mut consumers: Vec<Vec<usize>> = vec![Vec::new(); graph.gates.len()];
+    for (gate_index, gate) in graph.gates.iter().enumerate() {
+        if matches!(gate, TassadarAlmGate::ChannelWrite { .. }) {
+            continue;
+        }
+        for dep in gate_dependencies(gate) {
+            consumers[dep as usize].push(gate_index);
+        }
+    }
+    consumers
+}
+
+fn normalize_channel_write_phases(graph: &TassadarAlmGraph, phases: &mut [u32], horizon: u32) {
+    for (gate_index, gate) in graph.gates.iter().enumerate() {
+        if matches!(gate, TassadarAlmGate::ChannelWrite { .. }) {
+            let latest_dep = gate_dependencies(gate)
+                .iter()
+                .map(|dep| phases[*dep as usize])
+                .max()
+                .unwrap_or(0);
+            phases[gate_index] = latest_dep.min(horizon);
+        }
+    }
+}
+
+fn compute_deaths(graph: &TassadarAlmGraph, phases: &[u32]) -> Vec<u32> {
+    let max_phase = phases.iter().copied().max().unwrap_or(0);
+    let end_phase = max_phase + 1;
+    let mut deaths: Vec<u32> = phases.to_vec();
+    let record_use = |value: u32, phase: u32, deaths: &mut Vec<u32>| {
+        if deaths[value as usize] < phase {
+            deaths[value as usize] = phase;
+        }
+    };
+    for (gate_index, gate) in graph.gates.iter().enumerate() {
+        let phase = phases[gate_index];
+        match gate {
+            TassadarAlmGate::Input { .. } | TassadarAlmGate::Const { .. } => {}
+            TassadarAlmGate::Linear { terms, .. } => {
+                for (_, value) in terms {
+                    record_use(value.0, phase, &mut deaths);
+                }
+            }
+            TassadarAlmGate::ReGlu { value, gate } => {
+                record_use(value.0, phase, &mut deaths);
+                record_use(gate.0, phase, &mut deaths);
+            }
+            TassadarAlmGate::ChannelWrite { key, value, .. } => {
+                record_use(key.0, end_phase, &mut deaths);
+                record_use(value.0, end_phase, &mut deaths);
+            }
+            TassadarAlmGate::ChannelRead { query, .. } => {
+                record_use(query.0, phase, &mut deaths);
+            }
+            TassadarAlmGate::CumSum { value, .. } => {
+                record_use(value.0, phase, &mut deaths);
+            }
+        }
+    }
+    for output in &graph.outputs {
+        record_use(output.0, end_phase, &mut deaths);
+    }
+    deaths
+}
+
+fn allocate_slots(graph: &TassadarAlmGraph, assignment: &ScheduleAssignment) -> SlotAllocation {
+    let gate_count = graph.gates.len();
+    let phases = &assignment.phases;
+    let deaths = compute_deaths(graph, phases);
+    let mut order: Vec<usize> = (0..gate_count)
+        .filter(|gate| assignment.alias[*gate].is_none())
+        .collect();
+    order.sort_by_key(|gate| (phases[*gate], *gate));
+    let mut slot_free_at: Vec<u32> = Vec::new();
+    let mut slots: Vec<u32> = vec![0; gate_count];
+    let mut subtractions: Vec<TassadarAlmSlotSubtraction> = Vec::new();
+    let mut slot_last_gate: Vec<u32> = Vec::new();
+    for gate_index in order {
+        let birth = phases[gate_index];
+        let death = deaths[gate_index];
+        let mut chosen: Option<usize> = None;
+        for (slot, free_at) in slot_free_at.iter().enumerate() {
+            if *free_at < birth {
+                chosen = Some(slot);
+                break;
+            }
+        }
+        match chosen {
+            Some(slot) => {
+                subtractions.push(TassadarAlmSlotSubtraction {
+                    phase: birth,
+                    slot: slot as u32,
+                    stale_gate: slot_last_gate[slot],
+                });
+                slot_free_at[slot] = death;
+                slot_last_gate[slot] = gate_index as u32;
+                slots[gate_index] = slot as u32;
+            }
+            None => {
+                slots[gate_index] = slot_free_at.len() as u32;
+                slot_free_at.push(death);
+                slot_last_gate.push(gate_index as u32);
+            }
+        }
+    }
+    for (gate_index, target) in assignment.alias.iter().enumerate() {
+        if let Some(target) = target {
+            slots[gate_index] = slots[*target as usize];
+        }
+    }
+    SlotAllocation {
+        slots,
+        subtractions,
+        slot_count: slot_free_at.len() as u32,
+    }
+}
+
+fn peak_live_width(graph: &TassadarAlmGraph, assignment: &ScheduleAssignment) -> u32 {
+    let phases = &assignment.phases;
+    let deaths = compute_deaths(graph, phases);
+    let max_phase = deaths.iter().copied().max().unwrap_or(0);
+    let mut peak = 0_u32;
+    for phase in 0..=max_phase {
+        let live = (0..graph.gates.len())
+            .filter(|gate| assignment.alias[*gate].is_none())
+            .filter(|gate| phases[*gate] <= phase && deaths[*gate] >= phase)
+            .count() as u32;
+        peak = peak.max(live);
+    }
+    peak
+}
+
+fn liveness_score(graph: &TassadarAlmGraph, assignment: &ScheduleAssignment) -> u64 {
+    let deaths = compute_deaths(graph, &assignment.phases);
+    deaths
+        .iter()
+        .enumerate()
+        .filter(|(gate, _)| assignment.alias[*gate].is_none())
+        .map(|(gate, death)| u64::from(death.saturating_sub(assignment.phases[gate])))
+        .sum()
+}
+
+fn assignment_order_key(
+    graph: &TassadarAlmGraph,
+    assignment: &ScheduleAssignment,
+) -> Result<(u32, u64, u32, Vec<u32>), TassadarAlmBackendError> {
+    let allocation = allocate_slots(graph, assignment);
+    let scheduled: Vec<ScheduledGate> = (0..graph.gates.len())
+        .map(|gate| ScheduledGate {
+            phase: assignment.phases[gate],
+        })
+        .collect();
+    validate_schedule(graph, &scheduled)?;
+    Ok((
+        allocation
+            .slot_count
+            .max(peak_live_width(graph, assignment)),
+        liveness_score(graph, assignment),
+        assignment.phases.iter().copied().max().unwrap_or(0),
+        assignment.phases.clone(),
+    ))
+}
+
+fn keep_better_assignment(
+    graph: &TassadarAlmGraph,
+    best: &mut ScheduleAssignment,
+    best_key: (u32, u64, u32, Vec<u32>),
+    candidate: ScheduleAssignment,
+) -> Result<(u32, u64, u32, Vec<u32>), TassadarAlmBackendError> {
+    let Ok(candidate_key) = assignment_order_key(graph, &candidate) else {
+        return Ok(best_key);
+    };
+    if compare_assignment_keys(&candidate_key, &best_key) == Ordering::Less {
+        *best = candidate;
+        Ok(candidate_key)
+    } else {
+        Ok(best_key)
+    }
+}
+
+fn compare_assignment_keys(
+    left: &(u32, u64, u32, Vec<u32>),
+    right: &(u32, u64, u32, Vec<u32>),
+) -> Ordering {
+    left.0
+        .cmp(&right.0)
+        .then_with(|| left.1.cmp(&right.1))
+        .then_with(|| left.2.cmp(&right.2))
+        .then_with(|| left.3.cmp(&right.3))
+}
+
+fn alap_phase_assignment(
+    graph: &TassadarAlmGraph,
+    greedy: &ScheduleAssignment,
+    horizon: u32,
+) -> Option<ScheduleAssignment> {
+    let consumers = consumer_table(graph);
+    let mut phases: Vec<u32> = vec![0; graph.gates.len()];
+    let alias = greedy.alias.clone();
+    let mut next_cumsum_phase: BTreeMap<u16, u32> = BTreeMap::new();
+    for gate_index in (0..graph.gates.len()).rev() {
+        let gate = &graph.gates[gate_index];
+        if matches!(
+            gate,
+            TassadarAlmGate::Input { .. }
+                | TassadarAlmGate::Const { .. }
+                | TassadarAlmGate::ChannelWrite { .. }
+        ) {
+            continue;
+        }
+        let mut latest = horizon;
+        for consumer in &consumers[gate_index] {
+            latest = latest.min(phases[*consumer].saturating_sub(1));
+        }
+        if let TassadarAlmGate::CumSum { channel_id, .. } = gate {
+            if let Some(next) = next_cumsum_phase.get(&channel_id.0) {
+                latest = latest.min(next.saturating_sub(1));
+            }
+        }
+        let kind = required_phase_kind(gate)?;
+        let phase = previous_phase_of_kind(latest, kind)?;
+        phases[gate_index] = phase;
+        if let TassadarAlmGate::CumSum { channel_id, .. } = gate {
+            next_cumsum_phase.insert(channel_id.0, phase);
+        }
+    }
+    normalize_channel_write_phases(graph, &mut phases, horizon);
+    Some(ScheduleAssignment { phases, alias })
+}
+
+fn local_search_phase_assignment(
+    graph: &TassadarAlmGraph,
+    seed: &ScheduleAssignment,
+    horizon: u32,
+) -> Result<Option<ScheduleAssignment>, TassadarAlmBackendError> {
+    let consumers = consumer_table(graph);
+    let mut current = seed.clone();
+    let mut current_key = assignment_order_key(graph, &current)?;
+    let mut improved_any = false;
+    for _ in 0..4 {
+        let mut improved_this_pass = false;
+        for gate_index in 0..graph.gates.len() {
+            let gate = &graph.gates[gate_index];
+            let Some(kind) = required_phase_kind(gate) else {
+                continue;
+            };
+            if kind == TassadarAlmPhaseKind::Embedding {
+                continue;
+            }
+            let mut phase = next_phase_of_kind(1, kind);
+            while phase <= horizon {
+                if phase != current.phases[gate_index]
+                    && gate_phase_move_is_valid(
+                        graph,
+                        &consumers,
+                        &current.phases,
+                        gate_index,
+                        phase,
+                    )
+                {
+                    let mut trial = current.clone();
+                    trial.phases[gate_index] = phase;
+                    normalize_channel_write_phases(graph, &mut trial.phases, horizon);
+                    let Ok(trial_key) = assignment_order_key(graph, &trial) else {
+                        phase += 4;
+                        continue;
+                    };
+                    if compare_assignment_keys(&trial_key, &current_key) == Ordering::Less {
+                        current = trial;
+                        current_key = trial_key;
+                        improved_this_pass = true;
+                        improved_any = true;
+                    }
+                }
+                phase += 4;
+            }
+        }
+        if !improved_this_pass {
+            break;
+        }
+    }
+    Ok(improved_any.then_some(current))
+}
+
+fn gate_phase_move_is_valid(
+    graph: &TassadarAlmGraph,
+    consumers: &[Vec<usize>],
+    phases: &[u32],
+    gate_index: usize,
+    phase: u32,
+) -> bool {
+    let gate = &graph.gates[gate_index];
+    if required_phase_kind(gate).is_some_and(|kind| tassadar_alm_phase_kind(phase) != kind) {
+        return false;
+    }
+    for dep in gate_dependencies(gate) {
+        if phases[dep as usize] >= phase {
+            return false;
+        }
+    }
+    for consumer in &consumers[gate_index] {
+        if phase >= phases[*consumer] {
+            return false;
+        }
+    }
+    if let TassadarAlmGate::CumSum { channel_id, .. } = gate {
+        for (other_index, other) in graph.gates.iter().enumerate() {
+            if let TassadarAlmGate::CumSum {
+                channel_id: other_channel,
+                ..
+            } = other
+            {
+                if other_channel.0 != channel_id.0 || other_index == gate_index {
+                    continue;
+                }
+                if other_index < gate_index && phases[other_index] >= phase {
+                    return false;
+                }
+                if other_index > gate_index && phase >= phases[other_index] {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+fn exact_milp_phase_assignment(
+    graph: &TassadarAlmGraph,
+    incumbent: &ScheduleAssignment,
+    horizon: u32,
+    incumbent_width: u32,
+) -> Result<Option<ScheduleAssignment>, TassadarAlmBackendError> {
+    if graph.gates.len() > TASSADAR_ALM_E4_EXACT_GATE_LIMIT {
+        return Ok(None);
+    }
+    let domains = exact_phase_domains(graph, incumbent, horizon);
+    if domains.iter().any(Vec::is_empty) {
+        return Ok(None);
+    }
+    let alias = incumbent.alias.clone();
+    let mut state = ExactMilpSearch {
+        graph,
+        domains,
+        alias,
+        horizon,
+        nodes: 0,
+        incumbent_width,
+        best: None,
+    };
+    let mut partial = vec![None; graph.gates.len()];
+    state.search(0, &mut partial)?;
+    Ok(state.best)
+}
+
+fn exact_phase_domains(
+    graph: &TassadarAlmGraph,
+    incumbent: &ScheduleAssignment,
+    horizon: u32,
+) -> Vec<Vec<u32>> {
+    graph
+        .gates
+        .iter()
+        .enumerate()
+        .map(|(gate_index, gate)| match required_phase_kind(gate) {
+            Some(TassadarAlmPhaseKind::Embedding) => vec![0],
+            Some(kind) => {
+                let mut phases = Vec::new();
+                let mut phase = next_phase_of_kind(1, kind);
+                while phase <= horizon {
+                    if phase >= incumbent.phases[gate_index] {
+                        phases.push(phase);
+                    }
+                    phase += 4;
+                }
+                phases.reverse();
+                phases
+            }
+            None => vec![0],
+        })
+        .collect()
+}
+
+struct ExactMilpSearch<'a> {
+    graph: &'a TassadarAlmGraph,
+    domains: Vec<Vec<u32>>,
+    alias: Vec<Option<u32>>,
+    horizon: u32,
+    nodes: usize,
+    incumbent_width: u32,
+    best: Option<ScheduleAssignment>,
+}
+
+impl ExactMilpSearch<'_> {
+    fn search(
+        &mut self,
+        gate_index: usize,
+        partial: &mut [Option<u32>],
+    ) -> Result<(), TassadarAlmBackendError> {
+        if self.nodes >= TASSADAR_ALM_E4_EXACT_NODE_LIMIT {
+            return Ok(());
+        }
+        self.nodes += 1;
+        if gate_index == self.graph.gates.len() {
+            let mut phases: Vec<u32> = partial.iter().map(|phase| phase.unwrap_or(0)).collect();
+            normalize_channel_write_phases(self.graph, &mut phases, self.horizon);
+            let candidate = ScheduleAssignment {
+                phases,
+                alias: self.alias.clone(),
+            };
+            let Ok(key) = assignment_order_key(self.graph, &candidate) else {
+                return Ok(());
+            };
+            if key.0 < self.incumbent_width {
+                self.incumbent_width = key.0;
+                self.best = Some(candidate);
+            } else if let Some(best) = &self.best {
+                let best_key = assignment_order_key(self.graph, best)?;
+                if compare_assignment_keys(&key, &best_key) == Ordering::Less {
+                    self.best = Some(candidate);
+                }
+            }
+            return Ok(());
+        }
+
+        if matches!(
+            self.graph.gates[gate_index],
+            TassadarAlmGate::ChannelWrite { .. }
+        ) {
+            partial[gate_index] = Some(0);
+            self.search(gate_index + 1, partial)?;
+            partial[gate_index] = None;
+            return Ok(());
+        }
+
+        for phase in self.domains[gate_index].clone() {
+            if !partial_phase_is_valid(self.graph, partial, gate_index, phase) {
+                continue;
+            }
+            partial[gate_index] = Some(phase);
+            if partial_peak_live_width(self.graph, partial, self.horizon) < self.incumbent_width {
+                self.search(gate_index + 1, partial)?;
+            }
+            partial[gate_index] = None;
+        }
+        Ok(())
+    }
+}
+
+fn partial_phase_is_valid(
+    graph: &TassadarAlmGraph,
+    partial: &[Option<u32>],
+    gate_index: usize,
+    phase: u32,
+) -> bool {
+    let gate = &graph.gates[gate_index];
+    if let Some(kind) = required_phase_kind(gate) {
+        if tassadar_alm_phase_kind(phase) != kind {
+            return false;
+        }
+    }
+    for dep in gate_dependencies(gate) {
+        let Some(dep_phase) = partial[dep as usize] else {
+            return false;
+        };
+        if dep_phase >= phase {
+            return false;
+        }
+    }
+    if let TassadarAlmGate::CumSum { channel_id, .. } = gate {
+        for (other_index, other) in graph.gates[..gate_index].iter().enumerate() {
+            if let TassadarAlmGate::CumSum {
+                channel_id: other_channel,
+                ..
+            } = other
+            {
+                if other_channel.0 == channel_id.0
+                    && partial[other_index].is_some_and(|other_phase| other_phase >= phase)
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+fn partial_peak_live_width(graph: &TassadarAlmGraph, partial: &[Option<u32>], horizon: u32) -> u32 {
+    let births: Vec<Option<u32>> = partial.to_vec();
+    let mut deaths: Vec<Option<u32>> = partial.to_vec();
+    let record = |value: u32, phase: u32, deaths: &mut Vec<Option<u32>>| {
+        if let Some(death) = deaths[value as usize].as_mut() {
+            *death = (*death).max(phase);
+        }
+    };
+    for (gate_index, gate) in graph.gates.iter().enumerate() {
+        let until = if matches!(gate, TassadarAlmGate::ChannelWrite { .. }) {
+            horizon + 1
+        } else if let Some(phase) = partial[gate_index] {
+            phase
+        } else {
+            continue;
+        };
+        for dep in gate_dependencies(gate) {
+            record(dep, until, &mut deaths);
+        }
+    }
+    for output in &graph.outputs {
+        record(output.0, horizon + 1, &mut deaths);
+    }
+    let alias: Vec<Option<u32>> = graph
+        .gates
+        .iter()
+        .map(|gate| match gate {
+            TassadarAlmGate::ChannelWrite { value, .. } => Some(value.0),
+            _ => None,
+        })
+        .collect();
+    let mut peak = 0_u32;
+    for phase in 0..=horizon + 1 {
+        let live = (0..graph.gates.len())
+            .filter(|gate| alias[*gate].is_none())
+            .filter(|gate| {
+                births[*gate].is_some_and(|birth| birth <= phase)
+                    && deaths[*gate].is_some_and(|death| death >= phase)
+            })
+            .count() as u32;
+        peak = peak.max(live);
+    }
+    peak
 }
 
 fn next_phase_of_kind(earliest: u32, kind: TassadarAlmPhaseKind) -> u32 {
@@ -821,8 +1423,13 @@ mod tests {
 
     use psionic_ir::{
         tassadar_alm_running_sum_workload, tassadar_alm_stack_micro_workload,
-        tassadar_alm_verb_parity_workload, TassadarAlmEvaluator,
+        tassadar_alm_verb_parity_workload, TassadarAlmChannelDecl, TassadarAlmChannelId,
+        TassadarAlmChannelKind, TassadarAlmEvaluator, TassadarAlmGate, TassadarAlmGraph,
+        TassadarAlmSeedWrite, TassadarAlmValueId, TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
     };
+
+    use crate::tassadar_alm_numeric::tassadar_alm_numeric_program_corpus_specs_v1;
+    use crate::tassadar_alm_wasm_interpreter::tassadar_alm_wasm_interpreter;
 
     use super::*;
 
@@ -876,6 +1483,81 @@ mod tests {
         renamed.graph_id = "alm.test.renamed".to_string();
         let c = compile_tassadar_alm_graph(&renamed).expect("compiles");
         assert_ne!(a.stable_digest(), c.stable_digest());
+    }
+
+    #[test]
+    fn e4_scheduler_is_never_wider_than_greedy_on_existing_programs() {
+        let mut graphs = vec![
+            tassadar_alm_running_sum_workload(),
+            tassadar_alm_verb_parity_workload(),
+            tassadar_alm_stack_micro_workload(),
+        ];
+        for spec in tassadar_alm_numeric_program_corpus_specs_v1() {
+            graphs.push(tassadar_alm_wasm_interpreter(&spec.program).expect("program lowers"));
+        }
+
+        for graph in graphs {
+            let greedy = compile_tassadar_alm_graph_greedy(&graph).expect("greedy compiles");
+            let e4 = compile_tassadar_alm_graph(&graph).expect("e4 compiles");
+            assert_eq!(e4.compiler_family, TASSADAR_ALM_BACKEND_COMPILER_FAMILY);
+            assert_eq!(
+                greedy.compiler_family,
+                TASSADAR_ALM_GREEDY_BACKEND_COMPILER_FAMILY
+            );
+            assert!(
+                e4.slot_count <= greedy.slot_count,
+                "{}: e4 slot_count {} > greedy slot_count {}",
+                graph.graph_id,
+                e4.slot_count,
+                greedy.slot_count
+            );
+        }
+    }
+
+    #[test]
+    fn e4_exact_milp_keeps_bounded_window_replay_correct_and_no_wider() {
+        let graph = TassadarAlmGraph {
+            schema_version: TASSADAR_ALM_GRAPH_SCHEMA_VERSION,
+            graph_id: "alm.test.e4_exact_liveness_reduction".to_string(),
+            input_field_count: 0,
+            channels: vec![TassadarAlmChannelDecl {
+                channel_id: TassadarAlmChannelId(0),
+                name: "memory".to_string(),
+                kind: TassadarAlmChannelKind::Keyed,
+            }],
+            seed_writes: vec![TassadarAlmSeedWrite {
+                channel_id: TassadarAlmChannelId(0),
+                key: 3,
+                value: 99,
+            }],
+            gates: vec![
+                TassadarAlmGate::Const { value: 1 },
+                TassadarAlmGate::Const { value: 2 },
+                TassadarAlmGate::Const { value: 3 },
+                TassadarAlmGate::Linear {
+                    terms: vec![(1, TassadarAlmValueId(0))],
+                    bias: 0,
+                },
+                TassadarAlmGate::Linear {
+                    terms: vec![(1, TassadarAlmValueId(1))],
+                    bias: 0,
+                },
+                TassadarAlmGate::Linear {
+                    terms: vec![(1, TassadarAlmValueId(2))],
+                    bias: 0,
+                },
+                TassadarAlmGate::ChannelRead {
+                    channel_id: TassadarAlmChannelId(0),
+                    query: TassadarAlmValueId(5),
+                },
+            ],
+            outputs: vec![TassadarAlmValueId(6)],
+        };
+        let greedy = compile_tassadar_alm_graph_greedy(&graph).expect("greedy compiles");
+        let e4 = compile_tassadar_alm_graph(&graph).expect("e4 compiles");
+        assert!(e4.slot_count <= greedy.slot_count);
+        let trace = TassadarAlmCompiledExecutor::execute(&e4, &[vec![]]).expect("e4 executes");
+        assert_eq!(trace.step_outputs, vec![vec![99]]);
     }
 
     #[test]
