@@ -571,6 +571,28 @@ Required outcome:
 - continue refusing unsupported cluster sharding explicitly instead of
   collapsing to whole-request or replica-routed claims
 
+#### WAN pipeline serving (next phase) — detailed implementation roadmap
+
+Extending these single-host sharded lanes to **sharded serving across separate
+machines over a WAN** (no worker holds the whole model) has its own staged
+implementation plan:
+[`docs/audits/2026-06-19-shard-wan-pipeline-implementation-roadmap.md`](audits/2026-06-19-shard-wan-pipeline-implementation-roadmap.md).
+
+It covers authenticated activation transport, N-stage plain pipeline serving,
+topology-aware route selection, and WAN-latency hiding via speculative decode,
+direct return, and async pipelined verification — staged **Phase 0–13** (freeze
+the reference contract → trusted local two-stage split → Rust activation
+transport → N-stage serving → WAN topology measurement → plain WAN serving gate →
+speculative decode → direct return → async verification → quantized large-model
+stages → self-managing trusted swarm → permissionless envelope → privacy
+hardening). Each Shard concept maps to the owned
+`psionic-cluster` / `psionic-net` / `psionic-runtime` / `psionic-serve`
+surfaces; exact greedy parity stays the non-negotiable acceptance gate; and
+pricing/payout/identity/marketplace authority stays **outside** Psionic (it emits
+evidence those outer systems consume). The product-side fold-in — this fabric as
+an inference supply lane with contributor + referral revshare — is tracked in the
+`openagents` repo at `docs/inference/2026-06-19-decentralized-serving-shard-wan.md`.
+
 ### Validation, security, and rollout
 
 Tracked by landed `PSI-196` / [#3305](https://github.com/OpenAgentsInc/openagents/issues/3305)

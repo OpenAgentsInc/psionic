@@ -15,8 +15,12 @@
 > `docs/audits/2026-03-15-pytorch-test-suite-port-audit.md`,
 > `docs/audits/2026-03-15-full-pytorch-port-to-rust-in-psionic-audit.md`,
 > `docs/audits/2026-03-15-decentralized-training-target-sequencing-audit.md`,
-> and
-> `docs/audits/2026-03-15-psionic-tinygrad-philosophy-pytorch-drop-in-audit.md`.
+> `docs/audits/2026-03-15-psionic-tinygrad-philosophy-pytorch-drop-in-audit.md`,
+> and the WAN sharded-serving implementation roadmap
+> `docs/audits/2026-06-19-shard-wan-pipeline-implementation-roadmap.md` (the
+> staged Phase 0–13 plan for sharded inference serving across machines over a
+> WAN; see also `ROADMAP_CLUSTER.md` → "Real sharded execution" → "WAN pipeline
+> serving").
 >
 > This is the repo-local full-library roadmap for `crates/psionic-*`.
 > It is not the workspace-level umbrella roadmap for `Psion`.
