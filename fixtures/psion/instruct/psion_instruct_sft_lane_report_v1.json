@@ -55,17 +55,17 @@
     "94873f47da6abd87bbe73c4971de6a4723afac73ee9211ce36db1dd568a64379",
     "4effaa5ae830744cbf8ac804598a26a62f62303440cf8ce73b2ffd11adac79d9",
     "f123ddc095d0988e1818c3294e31e2e341b18c8858600e25476fa02dbd749eb7",
-    "389b9be2f670c30887fe70da5a34f41a6bb5f50ba606b79dd8590f124355b634",
-    "bba1bd440a55cdb11af1bd4dfc9d6e563f65e60c2b6dd800491b763bc67aaffd",
+    "67719bd94885d1fbdc14c2d7f86f88813fbb5eb82b96eed0d65b220b579a98af",
+    "8be721119962148461264025a871f88dd97809e04bc19004ab91a83f0dd67d3e",
     "857609e4eaa5b9f68c42642911b5c0955686938b6ee093ba6e2fd527c1f422af",
-    "6fec9dec9fa7adeb501b45eefee73b9880adbbfe7679cf178f36c07edfcf34e4",
-    "1240b0258d6287ced7a2d283751be387eb7501fb9342c892624d0dd272ce4727"
+    "d2233fd8f4c1a9e3e67dd5ba24f58b6537aed2460524382ca1a8e566b1e18b6c",
+    "a3570a819446e17d5a9552eee73b02fed9783405ecb969f3c6ec4211caa92a2d"
   ],
-  "adapter_artifact_digest": "3176f9488b5cd27ce90109b43adc45976e36a1ae82c82762d3ffbc4762c0a8f3",
-  "adapter_identity_digest": "31100af8b5cc80190a46e79df80adf646a62d5c54d880c33673eac31d855979c",
+  "adapter_artifact_digest": "f1c3386d40e0c7caa52cf908f2358b9158983608251afc5b5a0c7c389aec5354",
+  "adapter_identity_digest": "5b7665196d4ae78251d05b0cf4b77de0cf770c089b9787febd059d4ad516808c",
   "resume_drill": {
     "checkpoint_at_step": 3,
-    "checkpoint_state_digest": "sha256:c126d5625428740bb4657ea9c1ad2067be65691e667f1db57151e04cd63710ae",
+    "checkpoint_state_digest": "sha256:bb29694a3b61e98b7e1d6e67729fb242c985ac47b1016c160682c738dbf92649",
     "resumed_steps": 5,
     "resume_bit_exact": true,
     "uninterrupted_final_parameter_digest": "sha256:9705945b61d58f8893c8a1e823a3f6d3414b30df3bce5aa784441d5b095bd4a7",
@@ -73,5 +73,5 @@
     "post_resume_receipt_digests_match": true
   },
   "claim_boundary": "Bounded fixture-scale Psion statistical lane evidence only: deterministic smoke training over repo-owned example records. No general instruct capability claim and no real training-run claim.",
-  "report_digest": "sha256:ec81e1782daa2300965e02fe65b1edc91968d349ece4714febbba8dda0e55ef0"
+  "report_digest": "sha256:76b5524234b4dd6507560c0cda6f28e782fe097c1fb022108aaaae40794d6871"
 }
