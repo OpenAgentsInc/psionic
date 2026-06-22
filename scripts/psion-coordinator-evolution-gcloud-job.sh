@@ -62,11 +62,18 @@ apt-get update -y
 apt-get install -y git build-essential curl pkg-config libssl-dev
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
-git clone --depth 1 --branch agent/psion-train \
+git clone --depth 1 --branch agent/m6-live-train \
   https://github.com/OpenAgentsInc/psionic.git /tmp/psionic || \
   git clone --depth 1 https://github.com/OpenAgentsInc/psionic.git /tmp/psionic
 cd /tmp/psionic
-# CPU-only ES smoke. Real training swaps the fixture eval for the live hook.
+# CPU-only no-spend live-train VALIDATION pass (Khala M6, #6014). Drives a REAL
+# frozen backbone (forward_with_hidden) -> CoordinatorHead -> sep-CMA-ES over a
+# capability-filtered pool, with the DailySpendCap wired in and ZERO sats moved.
+# A real (sat-moving) run is HELD behind a live Pylon verdict source + the shared
+# buy-mode daily cap; see docs/COORDINATOR_EVOLUTION_TRAINING.md.
+cargo run --release -q -p psionic-train --bin coordinator_live_train \
+  2>&1 | tee /tmp/coordinator_live_train.log
+# Also keep the P3-P5 fixture smoke for backwards reference.
 cargo run --release -q -p psionic-train --bin coordinator_evolution_smoke \
   2>&1 | tee /tmp/coordinator_evolution_smoke.log
 # Self-delete so the VM does not linger past the bounded job.
@@ -109,7 +116,7 @@ case "$MODE" in
     "${create_cmd[@]}"
     echo "Submitted. Tail the smoke log via:"
     echo "  gcloud compute ssh $INSTANCE_NAME --zone $ZONE --project $PROJECT_ID \\"
-    echo "    --command 'tail -f /tmp/coordinator_evolution_smoke.log'"
+    echo "    --command 'tail -f /tmp/coordinator_live_train.log'"
     ;;
   teardown)
     echo "== TEARDOWN -- deleting $INSTANCE_NAME =="

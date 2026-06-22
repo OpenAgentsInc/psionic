@@ -108,6 +108,82 @@ A live `CoordinatorFitness` impl that drives `probe_gepa_rollout_coordinator.rs`
 and aggregates Pylon-returned verdicts is the next build step — see "What real
 training still needs" below.
 
+## M6 live-training lane (issue #6014, this branch)
+
+The live-training wiring lands in
+`crates/psionic-train/src/coordinator_live_training.rs` with a CPU driver bin
+`crates/psionic-train/src/bin/coordinator_live_train.rs`:
+
+- **`LiveCoordinatorFitness`** — the live `CoordinatorFitness`. Each candidate
+  materializes a real `CoordinatorHead`, and for every `EvalSample` it computes
+  the backbone hidden state via an injected `forward_with_hidden` closure (a
+  frozen cs336 stack here; swap in Qwen3-0.6B on the production lane), runs
+  `head.decide(h)`, resolves the worker through the P5 `WorkerPoolBinding`, asks
+  an `EvalVerdictSource` for the verdict + spend, **debits the spend against the
+  cap first (fail-closed)**, and aggregates with `TerminalRewardAdapter`.
+- **`DailySpendCap`** — a hard, fail-closed daily cap clamped to the owner's
+  10,000 sats/day (`OWNER_DAILY_CAP_MSATS = 10_000_000` msats). Same
+  `spent_today / day_key / daily_cap` semantics as the shared buy-mode ceiling.
+- **`EvalVerdictSource`** — the seam for the verdict. `SimulatedVerdictSource`
+  is the deterministic, **zero-spend** validation source; the live lane binds
+  this to a Pylon dispatch + the Tassadar replay verdict.
+
+### Cap integration point (exact, cross-repo)
+
+The owner budget is ONE shared autonomous daily ceiling whose authority is the
+`openagents` Worker, not psionic:
+
+- File: `apps/openagents.com/workers/api/src/buy-mode-dispatcher.ts`.
+- Columns (minified at runtime, semantics stable): `daily_cap_msats`,
+  `spent_today_msats`, `day_key`, `per_job_cap_msats`, `spend_enabled` on the
+  buy-mode campaign row.
+- Enforcement: `dispatchJob` / `recordSettlement` reject when
+  `campaign.spentTodayMsats + amountMsats > campaign.dailyCapMsats`, emit
+  `alert.buy_mode.daily_cap_breach`, and halt the campaign. Roll-over is by
+  `day_key` (UTC date).
+
+`DailySpendCap::can_spend` uses the **identical predicate**
+(`spent_today + amount <= daily_cap`). On a real run, each
+`LiveCoordinatorFitness` eval dispatched to Pylon MUST be one buy-mode
+`dispatchJob` call against the SAME campaign row, carrying its
+`per_job_cap_msats` / `daily_cap_msats`, so the local cap and the shared cap
+debit the same budget. The local cap is the fail-closed backstop, never a
+parallel budget.
+
+### Validation result (no-spend smoke)
+
+```
+cargo run -q -p psionic-train --bin coordinator_live_train          # validate (no spend)
+cargo run -q -p psionic-train --bin coordinator_live_train -- --real # bounded real run (HELD)
+```
+
+Observed (deterministic, seed `0x6014_6017`):
+
+```
+P5 worker pool: 3 eligible for `rust_build` -> ["frontier-claude", "open-pylon-a", "open-pylon-b"]
+P2 head: hidden_dim=8 num_workers=3 num_roles=3 -> 48 params
+LiveRunReport (simulated, no-spend):
+  initial fitness : 0.3333
+  best fitness    : 1.0000   (real frozen-backbone hidden states routed correctly)
+  improved        : true
+  evaluations     : 8001
+  spent (msats)   : 0
+  cap   (msats)   : 10000000
+  halted on cap   : false
+```
+
+sep-CMA-ES drove a real `CoordinatorHead`, reading REAL frozen-backbone
+`forward_with_hidden` hidden states, to route all 3 distinct samples to their
+correct capability-eligible workers, **spending zero sats** while exercising the
+cap path. This is a SMOKE (simulated verdict source), not a frontier ML result.
+
+The `--real` run is **HELD**: a sat-moving run needs a live Pylon verdict source
+(dispatch each trajectory as a buy-mode eval job), the Tassadar
+`training.verification_classes.v1` verdict, and a spend-enabled buy-mode campaign
+row to debit the shared cap. The driver refuses to spend without shared-cap
+authority or to fabricate verdicts; cap fail-closed is proven by
+`coordinator_live_training::tests::live_fitness_fails_closed_at_the_cap`.
+
 ## What real training still needs
 
 1. A **live `CoordinatorFitness`** wired to `probe_gepa_rollout_coordinator.rs`
