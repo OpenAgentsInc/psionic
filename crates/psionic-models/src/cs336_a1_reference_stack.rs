@@ -436,6 +436,68 @@ impl Cs336A1TransformerLm {
         self.logits_from_final_hidden(&final_hidden)
     }
 
+    /// Forward pass that returns both full-sequence logits and the
+    /// last-token (penultimate-position) hidden state.
+    ///
+    /// This is the P1 hidden-state-extraction primitive for the learned
+    /// coordinator (Khala M6 / TRINITY substrate). TRINITY routes on the
+    /// hidden vector of the final prompt token, so the returned hidden tensor
+    /// has shape `[batch, d_model]` (the sequence axis is collapsed to the
+    /// last position). The logits tensor keeps the standard
+    /// `[batch, seq, vocab]` shape so existing callers are unaffected.
+    ///
+    /// The forward is computed once; logits and hidden state are read off the
+    /// same activations, so this costs the same as `forward_tokens` plus a
+    /// cheap slice. Given identical weights and inputs it is deterministic,
+    /// which is required for stable evolution-strategy fitness on the head.
+    pub fn forward_with_hidden(
+        &self,
+        token_shape: Shape,
+        token_ids: &[usize],
+    ) -> Result<(NnTensor, NnTensor), Cs336A1ReferenceError> {
+        let final_hidden = self.final_hidden_for_tokens(token_shape, token_ids)?;
+        let last_token_hidden = self.last_token_hidden(&final_hidden)?;
+        let logits = self.logits_from_final_hidden(&final_hidden)?;
+        Ok((logits, last_token_hidden))
+    }
+
+    /// Extracts the hidden vector of the final sequence position for every
+    /// batch row, collapsing a `[.., seq, d_model]` hidden tensor down to
+    /// `[batch, d_model]` (batch is the product of all leading dimensions).
+    fn last_token_hidden(
+        &self,
+        final_hidden: &NnTensor,
+    ) -> Result<NnTensor, Cs336A1ReferenceError> {
+        let dims = final_hidden.dims();
+        if dims.len() < 2 || dims[dims.len() - 1] != self.config.d_model {
+            return Err(Cs336A1ReferenceError::InvalidConfiguration {
+                context: "transformer_lm",
+                detail: format!(
+                    "expected hidden state rank >= 2 with trailing width {}, found {:?}",
+                    self.config.d_model, dims
+                ),
+            });
+        }
+        let d_model = self.config.d_model;
+        let sequence_length = dims[dims.len() - 2];
+        if sequence_length == 0 {
+            return Err(Cs336A1ReferenceError::InvalidConfiguration {
+                context: "transformer_lm",
+                detail: String::from("sequence dimension must be non-empty"),
+            });
+        }
+        let batch = dims[..dims.len() - 2].iter().product::<usize>().max(1);
+        let values = final_hidden.as_f32_slice()?;
+        let mut output = vec![0.0_f32; batch * d_model];
+        for row in 0..batch {
+            let row_offset = row * sequence_length * d_model;
+            let last_token_offset = row_offset + (sequence_length - 1) * d_model;
+            output[row * d_model..(row + 1) * d_model]
+                .copy_from_slice(&values[last_token_offset..last_token_offset + d_model]);
+        }
+        Ok(NnTensor::f32(Shape::new(vec![batch, d_model]), output)?)
+    }
+
     pub fn final_hidden_for_tokens(
         &self,
         token_shape: Shape,
@@ -1296,5 +1358,86 @@ mod tests {
         assert!(keys.contains(&String::from("layers.0.ln1.weight")));
         assert!(keys.contains(&String::from("ln_final.weight")));
         assert!(keys.contains(&String::from("lm_head.weight")));
+    }
+
+    fn build_two_dim_smoke_lm() -> Cs336A1TransformerLm {
+        let config = Cs336A1ReferenceConfig {
+            vocab_size: 3,
+            context_length: 4,
+            d_model: 2,
+            num_layers: 1,
+            num_heads: 1,
+            d_ff: 2,
+        };
+        let mut model = Cs336A1TransformerLm::new("lm", config, 10_000.0, 1e-6).expect("model");
+        let mut weights = model.state_dict();
+        for (path, entry) in &mut weights.entries {
+            let len = entry.spec.shape().element_count();
+            let values = match path.as_str() {
+                "token_embeddings.weight" => vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                "lm_head.weight" => vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                "ln_final.weight" | "layers.0.ln1.weight" | "layers.0.ln2.weight" => {
+                    vec![1.0, 1.0]
+                }
+                _ => vec![0.0; len],
+            };
+            entry.data = TensorData::F32(values);
+        }
+        model
+            .load_state_dict(&weights, ModuleStateLoadMode::Strict)
+            .expect("load");
+        model
+    }
+
+    #[test]
+    fn forward_with_hidden_shapes_and_matches_logit_path() {
+        let model = build_two_dim_smoke_lm();
+        let (logits, hidden) = model
+            .forward_with_hidden(Shape::new(vec![1, 2]), &[0, 1])
+            .expect("forward_with_hidden");
+        // Logits keep the standard [batch, seq, vocab] shape.
+        assert_eq!(logits.dims(), &[1, 2, 3]);
+        // Hidden state is collapsed to [batch, d_model].
+        assert_eq!(hidden.dims(), &[1, 2]);
+
+        // forward_with_hidden must return exactly the same logits as the
+        // existing forward_tokens path (no behavioral drift).
+        let reference = model
+            .forward_tokens(Shape::new(vec![1, 2]), &[0, 1])
+            .expect("forward_tokens");
+        assert_eq!(
+            logits.as_f32_slice().expect("logits"),
+            reference.as_f32_slice().expect("reference"),
+        );
+
+        // The returned hidden state must be the last-position slice of the
+        // full final-hidden tensor.
+        let final_hidden = model
+            .final_hidden_for_tokens(Shape::new(vec![1, 2]), &[0, 1])
+            .expect("final_hidden");
+        let full = final_hidden.as_f32_slice().expect("full");
+        let last = &full[(2 - 1) * 2..2 * 2];
+        assert_eq!(hidden.as_f32_slice().expect("hidden"), last);
+    }
+
+    #[test]
+    fn forward_with_hidden_is_deterministic() {
+        let model = build_two_dim_smoke_lm();
+        let (logits_a, hidden_a) = model
+            .forward_with_hidden(Shape::new(vec![1, 2]), &[0, 1])
+            .expect("first");
+        let (logits_b, hidden_b) = model
+            .forward_with_hidden(Shape::new(vec![1, 2]), &[0, 1])
+            .expect("second");
+        // Determinism is required for stable evolution-strategy fitness on the
+        // coordinator head: identical weights + inputs => identical features.
+        assert_eq!(
+            hidden_a.as_f32_slice().expect("a"),
+            hidden_b.as_f32_slice().expect("b"),
+        );
+        assert_eq!(
+            logits_a.as_f32_slice().expect("a"),
+            logits_b.as_f32_slice().expect("b"),
+        );
     }
 }

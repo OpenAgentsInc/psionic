@@ -1,6 +1,7 @@
 //! Model abstractions for Psionic.
 
 mod attnres;
+mod coordinator_head;
 mod cs336_a1_reference_stack;
 mod cs336_a1_tokenizer;
 mod cs336_a2_flashattention_reference;
@@ -90,6 +91,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub use attnres::*;
+pub use coordinator_head::*;
 pub use cs336_a1_reference_stack::*;
 pub use cs336_a1_tokenizer::*;
 pub use cs336_a2_flashattention_reference::*;
