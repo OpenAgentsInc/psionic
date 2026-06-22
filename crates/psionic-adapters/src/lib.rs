@@ -29,6 +29,12 @@ pub enum AdapterArtifactKind {
     Lora,
     /// Generic residual adapter weights.
     ResidualAdapter,
+    /// Frozen-backbone coordinator head: a small task head read off a
+    /// penultimate-token hidden state, emitting `(worker, role)` routing
+    /// logits. The backbone weights are not part of the artifact; only the
+    /// head parameters are packaged. This is the P2 coordinator artifact kind
+    /// for the learned coordinator (Khala M6 / TRINITY substrate).
+    CoordinatorHead,
 }
 
 /// Concrete packaging format for adapter artifacts.
@@ -53,6 +59,10 @@ pub enum AdapterTargetFamily {
     DecoderFeedForward,
     /// Decoder-wide adapter touching multiple subsystems.
     DecoderComposite,
+    /// Coordinator router head reading a frozen-backbone hidden state and
+    /// emitting `(worker, role)` routing logits. The head does not modify the
+    /// decoder; it sits on top of the extracted hidden feature.
+    CoordinatorRouter,
 }
 
 /// Residency mode used when serving adapters.
@@ -1213,6 +1223,7 @@ fn adapter_kind_label(kind: AdapterArtifactKind) -> &'static [u8] {
     match kind {
         AdapterArtifactKind::Lora => b"lora",
         AdapterArtifactKind::ResidualAdapter => b"residual_adapter",
+        AdapterArtifactKind::CoordinatorHead => b"coordinator_head",
     }
 }
 
@@ -1229,6 +1240,7 @@ fn adapter_target_label(target: AdapterTargetFamily) -> &'static [u8] {
         AdapterTargetFamily::DecoderAttention => b"decoder_attention",
         AdapterTargetFamily::DecoderFeedForward => b"decoder_feed_forward",
         AdapterTargetFamily::DecoderComposite => b"decoder_composite",
+        AdapterTargetFamily::CoordinatorRouter => b"coordinator_router",
     }
 }
 
