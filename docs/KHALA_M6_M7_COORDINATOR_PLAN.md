@@ -1,4 +1,4 @@
-# Khala M6/M7 Learned-Coordinator Build Plan (Psionic)
+# Khala M6/M7/M8 Learned-Coordinator Build Plan (Psionic)
 
 Sequenced, honest build plan for the Khala learned-coordinator capability
 (OpenAgents EPIC #6017; issues #6014 M6 TRINITY, #6015 M7 Conductor). The
@@ -230,6 +230,98 @@ not code that lands in this scaffold:
    single-model cost at comparable quality under the M2 rubric (the #6015
    Done-when proof).
 
+## M8 head-to-head evaluation harness (2026-06-23) — `coordinator_m8_head_to_head.rs`
+
+M8 (OpenAgents issue #6016) is the north-star head-to-head demo: publish our own
+Fugu-Ultra-vs-frontier comparison where **`openagents/khala` solves the
+benchmark BY COMPOSITION, verified, cheaper than a single model**. The
+publication-side machinery (evidence manifest, metric reducer, closure audit,
+fixture pack) already lives in the `openagents` repo
+(`scripts/khala-demo/reduce-head-to-head.mjs`,
+`docs/inference/khala-head-to-head-demo.md`, the `khala_head_to_head_evidence.v1`
+fixture). What was missing — and what this change adds in Psionic, which owns
+coordinator/execution truth — is the **evaluation harness that produces a lane's
+metrics in the first place**: composed (M7 Conductor over the M6 pool) vs a
+single-model baseline on a fixture task set, scored on quality + cost, with the
+deterministic win verdict the "compose to win, cheaper" claim rests on.
+
+### M8 scaffold status — what is real vs owner/compute-gated
+
+`crates/psionic-train/src/coordinator_m8_head_to_head.rs`:
+
+**Real + offline-proven (tests green, fixture-backed, no spend):**
+
+- **`M8HeadToHeadHarness`** runs the composed arm vs the single-model baseline
+  over a `HeadToHeadTaskSet`. For each task it **builds + validates the Conductor
+  plan over the M6 `WorkerPoolBinding`** (so the composed arm can only fan out
+  across receipt-eligible workers — the capability gate is honored, a plan naming
+  an out-of-pool worker is a structured `ComposedPlanFailed`, never a silently
+  scored outcome), and it **validates the baseline's worker index against the
+  same pool**. It reuses the M7 `ConductorPlanner`/`ConductorPolicy` seam, so
+  tests run with a fixture plan, not a 7B.
+- **`ArmCostMetric`** computes, per arm, the exact gateway / demo-reducer
+  vocabulary: **accepted rate** (the reducer's `verifiedRate`),
+  **cost-per-accepted-outcome** (`total_cost / accepted`, the gateway's headline
+  metric; `None`/"not_applicable" when nothing was accepted), and
+  **verified-work-per-sat** (`accepted / total_cost`, the roadmap business
+  metric; `None` only on the offline lane where no sats moved). Both arms are
+  aggregated via the M6 `ArmOutcome`/`TerminalRewardAdapter` and scored through
+  the M6 `ShadowComparison` decision logic unchanged.
+- **`HeadToHeadReport`** is the deterministic, typed, serde-round-tripping report:
+  composed vs single-model on quality + cost, the underlying `ShadowComparison`,
+  the composed worker fan-out, and the M8 **`HeadToHeadVerdict`**:
+  - `ComposeToWinCheaper` — fires ONLY when the comparison ran on the paid
+    (verified-work-per-sat) lane, composition **strictly** beat single-model on
+    that cost lane, AND quality stayed comparable (composed accepted rate within
+    `QUALITY_PARITY_EPSILON` = 0.05 of single-model's). This is the only verdict
+    that supports publishing "compose to win, cheaper".
+  - `CheaperButLowerQuality` — composition was cheaper per-sat but its quality
+    dropped below parity (the per-sat win came from accepting fewer outcomes, not
+    from being better). Not an honest win.
+  - `SingleModelNotBeaten` — single-model was at least as good on cost (ties
+    included; a tie is not a win).
+  - `NoCostLaneOffline` — at least one arm moved no sats, so there is no cost win
+    to claim; the cheaper-than-single-model claim requires the paid lane.
+
+The harness has **no dispatch seam at all**: a run only consumes fixture
+outcomes and produces a report. It dispatches no work, moves no sats, and starts
+no training. 17 unit tests cover the metric math, the win verdict (each
+verdict variant), the quality-parity tolerance, the capability-gate honoring
+(invalid composed plan + out-of-pool baseline both error, not panic), empty-set
+rejection, determinism, and serde round-trip.
+
+**Owner / compute-gated — the remaining gates (`M8HeadToHeadReadiness`):** every
+field is `false` in the shipped harness (mirrors M7's `ConductorReadiness`);
+flipping them is owner/compute work, not code that lands here:
+
+1. `composed_arm_live` — the composed arm runs a real trained Conductor policy
+   (7B over the M6 pool), not a fixture plan (compute; depends on M7
+   `policy_backend_wired` + `training_run_executed`).
+2. `single_model_baseline_live` — the baseline runs a real frontier endpoint, not
+   a fixture outcome.
+3. `paid_verdict_source_armed` — the `EvalVerdictSource` is **armed** over the
+   live Pylon pool (M4, #6012) with a spend-enabled buy-mode campaign, so the
+   per-arm outcomes are real verified evals (owner).
+4. `paid_compose_to_win_recorded` — a paid head-to-head where composition's
+   verified-work-per-sat beat single-model at comparable quality under the M2
+   rubric (the #6016 Done-when proof; owner + M4 + M6).
+5. `demo_closure_audit_passes` — the openagents-repo reducer's closure audit
+   returns `canClose: true` for a *live* manifest (publication-side, owner).
+
+### M8 Done-when next slice (after this change)
+
+1. **Wire the composed arm to the M7 live policy** once `ConductorReadiness`'s
+   `policy_backend_wired` + `training_run_executed` flip — replace the fixture
+   `ConductorPolicy` with the trained 7B served over the M6 pool. Compute-gated.
+2. **Arm the verdict source** over the live M4 Pylon pool with a spend-enabled
+   buy-mode campaign and a real frontier baseline endpoint, then run the harness
+   on the live crossy-road task set to record a paid `ComposeToWinCheaper`
+   verdict. Owner-gated (arming + spend-enabled campaign + the daily cap).
+3. **Hand the per-lane metrics to the publication reducer** — the harness's
+   `ArmCostMetric` is the per-lane shape the openagents
+   `reduce-head-to-head.mjs` manifest carries; feeding a live report into a live
+   manifest is what flips the reducer's `canClose` to `true` and closes #6016.
+
 ## Effort / risk
 
 | Slice | Effort | Risk | Blocked on |
@@ -242,6 +334,8 @@ not code that lands in this scaffold:
 | M7 Conductor scaffold (plan contract + planner + GRPO/DPPO trainer, inert) | done (this change) | low | — |
 | M7 Conductor real GRPO run (DPPO+FP32 over a 7B) | large | high (RL stability) | **compute** (policy backend + H100-hours) |
 | M7 paid composition demo (crossy-road, cheaper than single-model) | large | high | **arm + M4 paid lane + M6 shadow-win + M2 rubric** |
+| M8 head-to-head eval harness (composed-vs-single, fixture, inert) | done (this change) | low | — |
+| M8 armed head-to-head run (live composed + frontier baseline, paid) | large | high | **M7 live policy + arm + M4 paid lane + M2 rubric + demo closure audit** |
 
 ## Concrete next slice (after this change)
 
@@ -297,6 +391,7 @@ not code that lands in this scaffold:
 - Tests: `cargo test -p psionic-train --lib coordinator`,
   `cargo test -p psionic-train --lib coordinator_eval_verdict`,
   `cargo test -p psionic-train --lib coordinator_conductor`,
+  `cargo test -p psionic-train --lib coordinator_m8_head_to_head`,
   `cargo test -p psionic-models --lib coordinator_head`
 - Companion runbook: `docs/COORDINATOR_EVOLUTION_TRAINING.md`
 - Spec (openagents): `docs/sakana/psionic-coordinator-roadmap.md`,
