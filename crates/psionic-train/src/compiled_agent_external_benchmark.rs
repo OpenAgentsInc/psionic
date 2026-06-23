@@ -901,6 +901,18 @@ fn evaluate_route(
         CompiledAgentArtifactPayload::RevisionSet { revision } => {
             Ok(evaluate_compiled_agent_route(prompt, revision))
         }
+        // The compiled-agent route benchmark scores route-model / revision-set
+        // payloads. A coordinator-head candidate is a frozen-backbone routing
+        // head evaluated through the coordinator `ShadowComparison`, not this
+        // prompt-route benchmark.
+        CompiledAgentArtifactPayload::CoordinatorHead { .. } => {
+            Err(CompiledAgentExternalBenchmarkError::IncompatibleArtifactContract {
+                detail: format!(
+                    "module `{}` carries a coordinator-head payload, which is not scored by the route benchmark",
+                    entry.module_name
+                ),
+            })
+        }
     }
 }
 

@@ -79,6 +79,15 @@ pub enum CompiledAgentArtifactPayload {
     RouteModel {
         artifact: CompiledAgentRouteModelArtifact,
     },
+    /// A trained frozen-backbone coordinator head (Khala M6 / TRINITY). The
+    /// payload is the digest-pinned head identity (config + flat-parameter
+    /// digest) rather than the backbone weights, matching the
+    /// `AdapterArtifactKind::CoordinatorHead` packaging contract. This variant
+    /// is additive: the existing `RevisionSet` / `RouteModel` payloads keyed to
+    /// `CompiledAgentModuleKind` modules are unchanged.
+    CoordinatorHead {
+        artifact: crate::CoordinatorHeadCandidateArtifact,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
