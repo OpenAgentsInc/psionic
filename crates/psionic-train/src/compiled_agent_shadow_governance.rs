@@ -1077,6 +1077,17 @@ fn revision_from_entry(entry: &CompiledAgentArtifactContractEntry) -> CompiledAg
             revision.route_model_artifact = Some(artifact.clone());
             revision
         }
+        // A coordinator-head candidate is not a route/grounded module revision —
+        // it is a frozen-backbone routing head packaged under
+        // `AdapterArtifactKind::CoordinatorHead`. The compiled-agent
+        // revision-set shadow surface does not model it, so it carries the
+        // baseline revision identity here (its real shadow gate is the
+        // coordinator `ShadowComparison`, not this revision-set comparison).
+        CompiledAgentArtifactPayload::CoordinatorHead { artifact } => {
+            let mut revision = compiled_agent_baseline_revision_set();
+            revision.revision_id = artifact.artifact_id();
+            revision
+        }
     }
 }
 

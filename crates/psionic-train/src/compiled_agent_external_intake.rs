@@ -1562,6 +1562,13 @@ fn candidate_route_prediction(
         CompiledAgentArtifactPayload::RevisionSet { revision } => {
             (evaluate_compiled_agent_route(prompt, revision), None)
         }
+        // A coordinator-head candidate is not scored by the prompt-route intake
+        // path (its gate is the coordinator `ShadowComparison`). Fall back to the
+        // deterministic baseline route with no model confidence.
+        CompiledAgentArtifactPayload::CoordinatorHead { .. } => (
+            evaluate_compiled_agent_route(prompt, &compiled_agent_baseline_revision_set()),
+            None,
+        ),
     }
 }
 
@@ -1682,6 +1689,14 @@ fn revision_from_entry(
             Err(CompiledAgentExternalIntakeError::InvalidRuntimeSubmission {
                 detail: format!(
                     "module `{}` does not carry a revision-set payload",
+                    entry.module_name
+                ),
+            })
+        }
+        CompiledAgentArtifactPayload::CoordinatorHead { .. } => {
+            Err(CompiledAgentExternalIntakeError::InvalidRuntimeSubmission {
+                detail: format!(
+                    "module `{}` carries a coordinator-head payload, not a revision-set payload",
                     entry.module_name
                 ),
             })
