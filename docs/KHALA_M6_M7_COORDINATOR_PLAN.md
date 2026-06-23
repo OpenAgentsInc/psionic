@@ -31,7 +31,10 @@ candidate-artifact emission consumes.
 What remains genuinely new and unbuilt: the **typed candidate-artifact emission**
 into `CompiledAgentPromotedArtifactContract` (contract-touching, deferred to a
 reviewed change), the **live paid lane** (blocked on M4 real pool + a reachable
-Pylon verdict source), and the entire **M7 Conductor GRPO lane**.
+Pylon verdict source), and the **M7 Conductor real GRPO training run** + the
+paid composition demo (the **M7 scaffold** — plan contract, planner, GRPO/DPPO
+trainer — is now built and tested as `coordinator_conductor.rs`, inert until
+armed; see the M7 scaffold-status section below).
 
 ## P1–P5 in our stack: what each is, exists vs new
 
@@ -161,6 +164,72 @@ The ES (TRINITY) lane mostly avoids logprob mismatch entirely, which is why it i
 the cheaper, higher-leverage first build; DPPO/FP32 matter only for the
 Conductor RL lane. M7 also needs the Verse multi-worker fan-out view (M5).
 
+### M7 scaffold status (2026-06-23) — `coordinator_conductor.rs`
+
+The M7 Conductor scaffold is landed as a reviewed PR
+(`crates/psionic-train/src/coordinator_conductor.rs`), built + tested on CPU with
+no spend and no model weights. It reuses the M6 substrate unchanged. What it
+contains, and what stays owner/compute-gated:
+
+**Real + offline-proven (tests green):**
+
+- **The plan contract** — `ConductorPlan` materializes the Conductor paper's
+  three parallel lists (`model_id` / `subtasks` / `access_list`) as a validated
+  `Vec<ConductorStep>`. `AccessList` (`All` / `None` / `Indices`) is the
+  access-list topology; validation enforces a DAG over the linear ordering (no
+  self/forward edges), bounds the step count to `max_steps` (the paper's 5-step
+  cap), and rejects any `worker_index` outside the **M6 `WorkerPoolBinding`** —
+  so the language plan can never name a worker the capability gate already
+  filtered out. `parse` is a deterministic, bounded-field structuring step that
+  runs *after* the semantic decode (no intent keyword-matching). `worker_fanout`
+  is the compose-across-the-map set the Verse view (M5) will render;
+  `resolve_worker_ids` maps indices to stable ids through the binding.
+- **The planner stepping interface** — `ConductorPlanner<P: ConductorPolicy>`:
+  decode (via an injected `ConductorPolicy` text-generation seam, so tests run
+  with a fixture, not a 7B) → parse → validate → `step()` yields a
+  `PlanStepOutcome` (resolved worker id, subtask, access, `is_final`) for the
+  plan→implement→verify→refine loop. A malformed model output is surfaced as a
+  structured `ConductorError` (the GRPO format-condition reward-0 signal), never
+  a panic.
+- **The GRPO/DPPO trainer scaffold with the TMAX recipe** —
+  `ConductorTrainerConfig::tmax_table13()` captures FP32 head ON, DPPO TV mask
+  0.1, zero-std filtering ON, group size 32, KL β 0, LR 1e-6, centered advantage.
+  `ConductorTrainer::update_step` groups rollouts by `prompt_id`, **filters
+  zero-std GRPO groups** (`GrpoGroup::is_zero_std`), computes **centered
+  advantages**, applies the **DPPO TV-mask** (`DpppoUpdate::token_is_masked`,
+  with the **FP32-head** path treating the trainer logprob as exact so the
+  measured divergence is the real policy gap, not a precision artifact), and
+  emits a deterministic `GrpoUpdateStep` summary. **Reward = the M6
+  `EvalVerdictSource` verdict** via `TerminalRewardAdapter` (verified-work, not
+  raw pass rate). It applies **no gradient** — there is no autograd/serving
+  backend in the scaffold; it proves the *loop steps*, not that the Conductor is
+  good.
+
+**Default-off / fail-closed (tests assert):**
+
+- `ConductorTrainer` is **`Disarmed` by default** (same `CoordinatorArmState` as
+  the M6 lanes). `guard_paid_rollout` refuses cleanly while disarmed (no spend,
+  no dispatch); even when **armed** it pre-checks the **`DailySpendCap`** and
+  fails closed over-cap; the cap clamps to the owner's 10,000 sat/day ceiling
+  (`OWNER_DAILY_CAP_MSATS`) as a hard upper bound. Nothing in this module
+  dispatches work, moves sats, or starts a training run. The openagents gateway
+  verdict shapes are consumed read-only.
+
+**Owner / compute-gated — the remaining gates (`ConductorReadiness`):** every
+field is `false` in the shipped scaffold; flipping them is owner/compute work,
+not code that lands in this scaffold:
+
+1. `policy_backend_wired` — a 7B base policy + FP32 head + autograd/serving split
+   (compute).
+2. `training_run_executed` — a real GRPO run that converges (H100-hours).
+3. `paid_verdict_source_armed` — `EvalVerdictSource` **armed** over the live
+   Pylon pool (M4, #6012) + a spend-enabled buy-mode campaign (owner).
+4. `paid_shadow_win_recorded` — an M6 paid `ShadowComparison`
+   verified-work-per-sat win over single-model (owner + M6).
+5. `crossy_road_composition_verified` — the crossy-road composition beats
+   single-model cost at comparable quality under the M2 rubric (the #6015
+   Done-when proof).
+
 ## Effort / risk
 
 | Slice | Effort | Risk | Blocked on |
@@ -170,7 +239,9 @@ Conductor RL lane. M7 also needs the Verse multi-worker fan-out view (M5).
 | SVF adapter (P2 optional) | small | low | — |
 | Candidate-artifact emission into the contract | medium | medium (contract-touching) | reviewed PR |
 | Live paid lane (full M6 win) | medium | medium (cost, LLM nondeterminism) | **M4 real pool** + Pylon verdict source |
-| M7 Conductor GRPO (DPPO+FP32) | large | high (RL stability) | **M5 viz + M6** |
+| M7 Conductor scaffold (plan contract + planner + GRPO/DPPO trainer, inert) | done (this change) | low | — |
+| M7 Conductor real GRPO run (DPPO+FP32 over a 7B) | large | high (RL stability) | **compute** (policy backend + H100-hours) |
+| M7 paid composition demo (crossy-road, cheaper than single-model) | large | high | **arm + M4 paid lane + M6 shadow-win + M2 rubric** |
 
 ## Concrete next slice (after this change)
 
@@ -194,6 +265,30 @@ Conductor RL lane. M7 also needs the Verse multi-worker fan-out view (M5).
    gateway verdict, an armed source, and a spend-enabled buy-mode campaign row.
    This change provides the seam and the fixture lane; it never fabricates a
    verdict and never dispatches in tests.
+4. **M7 Conductor scaffold** — DONE (this change):
+   `coordinator_conductor.rs` ships the typed plan contract (`ConductorPlan` over
+   the M6 pool), the planner stepping interface (`ConductorPlanner` /
+   `ConductorPolicy` / `PlanStepOutcome`), and the GRPO/DPPO trainer scaffold
+   (`ConductorTrainer` / `ConductorTrainerConfig::tmax_table13` / `DpppoUpdate` /
+   `GrpoGroup` / `GrpoUpdateStep`) with reward = the M6 `EvalVerdictSource`
+   verdict, **inert until armed**. The remaining work toward the #6015 Done-when
+   is the `ConductorReadiness` gate list: a real GRPO run over a 7B policy
+   (compute) and the paid crossy-road composition demo (arm + M4 paid lane + M6
+   shadow-win + M2 rubric).
+
+### M7 Done-when next slice (after this change)
+
+1. **Policy backend** — wire a 7B base policy + the FP32 LM head to a real
+   autograd/serving split behind `ConductorPolicy` and the trainer's logprob
+   path. Compute-gated; the scaffold ships only the typed loop, no weights.
+2. **First GRPO run** — drive `ConductorTrainer::update_step` over real rollouts
+   (format + correctness reward via `EvalVerdictSource`) until the loop converges
+   on the crossy-road task set. H100-hours; owner/compute decision.
+3. **Paid composition demo** — arm the verdict source over the live M4 Pylon
+   pool, collect a learned-vs-single-model `ShadowComparison` on
+   verified-work-per-sat, and prove the crossy-road composition beats
+   single-model cost at comparable quality under the M2 rubric. Owner-gated
+   (arming + spend-enabled campaign + daily cap).
 
 ## Build / run anchors
 
@@ -201,6 +296,7 @@ Conductor RL lane. M7 also needs the Verse multi-worker fan-out view (M5).
 - Live validation (no spend): `cargo run -q -p psionic-train --bin coordinator_live_train`
 - Tests: `cargo test -p psionic-train --lib coordinator`,
   `cargo test -p psionic-train --lib coordinator_eval_verdict`,
+  `cargo test -p psionic-train --lib coordinator_conductor`,
   `cargo test -p psionic-models --lib coordinator_head`
 - Companion runbook: `docs/COORDINATOR_EVOLUTION_TRAINING.md`
 - Spec (openagents): `docs/sakana/psionic-coordinator-roadmap.md`,
