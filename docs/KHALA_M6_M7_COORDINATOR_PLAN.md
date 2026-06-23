@@ -177,20 +177,30 @@ Conductor RL lane. M7 also needs the Verse multi-worker fan-out view (M5).
 1. **SVF adapter** (P2 optional) behind `CoordinatorHead` — small, additive, may
    lift representation per TRINITY ablations; gate it on whether the offline lane
    plateaus.
-2. **Candidate-artifact emission** as a reviewed PR: extend
-   `CompiledAgentPromotedArtifactContract` (or add a coordinator-specific typed
-   payload) so a trained head ships as a digest-pinned Candidate with the
-   heuristic router as rollback, consuming `ShadowComparison` for the
+2. **Candidate-artifact emission** — DONE (`#1136`, merged):
+   `coordinator_candidate_emission.rs` ships a trained head as a digest-pinned
+   Candidate under `CompiledAgentPromotedArtifactContract` with the heuristic
+   router as `rollback_artifact_id`, consuming `ShadowComparison` for the
    promote/hold/rollback decision.
-3. **Pylon verdict source** for the paid lane: implement `EvalVerdictSource` over
-   the buy-mode dispatch path + Tassadar verdict, behind the daily cap — the
-   first thing M4 unblocks.
+3. **Pylon verdict source** for the paid lane — PLUMBING DONE (this change):
+   `coordinator_eval_verdict_source.rs` adds `DispatchBackedVerdictSource`, a real
+   `EvalVerdictSource` over the buy-mode dispatch path (`BuyModeDispatch` seam) that
+   reads the `training.verification_classes.v1` verdict, yields the scalar terminal
+   reward, and feeds `LiveCoordinatorFitness` / `ShadowComparison`. It is
+   **disarmed by default** (`CoordinatorArmState::Disarmed`) and **fail-closed
+   behind the daily cap** (an over-cap or disarmed request dispatches nothing and
+   moves no sats). The remaining **owner-gated** work is a *live* `BuyModeDispatch`
+   that publishes to the real Pylon pool (M4, #6012, merged) and reads the settled
+   gateway verdict, an armed source, and a spend-enabled buy-mode campaign row.
+   This change provides the seam and the fixture lane; it never fabricates a
+   verdict and never dispatches in tests.
 
 ## Build / run anchors
 
 - Offline smoke: `cargo run -q -p psionic-train --bin coordinator_evolution_smoke`
 - Live validation (no spend): `cargo run -q -p psionic-train --bin coordinator_live_train`
 - Tests: `cargo test -p psionic-train --lib coordinator`,
+  `cargo test -p psionic-train --lib coordinator_eval_verdict`,
   `cargo test -p psionic-models --lib coordinator_head`
 - Companion runbook: `docs/COORDINATOR_EVOLUTION_TRAINING.md`
 - Spec (openagents): `docs/sakana/psionic-coordinator-roadmap.md`,
