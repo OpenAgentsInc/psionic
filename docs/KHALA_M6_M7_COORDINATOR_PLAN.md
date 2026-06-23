@@ -282,13 +282,28 @@ deterministic win verdict the "compose to win, cheaper" claim rests on.
     included; a tie is not a win).
   - `NoCostLaneOffline` — at least one arm moved no sats, so there is no cost win
     to claim; the cheaper-than-single-model claim requires the paid lane.
+- **`M8RealRunPreflight`** is the real-run bridge for #1142, still pure and
+  no-spend. It takes a non-empty `HeadToHeadTaskSet`, `M8HeadToHeadReadiness`,
+  and explicit `M8RealRunPreflightOptions` (`owner_confirmed`, non-blank
+  `approval_ref`, positive `spend_cap_msats`, and `max_paid_evals`). The planned
+  paid eval count is `task_count * 2` (composed arm + single-model arm for every
+  task). The preflight separates:
+  - **dispatch blockers** — missing owner approval/ref, zero spend cap, missing
+    or too-small eval cap, non-live composed arm, non-live single-model baseline,
+    or unarmed paid verdict source. `can_dispatch_real_eval()` is true only when
+    this list is empty.
+  - **publication blockers** — no paid `ComposeToWinCheaper` result recorded yet,
+    or the live openagents manifest closure audit has not passed.
+    `publishable_done_when()` is true only when both dispatch and publication
+    blockers are empty.
 
 The harness has **no dispatch seam at all**: a run only consumes fixture
 outcomes and produces a report. It dispatches no work, moves no sats, and starts
-no training. 17 unit tests cover the metric math, the win verdict (each
+no training. 21 unit tests cover the metric math, the win verdict (each
 verdict variant), the quality-parity tolerance, the capability-gate honoring
 (invalid composed plan + out-of-pool baseline both error, not panic), empty-set
-rejection, determinism, and serde round-trip.
+rejection, determinism, serde round-trip, and the owner-armed real-run preflight
+gate split.
 
 **Owner / compute-gated — the remaining gates (`M8HeadToHeadReadiness`):** every
 field is `false` in the shipped harness (mirrors M7's `ConductorReadiness`);
@@ -313,11 +328,15 @@ flipping them is owner/compute work, not code that lands here:
 1. **Wire the composed arm to the M7 live policy** once `ConductorReadiness`'s
    `policy_backend_wired` + `training_run_executed` flip — replace the fixture
    `ConductorPolicy` with the trained 7B served over the M6 pool. Compute-gated.
-2. **Arm the verdict source** over the live M4 Pylon pool with a spend-enabled
+2. **Pass `M8RealRunPreflight`** with explicit owner approval, a reviewable
+   approval ref, positive spend cap, and an eval cap covering both arms for every
+   task. This is the launch permission check for the real comparison; it still
+   dispatches nothing by itself.
+3. **Arm the verdict source** over the live M4 Pylon pool with a spend-enabled
    buy-mode campaign and a real frontier baseline endpoint, then run the harness
    on the live crossy-road task set to record a paid `ComposeToWinCheaper`
    verdict. Owner-gated (arming + spend-enabled campaign + the daily cap).
-3. **Hand the per-lane metrics to the publication reducer** — the harness's
+4. **Hand the per-lane metrics to the publication reducer** — the harness's
    `ArmCostMetric` is the per-lane shape the openagents
    `reduce-head-to-head.mjs` manifest carries; feeding a live report into a live
    manifest is what flips the reducer's `canClose` to `true` and closes #6016.
@@ -334,8 +353,9 @@ flipping them is owner/compute work, not code that lands here:
 | M7 Conductor scaffold (plan contract + planner + GRPO/DPPO trainer, inert) | done (this change) | low | — |
 | M7 Conductor real GRPO run (DPPO+FP32 over a 7B) | large | high (RL stability) | **compute** (policy backend + H100-hours) |
 | M7 paid composition demo (crossy-road, cheaper than single-model) | large | high | **arm + M4 paid lane + M6 shadow-win + M2 rubric** |
-| M8 head-to-head eval harness (composed-vs-single, fixture, inert) | done (this change) | low | — |
-| M8 armed head-to-head run (live composed + frontier baseline, paid) | large | high | **M7 live policy + arm + M4 paid lane + M2 rubric + demo closure audit** |
+| M8 head-to-head eval harness (composed-vs-single, fixture, inert) | done | low | — |
+| M8 real-run preflight (owner approval + spend/eval caps + live-arm gates) | done (this change) | low | — |
+| M8 armed head-to-head run (live composed + frontier baseline, paid) | large | high | **M7 live policy + owner approval + arm + M4 paid lane + M2 rubric + demo closure audit** |
 
 ## Concrete next slice (after this change)
 

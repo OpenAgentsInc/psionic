@@ -559,6 +559,175 @@ impl M8HeadToHeadReadiness {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Owner-armed real-run preflight: bounded, explicit, no dispatch.
+// ---------------------------------------------------------------------------
+
+/// Explicit owner/cap inputs required before the real M8 head-to-head may leave
+/// fixture mode. This is a *preflight* contract only: it does not hold provider
+/// credentials, does not dispatch jobs, and does not move sats.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct M8RealRunPreflightOptions {
+    /// The owner deliberately approved a real paid M8 comparison for this run.
+    pub owner_confirmed: bool,
+    /// Human-readable approval reference, issue/comment/runbook id, or operator
+    /// handoff id tying the spend decision to a reviewable record.
+    pub approval_ref: Option<String>,
+    /// Spend ceiling for the real run, in millisats. Must be positive.
+    pub spend_cap_msats: u64,
+    /// Hard cap on paid eval calls. Must cover both arms for every task.
+    pub max_paid_evals: usize,
+}
+
+impl M8RealRunPreflightOptions {
+    /// Safe default: no owner approval, no approval ref, no spend cap, no eval
+    /// cap. A preflight built from this can never dispatch.
+    #[must_use]
+    pub const fn disarmed() -> Self {
+        Self {
+            owner_confirmed: false,
+            approval_ref: None,
+            spend_cap_msats: 0,
+            max_paid_evals: 0,
+        }
+    }
+}
+
+/// Reasons the real paid M8 comparison may not be dispatched yet.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum M8RealRunDispatchBlocker {
+    /// No explicit owner approval was supplied.
+    OwnerApprovalMissing,
+    /// The approval record is absent or blank.
+    ApprovalRefMissing,
+    /// The spend cap is zero.
+    SpendCapMissing,
+    /// The paid eval cap is zero.
+    PaidEvalCapMissing,
+    /// The paid eval cap does not cover both arms for every task.
+    PaidEvalCapTooLow {
+        /// Required paid eval calls (`task_count * 2`).
+        required: usize,
+        /// Provided paid eval cap.
+        provided: usize,
+    },
+    /// The composed arm is still fixture/offline.
+    ComposedArmNotLive,
+    /// The single-model baseline is still fixture/offline.
+    SingleModelBaselineNotLive,
+    /// The paid verdict source is not armed over the live Pylon pool.
+    PaidVerdictSourceNotArmed,
+}
+
+/// Reasons the M8 publication Done-when is not closed yet, even if dispatch is
+/// otherwise allowed. These are post-run evidence gates, not pre-dispatch gates.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum M8RealRunPublicationBlocker {
+    /// No paid `ComposeToWinCheaper` result has been recorded yet.
+    PaidComposeToWinNotRecorded,
+    /// The openagents demo closure audit has not passed for a live manifest.
+    DemoClosureAuditNotPassed,
+}
+
+/// Pure preflight for the real M8 head-to-head lane. It separates launch
+/// blockers (owner/cap/live-arm gates) from publication blockers (post-run
+/// evidence gates) so an operator can see exactly what remains without
+/// accidentally dispatching work.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct M8RealRunPreflight {
+    /// Number of tasks in the head-to-head set.
+    pub task_count: usize,
+    /// Paid eval calls needed to run both arms for every task.
+    pub planned_paid_evals: usize,
+    /// The supplied spend ceiling in millisats.
+    pub spend_cap_msats: u64,
+    /// The supplied paid eval cap.
+    pub max_paid_evals: usize,
+    /// Blockers that prevent dispatching the real paid comparison.
+    pub dispatch_blockers: Vec<M8RealRunDispatchBlocker>,
+    /// Blockers that prevent publishing/closing M8 Done-when.
+    pub publication_blockers: Vec<M8RealRunPublicationBlocker>,
+}
+
+impl M8RealRunPreflight {
+    /// Builds the real-run preflight from the non-empty task set, readiness gates,
+    /// and explicit owner/cap inputs. This performs no dispatch and moves no sats.
+    #[must_use]
+    pub fn new(
+        task_set: &HeadToHeadTaskSet,
+        readiness: M8HeadToHeadReadiness,
+        options: M8RealRunPreflightOptions,
+    ) -> Self {
+        let task_count = task_set.len();
+        let planned_paid_evals = task_count.saturating_mul(2);
+        let mut dispatch_blockers = Vec::new();
+        let mut publication_blockers = Vec::new();
+
+        if !options.owner_confirmed {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::OwnerApprovalMissing);
+        }
+        if options
+            .approval_ref
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or_default()
+            .is_empty()
+        {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::ApprovalRefMissing);
+        }
+        if options.spend_cap_msats == 0 {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::SpendCapMissing);
+        }
+        if options.max_paid_evals == 0 {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::PaidEvalCapMissing);
+        } else if options.max_paid_evals < planned_paid_evals {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::PaidEvalCapTooLow {
+                required: planned_paid_evals,
+                provided: options.max_paid_evals,
+            });
+        }
+        if !readiness.composed_arm_live {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::ComposedArmNotLive);
+        }
+        if !readiness.single_model_baseline_live {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::SingleModelBaselineNotLive);
+        }
+        if !readiness.paid_verdict_source_armed {
+            dispatch_blockers.push(M8RealRunDispatchBlocker::PaidVerdictSourceNotArmed);
+        }
+
+        if !readiness.paid_compose_to_win_recorded {
+            publication_blockers.push(M8RealRunPublicationBlocker::PaidComposeToWinNotRecorded);
+        }
+        if !readiness.demo_closure_audit_passes {
+            publication_blockers.push(M8RealRunPublicationBlocker::DemoClosureAuditNotPassed);
+        }
+
+        Self {
+            task_count,
+            planned_paid_evals,
+            spend_cap_msats: options.spend_cap_msats,
+            max_paid_evals: options.max_paid_evals,
+            dispatch_blockers,
+            publication_blockers,
+        }
+    }
+
+    /// Whether the real paid comparison is allowed to dispatch.
+    #[must_use]
+    pub fn can_dispatch_real_eval(&self) -> bool {
+        self.dispatch_blockers.is_empty()
+    }
+
+    /// Whether M8's publication Done-when can be closed.
+    #[must_use]
+    pub fn publishable_done_when(&self) -> bool {
+        self.can_dispatch_real_eval() && self.publication_blockers.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -939,5 +1108,135 @@ mod tests {
             demo_closure_audit_passes: true,
         };
         assert!(r.armed_done_when_met());
+    }
+
+    // ---- Owner-armed real-run preflight -----------------------------------
+
+    fn live_ready_before_publication() -> M8HeadToHeadReadiness {
+        M8HeadToHeadReadiness {
+            composed_arm_live: true,
+            single_model_baseline_live: true,
+            paid_verdict_source_armed: true,
+            paid_compose_to_win_recorded: false,
+            demo_closure_audit_passes: false,
+        }
+    }
+
+    fn preflight_task_set(n: usize) -> HeadToHeadTaskSet {
+        let tasks = (0..n)
+            .map(|i| task(&format!("t{i}"), Verified, 10.0, Verified, 30.0))
+            .collect();
+        HeadToHeadTaskSet::new(tasks).expect("preflight task set")
+    }
+
+    #[test]
+    fn real_run_preflight_is_disarmed_by_default_and_moves_nothing() {
+        let set = preflight_task_set(2);
+        let preflight = M8RealRunPreflight::new(
+            &set,
+            M8HeadToHeadReadiness::fixture(),
+            M8RealRunPreflightOptions::disarmed(),
+        );
+
+        assert_eq!(preflight.task_count, 2);
+        assert_eq!(preflight.planned_paid_evals, 4);
+        assert!(!preflight.can_dispatch_real_eval());
+        assert!(!preflight.publishable_done_when());
+        assert_eq!(
+            preflight.dispatch_blockers,
+            vec![
+                M8RealRunDispatchBlocker::OwnerApprovalMissing,
+                M8RealRunDispatchBlocker::ApprovalRefMissing,
+                M8RealRunDispatchBlocker::SpendCapMissing,
+                M8RealRunDispatchBlocker::PaidEvalCapMissing,
+                M8RealRunDispatchBlocker::ComposedArmNotLive,
+                M8RealRunDispatchBlocker::SingleModelBaselineNotLive,
+                M8RealRunDispatchBlocker::PaidVerdictSourceNotArmed,
+            ]
+        );
+        assert_eq!(
+            preflight.publication_blockers,
+            vec![
+                M8RealRunPublicationBlocker::PaidComposeToWinNotRecorded,
+                M8RealRunPublicationBlocker::DemoClosureAuditNotPassed,
+            ]
+        );
+    }
+
+    #[test]
+    fn real_run_preflight_requires_eval_cap_for_both_arms() {
+        let set = preflight_task_set(3);
+        let preflight = M8RealRunPreflight::new(
+            &set,
+            live_ready_before_publication(),
+            M8RealRunPreflightOptions {
+                owner_confirmed: true,
+                approval_ref: Some("openagents/psionic#1142 owner approval".to_string()),
+                spend_cap_msats: 1_000_000,
+                max_paid_evals: 5,
+            },
+        );
+
+        assert_eq!(preflight.planned_paid_evals, 6);
+        assert!(!preflight.can_dispatch_real_eval());
+        assert_eq!(
+            preflight.dispatch_blockers,
+            vec![M8RealRunDispatchBlocker::PaidEvalCapTooLow {
+                required: 6,
+                provided: 5,
+            }]
+        );
+    }
+
+    #[test]
+    fn real_run_preflight_allows_dispatch_before_publication_done_when() {
+        let set = preflight_task_set(3);
+        let preflight = M8RealRunPreflight::new(
+            &set,
+            live_ready_before_publication(),
+            M8RealRunPreflightOptions {
+                owner_confirmed: true,
+                approval_ref: Some("openagents/psionic#1142 owner approval".to_string()),
+                spend_cap_msats: 1_000_000,
+                max_paid_evals: 6,
+            },
+        );
+
+        assert!(preflight.can_dispatch_real_eval());
+        assert!(!preflight.publishable_done_when());
+        assert!(preflight.dispatch_blockers.is_empty());
+        assert_eq!(
+            preflight.publication_blockers,
+            vec![
+                M8RealRunPublicationBlocker::PaidComposeToWinNotRecorded,
+                M8RealRunPublicationBlocker::DemoClosureAuditNotPassed,
+            ]
+        );
+    }
+
+    #[test]
+    fn real_run_preflight_done_when_requires_recorded_win_and_closure_audit() {
+        let set = preflight_task_set(1);
+        let preflight = M8RealRunPreflight::new(
+            &set,
+            M8HeadToHeadReadiness {
+                composed_arm_live: true,
+                single_model_baseline_live: true,
+                paid_verdict_source_armed: true,
+                paid_compose_to_win_recorded: true,
+                demo_closure_audit_passes: true,
+            },
+            M8RealRunPreflightOptions {
+                owner_confirmed: true,
+                approval_ref: Some("openagents/psionic#1142 closeout".to_string()),
+                spend_cap_msats: 1_000_000,
+                max_paid_evals: 2,
+            },
+        );
+
+        assert!(preflight.can_dispatch_real_eval());
+        assert!(preflight.publishable_done_when());
+        assert!(preflight.dispatch_blockers.is_empty());
+        assert!(preflight.publication_blockers.is_empty());
     }
 }
