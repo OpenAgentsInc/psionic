@@ -125,8 +125,10 @@ The live-training wiring lands in
   10,000 sats/day (`OWNER_DAILY_CAP_MSATS = 10_000_000` msats). Same
   `spent_today / day_key / daily_cap` semantics as the shared buy-mode ceiling.
 - **`EvalVerdictSource`** — the seam for the verdict. `SimulatedVerdictSource`
-  is the deterministic, **zero-spend** validation source; the live lane binds
-  this to a Pylon dispatch + the Tassadar replay verdict.
+  is the deterministic, **zero-spend** validation source; the live lane binds this
+  to `DispatchBackedVerdictSource` over either the signed Pylon TCP dispatcher or
+  the default-off OpenAgents Worker HTTP dispatcher, both reading the Tassadar
+  replay verdict instead of a prompted judge.
 
 ### Cap integration point (exact, cross-repo)
 
@@ -179,9 +181,13 @@ cap path. This is a SMOKE (simulated verdict source), not a frontier ML result.
 
 The `--real` run is **HELD**: a sat-moving run needs a live Pylon verdict source
 (dispatch each trajectory as a buy-mode eval job), the Tassadar
-`training.verification_classes.v1` verdict, and a spend-enabled buy-mode campaign
-row to debit the shared cap. The driver refuses to spend without shared-cap
-authority or to fabricate verdicts; cap fail-closed is proven by
+`training.verification_classes.v1` verdict, an owner-armed dispatcher, and a
+spend-enabled buy-mode campaign row to debit the shared cap. The signed TCP
+dispatcher (`coordinator_live_buymode_dispatch.rs`) and the default-off HTTP
+Worker bridge (`coordinator_http_buymode_dispatch.rs`) are now both present, but
+neither arms itself and neither proves a live sat-moving deployment run. The
+driver refuses to spend without shared-cap authority or to fabricate verdicts;
+cap fail-closed is proven by
 `coordinator_live_training::tests::live_fitness_fails_closed_at_the_cap`.
 
 ## What real training still needs

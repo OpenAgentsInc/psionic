@@ -367,18 +367,21 @@ flipping them is owner/compute work, not code that lands here:
    Candidate under `CompiledAgentPromotedArtifactContract` with the heuristic
    router as `rollback_artifact_id`, consuming `ShadowComparison` for the
    promote/hold/rollback decision.
-3. **Pylon verdict source** for the paid lane — PLUMBING DONE (this change):
+3. **Pylon verdict source** for the paid lane — PLUMBING DONE:
    `coordinator_eval_verdict_source.rs` adds `DispatchBackedVerdictSource`, a real
    `EvalVerdictSource` over the buy-mode dispatch path (`BuyModeDispatch` seam) that
    reads the `training.verification_classes.v1` verdict, yields the scalar terminal
    reward, and feeds `LiveCoordinatorFitness` / `ShadowComparison`. It is
    **disarmed by default** (`CoordinatorArmState::Disarmed`) and **fail-closed
    behind the daily cap** (an over-cap or disarmed request dispatches nothing and
-   moves no sats). The remaining **owner-gated** work is a *live* `BuyModeDispatch`
-   that publishes to the real Pylon pool (M4, #6012, merged) and reads the settled
-   gateway verdict, an armed source, and a spend-enabled buy-mode campaign row.
-   This change provides the seam and the fixture lane; it never fabricates a
-   verdict and never dispatches in tests.
+   moves no sats). `coordinator_live_buymode_dispatch.rs` provides the signed TCP
+   Pylon worker protocol; `coordinator_http_buymode_dispatch.rs` provides the
+   default-off OpenAgents Worker HTTP bridge (`PSIONIC_BUY_MODE_HTTP_ARM=armed`
+   plus endpoint/token) for owner-approved deployments. The remaining
+   **owner-gated** work is an actual armed run against the real Pylon pool (M4,
+   #6012, merged) and a spend-enabled buy-mode campaign row that settles the
+   gateway verdict. The fixture and HTTP tests never fabricate a live verdict and
+   never move sats.
 4. **M7 Conductor scaffold** — DONE (this change):
    `coordinator_conductor.rs` ships the typed plan contract (`ConductorPlan` over
    the M6 pool), the planner stepping interface (`ConductorPlanner` /
