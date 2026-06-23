@@ -1,0 +1,114 @@
+{
+  "schema_version": "openagents.models.tassadar_percepta_executor.cpu_transform_training_receipt.v1",
+  "receipt_id": "tassadar_percepta_cpu_transform_training_receipt_v1",
+  "receipt_ref": "receipt.models.tassadar_percepta_executor.cpu_transform_training.local_cpu_transform_rehearsal_v1",
+  "promise_ref": "promise:models.tassadar_percepta_executor.v1",
+  "promise_state": "planned",
+  "local_assignment_ref": "local_cpu_transform_rehearsal_v1",
+  "is_real_pylon_assignment": false,
+  "training_run_id": "tassadar-executor-transformer-train-v0",
+  "training_manifest_digest": "9546ef3576b3a5df2a175bddcdfc043b116c231a9f7d738a4f4903dbcff18394",
+  "trained_model_descriptor_digest": "0f330bdece7a7829491bf1861d22ef93a3344ad89a1b17ae4993d1a720e8197f",
+  "trained_weight_digest": "89089f4fe7dac674d2108a424c2a6d591b26cd33be7a3590dc079c300db8ce27",
+  "training_report_digest": "31aae5d38fd89b252485b3b9942907f5fba3a99739ae1a6f813813cad06fe7fa",
+  "best_checkpoint_id": "tassadar-executor-transformer-train-v0.checkpoint.epoch_0000",
+  "checkpoint_selection_basis": "boundary_metrics_lexicographic_v1",
+  "architecture_receipt_input_ref": "receipt.models.tassadar_percepta_executor.architecture.bundle.v1",
+  "distillation_dataset_input_ref": "receipt.training.tassadar_distillation_dataset.artanis_admin_verified_trace_refs.v1",
+  "replay_verdict": {
+    "verifier_class": "exact_trace_replay",
+    "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+    "dataset_digest": "1ee010f34595cc945b7d2f49aa0e3c3ad2c8e470594dc18a7dfa93f4a1583091",
+    "split": "Validation",
+    "claim_boundary": "GreedyDecodeUnvalidated",
+    "case_count": 2,
+    "exact_trace_case_count": 0,
+    "final_output_exact_case_count": 0,
+    "halt_exact_case_count": 0,
+    "aggregate_target_token_exactness_bps": 1,
+    "case_verdicts": [
+      {
+        "sequence_id": "tassadar.sequence.sudoku_v0_validation_a.sequential_cpu_reference",
+        "case_id": "sudoku_v0_validation_a",
+        "exact_trace_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "first_divergence_index": 0,
+        "reference_target_digest": "66e5855f9d9a76c582c99ee7e26573b1b622c43742afb21957a3d9c69f074758",
+        "predicted_target_digest": "498f7ff0a872b59ca6368bd4b69bc8998d4d108b3bda190df9cc50eb832037d9"
+      },
+      {
+        "sequence_id": "tassadar.sequence.sudoku_v0_validation_b.sequential_cpu_reference",
+        "case_id": "sudoku_v0_validation_b",
+        "exact_trace_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "first_divergence_index": 0,
+        "reference_target_digest": "bdbe8b6d02bc00f554470a5b10e5e1df4aaa1f0e9f18dc45f5b24f1cd7da2ab7",
+        "predicted_target_digest": "5f8c9fdfe72b7c3bc9cd13120ecc7edf0997b20ee11e719b69c99c006274ce41"
+      }
+    ]
+  },
+  "gates": [
+    {
+      "gate_id": "cpu_transform_training_completed",
+      "satisfied": true,
+      "compute_or_owner_gated": false,
+      "detail": "A deterministic CPU-only Tassadar executor transformer training run completed over the frozen verified-trace manifest."
+    },
+    {
+      "gate_id": "exact_replay_verifier_verdict_local",
+      "satisfied": true,
+      "compute_or_owner_gated": false,
+      "detail": "The selected checkpoint was replayed against CPU-reference truth, producing a per-case exact-trace / final-output / halt verdict by first divergence."
+    },
+    {
+      "gate_id": "trained_artifact_digest_present",
+      "satisfied": true,
+      "compute_or_owner_gated": false,
+      "detail": "The trained model carries stable descriptor and weight digests usable as a public-safe trained-artifact digest."
+    },
+    {
+      "gate_id": "pylon_assignment_receipt",
+      "satisfied": false,
+      "compute_or_owner_gated": true,
+      "detail": "No real Pylon assignment record exists; this is a local rehearsal, not dispatched contributor work."
+    },
+    {
+      "gate_id": "accepted_work_receipt",
+      "satisfied": false,
+      "compute_or_owner_gated": true,
+      "detail": "No accepted-work closeout exists; acceptance requires real dispatched Pylon work."
+    },
+    {
+      "gate_id": "real_settlement_receipt",
+      "satisfied": false,
+      "compute_or_owner_gated": true,
+      "detail": "No real settlement receipt exists; no money moved for this local rehearsal."
+    },
+    {
+      "gate_id": "green_promise_transition",
+      "satisfied": false,
+      "compute_or_owner_gated": true,
+      "detail": "Green requires owner sign-off under proof.claim_upgrade_receipts.v1 over real dispatched, accepted, verified, and settled work."
+    }
+  ],
+  "green_gate_satisfied": false,
+  "informs_blocker_ref": "blocker.product_promises.pylon_v03_cpu_transform_training_receipts_missing",
+  "can_now_claim": [
+    "a deterministic CPU-only Tassadar executor transformer training run completed over a frozen verified-trace manifest",
+    "an exact-replay verifier verdict (trace / final-output / halt by first divergence) was produced against CPU-reference truth",
+    "a stable trained-artifact digest (model descriptor + weights) is available as public-safe evidence",
+    "this receipt is a dereferenceable proof shape that the openagents CPU-transform status route can cite"
+  ],
+  "still_out_of_scope": [
+    "a real Pylon CPU-transform training assignment with accepted work",
+    "a real settlement receipt where money actually moved",
+    "model promotion, hosted inference, or a trained product model",
+    "CPU replacement, CPU outperformance, or general-model claims",
+    "a green transition for models.tassadar_percepta_executor.v1"
+  ],
+  "remaining_compute_owner_gate": "Dispatch this CPU-transform training as a real Pylon assignment (owner arms compute/spend), let it produce accepted-work + exact-replay verdict + real settlement receipts where money moves, then take the receipt-first green upgrade under proof.claim_upgrade_receipts.v1 with owner sign-off.",
+  "claim_boundary": "This is a local, deterministic, CPU-only training rehearsal receipt for models.tassadar_percepta_executor.v1. It proves training completed and replays exactly against CPU-reference truth, and it carries a trained-artifact digest. It does NOT claim a trained product model, accepted Pylon work, verifier-accepted paid work, real settlement, model promotion, inference, CPU replacement, or a green product promise. The promise stays planned.",
+  "receipt_digest": "6f2e1edeb078038a127e6b57cc31aeea639b560ae40fc3a535c808447f2e4561"
+}
