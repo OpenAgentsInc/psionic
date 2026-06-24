@@ -367,7 +367,8 @@ flipping them is owner/compute work, not code that lands here:
    Candidate under `CompiledAgentPromotedArtifactContract` with the heuristic
    router as `rollback_artifact_id`, consuming `ShadowComparison` for the
    promote/hold/rollback decision.
-3. **Pylon verdict source** for the paid lane — PLUMBING DONE:
+3. **Pylon verdict source + bounded paid shadow runner** for the paid lane —
+   BOUNDED LIVE CLOSEOUT DONE:
    `coordinator_eval_verdict_source.rs` adds `DispatchBackedVerdictSource`, a real
    `EvalVerdictSource` over the buy-mode dispatch path (`BuyModeDispatch` seam) that
    reads the `training.verification_classes.v1` verdict, yields the scalar terminal
@@ -377,10 +378,18 @@ flipping them is owner/compute work, not code that lands here:
    moves no sats). `coordinator_live_buymode_dispatch.rs` provides the signed TCP
    Pylon worker protocol; `coordinator_http_buymode_dispatch.rs` provides the
    default-off OpenAgents Worker HTTP bridge (`PSIONIC_BUY_MODE_HTTP_ARM=armed`
-   plus endpoint/token) for owner-approved deployments. The remaining
-   **owner-gated** work is an actual armed run against the real Pylon pool (M4,
-   #6012, merged) and a spend-enabled buy-mode campaign row that settles the
-   gateway verdict. The fixture and HTTP tests never fabricate a live verdict and
+   plus endpoint/token) for owner-approved deployments. The
+   `coordinator_live_train -- --real` driver now binds that HTTP bridge, requires
+   `PSIONIC_M6_WORKER_IDS`, runs a tiny learned-vs-heuristic paid shadow
+   comparison, emits the digest-pinned coordinator Candidate, and writes a
+   public-safe `psionic.khala_m6.paid_shadow_run.v1` receipt when
+   `PSIONIC_M6_REAL_OUTPUT` is set. On 2026-06-24 the owner-armed live run
+   completed against the OpenAgents Worker buy-mode eval endpoint and live
+   Pylon NIP-90 providers: learned 3/3 verified at 3 sats total vs heuristic
+   3/3 verified at 6 sats total, `verified-work-per-sat` 1.0 vs 0.5, 9000
+   msats spent under the 10000 msat local run cap, recommendation
+   `promote_candidate`. Runtime promotion remains approval-gated and never
+   automatic. The fixture and HTTP tests never fabricate a live verdict and
    never move sats.
 4. **M7 Conductor scaffold** — DONE (this change):
    `coordinator_conductor.rs` ships the typed plan contract (`ConductorPlan` over
@@ -411,6 +420,8 @@ flipping them is owner/compute work, not code that lands here:
 
 - Offline smoke: `cargo run -q -p psionic-train --bin coordinator_evolution_smoke`
 - Live validation (no spend): `cargo run -q -p psionic-train --bin coordinator_live_train`
+- Bounded paid shadow (env-armed only):
+  `cargo run -q -p psionic-train --bin coordinator_live_train -- --real`
 - Tests: `cargo test -p psionic-train --lib coordinator`,
   `cargo test -p psionic-train --lib coordinator_eval_verdict`,
   `cargo test -p psionic-train --lib coordinator_conductor`,

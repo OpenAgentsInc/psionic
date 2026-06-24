@@ -156,7 +156,7 @@ parallel budget.
 
 ```
 cargo run -q -p psionic-train --bin coordinator_live_train          # validate (no spend)
-cargo run -q -p psionic-train --bin coordinator_live_train -- --real # bounded real run (HELD)
+cargo run -q -p psionic-train --bin coordinator_live_train -- --real # bounded paid shadow run, env-armed only
 ```
 
 Observed (deterministic, seed `0x6014_6017`):
@@ -179,30 +179,77 @@ sep-CMA-ES drove a real `CoordinatorHead`, reading REAL frozen-backbone
 correct capability-eligible workers, **spending zero sats** while exercising the
 cap path. This is a SMOKE (simulated verdict source), not a frontier ML result.
 
-The `--real` run is **HELD**: a sat-moving run needs a live Pylon verdict source
-(dispatch each trajectory as a buy-mode eval job), the Tassadar
-`training.verification_classes.v1` verdict, an owner-armed dispatcher, and a
-spend-enabled buy-mode campaign row to debit the shared cap. The signed TCP
-dispatcher (`coordinator_live_buymode_dispatch.rs`) and the default-off HTTP
-Worker bridge (`coordinator_http_buymode_dispatch.rs`) are now both present, but
-neither arms itself and neither proves a live sat-moving deployment run. The
-driver refuses to spend without shared-cap authority or to fabricate verdicts;
-cap fail-closed is proven by
-`coordinator_live_training::tests::live_fitness_fails_closed_at_the_cap`.
+The `--real` run is **default-off** and fails closed until the live HTTP bridge
+is armed. It first reruns the no-spend validation, then performs a tiny paid
+shadow comparison:
+
+- learned arm: the sep-CMA-ES trained `CoordinatorHead` from the validation
+  pass, priced by `PSIONIC_M6_PER_EVAL_MSATS` (default `1000`, one sat);
+- heuristic arm: the fixed baseline route policy, priced by
+  `PSIONIC_M6_HEURISTIC_PER_EVAL_MSATS` (default double the learned price);
+- verdict source: `DispatchBackedVerdictSource<HttpBuyModeDispatch>`, armed only
+  through `PSIONIC_BUY_MODE_HTTP_ARM=armed`;
+- spend authority: the OpenAgents Worker buy-mode campaign row, with the local
+  `DailySpendCap` mirroring and backstopping the same cap predicate.
+
+Required live env:
+
+```
+PSIONIC_BUY_MODE_HTTP_ARM=armed
+PSIONIC_BUY_MODE_HTTP_ENDPOINT=https://openagents.com/api/operator/buy-mode/eval
+PSIONIC_BUY_MODE_HTTP_BEARER_TOKEN=<admin/operator token>
+PSIONIC_M6_WORKER_IDS=<worker-a>,<worker-b>,<worker-c>
+PSIONIC_M6_REAL_OUTPUT=fixtures/khala-m6/paid-shadow-run.json
+```
+
+Optional bounds:
+
+```
+PSIONIC_M6_PER_EVAL_MSATS=1000
+PSIONIC_M6_HEURISTIC_PER_EVAL_MSATS=2000
+PSIONIC_M6_DAILY_CAP_MSATS=10000000
+PSIONIC_BUY_MODE_HTTP_TIMEOUT_MS=10000
+PSIONIC_M6_RUN_REF=m6-20260624-live-a
+PSIONIC_M6_HEURISTIC_ROLLBACK_ID=compiled_agent.baseline.rule_v1.coordinator_route
+```
+
+`PSIONIC_M6_RUN_REF` is the live-run idempotency nonce. When set, the runner
+namespaces paid sample ids as `learned.<sample>.<run-ref>` and
+`heuristic.<sample>.<run-ref>`, preserving the paired shadow batch while keeping
+the learned and heuristic settlement lanes from colliding in the OpenAgents
+Worker idempotency ledger.
+
+The receipt schema is `psionic.khala_m6.paid_shadow_run.v1`. It records the
+public-safe worker ids, the bounded spend/cap report, the learned-vs-heuristic
+`ShadowComparison`, and the emitted digest-pinned coordinator `Candidate`.
+It intentionally records endpoint and spend-authority refs, not bearer tokens,
+raw invoices, preimages, wallet state, or private Worker payloads.
+
+Live closeout observation on 2026-06-24:
+
+- schema: `psionic.khala_m6.paid_shadow_run.v1`;
+- issue: `OpenAgentsInc/openagents#6014`;
+- endpoint ref: `openagents.worker.operator_buy_mode_eval`;
+- verdict ref: `training.verification_classes.v1.exact_trace_replay`;
+- spend authority ref: `openagents.buy_mode_campaign.daily_cap_msats`;
+- learned lane: 3/3 verified, 3 sats total, verified-work-per-sat `1.0`;
+- heuristic lane: 3/3 verified, 6 sats total, verified-work-per-sat `0.5`;
+- run spend: 9000 msats under the 10000 msat local cap;
+- recommendation: `promote_candidate`, with runtime promotion still
+  approval-gated and never automatic.
 
 ## What real training still needs
 
-1. A **live `CoordinatorFitness`** wired to `probe_gepa_rollout_coordinator.rs`
-   (replacing `FixtureCoordinatorEval`), aggregating Tassadar verdicts.
-2. **`forward_with_hidden` on a frozen backbone** (Qwen3-0.6B) feeding real
+1. **`forward_with_hidden` on a frozen backbone** (Qwen3-0.6B) feeding real
    hidden states into the head, instead of the fixture probe tensor.
-3. **Pylon fan-out** of the population eval + a **per-generation sat budget cap**
+2. **Pylon fan-out** of the population eval + a **per-generation sat budget cap**
    emitted as a receipt.
-4. **Compute/budget**: the optimizer is CPU-cheap; the cost is per-eval worker
+3. **Compute/budget**: the optimizer is CPU-cheap; the cost is per-eval worker
    spend. The paper operates at 1.5k–40k evals for a ~10K-dim problem; our
    per-eval cost is higher (real workers), which is exactly the budget-tight
    regime where ES is supposed to win — but only if metered. Budget the live
    run before launching; the CPU smoke above is free.
-5. **Shadow ship**: emit the trained head as a `Candidate` in
-   `CompiledAgentPromotedArtifactContract`, shadow vs the NB route model on
-   verified-work-per-sat, promote on a clean win.
+4. **Production-scale shadow ship**: the env-armed `--real` runner emits a
+   candidate and paid shadow-win receipt for the bounded M6 closeout. A broader
+   production shadow can reuse the same receipt shape with the Qwen backbone,
+   more live samples, and a larger owner-approved campaign cap.

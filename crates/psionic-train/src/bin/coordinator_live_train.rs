@@ -22,20 +22,38 @@
 //!
 //! Run:
 //!   cargo run -q -p psionic-train --bin coordinator_live_train            # validate (no spend)
-//!   cargo run -q -p psionic-train --bin coordinator_live_train -- --real  # bounded real run (held)
+//!   cargo run -q -p psionic-train --bin coordinator_live_train -- --real  # env-armed paid shadow run
 
+use std::fs;
+use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use psionic_core::Shape;
-use psionic_models::{CoordinatorHead, CoordinatorHeadConfig, Cs336A1ReferenceConfig, Cs336A1TransformerLm};
-use psionic_nn::ModuleStateLoadMode;
 use psionic_core::TensorData;
-use psionic_train::{
-    DailySpendCap, EvalSample, LiveCoordinatorFitness, LiveRunLane, LiveRunReport,
-    SepCmaEs, SepCmaEsConfig, SimulatedVerdictSource, TerminalRewardAdapter, WorkerKind,
-    WorkerPoolBinding, WorkerPoolMember, CoordinatorLiveTrainingError,
-    OWNER_DAILY_CAP_MSATS,
+use psionic_eval::CompiledAgentEvidenceClass;
+use psionic_models::{
+    CoordinatorHead, CoordinatorHeadConfig, Cs336A1ReferenceConfig, Cs336A1TransformerLm,
 };
+use psionic_nn::ModuleStateLoadMode;
+use psionic_train::{
+    CapDebitOwner, CompiledAgentArtifactValidatorLineage, CoordinatorArmState,
+    CoordinatorCandidateEmission, CoordinatorLiveTrainingError, DailySpendCap,
+    DispatchBackedVerdictSource, EvalSample, EvalVerdictSource, HttpBuyModeDispatch,
+    LiveCoordinatorFitness, LiveRunLane, LiveRunReport, SepCmaEs, SepCmaEsConfig, ShadowComparison,
+    SimulatedVerdictSource, TerminalRewardAdapter, TrajectoryOutcome, TrajectoryRequest,
+    VerificationVerdict, WorkerKind, WorkerPoolBinding, WorkerPoolMember, OWNER_DAILY_CAP_MSATS,
+};
+use serde::Serialize;
+use sha2::Digest;
+
+const LIVE_WORKER_IDS_ENV: &str = "PSIONIC_M6_WORKER_IDS";
+const LIVE_OUTPUT_ENV: &str = "PSIONIC_M6_REAL_OUTPUT";
+const LIVE_PER_EVAL_MSATS_ENV: &str = "PSIONIC_M6_PER_EVAL_MSATS";
+const LIVE_HEURISTIC_PER_EVAL_MSATS_ENV: &str = "PSIONIC_M6_HEURISTIC_PER_EVAL_MSATS";
+const LIVE_DAILY_CAP_MSATS_ENV: &str = "PSIONIC_M6_DAILY_CAP_MSATS";
+const LIVE_RUN_REF_ENV: &str = "PSIONIC_M6_RUN_REF";
+const LIVE_HEURISTIC_ROLLBACK_ID_ENV: &str = "PSIONIC_M6_HEURISTIC_ROLLBACK_ID";
 
 /// Builds a deterministic frozen cs336 backbone with `d_model == hidden_dim`.
 /// On the real lane this is replaced by a frozen Qwen3-0.6B; the loop is
@@ -84,11 +102,7 @@ fn frozen_backbone(d_model: usize, vocab: usize) -> Cs336A1TransformerLm {
     model
 }
 
-fn run_validation() -> Result<LiveRunReport, CoordinatorLiveTrainingError> {
-    let d_model = 8;
-    let backbone = frozen_backbone(d_model, 32);
-
-    // P5: capability-filtered eligible pool (3 workers for `rust_build`).
+fn validation_pool() -> Result<WorkerPoolBinding, CoordinatorLiveTrainingError> {
     let candidates = vec![
         WorkerPoolMember {
             worker_id: "frontier-claude".to_string(),
@@ -114,12 +128,57 @@ fn run_validation() -> Result<LiveRunReport, CoordinatorLiveTrainingError> {
             receipted_capabilities: ["python".to_string()].into_iter().collect(),
         },
     ];
-    let pool = WorkerPoolBinding::from_candidates(candidates, "rust_build")?;
+    WorkerPoolBinding::from_candidates(candidates, "rust_build")
+        .map_err(CoordinatorLiveTrainingError::from)
+}
+
+fn validation_samples() -> Vec<EvalSample> {
+    vec![
+        EvalSample {
+            sample_id: "task-0".to_string(),
+            token_ids: vec![1, 5, 9, 2],
+        },
+        EvalSample {
+            sample_id: "task-1".to_string(),
+            token_ids: vec![3, 7, 1, 8],
+        },
+        EvalSample {
+            sample_id: "task-2".to_string(),
+            token_ids: vec![2, 2, 6, 4],
+        },
+    ]
+}
+
+fn hidden_for_tokens(
+    backbone: &Cs336A1TransformerLm,
+    tokens: &[usize],
+) -> Result<Vec<f32>, CoordinatorLiveTrainingError> {
+    let (_, h) = backbone
+        .forward_with_hidden(Shape::new(vec![1, tokens.len()]), tokens)
+        .map_err(|e| CoordinatorLiveTrainingError::VerdictSource {
+            detail: e.to_string(),
+        })?;
+    h.as_f32_slice()
+        .map(<[f32]>::to_vec)
+        .map_err(|e| CoordinatorLiveTrainingError::VerdictSource {
+            detail: e.to_string(),
+        })
+}
+
+fn run_validation() -> Result<(LiveRunReport, CoordinatorHead), CoordinatorLiveTrainingError> {
+    let d_model = 8;
+    let backbone = frozen_backbone(d_model, 32);
+
+    // P5: capability-filtered eligible pool (3 workers for `rust_build`).
+    let pool = validation_pool()?;
     println!(
         "P5 worker pool: {} eligible for `{}` -> {:?}",
         pool.len(),
         pool.required_capability(),
-        pool.workers().iter().map(|w| w.worker_id.as_str()).collect::<Vec<_>>()
+        pool.workers()
+            .iter()
+            .map(|w| w.worker_id.as_str())
+            .collect::<Vec<_>>()
     );
 
     let head_config = CoordinatorHeadConfig {
@@ -139,11 +198,7 @@ fn run_validation() -> Result<LiveRunReport, CoordinatorLiveTrainingError> {
     // Three eval samples, each must route to a specific eligible worker to
     // Verify. The "correct" worker varies per sample so the head must learn a
     // real h -> worker mapping (not a constant).
-    let samples = vec![
-        EvalSample { sample_id: "task-0".to_string(), token_ids: vec![1, 5, 9, 2] },
-        EvalSample { sample_id: "task-1".to_string(), token_ids: vec![3, 7, 1, 8] },
-        EvalSample { sample_id: "task-2".to_string(), token_ids: vec![2, 2, 6, 4] },
-    ];
+    let samples = validation_samples();
     let source = SimulatedVerdictSource::new(vec![
         ("task-0".to_string(), 0),
         ("task-1".to_string(), 2),
@@ -153,10 +208,14 @@ fn run_validation() -> Result<LiveRunReport, CoordinatorLiveTrainingError> {
     let hidden = move |tokens: &[usize]| -> Result<Vec<f32>, CoordinatorLiveTrainingError> {
         let (_, h) = backbone
             .forward_with_hidden(Shape::new(vec![1, tokens.len()]), tokens)
-            .map_err(|e| CoordinatorLiveTrainingError::VerdictSource { detail: e.to_string() })?;
-        h.as_f32_slice()
-            .map(<[f32]>::to_vec)
-            .map_err(|e| CoordinatorLiveTrainingError::VerdictSource { detail: e.to_string() })
+            .map_err(|e| CoordinatorLiveTrainingError::VerdictSource {
+                detail: e.to_string(),
+            })?;
+        h.as_f32_slice().map(<[f32]>::to_vec).map_err(|e| {
+            CoordinatorLiveTrainingError::VerdictSource {
+                detail: e.to_string(),
+            }
+        })
     };
 
     // Owner cap wired in (no spend on this lane, but the path is exercised).
@@ -181,18 +240,375 @@ fn run_validation() -> Result<LiveRunReport, CoordinatorLiveTrainingError> {
     })?;
     let initial = seed_head.flatten_parameters()?;
     let outcome = optimizer.optimize(&fitness, &initial)?;
+    let trained_head = seed_head.with_flat_parameters(outcome.best_parameters.clone())?;
 
     let cap_after = fitness.cap_snapshot();
-    Ok(LiveRunReport {
-        lane: LiveRunLane::SimulatedNoSpend,
-        initial_fitness: outcome.initial_fitness,
-        best_fitness: outcome.best_fitness,
-        improved: outcome.improved(),
-        evaluations: outcome.evaluations,
-        spent_msats: cap_after.spent_today_msats(),
-        cap_msats: cap_after.cap_msats(),
-        halted_on_cap: fitness.halted_on_cap(),
-        day_key: cap_after.day_key().to_string(),
+    Ok((
+        LiveRunReport {
+            lane: LiveRunLane::SimulatedNoSpend,
+            initial_fitness: outcome.initial_fitness,
+            best_fitness: outcome.best_fitness,
+            improved: outcome.improved(),
+            evaluations: outcome.evaluations,
+            spent_msats: cap_after.spent_today_msats(),
+            cap_msats: cap_after.cap_msats(),
+            halted_on_cap: fitness.halted_on_cap(),
+            day_key: cap_after.day_key().to_string(),
+        },
+        trained_head,
+    ))
+}
+
+#[derive(Debug, Serialize)]
+struct RealShadowReceipt {
+    schema: &'static str,
+    issue_ref: &'static str,
+    generated_at_day_key_utc: String,
+    run: LiveRunReport,
+    shadow: ShadowComparison,
+    candidate: CoordinatorCandidateEmission,
+    learned_outcomes: Vec<TrajectoryOutcome>,
+    heuristic_outcomes: Vec<TrajectoryOutcome>,
+    live_refs: RealShadowRefs,
+}
+
+#[derive(Debug, Serialize)]
+struct RealShadowRefs {
+    worker_ids: Vec<String>,
+    dispatch_endpoint_ref: &'static str,
+    verdict_class_ref: &'static str,
+    spend_authority_ref: &'static str,
+}
+
+fn parse_u64_env(name: &str, fallback: u64) -> Result<u64, CoordinatorLiveTrainingError> {
+    match std::env::var(name) {
+        Ok(value) => {
+            value
+                .trim()
+                .parse::<u64>()
+                .map_err(|_| CoordinatorLiveTrainingError::VerdictSource {
+                    detail: format!("{name} must be a positive integer"),
+                })
+        }
+        Err(std::env::VarError::NotPresent) => Ok(fallback),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            Err(CoordinatorLiveTrainingError::VerdictSource {
+                detail: format!("{name} must be valid UTF-8"),
+            })
+        }
+    }
+}
+
+fn env_output_path() -> Option<PathBuf> {
+    std::env::var(LIVE_OUTPUT_ENV)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn utc_day_key_now() -> Result<String, CoordinatorLiveTrainingError> {
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| CoordinatorLiveTrainingError::VerdictSource {
+            detail: String::from("system clock is before unix epoch"),
+        })?
+        .as_secs();
+    let days = (seconds / 86_400) as i64;
+    let (year, month, day) = civil_from_days(days);
+    Ok(format!("{year:04}-{month:02}-{day:02}"))
+}
+
+// Howard Hinnant's civil-from-days conversion, with days counted from
+// 1970-01-01. This avoids adding a date dependency to a tiny launch binary.
+fn civil_from_days(days_since_epoch: i64) -> (i32, u32, u32) {
+    let z = days_since_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    ((y + if m <= 2 { 1 } else { 0 }) as i32, m as u32, d as u32)
+}
+
+fn live_pool_from_env() -> Result<WorkerPoolBinding, CoordinatorLiveTrainingError> {
+    let value = std::env::var(LIVE_WORKER_IDS_ENV).map_err(|_| {
+        CoordinatorLiveTrainingError::VerdictSource {
+            detail: format!("{LIVE_WORKER_IDS_ENV} is required for --real (comma-separated live Pylon worker ids)"),
+        }
+    })?;
+    let candidates: Vec<WorkerPoolMember> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|worker_id| !worker_id.is_empty())
+        .map(|worker_id| WorkerPoolMember {
+            worker_id: worker_id.to_string(),
+            kind: WorkerKind::Open,
+            receipted_capabilities: ["rust_build".to_string()].into_iter().collect(),
+        })
+        .collect();
+    WorkerPoolBinding::from_candidates(candidates, "rust_build")
+        .map_err(CoordinatorLiveTrainingError::from)
+}
+
+fn live_run_ref_from_env() -> Result<Option<String>, CoordinatorLiveTrainingError> {
+    let value = match std::env::var(LIVE_RUN_REF_ENV) {
+        Ok(value) => value.trim().to_string(),
+        Err(_) => return Ok(None),
+    };
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let valid = value.len() <= 80
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'));
+    if !valid {
+        return Err(CoordinatorLiveTrainingError::VerdictSource {
+            detail: format!(
+                "{LIVE_RUN_REF_ENV} must be <=80 chars of ASCII letters, digits, dot, underscore, or hyphen"
+            ),
+        });
+    }
+    Ok(Some(value))
+}
+
+fn collect_outcomes<S: EvalVerdictSource>(
+    lane_label: &str,
+    head: &CoordinatorHead,
+    pool: &WorkerPoolBinding,
+    samples: &[EvalSample],
+    backbone: &Cs336A1TransformerLm,
+    verdicts: &S,
+    cap: &mut DailySpendCap,
+    live_run_ref: Option<&str>,
+) -> Result<Vec<TrajectoryOutcome>, CoordinatorLiveTrainingError> {
+    use psionic_nn::NnTensor;
+
+    let hidden_dim = head.config().hidden_dim;
+    let mut outcomes = Vec::with_capacity(samples.len());
+
+    for sample in samples {
+        let hidden_values = hidden_for_tokens(backbone, &sample.token_ids)?;
+        let hidden =
+            NnTensor::f32(Shape::new(vec![1, hidden_dim]), hidden_values).map_err(|error| {
+                CoordinatorLiveTrainingError::VerdictSource {
+                    detail: error.to_string(),
+                }
+            })?;
+        let decisions = head.decide(&hidden)?;
+        let decision = &decisions[0];
+        let worker = pool.resolve(decision.worker_index).ok_or_else(|| {
+            CoordinatorLiveTrainingError::VerdictSource {
+                detail: format!(
+                    "head selected worker index {} outside live pool size {}",
+                    decision.worker_index,
+                    pool.len()
+                ),
+            }
+        })?;
+        let outcome = verdicts.verdict_for(&TrajectoryRequest {
+            worker_index: decision.worker_index,
+            worker_id: worker.worker_id.clone(),
+            role_index: decision.role_index,
+            sample_id: live_run_ref.map_or_else(
+                || sample.sample_id.clone(),
+                |run_ref| format!("{lane_label}.{}.{}", sample.sample_id, run_ref),
+            ),
+        })?;
+        cap.try_debit(outcome.spend_msats)?;
+        outcomes.push(TrajectoryOutcome {
+            verdict: outcome.verdict,
+            cost: outcome.spend_msats as f32 / 1_000.0,
+        });
+    }
+
+    Ok(outcomes)
+}
+
+fn heuristic_head(
+    config: CoordinatorHeadConfig,
+) -> Result<CoordinatorHead, CoordinatorLiveTrainingError> {
+    let mut params = vec![0.0; config.parameter_count()];
+    if config.num_workers > 0 {
+        // Bias the baseline toward the first eligible worker. The learned head
+        // is the validation-trained sep-CMA-ES candidate; this baseline models a
+        // fixed route policy with no sample-dependent hidden-state routing.
+        params[0] = 1.0;
+    }
+    CoordinatorHead::from_flat_weights(config, params).map_err(CoordinatorLiveTrainingError::from)
+}
+
+fn all_verified(outcomes: &[TrajectoryOutcome]) -> bool {
+    outcomes
+        .iter()
+        .all(|outcome| outcome.verdict == VerificationVerdict::Verified)
+}
+
+fn run_real(
+    trained_head: CoordinatorHead,
+) -> Result<RealShadowReceipt, CoordinatorLiveTrainingError> {
+    let dispatch_config = psionic_train::http_buy_mode_dispatch_config_from_env()
+        .map_err(|error| CoordinatorLiveTrainingError::VerdictSource {
+            detail: error.to_string(),
+        })?
+        .ok_or_else(|| CoordinatorLiveTrainingError::VerdictSource {
+            detail: String::from(
+                "HTTP buy-mode dispatch is not armed; set PSIONIC_BUY_MODE_HTTP_ARM=armed plus endpoint/token",
+            ),
+        })?;
+    let learned_dispatch = HttpBuyModeDispatch::new(dispatch_config.clone()).map_err(|error| {
+        CoordinatorLiveTrainingError::VerdictSource {
+            detail: error.to_string(),
+        }
+    })?;
+    let heuristic_dispatch = HttpBuyModeDispatch::new(dispatch_config).map_err(|error| {
+        CoordinatorLiveTrainingError::VerdictSource {
+            detail: error.to_string(),
+        }
+    })?;
+
+    let pool = live_pool_from_env()?;
+    if pool.len() != trained_head.config().num_workers {
+        return Err(CoordinatorLiveTrainingError::VerdictSource {
+            detail: format!(
+                "{LIVE_WORKER_IDS_ENV} must contain exactly {} eligible workers; got {}",
+                trained_head.config().num_workers,
+                pool.len(),
+            ),
+        });
+    }
+
+    let per_eval_msats = parse_u64_env(LIVE_PER_EVAL_MSATS_ENV, 1_000)?;
+    let heuristic_per_eval_msats = parse_u64_env(
+        LIVE_HEURISTIC_PER_EVAL_MSATS_ENV,
+        per_eval_msats.saturating_mul(2),
+    )?;
+    let daily_cap_msats = parse_u64_env(LIVE_DAILY_CAP_MSATS_ENV, OWNER_DAILY_CAP_MSATS)?;
+    let live_run_ref = live_run_ref_from_env()?;
+    let day_key = utc_day_key_now()?;
+    let cap = DailySpendCap::for_day(day_key.clone(), daily_cap_msats);
+    let samples = validation_samples();
+    let backbone = frozen_backbone(trained_head.config().hidden_dim, 32);
+
+    let learned_source = DispatchBackedVerdictSource::new(
+        learned_dispatch,
+        CoordinatorArmState::Armed,
+        per_eval_msats,
+        CapDebitOwner::Fitness,
+        cap.clone(),
+    );
+    let heuristic_source = DispatchBackedVerdictSource::new(
+        heuristic_dispatch,
+        CoordinatorArmState::Armed,
+        heuristic_per_eval_msats,
+        CapDebitOwner::Fitness,
+        cap.clone(),
+    );
+
+    let mut shared_cap = cap;
+    let learned_outcomes = collect_outcomes(
+        "learned",
+        &trained_head,
+        &pool,
+        &samples,
+        &backbone,
+        &learned_source,
+        &mut shared_cap,
+        live_run_ref.as_deref(),
+    )?;
+    let heuristic = heuristic_head(trained_head.config())?;
+    let heuristic_outcomes = collect_outcomes(
+        "heuristic",
+        &heuristic,
+        &pool,
+        &samples,
+        &backbone,
+        &heuristic_source,
+        &mut shared_cap,
+        live_run_ref.as_deref(),
+    )?;
+
+    let shadow = ShadowComparison::compare(&learned_outcomes, &heuristic_outcomes);
+    if !all_verified(&learned_outcomes) {
+        return Err(CoordinatorLiveTrainingError::VerdictSource {
+            detail: String::from("learned coordinator did not verify every live shadow trajectory"),
+        });
+    }
+    if !shadow.recommends_promotion() {
+        return Err(CoordinatorLiveTrainingError::VerdictSource {
+            detail: format!(
+                "paid shadow did not produce a promotion-eligible win: {}",
+                shadow.summary
+            ),
+        });
+    }
+
+    let report = LiveRunReport {
+        lane: LiveRunLane::BoundedReal,
+        initial_fitness: 0.0,
+        best_fitness: shadow.learned.verified_rate(),
+        improved: shadow.learned_wins,
+        evaluations: learned_outcomes.len() + heuristic_outcomes.len(),
+        spent_msats: shared_cap.spent_today_msats(),
+        cap_msats: shared_cap.cap_msats(),
+        halted_on_cap: false,
+        day_key: shared_cap.day_key().to_string(),
+    };
+
+    let validator_report_digest = {
+        let json = serde_json::to_vec(&shadow).map_err(|error| {
+            CoordinatorLiveTrainingError::VerdictSource {
+                detail: error.to_string(),
+            }
+        })?;
+        let digest = sha2::Sha256::digest(json);
+        hex::encode(digest)
+    };
+    let validator_report_ref = format!(
+        "psionic.khala_m6.paid_shadow.{}.{}",
+        report.day_key.replace('-', ""),
+        &validator_report_digest[..16],
+    );
+    let candidate = CoordinatorCandidateEmission::emit(
+        &trained_head,
+        std::env::var(LIVE_HEURISTIC_ROLLBACK_ID_ENV)
+            .unwrap_or_else(|_| "compiled_agent.baseline.rule_v1.coordinator_route".to_string()),
+        shadow.clone(),
+        CompiledAgentArtifactValidatorLineage {
+            validator_report_ref,
+            validator_report_digest,
+            xtrain_cycle_receipt_ref: None,
+            xtrain_cycle_receipt_digest: None,
+        },
+        CompiledAgentEvidenceClass::LearnedLane,
+    )
+    .map_err(|error| CoordinatorLiveTrainingError::VerdictSource {
+        detail: error.to_string(),
+    })?;
+
+    Ok(RealShadowReceipt {
+        schema: "psionic.khala_m6.paid_shadow_run.v1",
+        issue_ref: "OpenAgentsInc/openagents#6014",
+        generated_at_day_key_utc: day_key,
+        run: report,
+        shadow,
+        candidate,
+        learned_outcomes,
+        heuristic_outcomes,
+        live_refs: RealShadowRefs {
+            worker_ids: pool
+                .workers()
+                .iter()
+                .map(|worker| worker.worker_id.clone())
+                .collect(),
+            dispatch_endpoint_ref: "openagents.worker.operator_buy_mode_eval",
+            verdict_class_ref: "training.verification_classes.v1.exact_trace_replay",
+            spend_authority_ref: "openagents.buy_mode_campaign.daily_cap_msats",
+        },
     })
 }
 
@@ -208,7 +624,7 @@ fn main() -> ExitCode {
 
     // Always run the no-spend validation pass first.
     println!("-- Phase 1: no-spend simulated validation (proves loop + cap enforcement) --");
-    let report = match run_validation() {
+    let (report, trained_head) = match run_validation() {
         Ok(report) => report,
         Err(error) => {
             eprintln!("validation failed: {error}");
@@ -221,7 +637,10 @@ fn main() -> ExitCode {
     println!("  best fitness    : {:.4}", report.best_fitness);
     println!("  improved        : {}", report.improved);
     println!("  evaluations     : {}", report.evaluations);
-    println!("  spent (msats)   : {}  (must be 0 on this lane)", report.spent_msats);
+    println!(
+        "  spent (msats)   : {}  (must be 0 on this lane)",
+        report.spent_msats
+    );
     println!("  cap   (msats)   : {}", report.cap_msats);
     println!("  halted on cap   : {}", report.halted_on_cap);
     println!("  within cap      : {}", report.within_cap());
@@ -247,28 +666,43 @@ fn main() -> ExitCode {
     println!("enforcement path exercised. This is a SMOKE, not a frontier ML result.");
 
     if !real {
-        println!(
-            "\n(Pass --real to attempt a bounded real run. Held by default; see below.)"
-        );
+        println!("\n(Pass --real to attempt the env-armed bounded paid shadow run.)");
         return ExitCode::SUCCESS;
     }
 
     // -- Phase 2: bounded real run -----------------------------------------
     println!("\n-- Phase 2: bounded REAL run (--real) --");
-    println!("HELD. A real (sat-moving) run requires, and this binary will NOT fabricate:");
-    println!("  1. A live EvalVerdictSource that dispatches each trajectory to the Pylon");
-    println!("     network as a buy-mode eval job (reuse qwen_legal_pylon_dispatch path).");
-    println!("  2. The Tassadar training.verification_classes.v1 verdict as the reward");
-    println!("     (exact_trace_replay @ 1.0 for deterministic work), NOT a prompted judge.");
-    println!("  3. A spend-enabled buy-mode campaign row in the openagents Worker so each");
-    println!("     Pylon eval debits the SAME daily_cap_msats / spent_today_msats / day_key");
-    println!("     ledger this binary's DailySpendCap mirrors. Clamp: 10,000 sats/day.");
-    println!("  4. A frozen Qwen3-0.6B backbone for forward_with_hidden (swap the cs336 stub).");
+    let receipt = match run_real(trained_head) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            eprintln!("real run failed closed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("Paid shadow summary: {}", receipt.shadow.summary);
     println!(
-        "\nUntil (1)-(3) are reachable, launching here would either spend with no shared-cap\n\
-         authority or fabricate verdicts. Both are refused. The cap is proven to fail closed\n\
-         (see coordinator_live_training::tests::live_fitness_fails_closed_at_the_cap).\n\
-         Total sats spent by this invocation: 0."
+        "Paid shadow spent {} msats of {} msats cap across {} evals.",
+        receipt.run.spent_msats, receipt.run.cap_msats, receipt.run.evaluations
     );
+    if let Some(path) = env_output_path() {
+        if let Some(parent) = path.parent() {
+            if let Err(error) = fs::create_dir_all(parent) {
+                eprintln!("failed to create receipt directory: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+        let json = match serde_json::to_string_pretty(&receipt) {
+            Ok(json) => json,
+            Err(error) => {
+                eprintln!("failed to encode paid shadow receipt: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        if let Err(error) = fs::write(&path, format!("{json}\n")) {
+            eprintln!("failed to write paid shadow receipt: {error}");
+            return ExitCode::FAILURE;
+        }
+        println!("Paid shadow receipt: {}", path.display());
+    }
     ExitCode::SUCCESS
 }

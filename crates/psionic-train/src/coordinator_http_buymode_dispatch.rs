@@ -17,7 +17,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
-use std::io::{Read, Write};
+use std::thread;
 use std::time::Duration;
 
 use reqwest::blocking::Client;
@@ -37,6 +37,12 @@ pub const PSIONIC_BUY_MODE_HTTP_BEARER_TOKEN_ENV: &str = "PSIONIC_BUY_MODE_HTTP_
 pub const PSIONIC_BUY_MODE_HTTP_TIMEOUT_MS_ENV: &str = "PSIONIC_BUY_MODE_HTTP_TIMEOUT_MS";
 /// Default HTTP timeout. Kept short so a miswired live lane fails closed quickly.
 pub const DEFAULT_BUY_MODE_HTTP_TIMEOUT_MS: u64 = 10_000;
+const HTTP_DISPATCH_RETRY_DELAYS: [Duration; 4] = [
+    Duration::from_millis(15_000),
+    Duration::from_millis(30_000),
+    Duration::from_millis(60_000),
+    Duration::from_millis(90_000),
+];
 
 /// Validated configuration for [`HttpBuyModeDispatch`].
 #[derive(Clone, PartialEq, Eq)]
@@ -238,38 +244,71 @@ impl BuyModeDispatch for HttpBuyModeDispatch {
         &self,
         job: &BuyModeEvalJob,
     ) -> Result<BuyModeEvalResult, CoordinatorLiveTrainingError> {
-        let response = self
-            .client
-            .post(self.config.endpoint())
-            .bearer_auth(self.config.bearer_token.as_str())
-            .json(job)
-            .send()
-            .map_err(|_| CoordinatorLiveTrainingError::VerdictSource {
-                detail: String::from(
-                    "buy-mode HTTP dispatch request failed before a verdict was received",
-                ),
-            })?;
+        let mut attempt = 0_usize;
 
-        let status = response.status();
-        if !status.is_success() {
+        loop {
+            let response =
+                match self
+                    .client
+                    .post(self.config.endpoint())
+                    .bearer_auth(self.config.bearer_token.as_str())
+                    .json(job)
+                    .send()
+                {
+                    Ok(response) => response,
+                    Err(_) if attempt < HTTP_DISPATCH_RETRY_DELAYS.len() => {
+                        let delay = HTTP_DISPATCH_RETRY_DELAYS[attempt];
+                        attempt += 1;
+                        thread::sleep(delay);
+                        continue;
+                    }
+                    Err(_) => return Err(CoordinatorLiveTrainingError::VerdictSource {
+                        detail: String::from(
+                            "buy-mode HTTP dispatch request failed before a verdict was received",
+                        ),
+                    }),
+                };
+
+            let status = response.status();
+            if status.is_success() {
+                let decoded =
+                    response.json::<HttpBuyModeDispatchResponse>().map_err(|_| {
+                        CoordinatorLiveTrainingError::VerdictSource {
+                            detail: String::from(
+                                "buy-mode HTTP dispatch response did not match the expected verdict schema",
+                            ),
+                        }
+                    })?;
+
+                return Ok(BuyModeEvalResult {
+                    verdict: decoded.verdict,
+                    settled_msats: decoded.settled_msats,
+                });
+            }
+
+            let body = response.text().unwrap_or_default();
+            if is_retryable_relay_publish_blocker(&body)
+                && attempt < HTTP_DISPATCH_RETRY_DELAYS.len()
+            {
+                let delay = HTTP_DISPATCH_RETRY_DELAYS[attempt];
+                attempt += 1;
+                thread::sleep(delay);
+                continue;
+            }
+
             return Err(CoordinatorLiveTrainingError::VerdictSource {
                 detail: format!("buy-mode HTTP dispatch rejected the job with status {status}"),
             });
         }
-
-        let decoded = response
-            .json::<HttpBuyModeDispatchResponse>()
-            .map_err(|_| CoordinatorLiveTrainingError::VerdictSource {
-                detail: String::from(
-                    "buy-mode HTTP dispatch response did not match the expected verdict schema",
-                ),
-            })?;
-
-        Ok(BuyModeEvalResult {
-            verdict: decoded.verdict,
-            settled_msats: decoded.settled_msats,
-        })
     }
+}
+
+fn is_retryable_relay_publish_blocker(body: &str) -> bool {
+    body.len() <= 4_096
+        && body.contains("blocker.buy_mode.relay")
+        && !body.contains("daily_cap")
+        && !body.contains("per_job_cap")
+        && !body.contains("operator_spend")
 }
 
 fn validate_endpoint(endpoint: String) -> Result<String, HttpBuyModeDispatchConfigError> {
