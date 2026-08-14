@@ -44,6 +44,20 @@ passed for all 32 repository files, including all 18 weight shards. The
 directory is ignored by Git through `/target/`; model weights are not part of
 the repository.
 
+The selected Unsloth GGUF and its three small repository companions are
+materialized separately at:
+
+```text
+target/models/qwen/unsloth/Qwen3.8-27B-GGUF
+```
+
+The selected file is exactly 13,441,059,904 bytes with SHA-256
+`00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2`.
+Other quantizations, BF16 GGUF shards, and vision projectors are not downloaded.
+Their immutable sizes, digests, purposes, and materialization posture are
+recorded in
+[UNSLOTH_GGUF_ARTIFACT_INDEX.md](UNSLOTH_GGUF_ARTIFACT_INDEX.md).
+
 ## Documents
 
 - [MODEL_FACTS.md](MODEL_FACTS.md) records facts read from the upstream model
@@ -54,6 +68,10 @@ the repository.
 - [UPSTREAM_ARTIFACT_INDEX.md](UPSTREAM_ARTIFACT_INDEX.md) links every file in
   the pinned upstream repository and explains its role in loading, serving,
   prompt rendering, preprocessing, or weight materialization.
+- [UNSLOTH_GGUF_ARTIFACT_INDEX.md](UNSLOTH_GGUF_ARTIFACT_INDEX.md) indexes the
+  complete pinned Unsloth GGUF tree, records exact sizes and LFS digests, and
+  distinguishes the selected local text artifact from deferred comparators,
+  BF16 shards, and vision projectors.
 - [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) defines the ordered
   implementation milestones, acceptance gates, validation matrix, commit
   sequence, and release claim boundary for Qwen3.8 support.
@@ -68,6 +86,15 @@ the repository.
   llama.cpp converter, `qwen35` graph, hybrid memory, tokenizer, quantization,
   CPU/CUDA operations, MTP, vision split, and tests, then maps the concrete
   findings to Psionic gates.
+
+## Issue Backlog
+
+[GitHub issue #1157](https://github.com/OpenAgentsInc/psionic/issues/1157)
+tracks the complete implementation. Phase issues
+[#1143](https://github.com/OpenAgentsInc/psionic/issues/1143) through
+[#1156](https://github.com/OpenAgentsInc/psionic/issues/1156) define R1-R13,
+including the separate R9A MTP gate. Each issue closes only after its code and
+evidence are merged and pushed to `main`.
 
 ## Claim Boundary
 

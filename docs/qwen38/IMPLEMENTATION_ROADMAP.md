@@ -91,6 +91,30 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R10 | `planned` | Native Metal generation | Separate Apple backend claim |
 | R11 | `planned` | Native vision lane | Separate multimodal claim |
 | R12 | `planned` | Training and adapter lane | Separate training claim |
+| R13 | `planned` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
+
+## Issue Tracking
+
+[GitHub issue #1157](https://github.com/OpenAgentsInc/psionic/issues/1157)
+tracks the complete roadmap. Each unfinished phase has its own scope,
+dependency, evidence, validation, and merge-to-main close gate:
+
+| Phase | Issue |
+| --- | --- |
+| R1 | [#1143: artifact facts and product identity](https://github.com/OpenAgentsInc/psionic/issues/1143) |
+| R2 | [#1144: exact tokenizer and prompt contract](https://github.com/OpenAgentsInc/psionic/issues/1144) |
+| R3 | [#1145: family-neutral checkpoint admission](https://github.com/OpenAgentsInc/psionic/issues/1145) |
+| R4 | [#1146: official BF16 bounded evidence](https://github.com/OpenAgentsInc/psionic/issues/1146) |
+| R5 | [#1147: GGUF qualification and storage support](https://github.com/OpenAgentsInc/psionic/issues/1147) |
+| R6 | [#1148: native CPU generation](https://github.com/OpenAgentsInc/psionic/issues/1148) |
+| R7 | [#1149: native CUDA generation](https://github.com/OpenAgentsInc/psionic/issues/1149) |
+| R8 | [#1150: OpenAI-compatible serving](https://github.com/OpenAgentsInc/psionic/issues/1150) |
+| R9 | [#1151: comparator and release gate](https://github.com/OpenAgentsInc/psionic/issues/1151) |
+| R9A | [#1152: optional MTP decoding and rollback](https://github.com/OpenAgentsInc/psionic/issues/1152) |
+| R10 | [#1153: native Metal generation](https://github.com/OpenAgentsInc/psionic/issues/1153) |
+| R11 | [#1154: native image and video understanding](https://github.com/OpenAgentsInc/psionic/issues/1154) |
+| R12 | [#1155: training, recovery, and adapters](https://github.com/OpenAgentsInc/psionic/issues/1155) |
+| R13 | [#1156: beat the Unsloth-equivalent speed-test](https://github.com/OpenAgentsInc/psionic/issues/1156) |
 
 ## R0: Source Baseline
 
@@ -555,6 +579,32 @@ Required follow-on work includes:
 
 Do not relabel Qwen3.6 or Qwen3.5 adapters as Qwen3.8-compatible.
 
+## R13: Psionic Versus Unsloth-Equivalent Speed Gate
+
+The final local performance target compares native Psionic with the equivalent
+Unsloth GGUF path on the admitted RTX 4080 lane. The Unsloth Studio GGUF path
+audited for this roadmap delegates execution to llama.cpp or `llama-server`;
+the comparator report must therefore pin both the Unsloth revision and the
+effective llama.cpp revision and build.
+
+Use the same admitted GGUF digest, prompt token ids, generated-token count,
+context, batch and microbatch sizes, sampling, stop conditions, cache policy,
+warmup policy, GPU residency, and correctness contract. Record prefill
+throughput, decode throughput, time to first token, end-to-end latency, peak
+GPU and host memory, graph and cache behavior, and every fallback. Validate
+output correctness before accepting a performance row.
+
+The primary winning metric is median decode tokens per second. Psionic must
+strictly exceed the Unsloth-equivalent median across retained repeated runs
+without weakening R9 correctness, execution identity, state reset, memory, or
+refusal guarantees. MTP results are separate unless both sides use an
+equivalent speculative configuration.
+
+Before each measured GPU process, run the idle-process query required by the
+repository agent contract. Retain raw samples, summaries, exact replay
+commands, source and artifact revisions, hardware and runtime facts, output
+tokens, memory metrics, and the Psionic commit that produced the winning row.
+
 ## Test Matrix
 
 | Layer | Synthetic fixture | Official BF16 | Qualified GGUF | CPU | CUDA | Metal |
@@ -593,6 +643,8 @@ Land the implementation as narrow commits on `main`:
 9. Release checker, comparator bundle, and canonical doc status update.
 10. Optional MTP speculative decoding and rollback evidence.
 11. Native Metal generation and Apple backend evidence.
+12. Retained Psionic-versus-Unsloth-equivalent speed-test evidence and any
+    focused optimizations required to exceed it.
 
 Generated fixtures and reports land with the code that produces them. Do not
 mix broad formatting, unrelated Qwen3.5 benchmark files, or incidental report
