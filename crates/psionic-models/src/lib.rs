@@ -2677,6 +2677,38 @@ pub struct GgufBlobArtifact {
     artifact: WeightArtifactMetadata,
 }
 
+/// Stable evidence for one bounded row read from a GGUF tensor.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GgufTensorRowReadReceipt {
+    /// Stable tensor name.
+    pub tensor_name: String,
+    /// Logical tensor shape.
+    pub tensor_shape: Shape,
+    /// Raw GGUF storage type.
+    pub tensor_type: GgufTensorType,
+    /// Zero-based logical row index.
+    pub row_index: usize,
+    /// Number of logical scalar values in the row.
+    pub row_width: usize,
+    /// Row offset relative to the tensor storage range.
+    pub tensor_byte_offset: usize,
+    /// Absolute row offset inside the GGUF blob.
+    pub blob_byte_offset: usize,
+    /// Serialized byte length read for the row.
+    pub byte_length: usize,
+    /// SHA-256 digest of the exact serialized row bytes.
+    pub row_sha256: String,
+}
+
+/// Decoded values and stable evidence for one bounded GGUF tensor row read.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GgufTensorRowRead {
+    /// Decoded row values in logical order.
+    pub values: Vec<f32>,
+    /// Evidence for the exact source bytes used by the read.
+    pub receipt: GgufTensorRowReadReceipt,
+}
+
 impl GgufBlobArtifact {
     /// Opens a GGUF artifact directly from a local file path.
     pub fn open_path(
@@ -2780,6 +2812,103 @@ impl GgufBlobArtifact {
     /// Loads the named tensor through the paged blob path.
     pub fn load_tensor(&self, name: &str) -> Result<LoadedWeightTensor, ModelLoadError> {
         self.paged_tensor(name)?.load()
+    }
+
+    /// Reads and decodes one logical tensor row without materializing the full tensor.
+    pub fn load_tensor_row(
+        &self,
+        name: &str,
+        row_index: usize,
+    ) -> Result<GgufTensorRowRead, ModelLoadError> {
+        let tensor = self
+            .content
+            .tensor_info(name)
+            .ok_or_else(|| ModelLoadError::MissingTensor(String::from(name)))?;
+        let row_width = tensor.shape.dims().last().copied().ok_or_else(|| {
+            artifact_format_error("gguf", format!("tensor `{name}` is scalar and has no rows"))
+        })?;
+        if row_width == 0 {
+            return Err(artifact_format_error(
+                "gguf",
+                format!("tensor `{name}` has a zero-width row"),
+            ));
+        }
+        let row_count = tensor.shape.element_count() / row_width;
+        if row_index >= row_count {
+            return Err(artifact_format_error(
+                "gguf",
+                format!(
+                    "tensor `{name}` row index `{row_index}` is outside row count `{row_count}`"
+                ),
+            ));
+        }
+
+        let metadata = tensor.weight_metadata()?;
+        let row_shape = Shape::new(vec![row_width]);
+        let byte_length = if metadata.quantization == QuantizationMode::None {
+            row_width
+                .checked_mul(metadata.dtype.element_size_bytes())
+                .ok_or_else(|| {
+                    artifact_format_error(
+                        "gguf",
+                        format!("tensor `{name}` row byte length overflow"),
+                    )
+                })?
+        } else {
+            metadata
+                .quantization
+                .ggml_block_layout(&row_shape)
+                .ok_or_else(|| ModelLoadError::InvalidQuantizedTensorShape {
+                    quantization: metadata.quantization,
+                    shape: row_shape.dims().to_vec(),
+                })?
+                .byte_len()
+        };
+        let tensor_byte_offset = row_index.checked_mul(byte_length).ok_or_else(|| {
+            artifact_format_error("gguf", format!("tensor `{name}` row offset overflow"))
+        })?;
+        let paged = self.paged_tensor(name)?;
+        let bytes = paged.read_range(tensor_byte_offset, byte_length)?;
+        let values = if metadata.quantization == QuantizationMode::None {
+            match metadata.dtype {
+                DType::F32 => decode_f32_values("gguf", name, bytes)?,
+                DType::F16 => decode_f16_values("gguf", name, bytes)?,
+                DType::BF16 => decode_bf16_values("gguf", name, bytes)?,
+                other => {
+                    return Err(ModelLoadError::UnsupportedTensorDType {
+                        name: String::from(name),
+                        dtype: format!("{other:?}"),
+                    });
+                }
+            }
+        } else {
+            let layout = metadata
+                .quantization
+                .ggml_block_layout(&row_shape)
+                .expect("validated quantized row layout");
+            decode_ggml_quantized_values(metadata.quantization, layout, bytes)?
+        };
+        let blob_byte_offset = paged
+            .blob_offset()
+            .checked_add(tensor_byte_offset)
+            .ok_or_else(|| {
+                artifact_format_error("gguf", format!("tensor `{name}` blob offset overflow"))
+            })?;
+
+        Ok(GgufTensorRowRead {
+            values,
+            receipt: GgufTensorRowReadReceipt {
+                tensor_name: String::from(name),
+                tensor_shape: tensor.shape.clone(),
+                tensor_type: tensor.tensor_type,
+                row_index,
+                row_width,
+                tensor_byte_offset,
+                blob_byte_offset,
+                byte_length,
+                row_sha256: hex::encode(Sha256::digest(bytes)),
+            },
+        })
     }
 }
 
@@ -12047,6 +12176,50 @@ mod tests {
 
         let loaded = paged.load()?;
         assert_eq!(loaded.values()?.as_ref(), &[1.0, 2.0, 3.0, 4.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_blob_artifact_reads_bounded_dense_and_quantized_rows()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("rows.gguf");
+        let dense_bytes = super::encode_f32_bytes(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+        let q3_row_zero = vec![0_u8; 110];
+        let mut q3_row_one = vec![0_u8; 110];
+        q3_row_one[108..].copy_from_slice(&0x3c00_u16.to_le_bytes());
+        let mut q3_bytes = q3_row_zero.clone();
+        q3_bytes.extend_from_slice(&q3_row_one);
+        write_test_gguf(
+            &path,
+            GgufVersion::V3,
+            &[],
+            &[
+                TestGgufTensor::new("dense", vec![2, 4], GgufTensorType::F32, dense_bytes),
+                TestGgufTensor::new("q3", vec![2, 256], GgufTensorType::Q3K, q3_bytes),
+            ],
+        )?;
+
+        let artifact = GgufBlobArtifact::open_path(
+            &path,
+            LocalBlobOpenOptions::default()
+                .with_read_preference(BlobReadPreference::PreferBuffered),
+        )?;
+        let dense = artifact.load_tensor_row("dense", 1)?;
+        assert_eq!(dense.values, vec![5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(dense.receipt.tensor_shape, Shape::new(vec![2, 4]));
+        assert_eq!(dense.receipt.tensor_byte_offset, 16);
+        assert_eq!(dense.receipt.byte_length, 16);
+
+        let quantized = artifact.load_tensor_row("q3", 1)?;
+        assert_eq!(
+            quantized.values,
+            psionic_core::ggml_quantization::decode_q3_k_block(&q3_row_one)?.to_vec()
+        );
+        assert_eq!(quantized.receipt.tensor_byte_offset, 110);
+        assert_eq!(quantized.receipt.byte_length, 110);
+        assert_eq!(quantized.receipt.row_width, 256);
+        assert!(artifact.load_tensor_row("q3", 2).is_err());
         Ok(())
     }
 
