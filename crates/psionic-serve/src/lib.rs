@@ -4997,6 +4997,14 @@ pub enum ReferenceTextGenerationError {
     /// The constrained generation fallback could not find a valid continuation.
     #[error("structured output fallback could not find a valid continuation")]
     StructuredOutputExhausted,
+    /// Generation exceeded an explicit cooperative execution timeout.
+    #[error("generation timed out after {elapsed_millis} ms (timeout {timeout_millis} ms)")]
+    TimedOut {
+        /// Configured timeout in milliseconds.
+        timeout_millis: u64,
+        /// Observed elapsed time in milliseconds at the token-step boundary.
+        elapsed_millis: u64,
+    },
     /// An expected graph output was missing.
     #[error("missing graph output `{0}`")]
     MissingOutput(&'static str),
@@ -5049,6 +5057,10 @@ impl ReferenceTextGenerationError {
                 422,
                 self.to_string(),
             ),
+            Self::TimedOut { .. } => {
+                LocalRuntimeDiagnostic::new(LocalRuntimeErrorCode::TimedOut, 504, self.to_string())
+                    .with_backend(backend)
+            }
             Self::Model(error) => model_load_error_diagnostic(error),
             Self::PromotedBundleLoad(error) => {
                 promoted_parameter_golf_bundle_load_diagnostic(error)

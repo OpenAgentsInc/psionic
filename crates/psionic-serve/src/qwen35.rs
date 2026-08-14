@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, path::Path, sync::Arc, time::Instant};
+use std::{
+    collections::BTreeMap,
+    path::Path,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use psionic_backend_cpu::{
     CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
@@ -1153,6 +1158,36 @@ pub(crate) struct Qwen35CpuStateAllocationSummary {
     pub(crate) kv_cache_capacity_entries: usize,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Qwen35CpuGenerationDeadline {
+    started_at: Instant,
+    timeout: Duration,
+}
+
+impl Qwen35CpuGenerationDeadline {
+    fn new(timeout: Duration) -> Self {
+        Self {
+            started_at: Instant::now(),
+            timeout,
+        }
+    }
+
+    fn check(self) -> Result<(), ReferenceTextGenerationError> {
+        let elapsed = self.started_at.elapsed();
+        if elapsed < self.timeout {
+            return Ok(());
+        }
+        Err(ReferenceTextGenerationError::TimedOut {
+            timeout_millis: duration_millis_saturating(self.timeout),
+            elapsed_millis: duration_millis_saturating(elapsed),
+        })
+    }
+}
+
+fn duration_millis_saturating(duration: Duration) -> u64 {
+    duration.as_millis().try_into().unwrap_or(u64::MAX)
+}
+
 impl CpuGgufQwen35TextGenerationService {
     pub fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
         let backend = CpuBackend::new();
@@ -1369,7 +1404,11 @@ impl CpuGgufQwen35TextGenerationService {
     fn generate_inner(
         &mut self,
         request: &GenerationRequest,
+        deadline: Option<Qwen35CpuGenerationDeadline>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        if let Some(deadline) = deadline {
+            deadline.check()?;
+        }
         let prompt_eval_start = Instant::now();
         let prompt_tokens = match &request.prompt {
             GenerationInput::Text(text) => self.model.tokenizer.encode_with_defaults(text),
@@ -1401,7 +1440,13 @@ impl CpuGgufQwen35TextGenerationService {
         let mut bytes_moved = 0u64;
         let mut last_logits = Vec::new();
         for token in prompt_tokens.as_slice() {
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
             let step = self.model.forward_token(&mut state, *token)?;
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
             history.append(*token, Vec::new(), Vec::new())?;
             last_logits = step.logits;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
@@ -1422,6 +1467,9 @@ impl CpuGgufQwen35TextGenerationService {
         let mut last_token_emitted_at = None;
 
         let (termination, termination_detail) = loop {
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
             if generated_tokens.len() >= request.options.max_output_tokens {
                 break (
                     TerminationReason::MaxOutputTokens,
@@ -1479,6 +1527,9 @@ impl CpuGgufQwen35TextGenerationService {
             }
 
             let step = self.model.forward_token(&mut state, next_token)?;
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
             history.append(next_token, Vec::new(), Vec::new())?;
             last_logits = step.logits;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
@@ -1582,9 +1633,10 @@ impl CpuGgufQwen35TextGenerationService {
         })
     }
 
-    fn generate(
+    fn generate_with_deadline(
         &mut self,
         request: &GenerationRequest,
+        deadline: Option<Qwen35CpuGenerationDeadline>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
         if request.product_id != crate::TEXT_GENERATION_PRODUCT_ID {
             return Err(ReferenceTextGenerationError::UnsupportedProduct(
@@ -1617,9 +1669,28 @@ impl CpuGgufQwen35TextGenerationService {
         }
 
         self.residency.begin_request(current_time_millis());
-        let response = self.generate_inner(request);
+        let response = self.generate_inner(request, deadline);
         self.residency.finish_request(current_time_millis());
         response
+    }
+
+    /// Generates with a cooperative timeout checked at CPU token-step boundaries.
+    ///
+    /// Individual matrix operations are not preempted. A zero timeout expires
+    /// before tokenization or model execution begins.
+    pub fn generate_with_timeout(
+        &mut self,
+        request: &GenerationRequest,
+        timeout: Duration,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        self.generate_with_deadline(request, Some(Qwen35CpuGenerationDeadline::new(timeout)))
+    }
+
+    fn generate(
+        &mut self,
+        request: &GenerationRequest,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        self.generate_with_deadline(request, None)
     }
 }
 

@@ -309,9 +309,11 @@ into one generic engine claim.
   MTP-tail exclusion, deterministic reset, context and memory refusal, and
   cancellation. The generic OpenAI server still refuses Qwen3.8 until R8, and
   CUDA, Metal, media, adapters, session reuse, and MTP speculative decoding
-  remain unsupported. R6 stays `partial` pending retained prefill/decode
-  recurrent-intermediate parity and explicit generation-timeout handling. The
-  retained R4 and R5 reports themselves still do not execute full-width
+  remain unsupported. The internal CPU service now has a typed cooperative
+  generation timeout checked at token-step boundaries with stable `timed_out`
+  and HTTP `504` diagnostics. R6 stays `partial` pending retained prefill/decode
+  recurrent-intermediate parity. The retained R4 and R5 reports themselves
+  still do not execute full-width
   attention or MLPs, materialize full-vocabulary logits, generate tokens,
   serve requests, compute gradients, or execute media inputs.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation

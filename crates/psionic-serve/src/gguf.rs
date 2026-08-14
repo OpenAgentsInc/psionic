@@ -17915,6 +17915,35 @@ mod tests {
             GenerationOptions::greedy(1),
         );
 
+        let timeout_error = match &mut service.inner {
+            CpuGgufServiceKind::Qwen35(service) => service
+                .generate_with_timeout(&request, std::time::Duration::ZERO)
+                .expect_err("zero timeout must expire before qwen38 token execution"),
+            _ => panic!("qwen38 must route through the qwen35 CPU graph"),
+        };
+        assert!(matches!(
+            timeout_error,
+            ReferenceTextGenerationError::TimedOut {
+                timeout_millis: 0,
+                ..
+            }
+        ));
+        let timeout_diagnostic = timeout_error.diagnostic_for_request(&request);
+        assert_eq!(
+            timeout_diagnostic.code,
+            psionic_runtime::LocalRuntimeErrorCode::TimedOut
+        );
+        assert_eq!(timeout_diagnostic.status, 504);
+        assert_eq!(timeout_diagnostic.backend.as_deref(), Some("cpu"));
+        assert_eq!(
+            timeout_diagnostic.product_id.as_deref(),
+            Some(crate::TEXT_GENERATION_PRODUCT_ID)
+        );
+        assert_eq!(
+            timeout_diagnostic.model_id.as_deref(),
+            Some(descriptor.model.model_id.as_str())
+        );
+
         let first = service.generate(&request)?;
         let second = service.generate(&request)?;
         let support = service.runtime_support();

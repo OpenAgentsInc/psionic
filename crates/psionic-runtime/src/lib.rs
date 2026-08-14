@@ -308,6 +308,8 @@ pub enum LocalRuntimeErrorCode {
     InvalidOutput,
     /// The caller cancelled the request.
     Cancelled,
+    /// The request exceeded its explicit execution timeout.
+    TimedOut,
     /// The client disconnected after execution started.
     Disconnected,
     /// The runtime hit an unexpected internal error.

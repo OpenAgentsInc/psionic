@@ -1,8 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
 > Status: `partial` on 2026-08-14. R1-R5 are implemented. R6 now provides an
-> internal native CPU token-generation lane, while recurrent-intermediate
-> parity and explicit timeout handling remain open.
+> internal native CPU token-generation lane with explicit timeout handling,
+> while recurrent-intermediate parity remains open.
 
 ## Compatibility Result
 
@@ -200,6 +200,8 @@ MTP tail for standard generation, and reports unsupported media, adapters, and
 session reuse. It does not invoke a subprocess or hidden fallback.
 
 The generic OpenAI server, CUDA, Metal, media, and MTP speculative-decoding
-surfaces still refuse Qwen3.8. R6 remains `partial` until retained
-recurrent-intermediate comparator evidence covers prefill and token-at-a-time
-decode and the generation lane has an explicit timeout contract.
+surfaces still refuse Qwen3.8. The internal CPU service exposes a typed
+cooperative generation timeout with stable `timed_out` and HTTP `504`
+diagnostics. It checks before and after each non-preemptible token step. R6
+remains `partial` until retained recurrent-intermediate comparator evidence
+covers prefill and token-at-a-time decode.

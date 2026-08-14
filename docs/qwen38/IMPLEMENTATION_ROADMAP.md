@@ -449,13 +449,16 @@ Retained R6 evidence currently includes:
   recurrent layers and KV capacity exists only on the full-attention layer
 - stable repeated requests with clean per-request state
 - context-limit, host-memory, and stream-cancellation refusal checks
+- a typed cooperative CPU generation timeout with stable `timed_out` and HTTP
+  `504` diagnostics; zero-duration budgets refuse before execution and longer
+  budgets are checked before and after each non-preemptible token step
 - native greedy generation from `Qwen3.8-27B-UD-Q3_K_XL.gguf` without a
   subprocess or fallback
 - exact raw-prompt first-token and two-token output parity with pinned
   llama.cpp revision `9b05354ec6fb58b4e665e9a39ebc40285c015638`
 
 R6 remains open until pinned prefill and token-at-a-time recurrent-intermediate
-parity and an explicit generation-timeout path are retained.
+parity is retained.
 
 Generalize the existing Qwen3.5 hybrid runtime only as far as required for the
 admitted Qwen3.8 GGUF. Validate these boundaries independently:
