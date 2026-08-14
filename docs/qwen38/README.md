@@ -64,6 +64,10 @@ the repository.
   loader and Studio GGUF paths, identifies the reusable artifact, admission,
   memory, and prompt-handling patterns, and records the license and native
   execution boundaries.
+- [LLAMA_CPP_CODE_AUDIT.md](LLAMA_CPP_CODE_AUDIT.md) audits the pinned
+  llama.cpp converter, `qwen35` graph, hybrid memory, tokenizer, quantization,
+  CPU/CUDA operations, MTP, vision split, and tests, then maps the concrete
+  findings to Psionic gates.
 
 ## Claim Boundary
 

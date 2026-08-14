@@ -66,6 +66,27 @@ Qwen3.8 changes default reasoning and preservation behavior, so existing
 Qwen3.5 or Qwen3.6 template behavior cannot be reused without a Qwen3.8
 fixture and explicit request controls.
 
+### Audit-derived concrete gaps
+
+The pinned Unsloth and llama.cpp audits identify three blockers inside the
+otherwise reusable Qwen3.5 path:
+
+- Psionic recognizes GGUF type code 11 as Q3_K but does not map it to a
+  runtime quantization mode or implement its block decoder and native
+  projections. The selected `UD-Q3_K_XL` artifact is expected to require this
+  support, subject to exact tensor-table inspection.
+- Psionic currently routes the `qwen35` pretokenizer through a generic
+  byte-level BPE regex that groups one to three digits. Qwen3.5 and Qwen3.8
+  split each numeric code point and require explicit combining-mark behavior.
+- llama.cpp conversion rewrites recurrent V-head axes from grouped to tiled
+  order without emitting a layout metadata flag. Psionic's current default of
+  tiled order matches that converter, but arbitrary community artifacts need
+  converter provenance or tensor-level parity evidence.
+
+The audits also show that ordinary generation should skip the appended MTP
+block. MTP speculative decoding requires a separate recurrent rollback and
+memory contract after base-model parity.
+
 ## Required Identity Model
 
 The implementation should separate architecture identity from product model

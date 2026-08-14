@@ -16,6 +16,11 @@ safetensors checkpoint remains the architecture and tensor-table authority.
 The artifact decision and hardware envelope are recorded in
 [FIRST_GGUF_TARGET.md](FIRST_GGUF_TARGET.md).
 
+The upstream implementation inputs are pinned in
+[UNSLOTH_CODE_AUDIT.md](UNSLOTH_CODE_AUDIT.md) and
+[LLAMA_CPP_CODE_AUDIT.md](LLAMA_CPP_CODE_AUDIT.md). The llama.cpp comparator
+revision is `9b05354ec6fb58b4e665e9a39ebc40285c015638`.
+
 ## First Claim Boundary
 
 The first `implemented_early` claim includes:
@@ -41,6 +46,7 @@ The first claim excludes:
 - full BF16 CUDA residency on the local 16 GiB RTX 4080
 - Qwen3.8 training, LoRA serving, DPO, GRPO, or adapter promotion
 - automatic compatibility with every community GGUF conversion
+- MTP speculative decoding or recurrent-state rollback
 - native Metal execution or performance claims
 - an Ollama or llama.cpp subprocess presented as Psionic execution
 
@@ -73,14 +79,15 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | --- | --- | --- | --- |
 | R0 | `implemented` | Pinned upstream research and complete verified BF16 artifact | None; research only |
 | R1 | `planned` | Committed Qwen3.8 artifact-fact fixture and product identity | None; metadata only |
-| R2 | `planned` | Qwen3.8 tokenizer and prompt-template contract | None; frontend only |
+| R2 | `planned` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
 | R3 | `planned` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
 | R4 | `planned` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
-| R5 | `planned` | Qualified small GGUF and memory admission | Artifact admitted, not served |
+| R5 | `planned` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `planned` | Native CPU token generation | First executable text lane |
 | R7 | `planned` | Native CUDA token generation | First local accelerated lane |
 | R8 | `planned` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `planned` | Comparator, performance, and release gate | Retained `implemented_early` claim |
+| R9A | `planned` | Optional MTP speculative decoding and rollback | Separate acceleration claim |
 | R10 | `planned` | Native Metal generation | Separate Apple backend claim |
 | R11 | `planned` | Native vision lane | Separate multimodal claim |
 | R12 | `planned` | Training and adapter lane | Separate training claim |
@@ -159,10 +166,25 @@ Required cases:
 Tokenizer fixtures must prove actual Qwen3.8 token ids and rendered token
 sequences. Matching vocabulary size and special ids with Qwen3.6 are not enough.
 
+Implement a dedicated `qwen35` byte-level pretokenizer. It must preserve the
+published use of Unicode combining marks and split each numeric code point
+independently. Do not route `qwen35` through the current generic
+`\p{N}{1,3}` digit grouping.
+
+Required tokenizer edge cases:
+
+- ASCII digit runs of lengths one through six
+- non-ASCII numeric code points
+- precomposed and decomposed accented words
+- contractions in mixed case
+- punctuation followed by newlines
+- leading, trailing, and newline-adjacent whitespace
+
 Acceptance:
 
 - rendered bytes match golden upstream cases
 - token ids match an upstream-supported reference tokenizer
+- token ids match pinned llama.cpp for the dedicated Qwen3.5 regex cases
 - template and tokenizer digests are present in receipts
 - prompt cache identity changes when reasoning or preservation settings change
 
@@ -241,12 +263,41 @@ Record each candidate with:
 - source repository and immutable revision
 - exact filename, byte size, and SHA-256
 - quantization mode and mixed-quantization inventory
-- converter and source-model provenance when published
+- converter identity, revision, and source-model provenance when published or
+  independently derived
 - GGUF architecture and all family facts
 - tensor inventory and dimensions
 - tokenizer metadata and pre-tokenizer identity
 - embedded chat-template digest
 - native context and RoPE/MRoPE facts
+- stored V-head layout and the evidence used to select it
+- explicit MTP tensor disposition
+
+Build the exact download plan before transfer. The plan must name every target
+shard, expected byte size, expected digest, companion classification, and local
+materialization path. The first text plan excludes `mmproj`.
+
+The target filename is a profile label, not a runtime tensor type. Inspect the
+actual GGUF tensor table and implement every required storage type. Psionic
+currently recognizes GGUF type code 11 as Q3_K but cannot map it to a runtime
+quantization mode or decode its blocks. Q3_K CPU and CUDA support is therefore
+an explicit expected blocker for `UD-Q3_K_XL`, subject to confirmation from
+the downloaded artifact. Any IQ or other K types in the mixed profile are
+additional blockers.
+
+Validate the llama.cpp conversion contract with sampled official BF16 values:
+
+- `A_log` is stored as negative exponential A
+- time-step bias maps to the GGUF SSM time-step tensor
+- non-linear-attention norm offsets are applied
+- QKV, Z, alpha, beta, convolution, and output projection use tiled V-head
+  order
+- MRoPE sections are present and equal the admitted model contract
+
+The official llama.cpp converter does not emit
+`qwen35.ssm.v_head_reordered`. Record `v_head_layout = tiled` from converter
+provenance and parity evidence. Unknown-producer artifacts without equivalent
+evidence refuse.
 
 Qualification checks:
 
@@ -255,6 +306,9 @@ Qualification checks:
 - template behavior matches the Qwen3.8 prompt contract or is explicitly
   overridden by the digest-bound Psionic renderer
 - tensor names and shapes map to the supported hybrid runtime
+- sampled converter transforms match the official BF16 source
+- every concrete GGML type maps to an implemented loader and runtime mode
+- Q3_K block decode matches llama.cpp reference vectors when Q3_K is present
 - no required tensor silently dequantizes or falls back to an unreported host
   path
 - weights plus KV cache, recurrent state, scratch, graphs, and allocator margin
@@ -263,6 +317,7 @@ Qualification checks:
 - the 8,192-token CUDA envelope has separate peak-memory and parity evidence
 - output quality is compared with `Q3_K_M` before the Dynamic V3 artifact is
   made canonical
+- MTP tensors are inventoried but skipped for standard generation
 
 For the local 16 GiB RTX 4080, do not use file size alone as the admission
 test. The chosen context window must leave explicit memory for KV cache,
@@ -295,7 +350,9 @@ admitted Qwen3.8 GGUF. Validate these boundaries independently:
 - residual ordering
 - final normalization and LM head
 - sampling and stop-token handling
-- MTP posture; standard generation must state whether MTP tensors are unused
+- F32 convolution and delta-state allocation only on recurrent layers
+- separate KV allocation only on full-attention layers
+- MTP posture; standard generation skips and reports MTP tensors
 
 Acceptance:
 
@@ -303,6 +360,7 @@ Acceptance:
 - real-artifact greedy generation
 - first-token and multi-token parity against a reference runtime
 - stable repeated generation with clean per-request recurrent state
+- prefill and token-at-a-time decode parity at recurrent intermediate boundaries
 - no subprocess proxy and no unreported fallback
 - cancellation, timeout, context limit, and memory refusal remain functional
 
@@ -324,6 +382,9 @@ artifact identities without cloning the entire runtime.
 Acceptance:
 
 - admitted weights and state stay inside the published residency envelope
+- native Q3_K projections execute without a dense F16 mirror when Q3_K is
+  present in a required projection
+- SSM convolution and Gated DeltaNet run natively for both prefill and decode
 - CPU and CUDA agree on bounded logits or token sequences under fixed inputs
 - greedy and bounded sampled decode both work inside declared envelopes
 - graph capture and replay report Qwen3.8-specific cache identity
@@ -399,6 +460,8 @@ The gate should run:
 - structured-output acceptance or refusal
 - repeated-request state-reset checks
 - comparator cases against one upstream-supported runtime
+- comparator template cases with `low`, `medium`, and `xhigh` passed through
+  `chat_template_kwargs`
 - fallback-free CUDA publication checks
 
 Retained reports must record:
@@ -414,6 +477,31 @@ Retained reports must record:
 
 The initial release bar is correctness and truthful runtime publication.
 Performance tuning follows with separate retained evidence.
+
+Pin comparator reports to llama.cpp revision
+`9b05354ec6fb58b4e665e9a39ebc40285c015638`. A comparator version change
+requires prompt, tokenizer, intermediate, output, and performance evidence to
+be regenerated.
+
+## R9A: Optional MTP Speculative Decoding
+
+MTP is not required for the first Qwen3.8 text claim. Add it only after the
+base trunk is stable.
+
+Required work:
+
+- conditionally load the one appended NextN block
+- allocate its separate dense-attention KV cache and weights
+- accept target hidden rows and next-token embeddings with exact alignment
+- implement bounded recurrent-state snapshots and rollback for rejected draft
+  tokens
+- report draft count, accepted count, acceptance rate, added residency, and
+  rollback activity
+- preserve base-model output parity when MTP is disabled
+
+Acceptance requires correctness at draft boundaries, restored-state parity
+after partial rejection, a measured memory envelope, and a retained
+performance result. MTP presence in the artifact does not imply this claim.
 
 ## R10: Native Metal Generation
 
@@ -473,6 +561,8 @@ Do not relabel Qwen3.6 or Qwen3.5 adapters as Qwen3.8-compatible.
 | --- | --- | --- | --- | --- | --- | --- |
 | Product identity | required | required | required | n/a | n/a | n/a |
 | Tokenizer/template | required | required | required | n/a | n/a | n/a |
+| Converter layout | required | sampled source | required | n/a | n/a | n/a |
+| Quantized type decode | required | no | required | required | required | planned |
 | Tensor admission | required | required | required | n/a | n/a | n/a |
 | Bounded row evidence | required | required | optional | yes | no | no |
 | Full token generation | required | comparator | required | required | required | planned |
@@ -480,6 +570,7 @@ Do not relabel Qwen3.6 or Qwen3.5 adapters as Qwen3.8-compatible.
 | Structured output | required | no | required | required | required or refused | planned or refused |
 | Media | marker/refusal | processor facts | marker/refusal | refused | refused | refused |
 | Performance | no | no | required | informational | retained | follow-on retained |
+| MTP and rollback | synthetic follow-on | bounded source | optional follow-on | planned | planned | planned |
 
 Synthetic fixtures cover deterministic failures and small numerics. They do
 not replace real-artifact tests. Full-model tests should use environment-gated
@@ -494,12 +585,14 @@ Land the implementation as narrow commits on `main`:
 3. Family-neutral `qwen3_5_text` admission refactor with Qwen3.6 regression
    coverage.
 4. Qwen3.8 BF16 header and bounded execution reports.
-5. Qualified GGUF descriptor, memory plan, and refusal tests.
+5. Qualified GGUF descriptor, converter-layout fixtures, exact quantized type
+   support, memory plan, and refusal tests.
 6. Native CPU generation and reference parity.
 7. Native CUDA generation and backend-truth receipts.
 8. OpenAI-compatible serving, tools, streaming, and response replay.
 9. Release checker, comparator bundle, and canonical doc status update.
-10. Native Metal generation and Apple backend evidence.
+10. Optional MTP speculative decoding and rollback evidence.
+11. Native Metal generation and Apple backend evidence.
 
 Generated fixtures and reports land with the code that produces them. Do not
 mix broad formatting, unrelated Qwen3.5 benchmark files, or incidental report
@@ -513,10 +606,12 @@ R5 and later need:
 
 - the selected `Qwen3.8-27B-UD-Q3_K_XL.gguf` artifact downloaded and bound to
   immutable provenance, exact byte size, and SHA-256
+- its exact tensor-type inventory and converter-layout evidence
 - enough local GPU margin for the chosen artifact and context window, or a
   larger remote GPU for full-BF16 CUDA validation
-- upstream reference outputs for tokenizer, prompt, logits, generation, and
-  eventually vision
+- reference outputs from pinned llama.cpp revision
+  `9b05354ec6fb58b4e665e9a39ebc40285c015638` for tokenizer, prompt,
+  intermediates, logits, generation, and eventually vision
 
 These inputs do not block the metadata, template, admission, or bounded BF16
 milestones. They block honest native generation and accelerated release claims.
