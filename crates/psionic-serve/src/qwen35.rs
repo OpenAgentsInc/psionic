@@ -98,15 +98,10 @@ impl CudaGgufQwen35TextGenerationService {
     #[must_use]
     pub fn runtime_support(&self) -> crate::GgufDecoderRuntimeSupport {
         crate::GgufDecoderRuntimeSupport {
-            family: GgufDecoderFamily::Qwen35,
+            family: self.model.family_metadata.family,
             supported_backends: vec![String::from("cuda")],
             unsupported_backends: vec![String::from("cpu"), String::from("metal")],
-            unsupported_features: vec![
-                String::from("multimodal_inputs"),
-                String::from("video_inputs"),
-                String::from("adapter_serving"),
-                String::from("session_reuse"),
-            ],
+            unsupported_features: qwen35_unsupported_features(&self.model.family_metadata, true),
             quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
             adapter_runtime: crate::DecoderAdapterRuntimeSupport {
                 support_level: String::from("unsupported"),
@@ -293,7 +288,7 @@ impl StreamingTextGenerationExecutor for CudaGgufQwen35TextGenerationService {
         request: &GenerationRequest,
     ) -> Result<Self::Stream<'a>, ReferenceTextGenerationError> {
         let response = self.generate(request)?;
-        Ok(Box::new(CompletedQwen35Stream::new(response)))
+        Ok(Box::new(CompletedQwen35Stream::new(response, "cuda")))
     }
 }
 
@@ -1148,6 +1143,16 @@ pub struct CpuGgufQwen35TextGenerationService {
     residency_policy: psionic_runtime::ModelResidencyPolicy,
 }
 
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Qwen35CpuStateAllocationSummary {
+    pub(crate) recurrent_layer_count: usize,
+    pub(crate) full_attention_layer_count: usize,
+    pub(crate) convolution_state_f32: usize,
+    pub(crate) delta_state_f32: usize,
+    pub(crate) kv_cache_capacity_entries: usize,
+}
+
 impl CpuGgufQwen35TextGenerationService {
     pub fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
         let backend = CpuBackend::new();
@@ -1177,13 +1182,10 @@ impl CpuGgufQwen35TextGenerationService {
     #[must_use]
     pub fn runtime_support(&self) -> crate::GgufDecoderRuntimeSupport {
         crate::GgufDecoderRuntimeSupport {
-            family: GgufDecoderFamily::Qwen35,
+            family: self.model.family_metadata.family,
             supported_backends: vec![String::from("cpu")],
             unsupported_backends: vec![String::from("cuda"), String::from("metal")],
-            unsupported_features: vec![
-                String::from("adapter_serving"),
-                String::from("session_reuse"),
-            ],
+            unsupported_features: qwen35_unsupported_features(&self.model.family_metadata, false),
             quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
             adapter_runtime: crate::DecoderAdapterRuntimeSupport {
                 support_level: String::from("unsupported"),
@@ -1195,6 +1197,35 @@ impl CpuGgufQwen35TextGenerationService {
                 )],
             },
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn state_allocation_summary(
+        &self,
+        cache_capacity_tokens: usize,
+    ) -> Qwen35CpuStateAllocationSummary {
+        let state = self.model.initial_state(cache_capacity_tokens);
+        let mut summary = Qwen35CpuStateAllocationSummary {
+            recurrent_layer_count: 0,
+            full_attention_layer_count: 0,
+            convolution_state_f32: 0,
+            delta_state_f32: 0,
+            kv_cache_capacity_entries: 0,
+        };
+        for layer in state.layers {
+            match layer {
+                CpuQwen35LayerState::Hybrid(state) => {
+                    summary.recurrent_layer_count += 1;
+                    summary.convolution_state_f32 += state.conv_state.len();
+                    summary.delta_state_f32 += state.delta_state.len();
+                }
+                CpuQwen35LayerState::FullAttention(state) => {
+                    summary.full_attention_layer_count += 1;
+                    summary.kv_cache_capacity_entries += state.entries.capacity();
+                }
+            }
+        }
+        summary
     }
 
     #[must_use]
@@ -1608,7 +1639,7 @@ impl StreamingTextGenerationExecutor for CpuGgufQwen35TextGenerationService {
         request: &GenerationRequest,
     ) -> Result<Self::Stream<'a>, ReferenceTextGenerationError> {
         let response = self.generate(request)?;
-        Ok(Box::new(CompletedQwen35Stream::new(response)))
+        Ok(Box::new(CompletedQwen35Stream::new(response, "cpu")))
     }
 }
 
@@ -2151,7 +2182,7 @@ impl StreamingTextGenerationExecutor for MetalGgufQwen35TextGenerationService {
         request: &GenerationRequest,
     ) -> Result<Self::Stream<'a>, ReferenceTextGenerationError> {
         let response = self.generate(request)?;
-        Ok(Box::new(CompletedQwen35Stream::new(response)))
+        Ok(Box::new(CompletedQwen35Stream::new(response, "metal")))
     }
 }
 
@@ -2393,7 +2424,10 @@ impl CpuQwen35Model {
         let load_start = Instant::now();
         let artifact = GgufBlobArtifact::open_path(&path, gguf_local_blob_open_options())?;
         let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
-        if adapter.family_metadata().family != GgufDecoderFamily::Qwen35 {
+        if !matches!(
+            adapter.family_metadata().family,
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+        ) {
             return Err(ModelLoadError::UnsupportedModel(
                 adapter.descriptor().model.model_id.clone(),
             )
@@ -4363,6 +4397,27 @@ fn can_use_cuda_quantized_matvec(mode: QuantizationMode) -> bool {
 
 fn qwen35_requires_dense_f16_mirror(mode: QuantizationMode) -> bool {
     !can_use_cuda_quantized_matvec(mode)
+}
+
+fn qwen35_unsupported_features(
+    metadata: &GgufDecoderFamilyMetadata,
+    include_multimodal_refusals: bool,
+) -> Vec<String> {
+    let mut features = Vec::new();
+    if include_multimodal_refusals {
+        features.push(String::from("multimodal_inputs"));
+        features.push(String::from("video_inputs"));
+    }
+    features.push(String::from("adapter_serving"));
+    features.push(String::from("session_reuse"));
+    if family_fact_usize(metadata, "qwen35.nextn_predict_layers").unwrap_or(0) > 0 {
+        features.push(String::from("mtp_speculative_decoding_skipped"));
+    }
+    if !include_multimodal_refusals && matches!(metadata.family, GgufDecoderFamily::Qwen38) {
+        features.push(String::from("multimodal_inputs"));
+        features.push(String::from("video_inputs"));
+    }
+    features
 }
 
 fn supports_native_metal_qwen35_projection(mode: QuantizationMode) -> bool {
@@ -11262,13 +11317,14 @@ impl Qwen35CudaStepPlan {
 
 #[derive(Clone, Debug)]
 struct CompletedQwen35Stream {
+    backend: &'static str,
     policy: GenerationStreamingPolicy,
     chunk: Option<GenerationStreamChunk>,
     terminal: Option<GenerationStreamTerminal>,
 }
 
 impl CompletedQwen35Stream {
-    fn new(response: GenerationResponse) -> Self {
+    fn new(response: GenerationResponse, backend: &'static str) -> Self {
         let chunk = GenerationStreamChunk {
             request_id: response.request_id.clone(),
             model_id: response.model_id.clone(),
@@ -11283,6 +11339,7 @@ impl CompletedQwen35Stream {
             diagnostic: None,
         };
         Self {
+            backend,
             policy: default_generation_streaming_policy(),
             chunk: Some(chunk),
             terminal: Some(terminal),
@@ -11313,7 +11370,7 @@ impl GenerationEventStream for CompletedQwen35Stream {
                     499,
                     "stream cancelled by caller",
                 )
-                .with_backend("cuda"),
+                .with_backend(self.backend),
             );
             terminal
         })
@@ -11330,7 +11387,7 @@ impl GenerationEventStream for CompletedQwen35Stream {
                     499,
                     "stream disconnected by caller",
                 )
-                .with_backend("cuda"),
+                .with_backend(self.backend),
             );
             terminal
         })

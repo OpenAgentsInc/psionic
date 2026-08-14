@@ -248,7 +248,7 @@ impl CpuGgufTextGenerationService {
             GgufDecoderFamily::GptOss => CpuGgufServiceKind::GptOss(
                 CpuGgufGptOssTextGenerationService::from_gguf_path(path)?,
             ),
-            GgufDecoderFamily::Qwen35 => CpuGgufServiceKind::Qwen35(
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38 => CpuGgufServiceKind::Qwen35(
                 CpuGgufQwen35TextGenerationService::from_gguf_path(path)?,
             ),
             GgufDecoderFamily::Llama
@@ -17223,8 +17223,9 @@ mod tests {
     use crate::{
         AdapterServingBinding, CompiledWordGenerationModel, GenerationLoadState,
         GenerationModelHandle, GenerationOptions, GenerationProvenance, GenerationRequest,
-        GenerationResponse, GenerationStreamEvent, InMemoryKvCache, ReferenceTextGenerationError,
-        StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor,
+        GenerationResponse, GenerationStreamEvent, GenerationStreamStatus, InMemoryKvCache,
+        ReferenceTextGenerationError, StreamingTextGenerationExecutor, TerminationReason,
+        TextGenerationExecutor,
     };
     use psionic_adapters::{
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
@@ -17237,7 +17238,10 @@ mod tests {
         DecoderModelDescriptor, GgufDecoderAdapterLoader, GgufDecoderFamily, GgufMetadataValue,
         GgufTensorType, TokenId, TokenSequence,
     };
-    use psionic_runtime::{DeviceDiscovery, LocalServingIsolationPolicy};
+    use psionic_runtime::{
+        AdmissionRefusalReason, DeviceDiscovery, LocalServingIsolationPolicy, MemoryBudget,
+        ModelResidencyPolicy, ResidencyPressureAction, plan_model_admission,
+    };
     use psionic_train::{
         FixedBudgetTrainingRun, GEMMA_E4B_CUDA_ADAPTER_CHECKPOINT_SCHEMA_VERSION,
         GEMMA_E4B_CUDA_ADAPTER_TARGET_SET_ID, GEMMA_E4B_FINETUNING_MVP_TRAINING_FAMILY_ID,
@@ -17887,6 +17891,110 @@ mod tests {
     }
 
     #[test]
+    fn qwen38_cpu_generation_skips_mtp_and_resets_request_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen38.gguf");
+        write_test_gguf(
+            &path,
+            qwen38_decoder_metadata("tiny psionic qwen38").as_slice(),
+            qwen38_decoder_tensors().as_slice(),
+        )?;
+
+        let mut service = CpuGgufTextGenerationService::from_gguf_path(&path)?;
+        let descriptor = service.model_descriptor().clone();
+        let state_allocations = match &service.inner {
+            CpuGgufServiceKind::Qwen35(service) => service.state_allocation_summary(8),
+            _ => panic!("qwen38 must route through the qwen35 CPU graph"),
+        };
+        let request = GenerationRequest::new_text(
+            String::from("gguf-qwen38"),
+            descriptor.clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        );
+
+        let first = service.generate(&request)?;
+        let second = service.generate(&request)?;
+        let support = service.runtime_support();
+        let loaded = service.loaded_model_views();
+
+        assert_eq!(descriptor.model.family, "qwen38");
+        assert_eq!(descriptor.config.layer_count, 4);
+        assert_eq!(state_allocations.recurrent_layer_count, 3);
+        assert_eq!(state_allocations.full_attention_layer_count, 1);
+        assert_eq!(state_allocations.convolution_state_f32, 576);
+        assert_eq!(state_allocations.delta_state_f32, 384);
+        assert!(state_allocations.kv_cache_capacity_entries >= 8);
+        assert_eq!(first.output.text, "world");
+        assert_eq!(second.output, first.output);
+        assert_eq!(support.family, GgufDecoderFamily::Qwen38);
+        assert_eq!(support.supported_backends, vec![String::from("cpu")]);
+        assert_eq!(
+            support.unsupported_backends,
+            vec![String::from("cuda"), String::from("metal")]
+        );
+        assert!(
+            support
+                .unsupported_features
+                .contains(&String::from("mtp_speculative_decoding_skipped"))
+        );
+        assert!(
+            support
+                .unsupported_features
+                .contains(&String::from("multimodal_inputs"))
+        );
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].summary.family.as_deref(), Some("qwen38"));
+
+        let memory_policy = ModelResidencyPolicy {
+            max_loaded_models: None,
+            memory_budget: MemoryBudget {
+                resident_host_bytes: Some(
+                    loaded[0]
+                        .memory_plan
+                        .resident_host_bytes
+                        .saturating_sub(1),
+                ),
+                resident_device_bytes: None,
+            },
+            pressure_action: ResidencyPressureAction::RefuseNewModel,
+        };
+        let memory_refusal = plan_model_admission(
+            &[],
+            descriptor.model.model_id.as_str(),
+            &loaded[0].memory_plan,
+            &memory_policy,
+        )
+        .expect_err("qwen38 memory plan must participate in host-budget refusal");
+        assert_eq!(memory_refusal.reason, AdmissionRefusalReason::HostMemoryBudget);
+
+        let context_request = GenerationRequest::new_tokens(
+            "gguf-qwen38-context-refusal",
+            descriptor,
+            None,
+            TokenSequence::new(vec![TokenId(6); 256]),
+            GenerationOptions::greedy(1),
+        );
+        assert!(matches!(
+            service.generate(&context_request),
+            Err(ReferenceTextGenerationError::ContextWindow(_))
+        ));
+
+        let mut stream = service.generate_stream(&request)?;
+        let cancelled = stream.cancel().expect("qwen38 stream cancellation terminal");
+        assert_eq!(cancelled.status, GenerationStreamStatus::Cancelled);
+        assert_eq!(
+            cancelled
+                .diagnostic
+                .and_then(|diagnostic| diagnostic.backend),
+            Some(String::from("cpu"))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn cpu_gguf_service_streams_generic_family_output() -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("llama_stream.gguf");
@@ -18301,6 +18409,7 @@ mod tests {
             GgufDecoderFamily::Llama => "llama",
             GgufDecoderFamily::Qwen => "qwen",
             GgufDecoderFamily::Qwen35 => "qwen35",
+            GgufDecoderFamily::Qwen38 => "qwen38",
             GgufDecoderFamily::Qwen3 => "qwen3",
             GgufDecoderFamily::Gemma4 => "gemma4",
             GgufDecoderFamily::Mistral => "mistral",
@@ -18843,6 +18952,52 @@ mod tests {
         metadata
     }
 
+    fn qwen38_decoder_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = qwen35_decoder_metadata(name);
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.block_count")
+        {
+            *value = GgufMetadataValue::U32(5);
+        }
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.full_attention_interval")
+        {
+            *value = GgufMetadataValue::U32(4);
+        }
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.attention.head_count_kv")
+        {
+            *value = GgufMetadataValue::Array(vec![
+                GgufMetadataValue::U32(0),
+                GgufMetadataValue::U32(0),
+                GgufMetadataValue::U32(0),
+                GgufMetadataValue::U32(2),
+            ]);
+        }
+        metadata.extend([
+            (
+                String::from("general.base_model.0.name"),
+                GgufMetadataValue::String(String::from("Qwen3.8 27B")),
+            ),
+            (
+                String::from("general.base_model.0.repo_url"),
+                GgufMetadataValue::String(String::from("https://huggingface.co/Qwen/Qwen3.8-27B")),
+            ),
+            (
+                String::from("qwen35.nextn_predict_layers"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("qwen35.ssm.v_head_reordered"),
+                GgufMetadataValue::Bool(true),
+            ),
+        ]);
+        metadata
+    }
+
     fn dense_family_header(architecture: &str, name: &str) -> Vec<(String, GgufMetadataValue)> {
         dense_family_header_with_block_count(architecture, name, 1)
     }
@@ -19192,6 +19347,121 @@ mod tests {
             dense_tensor("blk.0.attn_q_norm.weight", vec![8], vec![1.0; 8]),
             dense_tensor("blk.0.attn_k_norm.weight", vec![8], vec![1.0; 8]),
         ]
+    }
+
+    fn qwen38_decoder_tensors() -> Vec<TestGgufTensor> {
+        let mut tensors = vec![
+            dense_tensor("token_embd.weight", vec![10, 32], {
+                let mut values = vec![0.0; 10 * 32];
+                values[6 * 32] = 2.0;
+                values
+            }),
+            dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("output.weight", vec![10, 32], {
+                let mut values = vec![0.0; 10 * 32];
+                values[7 * 32] = 1.0;
+                values
+            }),
+        ];
+        for layer_index in 0..4 {
+            let prefix = format!("blk.{layer_index}");
+            tensors.push(dense_tensor(
+                &format!("{prefix}.attn_norm.weight"),
+                vec![32],
+                vec![1.0; 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_gate.weight"),
+                vec![32, 32],
+                vec![0.0; 32 * 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_up.weight"),
+                vec![32, 32],
+                vec![0.0; 32 * 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_down.weight"),
+                vec![32, 32],
+                vec![0.0; 32 * 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.post_attention_norm.weight"),
+                vec![32],
+                vec![1.0; 32],
+            ));
+            if layer_index < 3 {
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_qkv.weight"),
+                    vec![64, 32],
+                    vec![0.0; 64 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_gate.weight"),
+                    vec![32, 32],
+                    vec![0.0; 32 * 32],
+                ));
+                tensors.push(dense_tensor(&format!("{prefix}.ssm_a"), vec![2], vec![0.0; 2]));
+                tensors.push(dense_tensor(&format!("{prefix}.ssm_dt"), vec![2], vec![0.0; 2]));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_alpha.weight"),
+                    vec![2, 32],
+                    vec![0.0; 2 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_beta.weight"),
+                    vec![2, 32],
+                    vec![0.0; 2 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_conv1d.weight"),
+                    vec![64, 4],
+                    vec![0.0; 64 * 4],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_norm.weight"),
+                    vec![8],
+                    vec![1.0; 8],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_out.weight"),
+                    vec![32, 32],
+                    vec![0.0; 32 * 32],
+                ));
+            } else {
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_q.weight"),
+                    vec![64, 32],
+                    vec![0.0; 64 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_k.weight"),
+                    vec![16, 32],
+                    vec![0.0; 16 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_v.weight"),
+                    vec![16, 32],
+                    vec![0.0; 16 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_output.weight"),
+                    vec![32, 32],
+                    vec![0.0; 32 * 32],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_q_norm.weight"),
+                    vec![8],
+                    vec![1.0; 8],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_k_norm.weight"),
+                    vec![8],
+                    vec![1.0; 8],
+                ));
+            }
+        }
+        tensors
     }
 
     fn token_embedding_values(hello_token_index: usize) -> Vec<f32> {

@@ -2153,15 +2153,13 @@ impl OpenAiCompatLoadedModel {
             if matches!(model.family, GgufDecoderFamily::Gemma4) {
                 return false;
             }
-            !matches!(model.family, GgufDecoderFamily::Qwen35)
-                || self.execution_engine_label() == "psionic"
+            !is_qwen35_graph_family(model.family) || self.execution_engine_label() == "psionic"
         })
     }
 
     fn supports_tool_calling(&self) -> bool {
         self.decoder().is_some_and(|model| {
-            !matches!(model.family, GgufDecoderFamily::Qwen35)
-                || self.execution_engine_label() == "psionic"
+            !is_qwen35_graph_family(model.family) || self.execution_engine_label() == "psionic"
         })
     }
 
@@ -2174,7 +2172,7 @@ impl OpenAiCompatLoadedModel {
 
     fn publishes_kv_cache_policies(&self) -> bool {
         self.decoder()
-            .is_some_and(|model| !matches!(model.family, GgufDecoderFamily::Qwen35))
+            .is_some_and(|model| !is_qwen35_graph_family(model.family))
     }
 
     fn structured_output_labels(&self) -> Option<Vec<&'static str>> {
@@ -2185,7 +2183,7 @@ impl OpenAiCompatLoadedModel {
     fn structured_output_capabilities(&self) -> Vec<StructuredOutputCapability> {
         match self.decoder() {
             Some(model)
-                if matches!(model.family, GgufDecoderFamily::Qwen35)
+                if is_qwen35_graph_family(model.family)
                     && self.execution_engine_label() != "psionic" =>
             {
                 unsupported_structured_output_capabilities(
@@ -6893,6 +6891,7 @@ fn decoder_family_label(family: GgufDecoderFamily) -> &'static str {
         GgufDecoderFamily::Qwen => "qwen",
         GgufDecoderFamily::Qwen3 => "qwen3",
         GgufDecoderFamily::Qwen35 => "qwen35",
+        GgufDecoderFamily::Qwen38 => "qwen38",
         GgufDecoderFamily::Gemma4 => "gemma4",
         GgufDecoderFamily::Mistral => "mistral",
         GgufDecoderFamily::GptOss => "gpt_oss",
@@ -10366,6 +10365,12 @@ fn load_generic_decoder_model(
         (OpenAiCompatBackend::Cpu, _, true) => {
             OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
         }
+        (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen38, false) => {
+            return Err(format!(
+                "qwen38 native CPU generation is currently an internal qualification lane; `{}` is not admitted on the generic OpenAI surface",
+                model_path.display(),
+            ));
+        }
         (OpenAiCompatBackend::Cpu, _, false) => OpenAiCompatRuntimeKind::GgufDecoderCpu,
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4, true) => {
             OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
@@ -10550,6 +10555,7 @@ fn generic_decoder_execution_profile(
     if matches!(
         (backend, family),
         (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen35)
+            | (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen38)
     ) {
         return default_text_generation_execution_profile();
     }
@@ -10572,8 +10578,15 @@ fn generic_decoder_scheduler_policy(
 ) -> Option<GenerationSchedulerPolicy> {
     matches!(backend, OpenAiCompatBackend::Cpu)
         .then_some(())
-        .filter(|_| !matches!(family, GgufDecoderFamily::Qwen35))
+        .filter(|_| !is_qwen35_graph_family(family))
         .map(|_| default_generation_scheduler_policy())
+}
+
+fn is_qwen35_graph_family(family: GgufDecoderFamily) -> bool {
+    matches!(
+        family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    )
 }
 
 fn generic_decoder_cluster_execution_truth(
@@ -16066,6 +16079,49 @@ mod tests {
             serde_json::json!("world")
         );
         assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen38_cpu_remains_internal_until_r8()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-qwen38.gguf");
+        let mut metadata = qwen35_decoder_metadata("tiny internal qwen38");
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.block_count")
+        {
+            *value = GgufMetadataValue::U32(2);
+        }
+        metadata.extend([
+            (
+                String::from("general.base_model.0.name"),
+                GgufMetadataValue::String(String::from("Qwen3.8 27B")),
+            ),
+            (
+                String::from("general.base_model.0.repo_url"),
+                GgufMetadataValue::String(String::from("https://huggingface.co/Qwen/Qwen3.8-27B")),
+            ),
+            (
+                String::from("qwen35.nextn_predict_layers"),
+                GgufMetadataValue::U32(1),
+            ),
+        ]);
+        write_test_gguf(
+            &qwen38_path,
+            metadata.as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let result = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path));
+        let error = match result {
+            Ok(_) => panic!("R6 qwen38 CPU lane must remain internal until R8"),
+            Err(error) => error,
+        };
+        let error = error.to_string();
+        assert!(error.contains("internal qualification lane"));
+        assert!(error.contains("not admitted on the generic OpenAI surface"));
         Ok(())
     }
 

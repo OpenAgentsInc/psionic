@@ -3992,6 +3992,8 @@ pub enum GgufDecoderFamily {
     Qwen3,
     /// Qwen3.5 family decoder behavior backed by the `qwen35` GGUF architecture.
     Qwen35,
+    /// Qwen3.8 product family executing through an admitted `qwen35` GGUF graph.
+    Qwen38,
     /// Mistral-family decoder behavior, including legacy Mistral models carried through `llama` GGUF metadata.
     Mistral,
     /// GPT-OSS / OpenAI-MoE decoder behavior.
@@ -4006,6 +4008,7 @@ impl GgufDecoderFamily {
             Self::Qwen => "qwen",
             Self::Qwen3 => "qwen3",
             Self::Qwen35 => "qwen35",
+            Self::Qwen38 => "qwen38",
             Self::Mistral => "mistral",
             Self::GptOss => "gpt_oss",
         }
@@ -6063,12 +6066,24 @@ fn classify_gguf_decoder_family(
         "mistral" | "mistral3" => Ok(GgufDecoderFamily::Mistral),
         "qwen2" => Ok(GgufDecoderFamily::Qwen),
         "qwen3" => Ok(GgufDecoderFamily::Qwen3),
+        "qwen35" if qwen35_metadata_identifies_qwen38_27b(metadata)? => {
+            Ok(GgufDecoderFamily::Qwen38)
+        }
         "qwen35" => Ok(GgufDecoderFamily::Qwen35),
         "gpt-oss" => Ok(GgufDecoderFamily::GptOss),
         other => Err(ModelLoadError::UnsupportedGgufArchitecture {
             architecture: other.to_string(),
         }),
     }
+}
+
+fn qwen35_metadata_identifies_qwen38_27b(
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+) -> Result<bool, ModelLoadError> {
+    let base_model_name = read_optional_gguf_string(metadata, "general.base_model.0.name")?;
+    let base_model_repo = read_optional_gguf_string(metadata, "general.base_model.0.repo_url")?;
+    Ok(base_model_name.as_deref() == Some("Qwen3.8 27B")
+        && base_model_repo.as_deref() == Some("https://huggingface.co/Qwen/Qwen3.8-27B"))
 }
 
 fn validate_supported_decoder_family_features(
@@ -6196,8 +6211,14 @@ fn build_gguf_decoder_descriptor(
         metadata,
         format!("{architecture}.embedding_length").as_str(),
     )?;
-    let layer_count =
+    let declared_layer_count =
         read_required_gguf_usize(metadata, format!("{architecture}.block_count").as_str())?;
+    let layer_count = effective_decoder_layer_count(
+        metadata,
+        family_metadata.family,
+        architecture,
+        declared_layer_count,
+    )?;
     let max_context =
         read_required_gguf_usize(metadata, format!("{architecture}.context_length").as_str())?;
     let intermediate_size = if matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
@@ -6216,7 +6237,10 @@ fn build_gguf_decoder_descriptor(
     )?;
     let head_dim = decoder_head_dim(family_metadata, hidden_size, head_count)?;
     let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
-    let kv_head_count = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
+    let kv_head_count = if matches!(
+        family_metadata.family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    ) {
         qwen35_kv_head_count(content, metadata, architecture, head_count, head_dim)?
     } else if matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
         gemma4_kv_head_count(metadata, architecture, head_count)?
@@ -6341,7 +6365,10 @@ fn build_gguf_decoder_tensor_layout(
         None => return Err(ModelLoadError::MissingTensor(String::from("output.weight"))),
     };
 
-    let qwen35_ssm_inner_size = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
+    let qwen35_ssm_inner_size = if matches!(
+        family_metadata.family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    ) {
         Some(read_required_gguf_usize(
             metadata,
             format!("{architecture}.ssm.inner_size").as_str(),
@@ -6349,7 +6376,10 @@ fn build_gguf_decoder_tensor_layout(
     } else {
         None
     };
-    let qwen35_ssm_group_count = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
+    let qwen35_ssm_group_count = if matches!(
+        family_metadata.family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    ) {
         Some(read_required_gguf_usize(
             metadata,
             format!("{architecture}.ssm.group_count").as_str(),
@@ -6357,7 +6387,10 @@ fn build_gguf_decoder_tensor_layout(
     } else {
         None
     };
-    let qwen35_ssm_state_size = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
+    let qwen35_ssm_state_size = if matches!(
+        family_metadata.family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    ) {
         Some(read_required_gguf_usize(
             metadata,
             format!("{architecture}.ssm.state_size").as_str(),
@@ -6365,7 +6398,10 @@ fn build_gguf_decoder_tensor_layout(
     } else {
         None
     };
-    let qwen35_ssm_conv_kernel = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
+    let qwen35_ssm_conv_kernel = if matches!(
+        family_metadata.family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    ) {
         Some(read_required_gguf_usize(
             metadata,
             format!("{architecture}.ssm.conv_kernel").as_str(),
@@ -6699,7 +6735,10 @@ fn build_gguf_decoder_tensor_layout(
             });
             continue;
         }
-        if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
+        if matches!(
+            family_metadata.family,
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+        ) {
             let query_width = config
                 .block
                 .attention
@@ -9114,6 +9153,31 @@ fn qwen35_full_attention_kv_width(
     Ok(key_rows)
 }
 
+fn effective_decoder_layer_count(
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+    family: GgufDecoderFamily,
+    architecture: &str,
+    declared_layer_count: usize,
+) -> Result<usize, ModelLoadError> {
+    if !matches!(
+        family,
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+    ) {
+        return Ok(declared_layer_count);
+    }
+    let nextn_key = format!("{architecture}.nextn_predict_layers");
+    let nextn_layers = read_optional_gguf_usize(metadata, nextn_key.as_str())?.unwrap_or(0);
+    declared_layer_count
+        .checked_sub(nextn_layers)
+        .filter(|layer_count| *layer_count > 0)
+        .ok_or_else(|| ModelLoadError::InvalidGgufMetadata {
+            key: nextn_key,
+            message: format!(
+                "nextn_predict_layers {nextn_layers} leaves no executable trunk layers from block_count {declared_layer_count}"
+            ),
+        })
+}
+
 fn collect_decoder_family_facts(
     metadata: &BTreeMap<String, GgufMetadataValue>,
     family: &GgufDecoderFamily,
@@ -9129,10 +9193,11 @@ fn collect_decoder_family_facts(
             format!("{architecture}.audio.block_count"),
             format!("{architecture}.vision.block_count"),
         ],
-        GgufDecoderFamily::Qwen35 => vec![
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38 => vec![
             format!("{architecture}.attention.head_count_kv"),
             format!("{architecture}.attention.scale"),
             format!("{architecture}.full_attention_interval"),
+            format!("{architecture}.nextn_predict_layers"),
             format!("{architecture}.mrope_sections"),
             format!("{architecture}.rope.dimension_sections"),
             format!("{architecture}.rope.mrope_interleaved"),
@@ -12755,6 +12820,50 @@ mod tests {
     }
 
     #[test]
+    fn qwen38_gguf_decoder_adapter_maps_product_identity_and_skips_mtp_tail()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen38.gguf");
+        write_test_gguf(
+            &path,
+            GgufVersion::V3,
+            &qwen38_decoder_metadata("Tiny Qwen3.8", Some(qwen35_chat_template())),
+            &qwen35_decoder_tensors(),
+        )?;
+
+        let adapter = GgufDecoderAdapterLoader.load_path(&path)?;
+        assert_eq!(adapter.descriptor().model.family, "qwen38");
+        assert_eq!(adapter.descriptor().tokenizer_family, "gpt2_bpe:qwen35");
+        assert_eq!(adapter.family_metadata().family, GgufDecoderFamily::Qwen38);
+        assert_eq!(adapter.family_metadata().architecture, "qwen35");
+        assert_eq!(adapter.descriptor().config.layer_count, 4);
+        assert_eq!(adapter.tensor_layout().layers.len(), 4);
+        assert_eq!(
+            adapter
+                .family_metadata()
+                .family_facts
+                .get("qwen35.nextn_predict_layers")
+                .and_then(GgufMetadataValue::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            adapter.tensor_layout().layers[0].layer_kind,
+            GgufDecoderLayerKind::Qwen35Hybrid
+        );
+        assert_eq!(
+            adapter.tensor_layout().layers[3].layer_kind,
+            GgufDecoderLayerKind::Qwen35FullAttention
+        );
+        assert_eq!(
+            adapter
+                .family_metadata()
+                .qwen35_multimodal_projection_config(),
+            None
+        );
+        Ok(())
+    }
+
+    #[test]
     fn gguf_decoder_adapter_loader_accepts_qwen35_scalar_kv_heads_and_ssm_dt_bias()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
@@ -13777,6 +13886,34 @@ mod tests {
         {
             *value = GgufMetadataValue::Bool(false);
         }
+        metadata
+    }
+
+    fn qwen38_decoder_metadata(
+        name: &str,
+        chat_template: Option<&str>,
+    ) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = qwen35_decoder_metadata(name, chat_template);
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.block_count")
+        {
+            *value = GgufMetadataValue::U32(5);
+        }
+        metadata.extend([
+            (
+                String::from("general.base_model.0.name"),
+                GgufMetadataValue::String(String::from("Qwen3.8 27B")),
+            ),
+            (
+                String::from("general.base_model.0.repo_url"),
+                GgufMetadataValue::String(String::from("https://huggingface.co/Qwen/Qwen3.8-27B")),
+            ),
+            (
+                String::from("qwen35.nextn_predict_layers"),
+                GgufMetadataValue::U32(1),
+            ),
+        ]);
         metadata
     }
 

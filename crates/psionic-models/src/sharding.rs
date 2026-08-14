@@ -35,7 +35,7 @@ pub fn gguf_decoder_family_tensor_parallel_contract(
         }
         GgufDecoderFamily::Qwen => "qwen",
         GgufDecoderFamily::Qwen3 => "qwen3",
-        GgufDecoderFamily::Qwen35 => {
+        GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38 => {
             return Err(DecoderFamilyShardingContractError::UnsupportedFamily { family });
         }
         GgufDecoderFamily::Mistral => "mistral",

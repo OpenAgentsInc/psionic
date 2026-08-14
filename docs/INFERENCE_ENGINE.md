@@ -283,7 +283,7 @@ into one generic engine claim.
   development. The repo now admits `Gemma 4` on CPU for bounded debug
   execution, but CPU still does not satisfy the first published `Gemma 4`
   support claim for Psionic.
-- `qwen38` execution remains `planned`. Current `main` has `implemented`
+- `qwen38` execution is `partial`. Current `main` has `implemented`
   Qwen3.8-27B artifact/product identity, prompt/tokenizer contracts, complete
   BF16 checkpoint-header admission plus bounded official BF16 row evidence,
   and GGUF qualification for the selected local artifact set. The
@@ -301,9 +301,19 @@ into one generic engine claim.
   artifact and `Q3_K_M` baseline have 4,096-token CUDA preflight admission;
   `Q4_K_M` is a CPU-offload comparator. Other variants, duplicate mappings,
   bad shards, wrong shard resolution, unsupported storage, and drifted facts
-  refuse. The retained R4 and R5 reports do not execute full-width attention or
-  MLPs, materialize full-vocabulary logits, generate tokens, serve requests,
-  compute gradients, or execute media inputs.
+  refuse. R6 adds an internal native CPU lane over the shared Qwen3.5 hybrid
+  graph. The selected Dynamic V3 artifact generates greedy tokens without a
+  subprocess or fallback; raw-prompt first-token and two-token outputs match
+  pinned llama.cpp revision `9b05354ec6fb58b4e665e9a39ebc40285c015638`.
+  Tiny-fixture evidence covers recurrent/full-attention state allocation,
+  MTP-tail exclusion, deterministic reset, context and memory refusal, and
+  cancellation. The generic OpenAI server still refuses Qwen3.8 until R8, and
+  CUDA, Metal, media, adapters, session reuse, and MTP speculative decoding
+  remain unsupported. R6 stays `partial` pending retained prefill/decode
+  recurrent-intermediate parity and explicit generation-timeout handling. The
+  retained R4 and R5 reports themselves still do not execute full-width
+  attention or MLPs, materialize full-vocabulary logits, generate tokens,
+  serve requests, compute gradients, or execute media inputs.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
 - Current `main` also admits native local execution for the real Hugging Face

@@ -603,6 +603,10 @@ fn quantized_base_bytes(bytes: u64, mode: QuantizationMode) -> u64 {
         | QuantizationMode::GgmlMxfp4 => bytes.saturating_div(4),
         QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ5K => bytes.saturating_mul(5) / 16,
         QuantizationMode::GgmlQ6K => bytes.saturating_mul(3) / 8,
+        // These modes are refused below; keep their refusal receipts conservatively BF16-sized.
+        QuantizationMode::GgmlQ3K
+        | QuantizationMode::GgmlIq3S
+        | QuantizationMode::GgmlIq4Xs => bytes,
     }
 }
 

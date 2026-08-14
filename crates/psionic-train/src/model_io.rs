@@ -3648,6 +3648,8 @@ mod tests {
             GgufTensorType::Q5K => 13,
             GgufTensorType::Q6K => 14,
             GgufTensorType::Q8K => 15,
+            GgufTensorType::IQ3S => 21,
+            GgufTensorType::IQ4XS => 23,
             GgufTensorType::BF16 => 30,
             GgufTensorType::MXFP4 => 39,
             GgufTensorType::Unknown(value) => value,

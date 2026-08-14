@@ -277,6 +277,7 @@ pub fn reasoning_parser_for_decoder_family(family: GgufDecoderFamily) -> Option<
         | GgufDecoderFamily::Qwen
         | GgufDecoderFamily::Qwen3
         | GgufDecoderFamily::Qwen35
+        | GgufDecoderFamily::Qwen38
         | GgufDecoderFamily::Mistral => None,
     }
 }

@@ -1,8 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
-> Status: `planned` on 2026-08-14. This document defines the implementation
-> direction. R1-R5 are implemented. It does not claim that Qwen3.8 generates
-> tokens in Psionic.
+> Status: `partial` on 2026-08-14. R1-R5 are implemented. R6 now provides an
+> internal native CPU token-generation lane, while recurrent-intermediate
+> parity and explicit timeout handling remain open.
 
 ## Compatibility Result
 
@@ -193,6 +193,13 @@ parity evidence.
 
 ## Current Refusal Posture
 
-Until the first artifact fixture and model-id admission land, Psionic should
-refuse `Qwen/Qwen3.8-27B` as unsupported. It should not silently normalize the
-model to Qwen3.6, Qwen3.5, or generic Qwen.
+Psionic admits the exact Qwen3.8-27B product identity and the qualified Dynamic
+V3 GGUF to the internal native CPU runtime. The runtime preserves `qwen38`
+product identity while reusing the `qwen35` execution graph, skips the declared
+MTP tail for standard generation, and reports unsupported media, adapters, and
+session reuse. It does not invoke a subprocess or hidden fallback.
+
+The generic OpenAI server, CUDA, Metal, media, and MTP speculative-decoding
+surfaces still refuse Qwen3.8. R6 remains `partial` until retained
+recurrent-intermediate comparator evidence covers prefill and token-at-a-time
+decode and the generation lane has an explicit timeout contract.

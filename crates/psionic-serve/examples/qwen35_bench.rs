@@ -338,6 +338,7 @@ fn run_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
     }
     Ok(finish_report(
         runtime.model_id().to_string(),
+        descriptor.model.family.clone(),
         config,
         prompt_tokens
             .as_slice()
@@ -383,6 +384,7 @@ fn run_report_from_generation(
 
 fn finish_report(
     model_id: String,
+    model_family: String,
     config: &BenchConfig,
     prompt_token_ids: Vec<u32>,
     load_s: f64,
@@ -414,7 +416,7 @@ fn finish_report(
     );
     BenchReport {
         schema_version: 1,
-        report_kind: String::from("psionic_qwen35_benchmark"),
+        report_kind: format!("psionic_{model_family}_benchmark"),
         backend: config.backend.label().to_string(),
         model_id,
         model_path: config.model_path.display().to_string(),

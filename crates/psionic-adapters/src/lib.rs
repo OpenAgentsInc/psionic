@@ -1259,10 +1259,13 @@ fn quantization_label(mode: QuantizationMode) -> &'static [u8] {
         QuantizationMode::GgmlQ4_0 => b"ggml_q4_0",
         QuantizationMode::GgmlQ4_1 => b"ggml_q4_1",
         QuantizationMode::GgmlQ5_0 => b"ggml_q5_0",
+        QuantizationMode::GgmlQ3K => b"ggml_q3_k",
         QuantizationMode::GgmlQ5K => b"ggml_q5_k",
         QuantizationMode::GgmlQ4K => b"ggml_q4_k",
         QuantizationMode::GgmlQ6K => b"ggml_q6_k",
         QuantizationMode::GgmlQ8_0 => b"ggml_q8_0",
+        QuantizationMode::GgmlIq3S => b"ggml_iq3_s",
+        QuantizationMode::GgmlIq4Xs => b"ggml_iq4_xs",
     }
 }
 
@@ -1418,7 +1421,7 @@ mod tests {
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterPackageError,
         AdapterPackageManifest, AdapterPackageTensor, AdapterResidencyMode, AdapterServingBinding,
         AdapterTargetFamily, AppleFmAdapterPackage, AppleFmAdapterPackageError,
-        LmHeadLoraAdapterArtifact,
+        LmHeadLoraAdapterArtifact, quantization_label,
     };
 
     #[derive(Debug, Deserialize)]
@@ -1449,6 +1452,16 @@ mod tests {
         )
         .with_provenance_digest("prov-digest")
         .with_governance_digest("gov-digest")
+    }
+
+    #[test]
+    fn qwen38_quantization_modes_have_stable_adapter_digest_labels() {
+        assert_eq!(quantization_label(QuantizationMode::GgmlQ3K), b"ggml_q3_k");
+        assert_eq!(quantization_label(QuantizationMode::GgmlIq3S), b"ggml_iq3_s");
+        assert_eq!(
+            quantization_label(QuantizationMode::GgmlIq4Xs),
+            b"ggml_iq4_xs"
+        );
     }
 
     #[test]
