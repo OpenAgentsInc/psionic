@@ -38,6 +38,9 @@ the repository.
 - [PSIONIC_GAP_ANALYSIS.md](PSIONIC_GAP_ANALYSIS.md) maps those facts to the
   current Qwen3.5 and Qwen3.6 implementation and defines the first honest
   implementation steps.
+- [UPSTREAM_ARTIFACT_INDEX.md](UPSTREAM_ARTIFACT_INDEX.md) links every file in
+  the pinned upstream repository and explains its role in loading, serving,
+  prompt rendering, preprocessing, or weight materialization.
 
 ## Claim Boundary
 
