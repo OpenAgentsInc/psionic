@@ -18147,6 +18147,14 @@ mod tests {
 
         let mut cuda = CudaGgufQwen35TextGenerationService::from_gguf_path(&path)?;
         let contract = cuda.cuda_runtime_contract();
+        let allocator_after_load = cuda
+            .cuda_allocator_pool_telemetry()
+            .expect("qwen38 cuda service must expose allocator telemetry");
+        assert!(allocator_after_load.resident_device_bytes >= contract.weight_device_bytes);
+        assert!(
+            allocator_after_load.peak_resident_device_bytes
+                >= allocator_after_load.resident_device_bytes
+        );
         let cuda_logits = cuda.test_raw_logits(&tokens)?;
         assert_eq!(cuda_logits.len(), cpu_logits.len());
         let max_absolute_error = cuda_logits
@@ -18188,6 +18196,18 @@ mod tests {
         });
         let first = cuda.generate(&request)?;
         let second = cuda.generate(&request)?;
+        let allocator_after_requests = cuda
+            .cuda_allocator_pool_telemetry()
+            .expect("qwen38 cuda service must retain allocator telemetry");
+        assert!(
+            allocator_after_requests.peak_resident_device_bytes
+                >= allocator_after_load.peak_resident_device_bytes
+        );
+        assert!(
+            allocator_after_requests.peak_resident_device_bytes
+                >= allocator_after_requests.resident_device_bytes
+        );
+        assert!(allocator_after_requests.returned_buffers > 0);
         assert_eq!(first.output.tokens, cpu_response.output.tokens);
         assert_eq!(second.output, first.output);
         let metrics = first
