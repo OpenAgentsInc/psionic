@@ -1668,10 +1668,13 @@ const fn quantization_mode_label(mode: QuantizationMode) -> &'static str {
         QuantizationMode::GgmlQ4_0 => "ggml_q4_0",
         QuantizationMode::GgmlQ4_1 => "ggml_q4_1",
         QuantizationMode::GgmlQ5_0 => "ggml_q5_0",
+        QuantizationMode::GgmlQ3K => "ggml_q3_k",
         QuantizationMode::GgmlQ5K => "ggml_q5_k",
         QuantizationMode::GgmlQ4K => "ggml_q4_k",
         QuantizationMode::GgmlQ6K => "ggml_q6_k",
         QuantizationMode::GgmlQ8_0 => "ggml_q8_0",
+        QuantizationMode::GgmlIq3S => "ggml_iq3_s",
+        QuantizationMode::GgmlIq4Xs => "ggml_iq4_xs",
     }
 }
 

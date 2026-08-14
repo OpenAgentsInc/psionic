@@ -75,6 +75,7 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     fmt, fs,
+    io::{Read, Seek, SeekFrom},
     mem::size_of,
     path::{Path, PathBuf},
 };
@@ -84,7 +85,10 @@ use psionic_catalog::{
     OllamaAdapterPolicy, OllamaCatalogSurface, OllamaLicenseFacts, OllamaManifest,
     OllamaProvenanceFacts, OllamaProvenanceKind, PagedBlobRange,
 };
-use psionic_core::{DType, QuantizationMode, QuantizedBlockLayout, Shape};
+use psionic_core::{
+    DType, QuantizationMode, QuantizedBlockLayout, Shape,
+    ggml_quantization::{decode_iq3_s_block, decode_iq4_xs_block, decode_q3_k_block},
+};
 pub use psionic_transformer::{
     ActivationFunction, AttnResBlockState, AttnResConfig, AttnResConfigError,
     AttnResExecutionError, AttnResTensor3, AttnResTensorError, DecoderAttentionConfig,
@@ -1880,6 +1884,10 @@ pub enum GgufTensorType {
     Q2K,
     /// GGML Q3_K tensor.
     Q3K,
+    /// GGML IQ3_S tensor.
+    IQ3S,
+    /// GGML IQ4_XS tensor.
+    IQ4XS,
     /// GGML Q4_K tensor.
     Q4K,
     /// GGML Q5_K tensor.
@@ -1909,6 +1917,8 @@ impl GgufTensorType {
             13 => Self::Q5K,
             14 => Self::Q6K,
             15 => Self::Q8K,
+            21 => Self::IQ3S,
+            23 => Self::IQ4XS,
             30 => Self::BF16,
             39 => Self::MXFP4,
             other => Self::Unknown(other),
@@ -1929,6 +1939,8 @@ impl GgufTensorType {
             | Self::Q8_1
             | Self::Q2K
             | Self::Q3K
+            | Self::IQ3S
+            | Self::IQ4XS
             | Self::Q4K
             | Self::Q5K
             | Self::Q6K
@@ -1943,17 +1955,19 @@ impl GgufTensorType {
             Self::Q4_0 => Some(QuantizationMode::GgmlQ4_0),
             Self::Q4_1 => Some(QuantizationMode::GgmlQ4_1),
             Self::Q5_0 => Some(QuantizationMode::GgmlQ5_0),
+            Self::Q3K => Some(QuantizationMode::GgmlQ3K),
             Self::Q5K => Some(QuantizationMode::GgmlQ5K),
             Self::Q4K => Some(QuantizationMode::GgmlQ4K),
             Self::Q6K => Some(QuantizationMode::GgmlQ6K),
             Self::Q8_0 => Some(QuantizationMode::GgmlQ8_0),
+            Self::IQ3S => Some(QuantizationMode::GgmlIq3S),
+            Self::IQ4XS => Some(QuantizationMode::GgmlIq4Xs),
             Self::F32
             | Self::F16
             | Self::BF16
             | Self::Q5_1
             | Self::Q8_1
             | Self::Q2K
-            | Self::Q3K
             | Self::Q8K
             | Self::Unknown(_) => None,
         }
@@ -1975,6 +1989,8 @@ impl fmt::Display for GgufTensorType {
             Self::Q8_1 => f.write_str("q8_1"),
             Self::Q2K => f.write_str("q2_k"),
             Self::Q3K => f.write_str("q3_k"),
+            Self::IQ3S => f.write_str("iq3_s"),
+            Self::IQ4XS => f.write_str("iq4_xs"),
             Self::Q4K => f.write_str("q4_k"),
             Self::Q5K => f.write_str("q5_k"),
             Self::Q6K => f.write_str("q6_k"),
@@ -2164,11 +2180,74 @@ impl GgufContent {
 
     /// Reads GGUF metadata and tensor descriptors from a local file.
     pub fn read_path(path: &Path) -> Result<Self, ModelLoadError> {
-        let bytes = fs::read(path).map_err(|error| ModelLoadError::ArtifactRead {
+        const INITIAL_HEADER_BYTES: usize = 1024 * 1024;
+        const MAX_HEADER_BYTES: usize = 256 * 1024 * 1024;
+
+        let mut file = fs::File::open(path).map_err(|error| ModelLoadError::ArtifactRead {
             path: path.display().to_string(),
             message: error.to_string(),
         })?;
-        Self::read(&bytes)
+        let file_len = file
+            .metadata()
+            .map_err(|error| ModelLoadError::ArtifactRead {
+                path: path.display().to_string(),
+                message: error.to_string(),
+            })?
+            .len();
+        let file_len_usize = usize::try_from(file_len).map_err(|_| {
+            artifact_format_error(
+                "gguf",
+                format!("artifact byte length {file_len} does not fit usize"),
+            )
+        })?;
+        let mut header_bytes = INITIAL_HEADER_BYTES.min(file_len_usize);
+        loop {
+            file.seek(SeekFrom::Start(0))
+                .map_err(|error| ModelLoadError::ArtifactRead {
+                    path: path.display().to_string(),
+                    message: error.to_string(),
+                })?;
+            let mut bytes = vec![0_u8; header_bytes];
+            file.read_exact(&mut bytes)
+                .map_err(|error| ModelLoadError::ArtifactRead {
+                    path: path.display().to_string(),
+                    message: error.to_string(),
+                })?;
+            match Self::read(&bytes) {
+                Ok(content) => {
+                    for tensor in content.tensor_infos() {
+                        let (start, byte_len) = content.tensor_byte_range(&tensor.name)?;
+                        let end = start.checked_add(byte_len).ok_or_else(|| {
+                            artifact_format_error(
+                                "gguf",
+                                format!("tensor `{}` byte range overflows usize", tensor.name),
+                            )
+                        })?;
+                        if end > file_len_usize {
+                            return Err(artifact_format_error(
+                                "gguf",
+                                format!(
+                                    "tensor `{}` byte range ends at {end}, past artifact length {file_len_usize}",
+                                    tensor.name
+                                ),
+                            ));
+                        }
+                    }
+                    return Ok(content);
+                }
+                Err(ModelLoadError::ArtifactFormat { message, .. })
+                    if message.starts_with("unexpected end of file while parsing gguf")
+                        && header_bytes < file_len_usize
+                        && header_bytes < MAX_HEADER_BYTES =>
+                {
+                    header_bytes = header_bytes
+                        .saturating_mul(2)
+                        .min(file_len_usize)
+                        .min(MAX_HEADER_BYTES);
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     /// Returns the parsed GGUF version.
@@ -2275,6 +2354,8 @@ impl GgufContent {
                 | GgufTensorType::Q8_1
                 | GgufTensorType::Q2K
                 | GgufTensorType::Q3K
+                | GgufTensorType::IQ3S
+                | GgufTensorType::IQ4XS
                 | GgufTensorType::Q4K
                 | GgufTensorType::Q5K
                 | GgufTensorType::Q6K
@@ -8507,11 +8588,14 @@ fn quantization_priority(quantization: QuantizationMode) -> u8 {
         QuantizationMode::GgmlQ4_0 => 2,
         QuantizationMode::GgmlQ4_1 => 3,
         QuantizationMode::GgmlQ5_0 => 4,
-        QuantizationMode::GgmlQ5K => 5,
-        QuantizationMode::GgmlQ4K => 6,
-        QuantizationMode::GgmlQ6K => 7,
-        QuantizationMode::GgmlQ8_0 => 8,
-        QuantizationMode::GgmlMxfp4 => 9,
+        QuantizationMode::GgmlQ3K => 5,
+        QuantizationMode::GgmlIq3S => 6,
+        QuantizationMode::GgmlIq4Xs => 7,
+        QuantizationMode::GgmlQ5K => 8,
+        QuantizationMode::GgmlQ4K => 9,
+        QuantizationMode::GgmlQ6K => 10,
+        QuantizationMode::GgmlQ8_0 => 11,
+        QuantizationMode::GgmlMxfp4 => 12,
     }
 }
 
@@ -9379,6 +9463,21 @@ fn decode_ggml_quantized_values(
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(layout, bytes),
         QuantizationMode::GgmlQ5_0 => decode_q5_0_blocks(layout, bytes),
+        QuantizationMode::GgmlQ3K => {
+            decode_shared_super_blocks(layout, bytes, quantization, |block| {
+                decode_q3_k_block(block)
+            })
+        }
+        QuantizationMode::GgmlIq3S => {
+            decode_shared_super_blocks(layout, bytes, quantization, |block| {
+                decode_iq3_s_block(block)
+            })
+        }
+        QuantizationMode::GgmlIq4Xs => {
+            decode_shared_super_blocks(layout, bytes, quantization, |block| {
+                decode_iq4_xs_block(block)
+            })
+        }
         QuantizationMode::GgmlQ5K => decode_q5_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ4K => decode_q4_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ6K => decode_q6_k_blocks(layout, bytes),
@@ -9387,6 +9486,33 @@ fn decode_ggml_quantized_values(
             Err(ModelLoadError::UnsupportedQuantizedTensorMode { quantization })
         }
     }
+}
+
+fn decode_shared_super_blocks(
+    layout: QuantizedBlockLayout,
+    bytes: &[u8],
+    quantization: QuantizationMode,
+    mut decode_block: impl FnMut(
+        &[u8],
+    ) -> Result<
+        [f32; 256],
+        psionic_core::ggml_quantization::GgmlBlockDecodeError,
+    >,
+) -> Result<Vec<f32>, ModelLoadError> {
+    if bytes.len() != layout.byte_len() {
+        return Err(ModelLoadError::InvalidQuantizedTensorByteLength {
+            quantization,
+            expected: layout.byte_len(),
+            actual: bytes.len(),
+        });
+    }
+    let mut values = Vec::with_capacity(layout.element_count());
+    for block in bytes.chunks_exact(layout.bytes_per_block) {
+        let decoded = decode_block(block)
+            .map_err(|error| artifact_format_error("gguf", error.to_string()))?;
+        values.extend(decoded);
+    }
+    Ok(values)
 }
 
 fn decode_mxfp4_blocks(
@@ -10141,6 +10267,39 @@ mod tests {
         assert_eq!(tensor.shape, Shape::new(vec![2, 2]));
         assert_eq!(tensor.tensor_type, GgufTensorType::F32);
         assert_eq!(content.tensor_bytes(&bytes, "dense")?.len(), 16);
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_content_read_path_grows_bounded_header_prefix() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempdir()?;
+        let path = temp.path().join("large_header.gguf");
+        write_test_gguf(
+            &path,
+            GgufVersion::V3,
+            &[(
+                String::from("test.large_metadata"),
+                GgufMetadataValue::String("x".repeat(1024 * 1024 + 17)),
+            )],
+            &[TestGgufTensor::new(
+                "dense",
+                vec![1],
+                GgufTensorType::F32,
+                super::encode_f32_bytes(&[1.0]),
+            )],
+        )?;
+
+        let content = GgufContent::read_path(&path)?;
+        assert_eq!(content.tensor_infos().count(), 1);
+        assert_eq!(
+            content
+                .metadata()
+                .get("test.large_metadata")
+                .and_then(GgufMetadataValue::as_str)
+                .map(str::len),
+            Some(1024 * 1024 + 17)
+        );
         Ok(())
     }
 
@@ -11762,6 +11921,50 @@ mod tests {
         ));
         let expected = (1..=32).map(|value| value as f32 * 2.0).collect::<Vec<_>>();
         assert_eq!(quantized.values()?.as_ref(), expected.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_weight_bundle_loader_routes_qwen38_quantized_storage()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("qwen38_quantized.gguf");
+        let q3_k = vec![0_u8; 110];
+        let iq3_s = vec![0_u8; 110];
+        let iq4_xs = vec![0_u8; 136];
+        write_test_gguf(
+            &path,
+            GgufVersion::V3,
+            &[],
+            &[
+                TestGgufTensor::new("q3_k", vec![256], GgufTensorType::Q3K, q3_k.clone()),
+                TestGgufTensor::new("iq3_s", vec![256], GgufTensorType::IQ3S, iq3_s.clone()),
+                TestGgufTensor::new("iq4_xs", vec![256], GgufTensorType::IQ4XS, iq4_xs.clone()),
+            ],
+        )?;
+
+        let bundle = GgufWeightBundleLoader.load_path(&path)?;
+        for (name, mode, expected) in [
+            (
+                "q3_k",
+                QuantizationMode::GgmlQ3K,
+                psionic_core::ggml_quantization::decode_q3_k_block(&q3_k)?.to_vec(),
+            ),
+            (
+                "iq3_s",
+                QuantizationMode::GgmlIq3S,
+                psionic_core::ggml_quantization::decode_iq3_s_block(&iq3_s)?.to_vec(),
+            ),
+            (
+                "iq4_xs",
+                QuantizationMode::GgmlIq4Xs,
+                psionic_core::ggml_quantization::decode_iq4_xs_block(&iq4_xs)?.to_vec(),
+            ),
+        ] {
+            let tensor = bundle.tensor(name).ok_or("missing quantized tensor")?;
+            assert_eq!(tensor.metadata().quantization, mode);
+            assert_eq!(tensor.values()?.as_ref(), expected.as_slice());
+        }
         Ok(())
     }
 
@@ -14786,6 +14989,8 @@ mod tests {
             GgufTensorType::Q5K => 13,
             GgufTensorType::Q6K => 14,
             GgufTensorType::Q8K => 15,
+            GgufTensorType::IQ3S => 21,
+            GgufTensorType::IQ4XS => 23,
             GgufTensorType::BF16 => 30,
             GgufTensorType::Unknown(value) => value,
         }

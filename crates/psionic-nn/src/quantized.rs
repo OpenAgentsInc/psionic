@@ -6,6 +6,9 @@ use crate::{
 };
 use psionic_core::{
     DType, Device, QuantizationMode, QuantizedBlockLayout, QuantizedTensorData, Shape, TensorData,
+    ggml_quantization::{
+        GgmlBlockDecodeError, decode_iq3_s_block, decode_iq4_xs_block, decode_q3_k_block,
+    },
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -920,6 +923,11 @@ fn decode_quantized_values(
             mode: QuantizationMode::GgmlQ5_0,
             detail: "ggml_q5_0 decode is not implemented in psionic-nn yet",
         }),
+        QuantizationMode::GgmlQ3K => decode_ggml_super_blocks(path, quantized, decode_q3_k_block),
+        QuantizationMode::GgmlIq3S => decode_ggml_super_blocks(path, quantized, decode_iq3_s_block),
+        QuantizationMode::GgmlIq4Xs => {
+            decode_ggml_super_blocks(path, quantized, decode_iq4_xs_block)
+        }
         QuantizationMode::GgmlQ5K => Err(QuantizationError::UnsupportedMode {
             mode: QuantizationMode::GgmlQ5K,
             detail: "ggml_q5_k decode is not implemented in psionic-nn yet",
@@ -932,6 +940,27 @@ fn decode_quantized_values(
             detail: "quantized wrappers require a real quantization family",
         }),
     }
+}
+
+fn decode_ggml_super_blocks(
+    path: &str,
+    quantized: &QuantizedTensorData,
+    decode_block: fn(&[u8]) -> Result<[f32; 256], GgmlBlockDecodeError>,
+) -> Result<Vec<f32>, QuantizationError> {
+    let mut values = Vec::with_capacity(quantized.layout.element_count());
+    for block in quantized
+        .bytes
+        .chunks_exact(quantized.layout.bytes_per_block)
+    {
+        let decoded =
+            decode_block(block).map_err(|error| QuantizationError::InvalidQuantizedLayout {
+                path: String::from(path),
+                mode: quantized.mode,
+                detail: error.to_string(),
+            })?;
+        values.extend(decoded);
+    }
+    Ok(values)
 }
 
 fn decode_int8_symmetric_blocks(
