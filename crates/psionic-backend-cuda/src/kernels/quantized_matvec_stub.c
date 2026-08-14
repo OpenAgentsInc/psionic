@@ -2,6 +2,45 @@ int psionic_cuda_quantized_kernels_compiled(void) {
     return 0;
 }
 
+#define PSIONIC_DEFINE_SUPER_BLOCK_STUBS(NAME)                                                   \
+int psionic_cuda_##NAME##_matvec(                                                                \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *input, void *output, void *stream                                                \
+) {                                                                                              \
+    (void)weights; (void)rows; (void)cols; (void)row_stride;                                    \
+    (void)input; (void)output; (void)stream; return 1;                                           \
+}                                                                                                \
+int psionic_cuda_##NAME##_dequantize_row_to_f32(                                                 \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *decode_params, void *output, void *stream                                        \
+) {                                                                                              \
+    (void)weights; (void)rows; (void)cols; (void)row_stride;                                    \
+    (void)decode_params; (void)output; (void)stream; return 1;                                   \
+}                                                                                                \
+int psionic_cuda_##NAME##_matvec_q8_1(                                                           \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *input_q8_1, const void *bias, void *output, void *stream                         \
+) {                                                                                              \
+    (void)weights; (void)rows; (void)cols; (void)row_stride;                                    \
+    (void)input_q8_1; (void)bias; (void)output; (void)stream; return 1;                          \
+}                                                                                                \
+int psionic_cuda_##NAME##_matvec_q8_1_argmax(                                                    \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *input_q8_1, const void *bias, void *output, void *stream                         \
+) {                                                                                              \
+    (void)weights; (void)rows; (void)cols; (void)row_stride;                                    \
+    (void)input_q8_1; (void)bias; (void)output; (void)stream; return 1;                          \
+}
+
+PSIONIC_DEFINE_SUPER_BLOCK_STUBS(q3_k)
+PSIONIC_DEFINE_SUPER_BLOCK_STUBS(q4_k)
+PSIONIC_DEFINE_SUPER_BLOCK_STUBS(q5_k)
+PSIONIC_DEFINE_SUPER_BLOCK_STUBS(q6_k)
+PSIONIC_DEFINE_SUPER_BLOCK_STUBS(iq3_s)
+PSIONIC_DEFINE_SUPER_BLOCK_STUBS(iq4_xs)
+
+#undef PSIONIC_DEFINE_SUPER_BLOCK_STUBS
+
 int psionic_cuda_q8_0_matvec(
     const void *weights,
     int rows,

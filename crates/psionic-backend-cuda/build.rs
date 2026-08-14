@@ -7,6 +7,7 @@ use std::{
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/kernels/quantized_matvec.cu");
+    println!("cargo:rerun-if-changed=src/kernels/qwen38_quant_tables.cuh");
     println!("cargo:rerun-if-changed=src/kernels/quantized_matvec_stub.c");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);

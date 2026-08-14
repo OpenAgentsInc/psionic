@@ -24,8 +24,11 @@ psionic-ir = { path = "../psionic-ir" }
 psionic-runtime = { path = "../psionic-runtime" }
 
 [dev-dependencies]
+hex = { workspace = true }
 psionic-backend-cpu = { path = "../psionic-backend-cpu" }
 psionic-backend-tests = { path = "../psionic-backend-tests" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [build-dependencies]
 cc = "1.1"

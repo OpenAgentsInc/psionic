@@ -21,8 +21,12 @@ constexpr int kMaxWarpsPerBlock = 1024 / kWarpSize;
 constexpr int kQ81ElementsPerBlock = 32;
 constexpr int kQ80BlockBytes = 34;
 constexpr int kQ81BlockBytes = 36;
+constexpr int kQ3KBlockBytes = 110;
 constexpr int kQ4KBlockBytes = 144;
+constexpr int kQ5KBlockBytes = 176;
 constexpr int kQ6KBlockBytes = 210;
+constexpr int kIq3SBlockBytes = 110;
+constexpr int kIq4XsBlockBytes = 136;
 constexpr int kAttentionMaxPositions = 1024;
 constexpr int kAttentionFa3MaxSplits = 8;
 constexpr int kAttentionFa3MaxHeadsPerGroup = 8;
@@ -32,6 +36,12 @@ constexpr int kMoeMaxExperts = 128;
 constexpr int kMoeMaxSelected = 32;
 constexpr int kLogitsMaxSelected = 128;
 constexpr int kLogitsFastSharedTopK = kLogitsMaxSelected;
+
+#include "qwen38_quant_tables.cuh"
+
+__device__ __constant__ int8_t kIq4NlValues[16] = {
+    -127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113,
+};
 
 __device__ __forceinline__ float half_to_float(uint16_t bits) {
     const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
@@ -457,6 +467,175 @@ struct Q6KDot {
         }
         return scale * static_cast<float>(scales[scale_index]) *
             static_cast<float>(quantized - 32) * input;
+    }
+};
+
+__device__ __forceinline__ int q3_k_scale(const uint8_t *packed, int scale_index) {
+    const uint32_t low0 = static_cast<uint32_t>(get_int_b1(packed, 0));
+    const uint32_t low1 = static_cast<uint32_t>(get_int_b1(packed, 1));
+    const uint32_t upper = static_cast<uint32_t>(get_int_b1(packed, 2));
+    constexpr uint32_t mask_two = 0x03030303u;
+    constexpr uint32_t mask_four = 0x0f0f0f0fu;
+    uint32_t word = 0;
+    switch (scale_index >> 2) {
+        case 0:
+            word = (low0 & mask_four) | ((upper & mask_two) << 4);
+            break;
+        case 1:
+            word = (low1 & mask_four) | (((upper >> 2) & mask_two) << 4);
+            break;
+        case 2:
+            word = ((low0 >> 4) & mask_four) | (((upper >> 4) & mask_two) << 4);
+            break;
+        default:
+            word = ((low1 >> 4) & mask_four) | (((upper >> 6) & mask_two) << 4);
+            break;
+    }
+    return static_cast<int>((word >> (8 * (scale_index & 3))) & 0xffu) - 32;
+}
+
+struct Q3KValue {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int block_index,
+        int lane
+    ) const {
+        const uint8_t *block = row_weights + block_index * kQ3KBlockBytes;
+        const int half_index = lane >> 7;
+        const int lane_in_half = lane & 127;
+        const int shift_group = lane_in_half >> 5;
+        const int lane_in_group = lane_in_half & 31;
+        const int quant_offset = lane_in_group & 15;
+        const int scale_index = half_index * 8 + shift_group * 2 + (lane_in_group >> 4);
+        const uint8_t low =
+            (block[32 + half_index * 32 + quant_offset + (lane_in_group >> 4) * 16] >>
+             (2 * shift_group)) & 3;
+        const uint8_t high_mask = static_cast<uint8_t>(1u << (half_index * 4 + shift_group));
+        const int high = (block[quant_offset + (lane_in_group >> 4) * 16] & high_mask) == 0 ? 4 : 0;
+        const float scale = half_to_float(load_u16_le(block + 108));
+        return scale * static_cast<float>(q3_k_scale(block + 96, scale_index)) *
+            static_cast<float>(static_cast<int>(low) - high);
+    }
+};
+
+struct Q5KValue {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int block_index,
+        int lane
+    ) const {
+        const uint8_t *block = row_weights + block_index * kQ5KBlockBytes;
+        const float scale = half_to_float(load_u16_le(block));
+        const float minimum = half_to_float(load_u16_le(block + 2));
+        const uint8_t *scales = block + 4;
+        const uint8_t *high_bits = block + 16;
+        const uint8_t *quants = block + 48;
+        const int quant_chunk = lane >> 6;
+        const int chunk_offset = lane & 63;
+        const int quant_index = quant_chunk * 32 + (chunk_offset & 31);
+        const int scale_index = quant_chunk * 2 + (chunk_offset >> 5);
+        const int2 scale_min = decode_q4_k_scale_min(scale_index, scales);
+        const uint8_t packed = quants[quant_index];
+        const uint8_t nibble = chunk_offset < 32 ? (packed & 0x0f) : (packed >> 4);
+        const uint8_t mask = static_cast<uint8_t>((chunk_offset < 32 ? 1u : 2u) << (2 * quant_chunk));
+        const int quantized = static_cast<int>(nibble) +
+            ((high_bits[chunk_offset & 31] & mask) != 0 ? 16 : 0);
+        return scale * static_cast<float>(scale_min.x) * static_cast<float>(quantized) -
+            minimum * static_cast<float>(scale_min.y);
+    }
+};
+
+struct Iq3SValue {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int block_index,
+        int lane
+    ) const {
+        const uint8_t *block = row_weights + block_index * kIq3SBlockBytes;
+        const int scale_block = lane >> 5;
+        const int lane_in_block = lane & 31;
+        const int code_pair = lane_in_block >> 3;
+        const int lane_in_code_pair = lane_in_block & 7;
+        const int code_selector = lane_in_code_pair >> 2;
+        const int code_byte = lane_in_code_pair & 3;
+        const uint8_t high = block[66 + scale_block];
+        const int high_bit = 2 * code_pair + code_selector;
+        const int code_index = static_cast<int>(
+            block[2 + scale_block * 8 + code_pair * 2 + code_selector]
+        ) | (static_cast<int>((high >> high_bit) & 1) << 8);
+        const uint32_t grid = kIq3SGrid[code_index];
+        const int magnitude = static_cast<int>((grid >> (8 * code_byte)) & 0xffu);
+        const uint8_t sign_bits = block[74 + scale_block * 4 + code_pair];
+        const int sign = (sign_bits & (1u << lane_in_code_pair)) == 0 ? 1 : -1;
+        const uint8_t packed_scale = block[106 + scale_block / 2];
+        const int local_scale = 1 + 2 * static_cast<int>(
+            scale_block % 2 == 0 ? (packed_scale & 0x0f) : (packed_scale >> 4)
+        );
+        return half_to_float(load_u16_le(block)) * static_cast<float>(local_scale * magnitude * sign);
+    }
+};
+
+struct Iq4XsValue {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int block_index,
+        int lane
+    ) const {
+        const uint8_t *block = row_weights + block_index * kIq4XsBlockBytes;
+        const int scale_block = lane >> 5;
+        const int lane_in_block = lane & 31;
+        const uint16_t scale_high = load_u16_le(block + 2);
+        const uint8_t scale_low = block[4 + scale_block / 2];
+        const int packed_scale = static_cast<int>(
+            (scale_low >> (4 * (scale_block % 2))) & 0x0f
+        ) | (static_cast<int>((scale_high >> (2 * scale_block)) & 3) << 4);
+        const uint8_t packed = block[8 + scale_block * 16 + (lane_in_block & 15)];
+        const uint8_t quant = lane_in_block < 16 ? (packed & 0x0f) : (packed >> 4);
+        return half_to_float(load_u16_le(block)) * static_cast<float>(packed_scale - 32) *
+            static_cast<float>(kIq4NlValues[quant]);
+    }
+};
+
+template <typename ValueFn>
+struct SuperBlockDot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int index,
+        float input
+    ) const {
+        return ValueFn{}(row_weights, index >> 8, index & 255) * input;
+    }
+};
+
+template <typename ValueFn>
+struct SuperBlockRowDequant {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int block_index,
+        int lane
+    ) const {
+        const int index = block_index * kQ81ElementsPerBlock + lane;
+        return ValueFn{}(row_weights, index >> 8, index & 255);
+    }
+};
+
+template <typename ValueFn>
+struct SuperBlockQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int input_block_index,
+        const Q81Block *input
+    ) const {
+        const Q81Block *input_block = input + input_block_index;
+        const int8_t *input_quants = reinterpret_cast<const int8_t *>(input_block->bytes + 4);
+        const int base_lane = (input_block_index & 7) * kQ81ElementsPerBlock;
+        float sum = 0.0f;
+#pragma unroll
+        for (int lane = 0; lane < kQ81ElementsPerBlock; ++lane) {
+            sum += ValueFn{}(row_weights, input_block_index >> 3, base_lane + lane) *
+                static_cast<float>(input_quants[lane]);
+        }
+        return sum * half_to_float(load_u16_le(input_block->bytes));
     }
 };
 
@@ -6713,6 +6892,64 @@ __global__ void accumulate_selected4_kernel(
 extern "C" int psionic_cuda_quantized_kernels_compiled(void) {
     return 1;
 }
+
+#define PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(NAME, VALUE_FN)                                      \
+extern "C" int psionic_cuda_##NAME##_matvec(                                                   \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *input, void *output, void *stream                                                \
+) {                                                                                              \
+    quantized_matvec_kernel<<<rows, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(         \
+        static_cast<const uint8_t *>(weights), row_stride, rows, cols,                           \
+        static_cast<const float *>(input), static_cast<float *>(output),                         \
+        SuperBlockDot<VALUE_FN>{}                                                                \
+    );                                                                                           \
+    return static_cast<int>(cudaGetLastError());                                                 \
+}                                                                                                \
+extern "C" int psionic_cuda_##NAME##_dequantize_row_to_f32(                                    \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *decode_params, void *output, void *stream                                        \
+) {                                                                                              \
+    const int blocks_per_row = cols / kQ81ElementsPerBlock;                                     \
+    dequantize_row_to_f32_kernel<<<                                                              \
+        blocks_per_row, kQ81ElementsPerBlock, 0, static_cast<cudaStream_t>(stream)               \
+    >>>(                                                                                         \
+        static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
+        static_cast<const int *>(decode_params), static_cast<float *>(output),                   \
+        SuperBlockRowDequant<VALUE_FN>{}                                                         \
+    );                                                                                           \
+    return static_cast<int>(cudaGetLastError());                                                 \
+}                                                                                                \
+extern "C" int psionic_cuda_##NAME##_matvec_q8_1(                                              \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *input_q8_1, const void *bias, void *output, void *stream                         \
+) {                                                                                              \
+    launch_quantized_matvec_q8_1_regular(                                                        \
+        static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
+        static_cast<const Q81Block *>(input_q8_1), static_cast<const float *>(bias),             \
+        static_cast<float *>(output), static_cast<cudaStream_t>(stream),                         \
+        SuperBlockQ81Dot<VALUE_FN>{}                                                             \
+    );                                                                                           \
+    return static_cast<int>(cudaGetLastError());                                                 \
+}                                                                                                \
+extern "C" int psionic_cuda_##NAME##_matvec_q8_1_argmax(                                       \
+    const void *weights, int rows, int cols, int row_stride,                                    \
+    const void *input_q8_1, const void *bias, void *output, void *stream                         \
+) {                                                                                              \
+    launch_quantized_matvec_q8_1_argmax_regular(                                                 \
+        static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
+        static_cast<const Q81Block *>(input_q8_1), static_cast<const float *>(bias),             \
+        static_cast<unsigned long long *>(output), static_cast<cudaStream_t>(stream),            \
+        SuperBlockQ81Dot<VALUE_FN>{}                                                             \
+    );                                                                                           \
+    return static_cast<int>(cudaGetLastError());                                                 \
+}
+
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q3_k, Q3KValue)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q5_k, Q5KValue)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq3_s, Iq3SValue)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq4_xs, Iq4XsValue)
+
+#undef PSIONIC_DEFINE_SUPER_BLOCK_KERNELS
 
 extern "C" int psionic_cuda_q8_0_matvec(
     const void *weights,

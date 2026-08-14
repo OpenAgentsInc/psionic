@@ -9836,6 +9836,42 @@ mod platform {
 
     unsafe extern "C" {
         fn psionic_cuda_quantized_kernels_compiled() -> c_int;
+        fn psionic_cuda_q3_k_matvec(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q5_k_matvec(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq3_s_matvec(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq4_xs_matvec(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_q8_0_matvec(
             weights: *const c_void,
             rows: c_int,
@@ -9876,6 +9912,42 @@ mod platform {
             input: *const c_void,
             rows: c_int,
             cols: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q3_k_dequantize_row_to_f32(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            decode_params: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q5_k_dequantize_row_to_f32(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            decode_params: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq3_s_dequantize_row_to_f32(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            decode_params: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq4_xs_dequantize_row_to_f32(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            decode_params: *const c_void,
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
@@ -9931,6 +10003,46 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_q3_k_matvec_q8_1(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q5_k_matvec_q8_1(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq3_s_matvec_q8_1(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq4_xs_matvec_q8_1(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_q8_0_matvec_q8_1(
             weights: *const c_void,
             rows: c_int,
@@ -9971,6 +10083,46 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_q3_k_matvec_q8_1_argmax(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q5_k_matvec_q8_1_argmax(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq3_s_matvec_q8_1_argmax(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_iq4_xs_matvec_q8_1_argmax(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_q8_0_matvec_q8_1_argmax(
             weights: *const c_void,
             rows: c_int,
@@ -9982,6 +10134,16 @@ mod platform {
             stream: CudaStream,
         ) -> CudaError;
         fn psionic_cuda_q4_k_matvec_q8_1_argmax(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q6_k_matvec_q8_1_argmax(
             weights: *const c_void,
             rows: c_int,
             cols: c_int,
@@ -11901,8 +12063,12 @@ mod platform {
             })?;
             let kernel: QuantizedMatvecKernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_matvec,
+                QuantizationMode::GgmlQ3K => psionic_cuda_q3_k_matvec,
+                QuantizationMode::GgmlQ5K => psionic_cuda_q5_k_matvec,
                 QuantizationMode::GgmlQ4K => psionic_cuda_q4_k_matvec,
                 QuantizationMode::GgmlQ6K => psionic_cuda_q6_k_matvec,
+                QuantizationMode::GgmlIq3S => psionic_cuda_iq3_s_matvec,
+                QuantizationMode::GgmlIq4Xs => psionic_cuda_iq4_xs_matvec,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_matvec,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -11986,6 +12152,10 @@ mod platform {
             })?;
             let kernel: DequantizeRowToF32Kernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_dequantize_row_to_f32,
+                QuantizationMode::GgmlQ3K => psionic_cuda_q3_k_dequantize_row_to_f32,
+                QuantizationMode::GgmlQ5K => psionic_cuda_q5_k_dequantize_row_to_f32,
+                QuantizationMode::GgmlIq3S => psionic_cuda_iq3_s_dequantize_row_to_f32,
+                QuantizationMode::GgmlIq4Xs => psionic_cuda_iq4_xs_dequantize_row_to_f32,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_dequantize_row_to_f32,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -12107,8 +12277,12 @@ mod platform {
             })?;
             let kernel: QuantizedMatvecQ81Kernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_matvec_q8_1,
+                QuantizationMode::GgmlQ3K => psionic_cuda_q3_k_matvec_q8_1,
+                QuantizationMode::GgmlQ5K => psionic_cuda_q5_k_matvec_q8_1,
                 QuantizationMode::GgmlQ4K => psionic_cuda_q4_k_matvec_q8_1,
                 QuantizationMode::GgmlQ6K => psionic_cuda_q6_k_matvec_q8_1,
+                QuantizationMode::GgmlIq3S => psionic_cuda_iq3_s_matvec_q8_1,
+                QuantizationMode::GgmlIq4Xs => psionic_cuda_iq4_xs_matvec_q8_1,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_matvec_q8_1,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -12179,7 +12353,12 @@ mod platform {
             })?;
             let kernel: QuantizedMatvecQ81ArgmaxKernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_matvec_q8_1_argmax,
+                QuantizationMode::GgmlQ3K => psionic_cuda_q3_k_matvec_q8_1_argmax,
+                QuantizationMode::GgmlQ5K => psionic_cuda_q5_k_matvec_q8_1_argmax,
                 QuantizationMode::GgmlQ4K => psionic_cuda_q4_k_matvec_q8_1_argmax,
+                QuantizationMode::GgmlQ6K => psionic_cuda_q6_k_matvec_q8_1_argmax,
+                QuantizationMode::GgmlIq3S => psionic_cuda_iq3_s_matvec_q8_1_argmax,
+                QuantizationMode::GgmlIq4Xs => psionic_cuda_iq4_xs_matvec_q8_1_argmax,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_matvec_q8_1_argmax,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -18460,6 +18639,7 @@ mod tests {
         TensorSpec,
     };
     use psionic_ir::{AutodiffContext, AutodiffGraphBuilder, Graph, GraphBuilder, evaluate_graph};
+    use serde::Deserialize;
 
     use super::CudaMemorySpace;
     use super::{
@@ -18473,6 +18653,20 @@ mod tests {
         DeviceDiscovery, ExecutionResult, NvidiaRecoveryAction, NvidiaRiskLevel, RuntimeError,
         ServedProductBackendPolicy,
     };
+
+    const QWEN38_QUANT_REFERENCE_VECTORS: &str =
+        include_str!("../../../fixtures/qwen38/qwen38_ggml_quant_reference_vectors_v1.json");
+
+    #[derive(Deserialize)]
+    struct Qwen38QuantReferenceReport {
+        vectors: Vec<Qwen38QuantReferenceVector>,
+    }
+
+    #[derive(Deserialize)]
+    struct Qwen38QuantReferenceVector {
+        block_type: String,
+        block_bytes_hex: String,
+    }
 
     #[test]
     fn bounded_scaled_dot_product_attention_support_tracks_selected_device() {
@@ -21855,6 +22049,110 @@ mod tests {
     }
 
     #[test]
+    fn cuda_backend_executes_qwen38_quantized_rows_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_reference_vector_256();
+        for (mode, row) in qwen38_quantized_rows()? {
+            let expected_dot = quantized_row_dot(&input, mode, &row)?;
+            let weights = backend.byte_buffer(&row)?;
+            let actual = backend.quantized_matvec(&weights, mode, 1, 256, &input)?;
+            assert_close(&actual, &[expected_dot], 2e-3);
+
+            let mut expected_row = Vec::new();
+            decode_quantized_row_into(mode, &row, &mut expected_row)?;
+            let decode_params = backend.byte_buffer(&i32_slice_to_bytes(&[0_i32, 0_i32, 0_i32]))?;
+            let output = backend.f32_buffer(256)?;
+            let mut submission = backend.begin_submission()?;
+            submission.dequantize_row_to_f32(
+                &weights,
+                mode,
+                1,
+                row.len(),
+                256,
+                &decode_params,
+                &output,
+            )?;
+            submission.commit(CudaCommandWait::Completed)?;
+            assert_close(&output.read_f32()?, &expected_row, 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_qwen38_q8_1_and_argmax_paths_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_q8_1_exact_vector_256();
+        let input_buffer = backend.input_buffer(Shape::new(vec![input.len()]), input.clone())?;
+        let q8_1_buffer =
+            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, 256)?])?;
+        for (mode, row) in qwen38_quantized_rows()? {
+            let expected = quantized_row_dot(&input, mode, &row)?;
+            let mut two_rows = row.clone();
+            two_rows.extend_from_slice(&row);
+            let weights = backend.byte_buffer(&two_rows)?;
+            let bias = backend.input_buffer(Shape::new(vec![2]), vec![0.0, 1.0])?;
+            let output = backend.f32_buffer(2)?;
+            let mut argmax_output = backend.byte_buffer(&vec![0_u8; std::mem::size_of::<u64>()])?;
+            argmax_output.write_bytes(
+                &(((u64::from(i32::MAX as u32)) << 32) | u64::from(f32::NEG_INFINITY.to_bits()))
+                    .to_ne_bytes(),
+            )?;
+
+            let mut submission = backend.begin_submission()?;
+            submission.quantize_f32_to_q8_1(&input_buffer, 1, 256, &q8_1_buffer)?;
+            submission.quantized_matvec_q8_1(
+                &weights,
+                0,
+                mode,
+                2,
+                256,
+                &q8_1_buffer,
+                Some(&bias),
+                &output,
+            )?;
+            submission.quantized_matvec_q8_1_argmax(
+                &weights,
+                0,
+                mode,
+                2,
+                256,
+                &q8_1_buffer,
+                Some(&bias),
+                &argmax_output,
+            )?;
+            submission.commit(CudaCommandWait::Completed)?;
+            assert_close(&output.read_f32()?, &[expected, expected + 1.0], 2e-3);
+
+            let packed_bytes = argmax_output.read_bytes()?;
+            let packed = u64::from_ne_bytes(
+                packed_bytes[..std::mem::size_of::<u64>()]
+                    .try_into()
+                    .expect("packed argmax buffer should be eight bytes"),
+            );
+            assert_eq!((packed >> 32) as usize, 1, "mode {mode:?}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn cuda_backend_dequantizes_mxfp4_row_when_available() -> Result<(), Box<dyn std::error::Error>>
     {
         let mut backend = CudaBackend::new();
@@ -24996,6 +25294,29 @@ mod tests {
             .collect()
     }
 
+    fn qwen38_quantized_rows()
+    -> Result<Vec<(QuantizationMode, Vec<u8>)>, Box<dyn std::error::Error>> {
+        let report =
+            serde_json::from_str::<Qwen38QuantReferenceReport>(QWEN38_QUANT_REFERENCE_VECTORS)?;
+        let mut rows = report
+            .vectors
+            .into_iter()
+            .map(|vector| {
+                let mode = match vector.block_type.as_str() {
+                    "Q3_K" => QuantizationMode::GgmlQ3K,
+                    "IQ3_S" => QuantizationMode::GgmlIq3S,
+                    "IQ4_XS" => QuantizationMode::GgmlIq4Xs,
+                    other => return Err(format!("unexpected reference block type {other}")),
+                };
+                let bytes =
+                    hex::decode(vector.block_bytes_hex).map_err(|error| error.to_string())?;
+                Ok((mode, bytes))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        rows.push((QuantizationMode::GgmlQ5K, sample_q5_k_row(0.5, 0.125, 3)));
+        Ok(rows)
+    }
+
     fn sample_q8_1_exact_vector() -> Vec<f32> {
         let mut values = Vec::with_capacity(32);
         for index in 0..31_i32 {
@@ -25037,6 +25358,24 @@ mod tests {
         bytes.extend_from_slice(&f32_to_f16_bits(minimum).to_le_bytes());
         for index in 0..12_u8 {
             bytes.push(offset.wrapping_add(index.wrapping_mul(7)));
+        }
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (15_u8).wrapping_sub(index & 0x0f) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        bytes
+    }
+
+    fn sample_q5_k_row(scale: f32, minimum: f32, offset: u8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(176);
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes.extend_from_slice(&f32_to_f16_bits(minimum).to_le_bytes());
+        for index in 0..12_u8 {
+            bytes.push(offset.wrapping_add(index.wrapping_mul(7)));
+        }
+        for index in 0..32_u8 {
+            bytes.push(offset.wrapping_add(index.wrapping_mul(11)));
         }
         for index in 0..128_u8 {
             let low = index & 0x0f;
