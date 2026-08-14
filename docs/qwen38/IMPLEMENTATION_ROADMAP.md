@@ -1,8 +1,8 @@
 # Qwen3.8 Implementation Roadmap
 
 > Status: `planned` on 2026-08-14. Upstream research, artifact acquisition, and
-> R1 product/artifact identity are `implemented`; Qwen3.8 execution in Psionic
-> remains `planned`.
+> R1 product/artifact identity and R2 prompt/tokenizer contracts are
+> `implemented`; Qwen3.8 execution in Psionic remains `planned`.
 
 ## Goal
 
@@ -80,7 +80,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | --- | --- | --- | --- |
 | R0 | `implemented` | Pinned upstream research and complete verified BF16 artifact | None; research only |
 | R1 | `implemented` | Committed Qwen3.8 artifact-fact fixture and product identity | None; metadata only |
-| R2 | `planned` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
+| R2 | `implemented` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
 | R3 | `planned` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
 | R4 | `planned` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
 | R5 | `planned` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
@@ -173,6 +173,23 @@ cargo test -p psionic-models qwen38_artifact
 
 ## R2: Tokenizer And Prompt Contract
 
+Status: `implemented` in `crates/psionic-models/src/qwen38_prompt.rs`, the
+dedicated `qwen35` branch in `runtime_tokenizer.rs`, and
+`fixtures/qwen38/qwen38_prompt_tokenizer_golden_v1.json`. Prompt receipts bind
+the Qwen3.8 template and tokenizer digests plus effective reasoning,
+preservation, tools, media-marker, and generation-frame settings. The GGUF
+runtime uses the published per-code-point numeric split and NFC normalization
+only for `qwen35`; other tokenizer families retain their existing patterns.
+This frontend milestone does not admit model weights or generation.
+
+The retained `llama-tokenize` comparison at revision
+`9b05354ec6fb58b4e665e9a39ebc40285c015638` matches eight of nine tokenizer
+cases against the selected GGUF. Its only mismatch is decomposed accented text:
+the GGUF path does not apply the official NFC normalizer. Psionic follows the
+official tokenizer for that case and records both token sequences in the
+golden fixture. llama.cpp remains the regex-boundary comparator, not the
+normalization authority.
+
 Implement the published Qwen3.8 prompt semantics as a distinct template
 version. Keep the upstream Jinja digest in the fixture and use parsed semantic
 cases to validate the Rust renderer.
@@ -215,7 +232,8 @@ Acceptance:
 
 - rendered bytes match golden upstream cases
 - token ids match an upstream-supported reference tokenizer
-- token ids match pinned llama.cpp for the dedicated Qwen3.5 regex cases
+- token ids match pinned llama.cpp for the dedicated Qwen3.5 regex-boundary
+  cases; any normalizer difference is retained with both token sequences
 - template and tokenizer digests are present in receipts
 - prompt cache identity changes when reasoning or preservation settings change
 

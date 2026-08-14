@@ -122,6 +122,13 @@ The chat template changes behavior relative to Qwen3.6:
 These semantics require a distinct Qwen3.8 template contract and fixture even
 if the decoder kernels are shared with Qwen3.6.
 
+Psionic implements that frontend contract as `qwen3.8.chat_template.v1` and
+binds it to the template and tokenizer digests above. The retained golden
+fixture is `fixtures/qwen38/qwen38_prompt_tokenizer_golden_v1.json`. Its source
+rows were rendered with Transformers 5.15.0 against the pinned local artifact.
+The generic GGUF tokenizer now routes `qwen35` through the published regex and
+NFC normalization rather than the generic three-digit numeric grouping.
+
 ## Generation Defaults
 
 The published generation config enables sampling with:

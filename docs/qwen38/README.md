@@ -1,8 +1,9 @@
 # Qwen3.8 Research
 
 > Status: `planned` on 2026-08-14. Upstream research, local artifact
-> acquisition, and R1 product/artifact identity are `implemented`. Psionic does
-> not yet claim Qwen3.8 inference, serving, training, or multimodal support.
+> acquisition, R1 product/artifact identity, and R2 prompt/tokenizer contracts
+> are `implemented`. Psionic does not yet claim Qwen3.8 inference, serving,
+> training, or multimodal support.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -118,6 +119,18 @@ R1 enforces that boundary through
 `psionic_models::Qwen38ArtifactAdmissionResult` types. The official and short
 27B model ids normalize deterministically. Served ids, other sizes, other
 products, and drifted fixtures refuse rather than inheriting the 27B contract.
+
+R2 adds the digest-bound `qwen3.8.chat_template.v1` renderer, prompt receipts,
+official-tokenizer loader, retained upstream golden hashes and token ids, and a
+dedicated GGUF `qwen35` pretokenizer. It implements NFC normalization,
+per-code-point Unicode numeric splitting, reasoning effort, thinking
+preservation, tools, grouped results, and media-marker framing. Media markers
+remain prompt bytes only; they do not widen the execution claim.
+
+The same fixture retains a pinned `llama-tokenize` comparison. Eight of nine
+cases match the official tokenizer exactly. llama.cpp does not NFC-normalize
+the decomposed-accent case when reading the selected GGUF, so Psionic keeps the
+official normalized IDs and records llama.cpp's divergent IDs explicitly.
 
 ## Primary Source
 

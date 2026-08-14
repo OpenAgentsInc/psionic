@@ -391,14 +391,20 @@ Sources:
 - [`src/unicode.cpp`, dedicated Qwen3.5 regex implementation](https://github.com/ggml-org/llama.cpp/blob/9b05354ec6fb58b4e665e9a39ebc40285c015638/src/unicode.cpp#L608-L675)
 - [`src/unicode.cpp`, regex dispatch](https://github.com/ggml-org/llama.cpp/blob/9b05354ec6fb58b4e665e9a39ebc40285c015638/src/unicode.cpp#L1050-L1065)
 
-Psionic currently maps `Qwen35` to its generic byte-level BPE regex. That
-generic regex groups digits with `\p{N}{1,3}`. Existing short fixtures do not
-prove exact Qwen3.5/Qwen3.8 pretokenization.
+R2 now routes `Qwen35` through the dedicated published regex and applies the
+official tokenizer's NFC normalizer before byte-level BPE. The retained fixture
+covers multi-digit strings, combining marks, contractions, punctuation, spaces,
+and newlines.
 
-R2 must add a dedicated Qwen3.5 pretokenizer pattern and golden Qwen3.8 cases
-covering multi-digit strings, combining marks, contractions, punctuation,
-spaces, and newlines. Token IDs must match both the official tokenizer and the
-pinned llama.cpp comparator.
+An empirical `llama-tokenize` pass at the pinned revision against
+`Qwen3.8-27B-UD-Q3_K_XL.gguf` matched eight of nine cases. The decomposed input
+`café café` is the exception: the official tokenizer and Psionic emit
+`[895, 56868, 50203]`, while llama.cpp emits
+`[895, 56868, 39579, 52033]`. The GGUF-loaded llama.cpp path does not apply the
+official NFC normalizer for that input. Psionic uses the official normalization
+contract. The exact comparator revision, artifact, counts, and divergent IDs
+are retained in
+`fixtures/qwen38/qwen38_prompt_tokenizer_golden_v1.json`.
 
 ## Chat Template and Reasoning Controls
 

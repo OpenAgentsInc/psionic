@@ -6,6 +6,7 @@ use std::{
 
 use fancy_regex::Regex;
 use thiserror::Error;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{
     GgufTokenizerMetadata, GgufTokenizerModel, GgufTokenizerPretokenizer, TokenId, TokenSequence,
@@ -19,6 +20,16 @@ const GENERIC_BYTE_LEVEL_BPE_PATTERN: &str = concat!(
     "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|",
     "\\p{N}{1,3}|",
     " ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*|",
+    "\\s*[\\r\\n]+|",
+    "\\s+(?!\\S)|",
+    "\\s+"
+);
+
+const QWEN35_BYTE_LEVEL_BPE_PATTERN: &str = concat!(
+    "(?i:'s|'t|'re|'ve|'m|'ll|'d)|",
+    "[^\\r\\n\\p{L}\\p{N}]?[\\p{L}\\p{M}]+|",
+    "\\p{N}|",
+    " ?[^\\s\\p{L}\\p{M}\\p{N}]+[\\r\\n]*|",
     "\\s*[\\r\\n]+|",
     "\\s+(?!\\S)|",
     "\\s+"
@@ -679,6 +690,7 @@ struct ByteLevelBpeTokenizerCore {
     special_decoder: HashMap<u32, String>,
     ordinary_regex: Regex,
     special_regex: Option<Regex>,
+    normalize_nfc: bool,
 }
 
 impl ByteLevelBpeTokenizerCore {
@@ -714,6 +726,11 @@ impl ByteLevelBpeTokenizerCore {
         }
 
         let special_regex = build_special_regex(&special_encoder)?;
+        let normalize_nfc = match tokenizer.pretokenizer.as_ref() {
+            Some(GgufTokenizerPretokenizer::Qwen35) => true,
+            Some(GgufTokenizerPretokenizer::Custom(value)) => value == "qwen35",
+            _ => false,
+        };
         Ok(Self {
             ordinary_encoder,
             ordinary_decoder,
@@ -721,6 +738,7 @@ impl ByteLevelBpeTokenizerCore {
             special_decoder,
             ordinary_regex,
             special_regex,
+            normalize_nfc,
         })
     }
 
@@ -783,9 +801,14 @@ impl ByteLevelBpeTokenizerCore {
         if text.is_empty() {
             return;
         }
+        let text = if self.normalize_nfc {
+            Cow::Owned(text.nfc().collect::<String>())
+        } else {
+            Cow::Borrowed(text)
+        };
         let matches = match self
             .ordinary_regex
-            .find_iter(text)
+            .find_iter(text.as_ref())
             .collect::<Result<Vec<_>, _>>()
         {
             Ok(matches) => matches,
@@ -873,16 +896,19 @@ fn byte_level_bpe_pattern(
         | Some(GgufTokenizerPretokenizer::Gemma4)
         | Some(GgufTokenizerPretokenizer::Qwen2)
         | Some(GgufTokenizerPretokenizer::Qwen3)
-        | Some(GgufTokenizerPretokenizer::Qwen35)
         | Some(GgufTokenizerPretokenizer::Refact)
         | Some(GgufTokenizerPretokenizer::Tekken) => Ok(GENERIC_BYTE_LEVEL_BPE_PATTERN),
+        Some(GgufTokenizerPretokenizer::Qwen35) => Ok(QWEN35_BYTE_LEVEL_BPE_PATTERN),
         Some(GgufTokenizerPretokenizer::Custom(value))
             if matches!(
                 value.as_str(),
-                "gpt-4o" | "default" | "qwen2" | "qwen3" | "qwen35" | "llama-bpe" | "llama"
+                "gpt-4o" | "default" | "qwen2" | "qwen3" | "llama-bpe" | "llama"
             ) =>
         {
             Ok(GENERIC_BYTE_LEVEL_BPE_PATTERN)
+        }
+        Some(GgufTokenizerPretokenizer::Custom(value)) if value == "qwen35" => {
+            Ok(QWEN35_BYTE_LEVEL_BPE_PATTERN)
         }
         Some(GgufTokenizerPretokenizer::Custom(value)) => {
             Err(GgufRuntimeTokenizerError::UnsupportedPretokenizer {
@@ -1142,7 +1168,94 @@ mod tests {
         TokenizerBoundary,
     };
 
-    use super::SentencePieceRuntimeTokenizer;
+    use super::{
+        QWEN35_BYTE_LEVEL_BPE_PATTERN, SentencePieceRuntimeTokenizer, unicode_to_byte_map,
+    };
+
+    fn qwen35_pretokenized_pieces(input: &str) -> Vec<String> {
+        fancy_regex::Regex::new(QWEN35_BYTE_LEVEL_BPE_PATTERN)
+            .expect("qwen35 regex")
+            .find_iter(input)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("qwen35 matches")
+            .into_iter()
+            .map(|matched| matched.as_str().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn qwen38_tokenizer_qwen35_pretokenizer_matches_published_unicode_and_digit_boundaries() {
+        let ascii = "1 12 123 123456";
+        let ascii_pieces = qwen35_pretokenized_pieces(ascii);
+        assert_eq!(ascii_pieces.concat(), ascii);
+        assert_eq!(
+            ascii_pieces
+                .iter()
+                .filter(|piece| piece.chars().all(|character| character.is_numeric()))
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["1", "1", "2", "1", "2", "3", "1", "2", "3", "4", "5", "6"]
+        );
+
+        let unicode = "١٢ ４５";
+        let unicode_pieces = qwen35_pretokenized_pieces(unicode);
+        assert_eq!(unicode_pieces.concat(), unicode);
+        assert_eq!(
+            unicode_pieces
+                .iter()
+                .filter(|piece| piece.chars().all(|character| character.is_numeric()))
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["١", "٢", "４", "５"]
+        );
+
+        for text in [
+            " cafe\u{301} résumé",
+            "I'm WE'LL she'd",
+            "word!!!\n\nnext",
+            " leading \n  trailing ",
+        ] {
+            assert_eq!(qwen35_pretokenized_pieces(text).concat(), text);
+        }
+        assert!(
+            qwen35_pretokenized_pieces(" cafe\u{301}")
+                .iter()
+                .any(|piece| piece == " cafe\u{301}")
+        );
+    }
+
+    #[test]
+    fn qwen38_tokenizer_qwen35_normalizes_ordinary_segments_to_nfc() {
+        let mut tokens = vec![String::new(); 256];
+        for (character, byte) in unicode_to_byte_map() {
+            tokens[usize::from(byte)] = character.to_string();
+        }
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&GgufTokenizerMetadata {
+            model: GgufTokenizerModel::Gpt2Bpe,
+            vocabulary: crate::GgufTokenizerVocabulary {
+                tokens,
+                bos_token_id: None,
+                eos_token_ids: Vec::new(),
+                pad_token_id: None,
+                unknown_token_id: None,
+            },
+            scores: vec![0.0; 256],
+            token_types: vec![1; 256],
+            merges: Vec::new(),
+            add_bos: false,
+            add_eos: false,
+            pretokenizer: Some(crate::GgufTokenizerPretokenizer::Qwen35),
+            token_type_count: None,
+            digest: String::from("qwen35-nfc-test"),
+        })
+        .expect("qwen35 runtime tokenizer");
+
+        assert_eq!(tokenizer.encode("é"), tokenizer.encode("e\u{301}"));
+        assert_eq!(
+            tokenizer.encode("é").as_slice(),
+            &[TokenId(0xc3), TokenId(0xa9)]
+        );
+    }
 
     fn sentencepiece_test_tokenizer() -> GgufTokenizerMetadata {
         GgufTokenizerMetadata {
