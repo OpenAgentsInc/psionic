@@ -41,6 +41,9 @@ the repository.
 - [UPSTREAM_ARTIFACT_INDEX.md](UPSTREAM_ARTIFACT_INDEX.md) links every file in
   the pinned upstream repository and explains its role in loading, serving,
   prompt rendering, preprocessing, or weight materialization.
+- [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) defines the ordered
+  implementation milestones, acceptance gates, validation matrix, commit
+  sequence, and release claim boundary for Qwen3.8 support.
 
 ## Claim Boundary
 
