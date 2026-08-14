@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use psionic_backend_cuda::CudaGemmTuningReport;
+use psionic_backend_cuda::{CudaAllocatorPoolTelemetry, CudaGemmTuningReport};
 use psionic_models::{
     GgufDecoderAdapterLoader, GgufRuntimeTokenizer, PromptMessage, PromptMessageRole,
     PromptRenderOptions, TokenId, TokenizerBoundary,
@@ -156,6 +156,8 @@ struct BenchRunReport {
     qwen35_graph_captures: usize,
     qwen35_graph_shape_drifts: usize,
     qwen35_graph_cache_identity: Option<String>,
+    cuda_allocator_resident_device_bytes_after_run: Option<u64>,
+    cuda_allocator_peak_resident_device_bytes_after_run: Option<u64>,
     qwen35_attention_layer_invocations: usize,
     qwen35_attention_backends: Vec<psionic_serve::Qwen35CudaAttentionBackendExecution>,
     qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport,
@@ -208,6 +210,13 @@ struct BenchTerminationReport {
 struct BenchPsionicCudaStartupReport {
     load_s: f64,
     runtime_contract: Qwen35CudaRuntimeContract,
+    allocator_measurement_scope: String,
+    allocator_resident_device_bytes_after_load: u64,
+    allocator_peak_resident_device_bytes_after_load: u64,
+    allocator_resident_device_bytes_after_warmup: u64,
+    allocator_peak_resident_device_bytes_after_warmup: u64,
+    allocator_resident_device_bytes_after_measurements: u64,
+    allocator_peak_resident_device_bytes_after_measurements: u64,
     cublas_handle_scope: String,
     cublas_stream_binding: String,
     cublas_lt_tuning_status: String,
@@ -771,6 +780,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         .map_err(|error| format!("failed to load qwen35 cuda service: {error}"))?;
     let load_s = load_started_at.elapsed().as_secs_f64();
     let runtime_contract = service.cuda_runtime_contract();
+    let allocator_after_load = required_cuda_allocator_telemetry(&service)?;
     let descriptor = service.model_descriptor().clone();
     let cublas_lt_tuning = cuda_gemm_tuning_startup_fields(service.cuda_gemm_tuning_report());
     let prefix_cache_bypass = PrefixCacheControl {
@@ -800,9 +810,23 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
     )?;
     let warmup_output_metrics =
         qwen35_output_metrics_report(warmup_response.metrics.qwen35_cuda_decode.as_ref());
-    let startup_report = BenchPsionicCudaStartupReport {
+    let allocator_after_warmup = required_cuda_allocator_telemetry(&service)?;
+    let mut startup_report = BenchPsionicCudaStartupReport {
         load_s,
         runtime_contract,
+        allocator_measurement_scope: String::from(
+            "psionic_owned_cuda_malloc_buffers_including_allocator_pool_cache",
+        ),
+        allocator_resident_device_bytes_after_load: allocator_after_load.resident_device_bytes,
+        allocator_peak_resident_device_bytes_after_load: allocator_after_load
+            .peak_resident_device_bytes,
+        allocator_resident_device_bytes_after_warmup: allocator_after_warmup.resident_device_bytes,
+        allocator_peak_resident_device_bytes_after_warmup: allocator_after_warmup
+            .peak_resident_device_bytes,
+        allocator_resident_device_bytes_after_measurements: allocator_after_warmup
+            .resident_device_bytes,
+        allocator_peak_resident_device_bytes_after_measurements: allocator_after_warmup
+            .peak_resident_device_bytes,
         cublas_handle_scope: String::from("per_device_runtime_owner"),
         cublas_stream_binding: String::from("bind_stream_per_submission"),
         cublas_lt_tuning_status: cublas_lt_tuning.tuning_status,
@@ -896,6 +920,11 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             fallback_profile_path.as_path(),
             &mut fallback_record_count,
         )?;
+        let allocator_after_run = required_cuda_allocator_telemetry(&service)?;
+        startup_report.allocator_resident_device_bytes_after_measurements =
+            allocator_after_run.resident_device_bytes;
+        startup_report.allocator_peak_resident_device_bytes_after_measurements =
+            allocator_after_run.peak_resident_device_bytes;
         let structured_output = structured_output_runtime_report(
             response.provenance.as_ref(),
             response.output.structured.as_ref(),
@@ -938,6 +967,12 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_captures: output_metrics.graph_captures,
             qwen35_graph_shape_drifts: output_metrics.graph_shape_drifts,
             qwen35_graph_cache_identity: output_metrics.graph_cache_identity.clone(),
+            cuda_allocator_resident_device_bytes_after_run: Some(
+                allocator_after_run.resident_device_bytes,
+            ),
+            cuda_allocator_peak_resident_device_bytes_after_run: Some(
+                allocator_after_run.peak_resident_device_bytes,
+            ),
             qwen35_attention_layer_invocations: output_metrics.attention_layer_invocations,
             qwen35_attention_backends: output_metrics.attention_backends.clone(),
             qwen35_host_fallback_evidence: fallback_evidence.clone(),
@@ -1083,6 +1118,8 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_captures: 0,
             qwen35_graph_shape_drifts: 0,
             qwen35_graph_cache_identity: None,
+            cuda_allocator_resident_device_bytes_after_run: None,
+            cuda_allocator_peak_resident_device_bytes_after_run: None,
             qwen35_attention_layer_invocations: 0,
             qwen35_attention_backends: Vec::new(),
             qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport::default(),
@@ -1505,6 +1542,14 @@ fn build_bench_report(
         mean_itl_s,
         mean_decode_tok_s,
     }
+}
+
+fn required_cuda_allocator_telemetry(
+    service: &CudaGgufQwen35TextGenerationService,
+) -> Result<CudaAllocatorPoolTelemetry, String> {
+    service.cuda_allocator_pool_telemetry().ok_or_else(|| {
+        String::from("cuda allocator telemetry is unavailable for the selected Psionic backend")
+    })
 }
 
 fn cuda_gemm_tuning_startup_fields(

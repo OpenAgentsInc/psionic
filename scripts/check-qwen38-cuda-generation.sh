@@ -52,8 +52,14 @@ check_common() {
       and (.psionic_cuda_startup.runtime_contract.execution_plan_digest | length) == 64
       and .psionic_cuda_startup.runtime_contract.graph_cache_namespace == "qwen38-cuda-graph-cache|v1"
       and (.psionic_cuda_startup.runtime_contract.graph_cache_identity | length) == 64
-      and .qwen38_evidence.residency_measurement.status == "exact_runtime_plan_inside_live_preflight_envelope"
+      and .qwen38_evidence.residency_measurement.status == "measured_psionic_cuda_allocator_high_water_inside_live_preflight_envelope"
+      and .qwen38_evidence.residency_measurement.scope == "psionic_owned_cuda_malloc_buffers_including_allocator_pool_cache"
       and .qwen38_evidence.residency_measurement.planned_peak_device_bytes == .psionic_cuda_startup.runtime_contract.planned_device_bytes
+      and .qwen38_evidence.residency_measurement.allocator_peak_resident_device_bytes == .psionic_cuda_startup.allocator_peak_resident_device_bytes_after_measurements
+      and .qwen38_evidence.residency_measurement.allocator_resident_device_bytes_after_measurements == .psionic_cuda_startup.allocator_resident_device_bytes_after_measurements
+      and .qwen38_evidence.residency_measurement.allocator_peak_resident_device_bytes >= .psionic_cuda_startup.runtime_contract.weight_device_bytes
+      and .qwen38_evidence.residency_measurement.allocator_peak_resident_device_bytes <= .psionic_cuda_startup.runtime_contract.preflight_required_device_bytes
+      and ([.runs[].cuda_allocator_peak_resident_device_bytes_after_run] | max) == .qwen38_evidence.residency_measurement.allocator_peak_resident_device_bytes
       and ([.runs[].qwen35_host_fallback_evidence.fallback_invocations] | add) == 0
       and ([.runs[].qwen35_graph_shape_drifts] | add) == 0
       and ([.runs[].qwen35_graph_hits] | add) > 0

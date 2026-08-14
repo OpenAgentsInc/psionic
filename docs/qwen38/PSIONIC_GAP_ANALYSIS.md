@@ -207,8 +207,9 @@ R7 CUDA generation is `partial`. Native compressed weights, recurrent state,
 full-attention KV, graph capture/replay, greedy decode, bounded sampling, and
 raw-logit observability pass the portable acceptance suite. Qwen3.8-specific
 plan/cache namespaces and live pre-upload memory refusal are machine-readable.
-The retained full-model greedy and bounded-sampling rows remain pending an
-idle RTX 4080 run.
+Psionic-owned current and peak CUDA allocation bytes are also machine-readable.
+The retained full-model greedy and bounded-sampling rows remain pending an idle
+RTX 4080 run.
 
 The generic OpenAI server, Metal, media, adapters, session reuse, and MTP
 speculative-decoding surfaces still refuse Qwen3.8. R8 owns public server

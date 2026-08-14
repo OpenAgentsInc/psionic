@@ -112,8 +112,11 @@ run_evidence() {
             greedy_output_token_ids: [11, 353]
           },
           residency_measurement: {
-            status: "exact_runtime_plan_inside_live_preflight_envelope",
+            status: "measured_psionic_cuda_allocator_high_water_inside_live_preflight_envelope",
+            scope: .psionic_cuda_startup.allocator_measurement_scope,
             planned_peak_device_bytes: .psionic_cuda_startup.runtime_contract.planned_device_bytes,
+            allocator_peak_resident_device_bytes: .psionic_cuda_startup.allocator_peak_resident_device_bytes_after_measurements,
+            allocator_resident_device_bytes_after_measurements: .psionic_cuda_startup.allocator_resident_device_bytes_after_measurements,
             preflight_free_device_bytes: .psionic_cuda_startup.runtime_contract.device_free_bytes_at_preflight,
             preflight_total_device_bytes: .psionic_cuda_startup.runtime_contract.device_capacity_bytes
           },

@@ -314,7 +314,9 @@ into one generic engine claim.
   lane uses Qwen3.8-specific execution-plan and graph-cache namespaces, caps
   the admitted context at 4,096 tokens, and reports exact weights, recurrent
   state, KV, scratch, dense-mirror count, raw-logit materialization, and host
-  fallback posture. Live total and free CUDA memory plus supported
+  fallback posture. CUDA allocator telemetry also records current and peak
+  Psionic-owned device bytes, including retained pool buffers. Live total and
+  free CUDA memory plus supported
   quantization are checked before the first upload. Tiny-fixture CPU/CUDA
   logits and token parity, greedy and bounded sampling, graph replay, raw-
   logit observability, state reset, context refusal, and preflight refusal pass.

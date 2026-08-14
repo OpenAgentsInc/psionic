@@ -539,7 +539,10 @@ weight upload. It refuses unsupported quantization or insufficient total/free
 memory before partial execution. The machine-readable runtime contract records
 artifact, plan, graph, context, exact device-weight, recurrent-state, KV,
 scratch, dense-mirror, raw-logit, and fallback truth. The admitted context is
-4,096 tokens. No 8,192-token claim follows from the current implementation.
+4,096 tokens. CUDA allocator telemetry records current and peak Psionic-owned
+device bytes, including retained pool buffers, so retained runs report a
+measured allocation high-water mark in addition to the planned envelope. No
+8,192-token claim follows from the current implementation.
 
 Reuse the existing Qwen3.5 CUDA kernels and execution plans only after CPU
 parity proves the shared architecture boundary. Add Qwen3.8-specific plan and

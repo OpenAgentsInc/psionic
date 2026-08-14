@@ -78,7 +78,10 @@ and executes through native row lookup. Mixed quantized full-attention Q/K/V
 parts remain independently resident without a dense F16 mirror. Live total and
 free CUDA memory are checked before the first weight upload. The runtime
 contract reports the exact device-weight, recurrent-state, KV, scratch, and
-planned-residency bytes together with raw-logit and host-fallback posture.
+planned-residency bytes together with raw-logit and host-fallback posture. The
+retained benchmark also records the exact high-water mark for Psionic-owned
+CUDA allocations, including allocator-pool buffers, at load, warmup, and
+completed-run barriers.
 
 R7 remains `partial` until
 `scripts/run-qwen38-cuda-generation-evidence.sh` completes on an idle admitted

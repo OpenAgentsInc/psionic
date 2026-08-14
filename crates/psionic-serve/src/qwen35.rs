@@ -9,9 +9,9 @@ use psionic_backend_cpu::{
     CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
 };
 use psionic_backend_cuda::{
-    CudaBackend, CudaBuffer, CudaDeviceMemoryInfo, CudaGemmTuningReport, CudaGemmTuningScope,
-    CudaGraphExec, CudaHostBuffer, CudaQuantizedMatvecStats, CudaSubmission,
-    ggml_q8_1_storage_bytes,
+    CudaAllocatorPoolTelemetry, CudaBackend, CudaBuffer, CudaDeviceMemoryInfo,
+    CudaGemmTuningReport, CudaGemmTuningScope, CudaGraphExec, CudaHostBuffer,
+    CudaQuantizedMatvecStats, CudaSubmission, ggml_q8_1_storage_bytes,
 };
 use psionic_backend_metal::{
     MetalBackend, MetalBuffer, MetalLogitsOutputMode, MetalQuantizedMatvecRequest,
@@ -223,6 +223,12 @@ impl CudaGgufQwen35TextGenerationService {
     #[must_use]
     pub fn cuda_gemm_tuning_report(&self) -> Option<CudaGemmTuningReport> {
         self.backend.cuda_gemm_tuning_report()
+    }
+
+    /// Reports exact Psionic-owned CUDA allocation counts and byte high-water marks.
+    #[must_use]
+    pub fn cuda_allocator_pool_telemetry(&self) -> Option<CudaAllocatorPoolTelemetry> {
+        self.backend.allocator_pool_telemetry()
     }
 
     #[must_use]

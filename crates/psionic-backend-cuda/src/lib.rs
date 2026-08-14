@@ -119,6 +119,10 @@ pub struct CudaAllocatorPoolTelemetry {
     pub returned_buffers: u64,
     /// Number of returned buffers evicted instead of cached.
     pub evicted_returns: u64,
+    /// Bytes currently held by Psionic-owned device allocations, including cached buffers.
+    pub resident_device_bytes: u64,
+    /// High-water mark for Psionic-owned device allocations, including cached buffers.
+    pub peak_resident_device_bytes: u64,
 }
 
 /// Live device-memory values reported by the selected CUDA runtime device.
@@ -231,8 +235,23 @@ impl CudaAllocatorPool {
         Some(device_ptr)
     }
 
-    fn record_cold_allocation(&mut self) {
+    fn record_cold_allocation(&mut self, byte_len: usize) {
         self.telemetry.cold_allocations = self.telemetry.cold_allocations.saturating_add(1);
+        self.telemetry.resident_device_bytes = self
+            .telemetry
+            .resident_device_bytes
+            .saturating_add(byte_len.try_into().unwrap_or(u64::MAX));
+        self.telemetry.peak_resident_device_bytes = self
+            .telemetry
+            .peak_resident_device_bytes
+            .max(self.telemetry.resident_device_bytes);
+    }
+
+    fn record_device_free(&mut self, byte_len: usize) {
+        self.telemetry.resident_device_bytes = self
+            .telemetry
+            .resident_device_bytes
+            .saturating_sub(byte_len.try_into().unwrap_or(u64::MAX));
     }
 
     fn checkin(&mut self, cache_key: String, byte_len: usize, device_ptr: usize) -> bool {
@@ -11181,7 +11200,7 @@ mod platform {
                 self.allocator_pool
                     .lock()
                     .expect("cuda allocator pool mutex should not be poisoned")
-                    .record_cold_allocation();
+                    .record_cold_allocation(allocation_len);
                 device_ptr
             };
             Ok(PlatformBuffer {
@@ -16158,10 +16177,22 @@ mod platform {
                     }
                 }
                 let _ = self.runtime.set_device();
-                let _ = self.runtime.check(
-                    unsafe { (self.runtime.cuda_free)(self.device_ptr) },
-                    "cudaFree",
-                );
+                let freed = self
+                    .runtime
+                    .check(
+                        unsafe { (self.runtime.cuda_free)(self.device_ptr) },
+                        "cudaFree",
+                    )
+                    .is_ok();
+                if freed {
+                    if let Some(pool_return) = &self.pool_return {
+                        pool_return
+                            .allocator_pool
+                            .lock()
+                            .expect("cuda allocator pool mutex should not be poisoned")
+                            .record_device_free(pool_return.byte_len);
+                    }
+                }
                 self.device_ptr = std::ptr::null_mut();
             }
         }
@@ -18745,7 +18776,7 @@ mod tests {
         let cache_key = allocator_pool_cache_key(&spec);
         let mut pool = CudaAllocatorPool::new(AllocatorPoolPolicy::exact_tensor_spec(2, 128));
         assert_eq!(pool.checkout(cache_key.as_str(), 32), None);
-        pool.record_cold_allocation();
+        pool.record_cold_allocation(32);
         assert!(pool.checkin(cache_key.clone(), 32, 0xfeedusize));
         assert_eq!(pool.report().state.cached_buffers, 1);
         assert_eq!(pool.report().state.cached_bytes, 32);
@@ -18757,6 +18788,21 @@ mod tests {
         assert_eq!(telemetry.reuse_hits, 1);
         assert_eq!(telemetry.returned_buffers, 1);
         assert_eq!(telemetry.evicted_returns, 0);
+        assert_eq!(telemetry.resident_device_bytes, 32);
+        assert_eq!(telemetry.peak_resident_device_bytes, 32);
+    }
+
+    #[test]
+    fn allocator_pool_tracks_current_and_peak_device_bytes() {
+        let mut pool = CudaAllocatorPool::new(AllocatorPoolPolicy::exact_tensor_spec(2, 128));
+        pool.record_cold_allocation(32);
+        pool.record_cold_allocation(16);
+        pool.record_device_free(32);
+
+        let telemetry = pool.telemetry();
+        assert_eq!(telemetry.cold_allocations, 2);
+        assert_eq!(telemetry.resident_device_bytes, 16);
+        assert_eq!(telemetry.peak_resident_device_bytes, 48);
     }
 
     #[test]
