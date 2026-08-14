@@ -121,6 +121,15 @@ pub struct CudaAllocatorPoolTelemetry {
     pub evicted_returns: u64,
 }
 
+/// Live device-memory values reported by the selected CUDA runtime device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CudaDeviceMemoryInfo {
+    /// Currently free device memory in bytes.
+    pub free_bytes: u64,
+    /// Total device memory visible to the runtime in bytes.
+    pub total_bytes: u64,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CudaGemmTuningScope {
     pub model_family: String,
@@ -4010,6 +4019,14 @@ impl CudaBackend {
                 Some(backend.platform.allocator_pool_telemetry())
             }
             CudaBackendState::Unavailable(_) => None,
+        }
+    }
+
+    /// Returns live free and total memory for the selected CUDA runtime device.
+    pub fn device_memory_info(&self) -> Result<Option<CudaDeviceMemoryInfo>, RuntimeError> {
+        match &self.state {
+            CudaBackendState::Available(backend) => backend.platform.device_memory_info().map(Some),
+            CudaBackendState::Unavailable(_) => Ok(None),
         }
     }
 
@@ -9383,6 +9400,7 @@ mod platform {
     type CudaSetDevice = unsafe extern "C" fn(c_int) -> CudaError;
     type CudaMalloc = unsafe extern "C" fn(*mut *mut c_void, usize) -> CudaError;
     type CudaMallocHost = unsafe extern "C" fn(*mut *mut c_void, usize) -> CudaError;
+    type CudaMemGetInfo = unsafe extern "C" fn(*mut usize, *mut usize) -> CudaError;
     type CudaFree = unsafe extern "C" fn(*mut c_void) -> CudaError;
     type CudaFreeHost = unsafe extern "C" fn(*mut c_void) -> CudaError;
     type CudaMemcpy = unsafe extern "C" fn(*mut c_void, *const c_void, usize, c_int) -> CudaError;
@@ -11074,6 +11092,7 @@ mod platform {
         cuda_set_device: CudaSetDevice,
         cuda_malloc: CudaMalloc,
         cuda_malloc_host: CudaMallocHost,
+        cuda_mem_get_info: CudaMemGetInfo,
         cuda_free: CudaFree,
         cuda_free_host: CudaFreeHost,
         cuda_memcpy: CudaMemcpy,
@@ -11117,6 +11136,12 @@ mod platform {
                 .lock()
                 .expect("cuda allocator pool mutex should not be poisoned")
                 .telemetry()
+        }
+
+        pub(super) fn device_memory_info(
+            &self,
+        ) -> Result<super::CudaDeviceMemoryInfo, RuntimeError> {
+            self.runtime.device_memory_info()
         }
 
         pub(super) fn cuda_gemm_tuning_report(&self) -> super::CudaGemmTuningReport {
@@ -16167,6 +16192,7 @@ mod platform {
                 cuda_set_device: unsafe { load_symbol(&cudart_library, b"cudaSetDevice\0")? },
                 cuda_malloc: unsafe { load_symbol(&cudart_library, b"cudaMalloc\0")? },
                 cuda_malloc_host: unsafe { load_symbol(&cudart_library, b"cudaMallocHost\0")? },
+                cuda_mem_get_info: unsafe { load_symbol(&cudart_library, b"cudaMemGetInfo\0")? },
                 cuda_free: unsafe { load_symbol(&cudart_library, b"cudaFree\0")? },
                 cuda_free_host: unsafe { load_symbol(&cudart_library, b"cudaFreeHost\0")? },
                 cuda_memcpy: unsafe { load_symbol(&cudart_library, b"cudaMemcpy\0")? },
@@ -16233,6 +16259,20 @@ mod platform {
                 unsafe { (self.cuda_set_device)(i32::from(self.ordinal)) },
                 "cudaSetDevice",
             )
+        }
+
+        fn device_memory_info(&self) -> Result<super::CudaDeviceMemoryInfo, RuntimeError> {
+            self.set_device()?;
+            let mut free_bytes = 0usize;
+            let mut total_bytes = 0usize;
+            self.check(
+                unsafe { (self.cuda_mem_get_info)(&mut free_bytes, &mut total_bytes) },
+                "cudaMemGetInfo",
+            )?;
+            Ok(super::CudaDeviceMemoryInfo {
+                free_bytes: free_bytes.try_into().unwrap_or(u64::MAX),
+                total_bytes: total_bytes.try_into().unwrap_or(u64::MAX),
+            })
         }
 
         fn bind_stream(&self, stream: CudaStream) -> Result<(), RuntimeError> {
@@ -16938,7 +16978,10 @@ mod platform {
 
 #[cfg(not(target_os = "linux"))]
 mod platform {
-    use super::{CudaAllocatorPoolTelemetry, CudaCommandStatus, CudaCommandWait, QuantizationMode};
+    use super::{
+        CudaAllocatorPoolTelemetry, CudaCommandStatus, CudaCommandWait, CudaDeviceMemoryInfo,
+        QuantizationMode,
+    };
     use psionic_core::TensorSpec;
     use psionic_runtime::{AllocatorPoolPolicy, AllocatorPoolReport, RuntimeError};
 
@@ -16964,6 +17007,12 @@ mod platform {
 
         pub(super) fn allocator_pool_telemetry(&self) -> CudaAllocatorPoolTelemetry {
             CudaAllocatorPoolTelemetry::default()
+        }
+
+        pub(super) fn device_memory_info(&self) -> Result<CudaDeviceMemoryInfo, RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda runtime substrate currently requires Linux libcudart",
+            )))
         }
 
         pub(super) fn cuda_gemm_tuning_report(&self) -> super::CudaGemmTuningReport {

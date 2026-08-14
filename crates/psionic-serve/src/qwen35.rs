@@ -9,8 +9,9 @@ use psionic_backend_cpu::{
     CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
 };
 use psionic_backend_cuda::{
-    CudaBackend, CudaBuffer, CudaGemmTuningReport, CudaGemmTuningScope, CudaGraphExec,
-    CudaHostBuffer, CudaQuantizedMatvecStats, CudaSubmission, ggml_q8_1_storage_bytes,
+    CudaBackend, CudaBuffer, CudaDeviceMemoryInfo, CudaGemmTuningReport, CudaGemmTuningScope,
+    CudaGraphExec, CudaHostBuffer, CudaQuantizedMatvecStats, CudaSubmission,
+    ggml_q8_1_storage_bytes,
 };
 use psionic_backend_metal::{
     MetalBackend, MetalBuffer, MetalLogitsOutputMode, MetalQuantizedMatvecRequest,
@@ -28,7 +29,11 @@ use psionic_runtime::{
     LocalRuntimeObservability, PrefixCacheIdentity, PrefixCacheMode, PrefixCacheRefusalReason,
     PrefixCacheState, SamplingPolicy,
 };
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+const QWEN38_CUDA_CONTEXT_LIMIT_TOKENS: usize = 4096;
+const QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES: u64 = 1_834_614_784;
 
 use crate::{
     ContinuousBatchGenerationResult, CudaGraphReplayMetrics, CudaGraphReplayMode,
@@ -57,6 +62,83 @@ pub struct CudaGgufQwen35TextGenerationService {
     residency_policy: psionic_runtime::ModelResidencyPolicy,
 }
 
+/// Machine-readable residency and fallback contract for one native Qwen CUDA service.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Qwen35CudaRuntimeContract {
+    pub family: GgufDecoderFamily,
+    pub model_id: String,
+    pub artifact_digest: String,
+    pub execution_plan_namespace: String,
+    pub execution_plan_digest: String,
+    pub graph_cache_namespace: String,
+    pub graph_cache_identity: String,
+    pub context_limit_tokens: usize,
+    pub artifact_bytes: u64,
+    pub device_capacity_bytes: Option<u64>,
+    pub device_free_bytes_at_preflight: Option<u64>,
+    pub preflight_required_device_bytes: u64,
+    pub preflight_margin_bytes: Option<u64>,
+    pub preflight_status: String,
+    pub weight_device_bytes: u64,
+    pub recurrent_state_bytes: u64,
+    pub kv_cache_bytes: u64,
+    pub scratch_device_bytes: u64,
+    pub planned_device_bytes: u64,
+    pub dense_f16_mirror_count: usize,
+    pub quantization_modes: Vec<QuantizationMode>,
+    pub raw_logits_materialization_observable: bool,
+    pub host_fallback_enabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Qwen38CudaPreflight {
+    required_device_bytes: u64,
+    free_device_bytes: u64,
+    total_device_bytes: u64,
+}
+
+fn qwen38_cuda_preflight(
+    artifact_bytes: u64,
+    memory: CudaDeviceMemoryInfo,
+) -> Result<Qwen38CudaPreflight, ModelLoadError> {
+    let required_device_bytes =
+        artifact_bytes.saturating_add(QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES);
+    if required_device_bytes > memory.total_bytes {
+        return Err(ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "qwen38 cuda preflight requires {required_device_bytes} device bytes for the artifact and 4096-token runtime reserve, but the selected device exposes {total} total bytes",
+                total = memory.total_bytes,
+            ),
+        });
+    }
+    if required_device_bytes > memory.free_bytes {
+        return Err(ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "qwen38 cuda preflight requires {required_device_bytes} free device bytes for the artifact and 4096-token runtime reserve, but cudaMemGetInfo reports {free} free of {total} total bytes",
+                free = memory.free_bytes,
+                total = memory.total_bytes,
+            ),
+        });
+    }
+    Ok(Qwen38CudaPreflight {
+        required_device_bytes,
+        free_device_bytes: memory.free_bytes,
+        total_device_bytes: memory.total_bytes,
+    })
+}
+
+fn qwen38_cuda_unsupported_quantization_modes(modes: &[QuantizationMode]) -> Vec<QuantizationMode> {
+    modes
+        .iter()
+        .copied()
+        .filter(|mode| {
+            !matches!(mode, QuantizationMode::None) && !can_use_cuda_quantized_matvec(*mode)
+        })
+        .collect()
+}
+
 impl CudaGgufQwen35TextGenerationService {
     pub fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
         let mut backend = CudaBackend::new();
@@ -74,9 +156,21 @@ impl CudaGgufQwen35TextGenerationService {
                     error.to_string(),
                 ))
             })?;
-        let model = Arc::new(CudaQwen35Model::from_gguf_path(path, &mut backend)?);
+        let mut model = CudaQwen35Model::from_gguf_path(path, &mut backend)?;
         let step_plan = model.build_step_plan(&mut backend)?;
         let _ = model.autotune_cublaslt_plans(&mut backend);
+        let context_limit_tokens = model.cuda_context_limit_tokens();
+        let (recurrent_state_bytes, kv_cache_bytes) =
+            model.planned_state_device_bytes(context_limit_tokens);
+        let scratch_device_bytes = step_plan.device_residency_bytes();
+        model.memory_plan.kv_cache_bytes = recurrent_state_bytes.saturating_add(kv_cache_bytes);
+        model.memory_plan.graph_bytes = scratch_device_bytes;
+        model.memory_plan.resident_device_bytes = model
+            .weight_device_bytes
+            .saturating_add(recurrent_state_bytes)
+            .saturating_add(kv_cache_bytes)
+            .saturating_add(scratch_device_bytes);
+        let model = Arc::new(model);
         let mut backend_health = BackendHealthTracker::default();
         let now_millis = current_time_millis();
         backend_health.observe("cuda", backend.health(), now_millis);
@@ -129,6 +223,95 @@ impl CudaGgufQwen35TextGenerationService {
     #[must_use]
     pub fn cuda_gemm_tuning_report(&self) -> Option<CudaGemmTuningReport> {
         self.backend.cuda_gemm_tuning_report()
+    }
+
+    #[must_use]
+    pub fn cuda_runtime_contract(&self) -> Qwen35CudaRuntimeContract {
+        let context_limit_tokens = self.model.cuda_context_limit_tokens();
+        let (recurrent_state_bytes, kv_cache_bytes) =
+            self.model.planned_state_device_bytes(context_limit_tokens);
+        let scratch_device_bytes = self.step_plan.device_residency_bytes();
+        let weight_device_bytes = self.model.weight_device_bytes;
+        let artifact_bytes = self.model.memory_plan.weights_bytes;
+        let device_capacity_bytes = self
+            .model
+            .qwen38_cuda_preflight
+            .map(|row| row.total_device_bytes);
+        let device_free_bytes_at_preflight = self
+            .model
+            .qwen38_cuda_preflight
+            .map(|row| row.free_device_bytes);
+        let preflight_required_device_bytes = self
+            .model
+            .qwen38_cuda_preflight
+            .map(|row| row.required_device_bytes)
+            .unwrap_or(0);
+        Qwen35CudaRuntimeContract {
+            family: self.model.family_metadata.family,
+            model_id: self.model.descriptor.model.model_id.clone(),
+            artifact_digest: self.model.descriptor.weights.digest.clone(),
+            execution_plan_namespace: String::from(match self.model.family_metadata.family {
+                GgufDecoderFamily::Qwen38 => "qwen38-native-cuda|v1",
+                _ => "qwen35-native-cuda|v1",
+            }),
+            execution_plan_digest: self.model.plan_digest.clone(),
+            graph_cache_namespace: String::from(match self.model.family_metadata.family {
+                GgufDecoderFamily::Qwen38 => "qwen38-cuda-graph-cache|v1",
+                _ => "qwen35-cuda-graph-cache|v1",
+            }),
+            graph_cache_identity: self.model.graph_cache_identity.clone(),
+            context_limit_tokens,
+            artifact_bytes,
+            device_capacity_bytes,
+            device_free_bytes_at_preflight,
+            preflight_required_device_bytes,
+            preflight_margin_bytes: device_free_bytes_at_preflight
+                .map(|capacity| capacity.saturating_sub(preflight_required_device_bytes)),
+            preflight_status: if self.model.qwen38_cuda_preflight.is_some() {
+                String::from("admitted_before_weight_upload")
+            } else {
+                String::from("not_required_for_qwen35")
+            },
+            weight_device_bytes,
+            recurrent_state_bytes,
+            kv_cache_bytes,
+            scratch_device_bytes,
+            planned_device_bytes: weight_device_bytes
+                .saturating_add(recurrent_state_bytes)
+                .saturating_add(kv_cache_bytes)
+                .saturating_add(scratch_device_bytes),
+            dense_f16_mirror_count: self.model.dense_f16_mirror_count(),
+            quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
+            raw_logits_materialization_observable: true,
+            host_fallback_enabled: false,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_raw_logits(
+        &mut self,
+        tokens: &TokenSequence,
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let mut state = self
+            .model
+            .initial_state(&mut self.backend, self.model.cuda_context_limit_tokens())?;
+        let options = GenerationOptions::sample(1);
+        let mut logits = Vec::new();
+        for token in tokens.as_slice() {
+            logits = self
+                .model
+                .forward_token(
+                    &mut self.backend,
+                    &mut self.step_plan,
+                    &mut state,
+                    *token,
+                    CudaStepOutputMode::FullLogits,
+                    &options,
+                    &[],
+                )?
+                .logits;
+        }
+        Ok(logits)
     }
 
     #[must_use]
@@ -336,9 +519,10 @@ impl CudaGgufQwen35TextGenerationService {
         if prompt_tokens.is_empty() {
             return Err(ReferenceTextGenerationError::EmptyPrompt);
         }
+        let context_limit_tokens = self.model.cuda_context_limit_tokens();
         let (prompt_tokens, context_window) = psionic_models::apply_context_window(
             &prompt_tokens,
-            self.model.descriptor.config.max_context,
+            context_limit_tokens,
             0,
             request.options.max_output_tokens,
             request.options.context_overflow_policy,
@@ -366,7 +550,7 @@ impl CudaGgufQwen35TextGenerationService {
         let cache_capacity_tokens = qwen35_cache_capacity_tokens(
             prompt_tokens.len(),
             request.options.max_output_tokens,
-            self.model.descriptor.config.max_context,
+            context_limit_tokens,
         );
         let mut state = if let Some(entry) = prefix_lookup.entry.as_ref() {
             entry.state.deep_clone(&mut self.backend)?
@@ -1036,6 +1220,10 @@ impl CudaGgufQwen35TextGenerationService {
             }
         }
 
+        if !decode_output_metrics.is_zero() {
+            decode_output_metrics.graph_cache_identity =
+                Some(self.model.graph_cache_identity.clone());
+        }
         let generated = TokenSequence::new(generated_tokens);
         let text = self.model.tokenizer.decode(generated.as_slice());
         let metrics = GenerationMetrics {
@@ -1283,6 +1471,21 @@ impl CpuGgufQwen35TextGenerationService {
             memory_plan: model.memory_plan.clone(),
             residency_policy: psionic_runtime::ModelResidencyPolicy::default(),
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_raw_logits(
+        &self,
+        tokens: &TokenSequence,
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let mut state = self
+            .model
+            .initial_state(self.model.descriptor.config.max_context);
+        let mut logits = Vec::new();
+        for token in tokens.as_slice() {
+            logits = self.model.forward_token(&mut state, *token)?.logits;
+        }
+        Ok(logits)
     }
 
     #[must_use]
@@ -4688,6 +4891,7 @@ fn qwen35_decode_output_metrics(
         output_modes: vec![output_mode],
         readback_bytes,
         raw_logits_materialized,
+        graph_cache_identity: None,
         graph_replay: None,
         attention_backend,
     }
@@ -4733,8 +4937,12 @@ fn can_use_q8_1_quantized_matvec(mode: QuantizationMode) -> bool {
     matches!(
         mode,
         QuantizationMode::GgmlQ8_0
+            | QuantizationMode::GgmlQ3K
+            | QuantizationMode::GgmlQ5K
             | QuantizationMode::GgmlQ4K
             | QuantizationMode::GgmlQ6K
+            | QuantizationMode::GgmlIq3S
+            | QuantizationMode::GgmlIq4Xs
             | QuantizationMode::GgmlMxfp4
     )
 }
@@ -4742,7 +4950,14 @@ fn can_use_q8_1_quantized_matvec(mode: QuantizationMode) -> bool {
 fn can_use_q8_1_argmax(mode: QuantizationMode) -> bool {
     matches!(
         mode,
-        QuantizationMode::GgmlQ8_0 | QuantizationMode::GgmlQ4K | QuantizationMode::GgmlMxfp4
+        QuantizationMode::GgmlQ8_0
+            | QuantizationMode::GgmlQ3K
+            | QuantizationMode::GgmlQ5K
+            | QuantizationMode::GgmlQ4K
+            | QuantizationMode::GgmlQ6K
+            | QuantizationMode::GgmlIq3S
+            | QuantizationMode::GgmlIq4Xs
+            | QuantizationMode::GgmlMxfp4
     )
 }
 
@@ -4750,9 +4965,13 @@ fn can_use_cuda_quantized_matvec(mode: QuantizationMode) -> bool {
     matches!(
         mode,
         QuantizationMode::GgmlQ8_0
+            | QuantizationMode::GgmlQ3K
+            | QuantizationMode::GgmlQ5K
             | QuantizationMode::GgmlMxfp4
             | QuantizationMode::GgmlQ4K
             | QuantizationMode::GgmlQ6K
+            | QuantizationMode::GgmlIq3S
+            | QuantizationMode::GgmlIq4Xs
     )
 }
 
@@ -5040,12 +5259,16 @@ struct CudaQwen35Model {
     tokenizer: GgufRuntimeTokenizer,
     token_embedding: HostMatrix,
     token_embedding_f16: Option<CudaBuffer>,
+    token_embedding_quantized: Option<CudaQuantizedMatrix>,
     output_norm: Vec<f32>,
     output_norm_device: CudaBuffer,
     output: CudaQuantizedMatrix,
     layers: Vec<Qwen35Layer>,
     plan_digest: String,
+    graph_cache_identity: String,
+    qwen38_cuda_preflight: Option<Qwen38CudaPreflight>,
     load_duration_ns: u64,
+    weight_device_bytes: u64,
     memory_plan: psionic_runtime::ModelMemoryPlan,
 }
 
@@ -5057,12 +5280,52 @@ impl CudaQwen35Model {
         let load_start = Instant::now();
         let artifact = GgufBlobArtifact::open_path(&path, gguf_local_blob_open_options())?;
         let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
-        if adapter.family_metadata().family != GgufDecoderFamily::Qwen35 {
+        if !matches!(
+            adapter.family_metadata().family,
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+        ) {
             return Err(ModelLoadError::UnsupportedModel(
                 adapter.descriptor().model.model_id.clone(),
             )
             .into());
         }
+        let qwen38_cuda_preflight = if matches!(
+            adapter.family_metadata().family,
+            GgufDecoderFamily::Qwen38
+        ) {
+            let unsupported_quantization = qwen38_cuda_unsupported_quantization_modes(
+                adapter.descriptor().weights.quantization_modes.as_slice(),
+            );
+            if !unsupported_quantization.is_empty() {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "qwen38 cuda preflight rejected unsupported quantization modes before weight upload: {unsupported_quantization:?}"
+                    ),
+                }
+                .into());
+            }
+            let artifact_bytes = std::fs::metadata(path.as_ref())
+                .map_err(|source| ModelLoadError::ArtifactRead {
+                    path: path.as_ref().display().to_string(),
+                    message: format!(
+                        "failed qwen38 cuda preflight metadata inspection before weight upload: {source}"
+                    ),
+                })?
+                .len();
+            let memory = backend
+                .device_memory_info()
+                .map_err(ReferenceTextGenerationError::Runtime)?
+                .ok_or_else(|| ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: String::from(
+                        "qwen38 cuda preflight requires live device-memory information before weight upload",
+                    ),
+                })?;
+            Some(qwen38_cuda_preflight(artifact_bytes, memory)?)
+        } else {
+            None
+        };
         let tokenizer = GgufRuntimeTokenizer::from_gguf(adapter.tokenizer()).map_err(|error| {
             ModelLoadError::ArtifactFormat {
                 format: String::from("gguf"),
@@ -5071,11 +5334,34 @@ impl CudaQwen35Model {
         })?;
         let token_embedding_name = adapter.tensor_layout().token_embedding.as_str();
         let token_embedding = HostMatrix::load(&artifact, token_embedding_name)?;
-        let token_embedding_f16 = try_build_cuda_host_matrix_row_major_f16_mirror(
-            backend,
-            token_embedding_name,
-            &token_embedding,
-        )?;
+        let (token_embedding_f16, token_embedding_quantized) = match &token_embedding.kind {
+            HostMatrixKind::Dense(_) => (
+                try_build_cuda_host_matrix_row_major_f16_mirror(
+                    backend,
+                    token_embedding_name,
+                    &token_embedding,
+                )?,
+                None,
+            ),
+            HostMatrixKind::Quantized(matrix) if can_use_cuda_quantized_matvec(matrix.mode) => (
+                None,
+                Some(load_cuda_quantized_matrix(
+                    backend,
+                    &artifact,
+                    token_embedding_name,
+                )?),
+            ),
+            HostMatrixKind::Quantized(matrix) => {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "qwen35 cuda token embedding `{token_embedding_name}` uses unsupported quantization {:?}",
+                        matrix.mode
+                    ),
+                }
+                .into());
+            }
+        };
         let output = if let Some(name) = adapter.tensor_layout().output.as_ref() {
             load_cuda_quantized_matrix(backend, &artifact, name.as_str())?
         } else {
@@ -5106,6 +5392,12 @@ impl CudaQwen35Model {
                     .map(CudaBuffer::byte_len)
                     .unwrap_or(0),
             )
+            .saturating_add(
+                token_embedding_quantized
+                    .as_ref()
+                    .map(CudaQuantizedMatrix::device_residency_bytes)
+                    .unwrap_or(0),
+            )
             .saturating_add(vec_f32_bytes(output_norm.as_slice()))
             .saturating_add(
                 layers
@@ -5126,22 +5418,32 @@ impl CudaQwen35Model {
             )
             .try_into()
             .unwrap_or(u64::MAX);
+        let plan_digest = digest_qwen35_cuda_plan(adapter.descriptor(), adapter.family_metadata());
+        let graph_cache_identity = digest_qwen35_cuda_graph_cache(
+            adapter.descriptor(),
+            adapter.family_metadata(),
+            plan_digest.as_str(),
+        );
         Ok(Self {
             descriptor: adapter.descriptor().clone(),
             family_metadata: adapter.family_metadata().clone(),
             tokenizer,
             token_embedding,
             token_embedding_f16,
+            token_embedding_quantized,
             output_norm,
             output_norm_device,
             output,
             layers,
-            plan_digest: digest_qwen35_cuda_plan(adapter.descriptor(), adapter.family_metadata()),
+            plan_digest,
+            graph_cache_identity,
+            qwen38_cuda_preflight,
             load_duration_ns: load_start
                 .elapsed()
                 .as_nanos()
                 .try_into()
                 .unwrap_or(u64::MAX),
+            weight_device_bytes: device_bytes,
             memory_plan: psionic_runtime::ModelMemoryPlan::split_residency(
                 weights_bytes,
                 0,
@@ -5165,6 +5467,74 @@ impl CudaQwen35Model {
                 .map(|layer| layer.initial_state(backend, cache_capacity_tokens))
                 .collect::<Result<Vec<_>, _>>()?,
         })
+    }
+
+    fn cuda_context_limit_tokens(&self) -> usize {
+        if matches!(self.family_metadata.family, GgufDecoderFamily::Qwen38) {
+            self.descriptor
+                .config
+                .max_context
+                .min(QWEN38_CUDA_CONTEXT_LIMIT_TOKENS)
+        } else {
+            self.descriptor.config.max_context
+        }
+    }
+
+    fn planned_state_device_bytes(&self, cache_capacity_tokens: usize) -> (u64, u64) {
+        let mut recurrent_bytes = 0usize;
+        let mut kv_cache_bytes = 0usize;
+        for layer in &self.layers {
+            match &layer.kind {
+                Qwen35LayerKind::Hybrid(hybrid) => {
+                    recurrent_bytes = recurrent_bytes
+                        .saturating_add(
+                            hybrid.qkv_gate_alpha_beta.rows_per_projection[0]
+                                .saturating_mul(hybrid.conv_kernel.saturating_sub(1))
+                                .saturating_mul(std::mem::size_of::<f32>()),
+                        )
+                        .saturating_add(
+                            hybrid
+                                .time_step_rank
+                                .saturating_mul(hybrid.state_size)
+                                .saturating_mul(hybrid.state_size)
+                                .saturating_mul(std::mem::size_of::<f32>()),
+                        );
+                }
+                Qwen35LayerKind::FullAttention(full_attention) => {
+                    kv_cache_bytes = kv_cache_bytes.saturating_add(
+                        cache_capacity_tokens
+                            .saturating_mul(full_attention.kv_width)
+                            .saturating_mul(std::mem::size_of::<u16>())
+                            .saturating_mul(2),
+                    );
+                }
+            }
+        }
+        (
+            recurrent_bytes.try_into().unwrap_or(u64::MAX),
+            kv_cache_bytes.try_into().unwrap_or(u64::MAX),
+        )
+    }
+
+    fn dense_f16_mirror_count(&self) -> usize {
+        let mut count = usize::from(self.token_embedding_f16.is_some())
+            .saturating_add(usize::from(self.output.transposed_f16.is_some()));
+        for layer in &self.layers {
+            count = count
+                .saturating_add(usize::from(layer.ffn_gate_up.transposed_f16.is_some()))
+                .saturating_add(usize::from(layer.ffn_down.transposed_f16.is_some()))
+                .saturating_add(match &layer.kind {
+                    Qwen35LayerKind::Hybrid(hybrid) => {
+                        usize::from(hybrid.qkv_gate_alpha_beta.transposed_f16.is_some())
+                            .saturating_add(usize::from(hybrid.ssm_out.transposed_f16.is_some()))
+                    }
+                    Qwen35LayerKind::FullAttention(full_attention) => usize::from(
+                        full_attention.qkv.transposed_f16.is_some(),
+                    )
+                    .saturating_add(usize::from(full_attention.output.transposed_f16.is_some())),
+                });
+        }
+        count
     }
 
     fn build_step_plan(
@@ -5351,26 +5721,39 @@ impl CudaQwen35Model {
         token: TokenId,
         position: usize,
     ) -> Result<u64, ReferenceTextGenerationError> {
-        let Some(token_embedding_f16) = self.token_embedding_f16.as_ref() else {
-            return Err(ReferenceTextGenerationError::Runtime(
-                crate::RuntimeError::Backend(String::from(
-                    "qwen35 cuda token embedding lookup requires a device f16 mirror",
-                )),
-            ));
-        };
         let decode_params_bytes = self.write_decode_params(plan, token, position)?;
         submission
             .copy_host_to_device(&plan.decode_params_host_buffer, &plan.decode_params_buffer)
             .map_err(ReferenceTextGenerationError::Runtime)?;
-        submission
-            .gather_f16_row_to_f32(
-                token_embedding_f16,
-                self.token_embedding.rows(),
-                self.token_embedding.columns(),
-                &plan.decode_params_buffer,
-                &plan.current_hidden_buffer,
-            )
-            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(token_embedding) = self.token_embedding_quantized.as_ref() {
+            submission
+                .dequantize_row_to_f32(
+                    &token_embedding.storage,
+                    token_embedding.host.mode,
+                    token_embedding.host.rows,
+                    token_embedding.host.row_byte_len,
+                    token_embedding.host.columns,
+                    &plan.decode_params_buffer,
+                    &plan.current_hidden_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        } else if let Some(token_embedding_f16) = self.token_embedding_f16.as_ref() {
+            submission
+                .gather_f16_row_to_f32(
+                    token_embedding_f16,
+                    self.token_embedding.rows(),
+                    self.token_embedding.columns(),
+                    &plan.decode_params_buffer,
+                    &plan.current_hidden_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        } else {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(String::from(
+                    "qwen35 cuda token embedding lookup has no admitted device storage",
+                )),
+            ));
+        }
         Ok(decode_params_bytes)
     }
 
@@ -5407,9 +5790,9 @@ impl CudaQwen35Model {
     }
 
     fn captured_initial_token(&self, layer_index: usize, token: TokenId) -> Option<TokenId> {
-        (layer_index == 0)
-            .then_some(token)
-            .filter(|_| self.token_embedding_f16.is_some())
+        (layer_index == 0).then_some(token).filter(|_| {
+            self.token_embedding_f16.is_some() || self.token_embedding_quantized.is_some()
+        })
     }
 
     fn encode_captured_decode_layers(
@@ -5500,7 +5883,7 @@ impl CudaQwen35Model {
         let mut bytes_moved = 0u64;
         let mut kernel_count = 0usize;
         let position = state.position;
-        if self.token_embedding_f16.is_none() {
+        if self.token_embedding_f16.is_none() && self.token_embedding_quantized.is_none() {
             let hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
             plan.current_hidden_buffer
                 .write_f32_at_offset(0, hidden.as_slice())
@@ -5711,7 +6094,7 @@ impl CudaQwen35Model {
         let graph_attention_backend_metrics = self.attention_backend_metrics(backend, state, true);
         let legacy_attention_backend_metrics =
             self.attention_backend_metrics(backend, state, false);
-        if self.token_embedding_f16.is_none() {
+        if self.token_embedding_f16.is_none() && self.token_embedding_quantized.is_none() {
             let hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
             plan.current_hidden_buffer
                 .write_f32_at_offset(0, hidden.as_slice())
@@ -7548,6 +7931,7 @@ impl Qwen35Layer {
                 required_tensor_name(layout.feed_forward_gate_weight.as_deref(), "ffn_gate")?,
                 required_tensor_name(layout.feed_forward_up_weight.as_deref(), "ffn_up")?,
             ],
+            false,
         )?;
         let kind = match layout.layer_kind {
             GgufDecoderLayerKind::Qwen35Hybrid => Qwen35LayerKind::Hybrid(Qwen35HybridLayer::load(
@@ -10222,6 +10606,7 @@ impl Qwen35HybridLayer {
                     required_tensor_name(layout.ssm_alpha_weight.as_deref(), "ssm_alpha")?,
                     required_tensor_name(layout.ssm_beta_weight.as_deref(), "ssm_beta")?,
                 ],
+                false,
             )?,
             ssm_conv1d_device: upload_f32_buffer(
                 backend,
@@ -10386,31 +10771,21 @@ impl Qwen35FullAttentionLayer {
         let query_name = required_tensor_name(layout.attention_query_weight.as_deref(), "attn_q")?;
         let key_name = required_tensor_name(layout.attention_key_weight.as_deref(), "attn_k")?;
         let value_name = required_tensor_name(layout.attention_value_weight.as_deref(), "attn_v")?;
-        let mut qkv = load_cuda_quantized_projection_group(
+        let qkv = load_cuda_quantized_projection_group(
             backend,
             artifact,
             &[query_name, key_name, value_name],
+            true,
         )?;
-        let native_qkv = if qkv
-            .host_parts
-            .iter()
-            .all(|part| can_use_q8_1_quantized_matvec(part.mode))
-            && qkv
-                .host_parts
-                .windows(2)
-                .any(|window| window[0].mode != window[1].mode)
-        {
+        let native_qkv = if qkv.native_parts.len() == 3 {
             Some(CudaQwen35FullAttentionQkv {
-                query_gate: load_cuda_quantized_matrix(backend, artifact, query_name)?,
-                key: load_cuda_quantized_matrix(backend, artifact, key_name)?,
-                value: load_cuda_quantized_matrix(backend, artifact, value_name)?,
+                query_gate: qkv.native_parts[0].clone(),
+                key: qkv.native_parts[1].clone(),
+                value: qkv.native_parts[2].clone(),
             })
         } else {
             None
         };
-        if native_qkv.is_some() {
-            qkv.transposed_f16 = None;
-        }
         let query_norm = load_dense_vector(
             artifact,
             required_tensor_name(layout.attention_query_norm.as_deref(), "attn_q_norm")?,
@@ -10682,6 +11057,46 @@ struct Qwen35CudaStepPlan {
 }
 
 impl Qwen35CudaStepPlan {
+    fn device_residency_bytes(&self) -> u64 {
+        [
+            &self.matvec_input_buffer,
+            &self.matvec_input_q8_1_buffer,
+            &self.vector_f16_buffer,
+            &self.matvec_output_buffer,
+            &self.current_hidden_buffer,
+            &self.decode_params_buffer,
+            &self.hidden_norm_buffer,
+            &self.gate_buffer,
+            &self.q_buffer,
+            &self.k_buffer,
+            &self.qkv_norm_buffer,
+            &self.conv_buffer,
+            &self.gated_delta_buffer,
+            &self.hybrid_norm_buffer,
+            &self.projected_buffer,
+            &self.activated_q8_1_buffer,
+            &self.decay_buffer,
+            &self.beta_buffer,
+            &self.attention_fa3_partial_output_buffer,
+            &self.attention_fa3_partial_max_buffer,
+            &self.attention_fa3_partial_sum_buffer,
+            &self.logits_buffer,
+            &self.sparse_logits_buffer,
+            &self.sparse_logit_indices_buffer,
+            &self.top_k_indices_buffer,
+            &self.top_k_values_buffer,
+            &self.top_k_partial_indices_buffer,
+            &self.top_k_partial_values_buffer,
+            &self.penalty_token_ids_buffer,
+            &self.penalty_token_counts_buffer,
+            &self.next_token_buffer,
+            &self.argmax_state_buffer,
+        ]
+        .iter()
+        .map(|buffer| u64::try_from(buffer.byte_len()).unwrap_or(u64::MAX))
+        .fold(0u64, u64::saturating_add)
+    }
+
     fn reset_graph_replay_state(&mut self) {
         self.no_output_graph_exec = None;
         self.no_output_graph_cache_identity = None;
@@ -12284,6 +12699,7 @@ impl CudaQuantizedMatrix {
 struct CudaQuantizedProjectionGroup {
     storage: CudaBuffer,
     host_parts: Vec<QuantizedMatrix>,
+    native_parts: Vec<CudaQuantizedMatrix>,
     rows_per_projection: Vec<usize>,
     columns: usize,
     mode: QuantizationMode,
@@ -12340,7 +12756,15 @@ impl CudaQuantizedProjectionGroup {
     }
 
     fn device_residency_bytes(&self) -> usize {
-        self.storage.byte_len().saturating_add(
+        let storage_bytes = if self.native_parts.is_empty() {
+            self.storage.byte_len()
+        } else {
+            self.native_parts
+                .iter()
+                .map(CudaQuantizedMatrix::device_residency_bytes)
+                .sum()
+        };
+        storage_bytes.saturating_add(
             self.transposed_f16
                 .as_ref()
                 .map(CudaBuffer::byte_len)
@@ -12490,6 +12914,7 @@ fn load_cuda_quantized_projection_group(
     backend: &mut CudaBackend,
     artifact: &GgufBlobArtifact,
     names: &[&str],
+    allow_mixed_native_parts: bool,
 ) -> Result<CudaQuantizedProjectionGroup, ModelLoadError> {
     let mut mode = None;
     let mut columns = None;
@@ -12553,7 +12978,38 @@ fn load_cuda_quantized_projection_group(
         .iter()
         .copied()
         .fold(0usize, usize::saturating_add);
-    let transposed_f16 = if mixed_quantization || qwen35_requires_dense_f16_mirror(resolved_mode) {
+    let native_parts = if allow_mixed_native_parts
+        && mixed_quantization
+        && projections
+            .iter()
+            .all(|projection| can_use_cuda_quantized_matvec(projection.mode))
+    {
+        projections
+            .iter()
+            .zip(host_parts.iter().cloned())
+            .map(|(projection, host)| {
+                let storage = backend.byte_buffer(projection.bytes.as_slice()).map_err(
+                    |error| ModelLoadError::ArtifactFormat {
+                        format: String::from("gguf"),
+                        message: format!(
+                            "failed to upload native mixed qwen35 cuda projection `{}`: {error}",
+                            projection.name
+                        ),
+                    },
+                )?;
+                Ok(CudaQuantizedMatrix {
+                    storage,
+                    host,
+                    transposed_f16: None,
+                })
+            })
+            .collect::<Result<Vec<_>, ModelLoadError>>()?
+    } else {
+        Vec::new()
+    };
+    let transposed_f16 = if native_parts.is_empty()
+        && (mixed_quantization || qwen35_requires_dense_f16_mirror(resolved_mode))
+    {
         Some(
             try_build_cuda_projection_group_transposed_f16_mirror(
                 backend,
@@ -12573,7 +13029,9 @@ fn load_cuda_quantized_projection_group(
     } else {
         None
     };
-    let storage =
+    let storage = if let Some(first) = native_parts.first() {
+        first.storage.clone()
+    } else {
         backend
             .byte_buffer(packed.as_slice())
             .map_err(|error| ModelLoadError::ArtifactFormat {
@@ -12582,10 +13040,12 @@ fn load_cuda_quantized_projection_group(
                     "failed to upload packed qwen35 cuda projection `{}`: {error}",
                     names.join(", ")
                 ),
-            })?;
+            })?
+    };
     Ok(CudaQuantizedProjectionGroup {
         storage,
         host_parts,
+        native_parts,
         rows_per_projection,
         columns: resolved_columns,
         mode: resolved_mode,
@@ -13113,7 +13573,29 @@ fn digest_qwen35_cuda_plan(
     hasher.update(descriptor.weights.digest.as_bytes());
     hasher.update(b"|");
     hasher.update(metadata.architecture.as_bytes());
-    hasher.update(b"|qwen35-native-cuda|v1");
+    hasher.update(match metadata.family {
+        GgufDecoderFamily::Qwen38 => b"|qwen38-native-cuda|v1".as_slice(),
+        _ => b"|qwen35-native-cuda|v1".as_slice(),
+    });
+    hex::encode(hasher.finalize())
+}
+
+fn digest_qwen35_cuda_graph_cache(
+    descriptor: &DecoderModelDescriptor,
+    metadata: &GgufDecoderFamilyMetadata,
+    plan_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(match metadata.family {
+        GgufDecoderFamily::Qwen38 => b"qwen38-cuda-graph-cache|v1".as_slice(),
+        _ => b"qwen35-cuda-graph-cache|v1".as_slice(),
+    });
+    hasher.update(b"|");
+    hasher.update(descriptor.model.model_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.weights.digest.as_bytes());
+    hasher.update(b"|");
+    hasher.update(plan_digest.as_bytes());
     hex::encode(hasher.finalize())
 }
 
@@ -13896,4 +14378,61 @@ fn rope_yarn(
 fn rope_yarn_ramp(low: f32, high: f32, i0: usize) -> f32 {
     let y = ((i0 / 2) as f32 - low) / (high - low).max(0.001);
     1.0 - y.clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES, qwen38_cuda_preflight,
+        qwen38_cuda_unsupported_quantization_modes,
+    };
+    use psionic_backend_cuda::CudaDeviceMemoryInfo;
+    use psionic_core::QuantizationMode;
+
+    #[test]
+    fn qwen38_cuda_preflight_refuses_total_or_current_free_memory_shortfall() {
+        let artifact_bytes = 13_441_059_904;
+        let required = artifact_bytes + QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES;
+        let total_error = qwen38_cuda_preflight(
+            artifact_bytes,
+            CudaDeviceMemoryInfo {
+                free_bytes: required,
+                total_bytes: required - 1,
+            },
+        )
+        .expect_err("total-memory shortfall must be refused");
+        assert!(total_error.to_string().contains("total bytes"));
+
+        let free_error = qwen38_cuda_preflight(
+            artifact_bytes,
+            CudaDeviceMemoryInfo {
+                free_bytes: required - 1,
+                total_bytes: required + 1,
+            },
+        )
+        .expect_err("live free-memory shortfall must be refused");
+        assert!(free_error.to_string().contains("cudaMemGetInfo"));
+    }
+
+    #[test]
+    fn qwen38_cuda_preflight_refuses_unsupported_quantization_modes() {
+        assert!(
+            qwen38_cuda_unsupported_quantization_modes(&[
+                QuantizationMode::None,
+                QuantizationMode::GgmlQ3K,
+                QuantizationMode::GgmlQ5K,
+                QuantizationMode::GgmlIq3S,
+                QuantizationMode::GgmlIq4Xs,
+            ])
+            .is_empty()
+        );
+        assert_eq!(
+            qwen38_cuda_unsupported_quantization_modes(&[
+                QuantizationMode::GgmlQ3K,
+                QuantizationMode::GgmlQ4_0,
+                QuantizationMode::Int8Symmetric,
+            ]),
+            vec![QuantizationMode::GgmlQ4_0, QuantizationMode::Int8Symmetric,]
+        );
+    }
 }

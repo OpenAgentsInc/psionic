@@ -17221,16 +17221,18 @@ mod tests {
         validate_gemma_exported_revision,
     };
     use crate::{
-        AdapterServingBinding, CompiledWordGenerationModel, GenerationLoadState,
-        GenerationModelHandle, GenerationOptions, GenerationProvenance, GenerationRequest,
-        GenerationResponse, GenerationStreamEvent, GenerationStreamStatus, InMemoryKvCache,
-        ReferenceTextGenerationError, StreamingTextGenerationExecutor, TerminationReason,
-        TextGenerationExecutor,
+        AdapterServingBinding, CompiledWordGenerationModel, CpuGgufQwen35TextGenerationService,
+        CudaGgufQwen35TextGenerationService, GenerationLoadState, GenerationModelHandle,
+        GenerationOptions, GenerationProvenance, GenerationRequest, GenerationResponse,
+        GenerationStreamEvent, GenerationStreamStatus, InMemoryKvCache, PrefixCacheControl,
+        PrefixCacheMode, Qwen35CudaDecodeOutputMode, ReferenceTextGenerationError,
+        StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor,
     };
     use psionic_adapters::{
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
         AdapterTargetFamily,
     };
+    use psionic_backend_cuda::CudaBackend;
     use psionic_backend_metal::MetalBackend;
     use psionic_core::{DType, Device, QuantizationMode, Shape, TensorSpec};
     use psionic_data::{TokenizerDigest, TokenizerFamily};
@@ -18063,10 +18065,7 @@ mod tests {
             max_loaded_models: None,
             memory_budget: MemoryBudget {
                 resident_host_bytes: Some(
-                    loaded[0]
-                        .memory_plan
-                        .resident_host_bytes
-                        .saturating_sub(1),
+                    loaded[0].memory_plan.resident_host_bytes.saturating_sub(1),
                 ),
                 resident_device_bytes: None,
             },
@@ -18079,7 +18078,10 @@ mod tests {
             &memory_policy,
         )
         .expect_err("qwen38 memory plan must participate in host-budget refusal");
-        assert_eq!(memory_refusal.reason, AdmissionRefusalReason::HostMemoryBudget);
+        assert_eq!(
+            memory_refusal.reason,
+            AdmissionRefusalReason::HostMemoryBudget
+        );
 
         let context_request = GenerationRequest::new_tokens(
             "gguf-qwen38-context-refusal",
@@ -18094,7 +18096,9 @@ mod tests {
         ));
 
         let mut stream = service.generate_stream(&request)?;
-        let cancelled = stream.cancel().expect("qwen38 stream cancellation terminal");
+        let cancelled = stream
+            .cancel()
+            .expect("qwen38 stream cancellation terminal");
         assert_eq!(cancelled.status, GenerationStreamStatus::Cancelled);
         assert_eq!(
             cancelled
@@ -18102,6 +18106,221 @@ mod tests {
                 .and_then(|diagnostic| diagnostic.backend),
             Some(String::from("cpu"))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_cuda_native_generation_matches_cpu_and_resets_state_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _guard = qwen38_cuda_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let backend = CudaBackend::new();
+        if backend.selected_device().is_none() || !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen38_cuda.gguf");
+        write_test_gguf(
+            &path,
+            qwen38_cuda_decoder_metadata("tiny psionic qwen38 cuda").as_slice(),
+            qwen38_cuda_decoder_tensors().as_slice(),
+        )?;
+
+        let tokens = TokenSequence::new(vec![TokenId(6), TokenId(7)]);
+        let mut cpu = CpuGgufQwen35TextGenerationService::from_gguf_path(&path)?;
+        let cpu_logits = cpu.test_raw_logits(&tokens)?;
+        let cpu_request = GenerationRequest::new_text(
+            "qwen38-cpu-parity",
+            cpu.model_descriptor().clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(3),
+        )
+        .with_prefix_cache_control(PrefixCacheControl {
+            mode: PrefixCacheMode::Bypass,
+            tenant_id: None,
+        });
+        let cpu_response = cpu.generate(&cpu_request)?;
+        drop(cpu);
+
+        let mut cuda = CudaGgufQwen35TextGenerationService::from_gguf_path(&path)?;
+        let contract = cuda.cuda_runtime_contract();
+        let cuda_logits = cuda.test_raw_logits(&tokens)?;
+        assert_eq!(cuda_logits.len(), cpu_logits.len());
+        let max_absolute_error = cuda_logits
+            .iter()
+            .zip(&cpu_logits)
+            .map(|(cuda, cpu)| (cuda - cpu).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_absolute_error <= 5e-3,
+            "qwen38 cpu/cuda logits diverged by {max_absolute_error}"
+        );
+
+        assert_eq!(contract.family, GgufDecoderFamily::Qwen38);
+        assert_eq!(contract.context_limit_tokens, 4096);
+        assert_eq!(contract.preflight_status, "admitted_before_weight_upload");
+        assert!(
+            contract.device_free_bytes_at_preflight
+                >= Some(contract.preflight_required_device_bytes)
+        );
+        assert_eq!(contract.dense_f16_mirror_count, 0);
+        assert!(!contract.host_fallback_enabled);
+        assert!(contract.raw_logits_materialization_observable);
+        assert!(
+            contract
+                .quantization_modes
+                .contains(&QuantizationMode::GgmlQ8_0)
+        );
+
+        let request = GenerationRequest::new_text(
+            "qwen38-cuda-greedy",
+            cuda.model_descriptor().clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(3),
+        )
+        .with_prefix_cache_control(PrefixCacheControl {
+            mode: PrefixCacheMode::Bypass,
+            tenant_id: None,
+        });
+        let first = cuda.generate(&request)?;
+        let second = cuda.generate(&request)?;
+        assert_eq!(first.output.tokens, cpu_response.output.tokens);
+        assert_eq!(second.output, first.output);
+        let metrics = first
+            .metrics
+            .qwen35_cuda_decode
+            .as_ref()
+            .expect("qwen38 cuda response must expose decode metrics");
+        assert_eq!(
+            metrics.graph_cache_identity.as_deref(),
+            Some(contract.graph_cache_identity.as_str())
+        );
+        assert!(
+            metrics
+                .output_modes
+                .contains(&Qwen35CudaDecodeOutputMode::ArgmaxOnly)
+        );
+        assert!(!metrics.raw_logits_materialized);
+        let graph = metrics
+            .graph_replay
+            .as_ref()
+            .expect("qwen38 greedy decode must expose graph replay evidence");
+        assert!(graph.capture_count >= 1);
+        assert!(graph.replay_hit_count >= 1);
+
+        let loaded = cuda.loaded_model_views();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(
+            loaded[0].memory_plan.resident_device_bytes,
+            contract.planned_device_bytes
+        );
+        assert_eq!(
+            loaded[0].memory_plan.kv_cache_bytes,
+            contract
+                .recurrent_state_bytes
+                .saturating_add(contract.kv_cache_bytes)
+        );
+        assert_eq!(
+            loaded[0].memory_plan.graph_bytes,
+            contract.scratch_device_bytes
+        );
+
+        let context_request = GenerationRequest::new_tokens(
+            "qwen38-cuda-context-refusal",
+            cuda.model_descriptor().clone(),
+            None,
+            TokenSequence::new(vec![TokenId(6); 4096]),
+            GenerationOptions::greedy(1),
+        );
+        assert!(matches!(
+            cuda.generate(&context_request),
+            Err(ReferenceTextGenerationError::ContextWindow(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_cuda_bounded_sampling_and_raw_logits_are_observable_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _guard = qwen38_cuda_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let backend = CudaBackend::new();
+        if backend.selected_device().is_none() || !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen38_cuda_sampling.gguf");
+        write_test_gguf(
+            &path,
+            qwen38_cuda_decoder_metadata("tiny psionic qwen38 cuda sampling").as_slice(),
+            qwen38_cuda_decoder_tensors().as_slice(),
+        )?;
+        let mut service = CudaGgufQwen35TextGenerationService::from_gguf_path(&path)?;
+
+        let mut bounded_options = GenerationOptions::sample(3);
+        bounded_options.temperature = Some(0.8);
+        bounded_options.top_k = Some(4);
+        bounded_options.seed = Some(7);
+        let bounded_request = GenerationRequest::new_text(
+            "qwen38-cuda-bounded-sample",
+            service.model_descriptor().clone(),
+            None,
+            "hello",
+            bounded_options,
+        )
+        .with_prefix_cache_control(PrefixCacheControl {
+            mode: PrefixCacheMode::Bypass,
+            tenant_id: None,
+        });
+        let bounded_first = service.generate(&bounded_request)?;
+        let bounded_second = service.generate(&bounded_request)?;
+        assert_eq!(bounded_second.output, bounded_first.output);
+        let bounded_metrics = bounded_first
+            .metrics
+            .qwen35_cuda_decode
+            .as_ref()
+            .expect("bounded qwen38 sample must expose cuda metrics");
+        assert!(
+            bounded_metrics
+                .output_modes
+                .contains(&Qwen35CudaDecodeOutputMode::TopKCandidates { top_k: 4 })
+        );
+        assert!(!bounded_metrics.raw_logits_materialized);
+
+        let mut raw_options = GenerationOptions::sample(3);
+        raw_options.temperature = Some(0.8);
+        raw_options.top_k = Some(129);
+        raw_options.seed = Some(11);
+        let raw_request = GenerationRequest::new_text(
+            "qwen38-cuda-raw-logits",
+            service.model_descriptor().clone(),
+            None,
+            "hello",
+            raw_options,
+        )
+        .with_prefix_cache_control(PrefixCacheControl {
+            mode: PrefixCacheMode::Bypass,
+            tenant_id: None,
+        });
+        let raw_response = service.generate(&raw_request)?;
+        let raw_metrics = raw_response
+            .metrics
+            .qwen35_cuda_decode
+            .as_ref()
+            .expect("raw-logits qwen38 sample must expose cuda metrics");
+        assert!(
+            raw_metrics
+                .output_modes
+                .contains(&Qwen35CudaDecodeOutputMode::RawLogits)
+        );
+        assert!(raw_metrics.raw_logits_materialized);
+        assert!(raw_metrics.readback_bytes > 0);
         Ok(())
     }
 
@@ -19109,6 +19328,34 @@ mod tests {
         metadata
     }
 
+    fn qwen38_cuda_decoder_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = qwen38_decoder_metadata(name);
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.context_length")
+        {
+            *value = GgufMetadataValue::U32(8192);
+        }
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.ssm.time_step_rank")
+        {
+            *value = GgufMetadataValue::U32(16);
+        }
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.ssm.inner_size")
+        {
+            *value = GgufMetadataValue::U32(128);
+        }
+        metadata
+    }
+
+    fn qwen38_cuda_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
     fn dense_family_header(architecture: &str, name: &str) -> Vec<(String, GgufMetadataValue)> {
         dense_family_header_with_block_count(architecture, name, 1)
     }
@@ -19512,8 +19759,16 @@ mod tests {
                     vec![32, 32],
                     vec![0.0; 32 * 32],
                 ));
-                tensors.push(dense_tensor(&format!("{prefix}.ssm_a"), vec![2], vec![0.0; 2]));
-                tensors.push(dense_tensor(&format!("{prefix}.ssm_dt"), vec![2], vec![0.0; 2]));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_a"),
+                    vec![2],
+                    vec![0.0; 2],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.ssm_dt"),
+                    vec![2],
+                    vec![0.0; 2],
+                ));
                 tensors.push(dense_tensor(
                     &format!("{prefix}.ssm_alpha.weight"),
                     vec![2, 32],
@@ -19573,6 +19828,54 @@ mod tests {
             }
         }
         tensors
+    }
+
+    fn qwen38_cuda_decoder_tensors() -> Vec<TestGgufTensor> {
+        qwen38_decoder_tensors()
+            .into_iter()
+            .map(|tensor| {
+                if tensor.name == "token_embd.weight" {
+                    let mut values = vec![0.0; 10 * 32];
+                    values[6 * 32] = 2.0;
+                    values[7 * 32] = 2.0;
+                    return quantized_q8_0_tensor_from_f32(
+                        tensor.name.as_str(),
+                        vec![10, 32],
+                        values,
+                    );
+                }
+                if tensor.name.ends_with(".attn_qkv.weight") {
+                    return quantized_q8_0_tensor(tensor.name.as_str(), vec![160, 32]);
+                }
+                if tensor.name.ends_with(".attn_gate.weight") {
+                    return quantized_q8_0_tensor(tensor.name.as_str(), vec![128, 32]);
+                }
+                if tensor.name.ends_with(".ssm_a") || tensor.name.ends_with(".ssm_dt") {
+                    return dense_tensor(tensor.name.as_str(), vec![16], vec![0.0; 16]);
+                }
+                if tensor.name.ends_with(".ssm_alpha.weight")
+                    || tensor.name.ends_with(".ssm_beta.weight")
+                {
+                    return quantized_q8_0_tensor(tensor.name.as_str(), vec![16, 32]);
+                }
+                if tensor.name.ends_with(".ssm_conv1d.weight") {
+                    return dense_tensor(tensor.name.as_str(), vec![160, 4], vec![0.0; 160 * 4]);
+                }
+                if tensor.name.ends_with(".ssm_out.weight") {
+                    return quantized_q8_0_tensor(tensor.name.as_str(), vec![32, 128]);
+                }
+                if tensor.shape.len() != 2 || tensor.name.ends_with("ssm_conv1d.weight") {
+                    return tensor;
+                }
+                assert_eq!(tensor.tensor_type, GgufTensorType::F32);
+                let values = tensor
+                    .bytes
+                    .chunks_exact(4)
+                    .map(|chunk| f32::from_le_bytes(chunk.try_into().expect("four f32 bytes")))
+                    .collect::<Vec<_>>();
+                quantized_q8_0_tensor_from_f32(tensor.name.as_str(), tensor.shape, values)
+            })
+            .collect()
     }
 
     fn token_embedding_values(hello_token_index: usize) -> Vec<f32> {

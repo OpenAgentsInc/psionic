@@ -68,6 +68,7 @@ pub fn builtin_psion_rvllm_cuda_graph_pool_packet() -> PsionRvllmCudaGraphPoolPa
             ],
             readback_bytes: 8_516,
             raw_logits_materialized: true,
+            graph_cache_identity: None,
             graph_replay: Some(CudaGraphReplayMetrics {
                 step_count: 3,
                 replay_hit_count: 1,

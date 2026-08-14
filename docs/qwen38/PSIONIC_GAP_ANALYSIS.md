@@ -1,8 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
-> Status: `partial` on 2026-08-14. R1-R5 are implemented. R6 now provides an
-> internal native CPU token-generation lane with explicit timeout handling,
-> while recurrent-intermediate parity remains open.
+> Status: `partial` on 2026-08-14. R1-R6 are implemented. R7 native CUDA
+> execution and portable acceptance tests are implemented, while retained
+> production-artifact CUDA evidence remains open.
 
 ## Compatibility Result
 
@@ -194,14 +194,22 @@ parity evidence.
 ## Current Refusal Posture
 
 Psionic admits the exact Qwen3.8-27B product identity and the qualified Dynamic
-V3 GGUF to the internal native CPU runtime. The runtime preserves `qwen38`
-product identity while reusing the `qwen35` execution graph, skips the declared
-MTP tail for standard generation, and reports unsupported media, adapters, and
-session reuse. It does not invoke a subprocess or hidden fallback.
+V3 GGUF to internal native CPU and CUDA runtimes. Both preserve `qwen38`
+product identity while reusing the shared `qwen3_5_text` execution graph, skip
+the declared MTP tail for standard generation, and report unsupported media,
+adapters, and session reuse. Neither invokes a subprocess or hidden fallback.
 
-The generic OpenAI server, CUDA, Metal, media, and MTP speculative-decoding
-surfaces still refuse Qwen3.8. The internal CPU service exposes a typed
-cooperative generation timeout with stable `timed_out` and HTTP `504`
-diagnostics. It checks before and after each non-preemptible token step. R6
-remains `partial` until retained recurrent-intermediate comparator evidence
-covers prefill and token-at-a-time decode.
+R6 CPU generation is `implemented`. Its retained pinned llama.cpp comparison
+covers greedy output plus 28 recurrent-intermediate prefill/decode checks. The
+internal CPU service also exposes typed cooperative timeout diagnostics.
+
+R7 CUDA generation is `partial`. Native compressed weights, recurrent state,
+full-attention KV, graph capture/replay, greedy decode, bounded sampling, and
+raw-logit observability pass the portable acceptance suite. Qwen3.8-specific
+plan/cache namespaces and live pre-upload memory refusal are machine-readable.
+The retained full-model greedy and bounded-sampling rows remain pending an
+idle RTX 4080 run.
+
+The generic OpenAI server, Metal, media, adapters, session reuse, and MTP
+speculative-decoding surfaces still refuse Qwen3.8. R8 owns public server
+registration and capability publication.

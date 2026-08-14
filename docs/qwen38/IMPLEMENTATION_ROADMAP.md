@@ -87,7 +87,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R4 | `implemented` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
 | R5 | `implemented` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `implemented` | Native CPU token generation | Internal executable text lane with retained parity |
-| R7 | `planned` | Native CUDA token generation | First local accelerated lane |
+| R7 | `partial` | Native CUDA token generation | First local accelerated lane |
 | R8 | `planned` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `planned` | Comparator, performance, and release gate | Retained `implemented_early` claim |
 | R9A | `planned` | Optional MTP speculative decoding and rollback | Separate acceleration claim |
@@ -520,6 +520,27 @@ first accelerated support claim.
 
 ## R7: Native CUDA Generation
 
+Status: `partial`. The shared native CUDA graph now admits Qwen3.8, preserves
+Qwen3.8-specific execution-plan and graph-cache namespaces, and passes the
+portable tiny-fixture acceptance suite. The required retained full-model rows
+remain pending an idle RTX 4080 run, so R7 is not yet
+`implemented`.
+
+The current implementation keeps the selected Dynamic V3 tensor storage on
+CUDA without dense F16 mirrors. The `Q3_K` token embedding uses native
+compressed row lookup. Mixed full-attention Q/K/V parts upload independently
+when their quantization modes differ. Recurrent convolution, Gated DeltaNet,
+full attention, FFN, final projection, greedy selection, bounded top-k
+selection, and raw-logit materialization remain on the existing native CUDA
+plan.
+
+Qwen3.8 admission reads live free and total CUDA memory before the first
+weight upload. It refuses unsupported quantization or insufficient total/free
+memory before partial execution. The machine-readable runtime contract records
+artifact, plan, graph, context, exact device-weight, recurrent-state, KV,
+scratch, dense-mirror, raw-logit, and fallback truth. The admitted context is
+4,096 tokens. No 8,192-token claim follows from the current implementation.
+
 Reuse the existing Qwen3.5 CUDA kernels and execution plans only after CPU
 parity proves the shared architecture boundary. Add Qwen3.8-specific plan and
 artifact identities without cloning the entire runtime.
@@ -550,6 +571,18 @@ Targeted validation:
 ```bash
 cargo test -p psionic-serve qwen38_cuda
 ```
+
+The retained evidence driver and checker are:
+
+```bash
+scripts/run-qwen38-cuda-generation-evidence.sh
+scripts/check-qwen38-cuda-generation.sh
+```
+
+The driver verifies the selected artifact byte length and SHA-256, builds the
+release benchmark, applies the required idle-GPU gate before each measured
+process, and produces separate greedy and bounded-sampling reports. It refuses
+without loading the model while any compute process is resident.
 
 ## R8: OpenAI-Compatible Serving
 

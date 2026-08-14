@@ -17,8 +17,8 @@ use psionic_runtime::{
 };
 use psionic_serve::{
     CudaGgufQwen35TextGenerationService, GenerationOptions, GenerationRequest, GenerationResponse,
-    GenerationTerminationCause, Qwen35CudaDecodeOutputMetrics, TerminationReason,
-    TextGenerationExecutor,
+    GenerationTerminationCause, Qwen35CudaDecodeOutputMetrics, Qwen35CudaRuntimeContract,
+    TerminationReason, TextGenerationExecutor,
 };
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -63,6 +63,7 @@ struct BenchConfig {
     json_out: Option<PathBuf>,
     require_fallback_free_cuda: bool,
     prompt: String,
+    raw_prompt: bool,
     max_output_tokens: usize,
     repeats: usize,
     decode_mode: BenchDecodeMode,
@@ -101,6 +102,7 @@ struct BenchReport {
     ollama_model: Option<String>,
     ollama_base_url: Option<String>,
     prompt: String,
+    prompt_mode: String,
     rendered_prompt: String,
     stop_sequences: Vec<String>,
     decode_mode: String,
@@ -153,6 +155,7 @@ struct BenchRunReport {
     qwen35_graph_misses: usize,
     qwen35_graph_captures: usize,
     qwen35_graph_shape_drifts: usize,
+    qwen35_graph_cache_identity: Option<String>,
     qwen35_attention_layer_invocations: usize,
     qwen35_attention_backends: Vec<psionic_serve::Qwen35CudaAttentionBackendExecution>,
     qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport,
@@ -189,6 +192,7 @@ struct BenchQwen35OutputMetricsReport {
     graph_misses: usize,
     graph_captures: usize,
     graph_shape_drifts: usize,
+    graph_cache_identity: Option<String>,
     attention_layer_invocations: usize,
     attention_backends: Vec<psionic_serve::Qwen35CudaAttentionBackendExecution>,
 }
@@ -203,6 +207,7 @@ struct BenchTerminationReport {
 #[derive(Clone, Debug, Serialize)]
 struct BenchPsionicCudaStartupReport {
     load_s: f64,
+    runtime_contract: Qwen35CudaRuntimeContract,
     cublas_handle_scope: String,
     cublas_stream_binding: String,
     cublas_lt_tuning_status: String,
@@ -339,6 +344,7 @@ impl Default for BenchConfig {
             json_out: None,
             require_fallback_free_cuda: false,
             prompt: String::from("Explain what Psionic is in one sentence."),
+            raw_prompt: false,
             max_output_tokens: 256,
             repeats: 3,
             decode_mode: BenchDecodeMode::Greedy,
@@ -410,6 +416,9 @@ impl BenchConfig {
                 }
                 "--prompt" => {
                     config.prompt = next_arg(&raw_args, &mut index, "--prompt")?;
+                }
+                "--raw-prompt" => {
+                    config.raw_prompt = true;
                 }
                 "--max-output-tokens" => {
                     config.max_output_tokens = parse_arg(
@@ -736,7 +745,7 @@ impl BenchConfig {
 }
 
 fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
-    let bench_model = load_bench_model(&config.model_path, &config.prompt)?;
+    let bench_model = load_bench_model(&config.model_path, &config.prompt, config.raw_prompt)?;
     let mut fast_path_report = psionic_cuda_fast_path_report(config);
     if let Err(reason) = validate_psionic_cuda_fast_path_contract(config, &mut fast_path_report) {
         let report = build_bench_report(
@@ -761,6 +770,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
     let mut service = CudaGgufQwen35TextGenerationService::from_gguf_path(&config.model_path)
         .map_err(|error| format!("failed to load qwen35 cuda service: {error}"))?;
     let load_s = load_started_at.elapsed().as_secs_f64();
+    let runtime_contract = service.cuda_runtime_contract();
     let descriptor = service.model_descriptor().clone();
     let cublas_lt_tuning = cuda_gemm_tuning_startup_fields(service.cuda_gemm_tuning_report());
     let prefix_cache_bypass = PrefixCacheControl {
@@ -792,6 +802,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         qwen35_output_metrics_report(warmup_response.metrics.qwen35_cuda_decode.as_ref());
     let startup_report = BenchPsionicCudaStartupReport {
         load_s,
+        runtime_contract,
         cublas_handle_scope: String::from("per_device_runtime_owner"),
         cublas_stream_binding: String::from("bind_stream_per_submission"),
         cublas_lt_tuning_status: cublas_lt_tuning.tuning_status,
@@ -926,6 +937,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_misses: output_metrics.graph_misses,
             qwen35_graph_captures: output_metrics.graph_captures,
             qwen35_graph_shape_drifts: output_metrics.graph_shape_drifts,
+            qwen35_graph_cache_identity: output_metrics.graph_cache_identity.clone(),
             qwen35_attention_layer_invocations: output_metrics.attention_layer_invocations,
             qwen35_attention_backends: output_metrics.attention_backends.clone(),
             qwen35_host_fallback_evidence: fallback_evidence.clone(),
@@ -1003,7 +1015,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
 }
 
 fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
-    let bench_model = load_bench_model(&config.model_path, &config.prompt)?;
+    let bench_model = load_bench_model(&config.model_path, &config.prompt, config.raw_prompt)?;
     let client = Client::builder()
         .build()
         .map_err(|error| format!("failed to build Ollama HTTP client: {error}"))?;
@@ -1070,6 +1082,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_misses: 0,
             qwen35_graph_captures: 0,
             qwen35_graph_shape_drifts: 0,
+            qwen35_graph_cache_identity: None,
             qwen35_attention_layer_invocations: 0,
             qwen35_attention_backends: Vec::new(),
             qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport::default(),
@@ -1155,29 +1168,41 @@ fn build_generation_options(
     options
 }
 
-fn load_bench_model(model_path: &Path, prompt: &str) -> Result<BenchModelContext, String> {
+fn load_bench_model(
+    model_path: &Path,
+    prompt: &str,
+    raw_prompt: bool,
+) -> Result<BenchModelContext, String> {
     let adapter = GgufDecoderAdapterLoader
         .load_path(model_path)
         .map_err(|error| format!("failed to load GGUF metadata: {error}"))?;
     let tokenizer = GgufRuntimeTokenizer::from_gguf(adapter.tokenizer())
         .map_err(|error| format!("failed to build GGUF runtime tokenizer: {error}"))?;
-    let renderer = adapter.prompt_renderer();
-    let rendered = renderer
-        .render_with_options(
-            None,
-            &[PromptMessage::new(
-                PromptMessageRole::User,
-                prompt.to_string(),
-            )],
-            true,
-            &PromptRenderOptions::default(),
-        )
-        .map_err(|error| format!("failed to render qwen35 prompt: {error}"))?;
-    Ok(BenchModelContext {
-        rendered: RenderedPrompt {
+    let rendered = if raw_prompt {
+        RenderedPrompt {
+            text: prompt.to_string(),
+            stop_sequences: Vec::new(),
+        }
+    } else {
+        let renderer = adapter.prompt_renderer();
+        let rendered = renderer
+            .render_with_options(
+                None,
+                &[PromptMessage::new(
+                    PromptMessageRole::User,
+                    prompt.to_string(),
+                )],
+                true,
+                &PromptRenderOptions::default(),
+            )
+            .map_err(|error| format!("failed to render qwen35 prompt: {error}"))?;
+        RenderedPrompt {
             text: rendered.text,
             stop_sequences: rendered.stop_sequences,
-        },
+        }
+    };
+    Ok(BenchModelContext {
+        rendered,
         tokenizer,
     })
 }
@@ -1194,6 +1219,7 @@ fn qwen35_output_metrics_report(
             graph_misses: 0,
             graph_captures: 0,
             graph_shape_drifts: 0,
+            graph_cache_identity: None,
             attention_layer_invocations: 0,
             attention_backends: Vec::new(),
         };
@@ -1232,6 +1258,7 @@ fn qwen35_output_metrics_report(
             .graph_replay
             .as_ref()
             .map_or(0, |graph| graph.shape_drift_count),
+        graph_cache_identity: metrics.graph_cache_identity.clone(),
         attention_layer_invocations: metrics
             .attention_backend
             .as_ref()
@@ -1441,6 +1468,11 @@ fn build_bench_report(
         ollama_base_url: matches!(config.backend, BenchBackend::Ollama)
             .then(|| config.ollama_base_url.clone()),
         prompt: config.prompt.clone(),
+        prompt_mode: String::from(if config.raw_prompt {
+            "raw_text"
+        } else {
+            "chat_template"
+        }),
         rendered_prompt: rendered.text.clone(),
         stop_sequences: rendered.stop_sequences.clone(),
         decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
@@ -1720,6 +1752,7 @@ mod tests {
             graph_misses,
             graph_captures,
             graph_shape_drifts: 0,
+            graph_cache_identity: Some(String::from("test-graph-cache-identity")),
             attention_layer_invocations: 27,
             attention_backends: vec![psionic_serve::Qwen35CudaAttentionBackendExecution {
                 requested_backend: String::from(
@@ -1887,7 +1920,7 @@ fn write_json_output<T: Serialize>(value: &T, output: Option<&PathBuf>) -> Resul
 
 fn usage() -> String {
     String::from(
-        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--max-output-tokens 128] [--repeats 3]",
+        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]",
     )
 }
 

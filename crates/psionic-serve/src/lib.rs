@@ -2016,6 +2016,9 @@ pub struct Qwen35CudaDecodeOutputMetrics {
     pub readback_bytes: u64,
     /// Whether any step materialized dense raw logits on the host.
     pub raw_logits_materialized: bool,
+    /// Model- and artifact-bound namespace for the CUDA graph cache used by this request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub graph_cache_identity: Option<String>,
     /// CUDA graph replay metrics accumulated across admitted decode steps.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub graph_replay: Option<CudaGraphReplayMetrics>,
@@ -2029,6 +2032,9 @@ impl Qwen35CudaDecodeOutputMetrics {
         self.step_count = self.step_count.saturating_add(other.step_count);
         self.readback_bytes = self.readback_bytes.saturating_add(other.readback_bytes);
         self.raw_logits_materialized |= other.raw_logits_materialized;
+        if self.graph_cache_identity.is_none() {
+            self.graph_cache_identity = other.graph_cache_identity.clone();
+        }
         self.output_modes.extend(other.output_modes.iter().cloned());
         self.output_modes.sort();
         self.output_modes.dedup();
@@ -2063,6 +2069,7 @@ impl Qwen35CudaDecodeOutputMetrics {
             && self.output_modes.is_empty()
             && self.readback_bytes == 0
             && !self.raw_logits_materialized
+            && self.graph_cache_identity.is_none()
             && self
                 .graph_replay
                 .as_ref()

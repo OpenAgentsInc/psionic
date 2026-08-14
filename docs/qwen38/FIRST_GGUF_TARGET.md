@@ -1,8 +1,9 @@
 # Qwen3.8 First GGUF Target
 
 > Status: `implemented` on 2026-08-14 for R5 artifact qualification and
-> 4,096-token CUDA residency preflight. It does not claim that Psionic can
-> generate tokens from the artifact yet.
+> `partial` for R7 native CUDA generation. The runtime and portable CUDA
+> acceptance suite are implemented. Retained production-artifact CUDA rows
+> still require an idle RTX 4080 run.
 
 ## Decision
 
@@ -70,6 +71,19 @@ implementation and 4,096-token CUDA residency preflight. The retained report
 records 866 required tensors with `F32`, `IQ3_S`, `IQ4_XS`, `Q3_K`, and
 `Q5_K` storage. `Q3_K_M` is retained as the standard K-quant baseline, and
 `Q4_K_M` is retained as a CPU-offload comparator.
+
+R7 extends the shared Qwen3.5 CUDA graph with Qwen3.8-specific plan and graph
+identities. The selected artifact's `Q3_K` token embedding remains compressed
+and executes through native row lookup. Mixed quantized full-attention Q/K/V
+parts remain independently resident without a dense F16 mirror. Live total and
+free CUDA memory are checked before the first weight upload. The runtime
+contract reports the exact device-weight, recurrent-state, KV, scratch, and
+planned-residency bytes together with raw-logit and host-fallback posture.
+
+R7 remains `partial` until
+`scripts/run-qwen38-cuda-generation-evidence.sh` completes on an idle admitted
+GPU and its greedy and bounded-sampling reports pass
+`scripts/check-qwen38-cuda-generation.sh`.
 
 ## Qualification Gates
 

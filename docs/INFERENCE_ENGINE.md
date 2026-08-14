@@ -308,7 +308,18 @@ into one generic engine claim.
   Tiny-fixture evidence covers recurrent/full-attention state allocation,
   MTP-tail exclusion, deterministic reset, context and memory refusal, and
   cancellation. The generic OpenAI server still refuses Qwen3.8 until R8, and
-  CUDA, Metal, media, adapters, session reuse, and MTP speculative decoding
+  R7 adds an internal native CUDA lane over the same graph. The selected
+  Dynamic V3 weights remain compressed on device, including native `Q3_K`
+  token-embedding lookup and mixed-quantized full-attention Q/K/V parts. The
+  lane uses Qwen3.8-specific execution-plan and graph-cache namespaces, caps
+  the admitted context at 4,096 tokens, and reports exact weights, recurrent
+  state, KV, scratch, dense-mirror count, raw-logit materialization, and host
+  fallback posture. Live total and free CUDA memory plus supported
+  quantization are checked before the first upload. Tiny-fixture CPU/CUDA
+  logits and token parity, greedy and bounded sampling, graph replay, raw-
+  logit observability, state reset, context refusal, and preflight refusal pass.
+  R7 remains `partial` pending retained full-model evidence from an idle RTX
+  4080. Metal, media, adapters, session reuse, and MTP speculative decoding
   remain unsupported. The internal CPU service now has a typed cooperative
   generation timeout checked at token-step boundaries with stable `timed_out`
   and HTTP `504` diagnostics. R6 is `implemented` for the internal CPU lane.
