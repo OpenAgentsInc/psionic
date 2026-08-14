@@ -1,9 +1,9 @@
 # Qwen3.8 Implementation Roadmap
 
 > Status: `planned` on 2026-08-14. Upstream research, artifact acquisition, and
-> R1 product/artifact identity, R2 prompt/tokenizer contracts, and R3
-> checkpoint admission are `implemented`; Qwen3.8 execution in Psionic remains
-> `planned`.
+> R1 product/artifact identity, R2 prompt/tokenizer contracts, R3 checkpoint
+> admission, and R4 bounded BF16 evidence are `implemented`; Qwen3.8 generation
+> in Psionic remains `planned`.
 
 ## Goal
 
@@ -83,7 +83,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R1 | `implemented` | Committed Qwen3.8 artifact-fact fixture and product identity | None; metadata only |
 | R2 | `implemented` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
 | R3 | `implemented` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
-| R4 | `planned` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
+| R4 | `implemented` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
 | R5 | `planned` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `planned` | Native CPU token generation | First executable text lane |
 | R7 | `planned` | Native CUDA token generation | First local accelerated lane |
@@ -287,6 +287,24 @@ cargo test -p psionic-models qwen38_forward
 ```
 
 ## R4: Official BF16 Bounded Evidence
+
+Status: `implemented` through `qwen38_bf16_evidence.rs` and the
+`qwen38_bf16_evidence` example. Three reviewed reports are retained under
+`fixtures/qwen38/reports/`:
+
+- `qwen38_bf16_header_admission_v1.json`
+- `qwen38_bf16_sampled_projection_v1.json`
+- `qwen38_bf16_bounded_traversal_v1.json`
+
+The header report replays 18 shards and 1,199 mappings. The sampled report reads
+one embedding row and three LM-head rows and retains deterministic sampled
+logits. The traversal report reads one deterministic BF16 row from all 851
+decoder and 15 MTP tensors, visits 64 decoder layers plus one MTP layer in
+order, and retains 866 row receipts. All reports bind the config, tokenizer,
+template, index, prompt-token, checkpoint-admission, tensor-read, and output
+digests. Their capability object sets full-width attention, full-width MLP,
+full-vocabulary logits, token generation, training gradients, and media
+execution to `false`.
 
 Add a Qwen3.8 example or command surface with three explicit backends:
 

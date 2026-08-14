@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     fs::File,
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
@@ -13,6 +13,8 @@ use serde::{
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+
+use half::{bf16, f16};
 
 pub const QWEN35_ROOT_MODEL_TYPE: &str = "qwen3_5";
 pub const QWEN35_TEXT_MODEL_TYPE: &str = "qwen3_5_text";
@@ -146,6 +148,23 @@ pub struct Qwen35TextWeightIndex {
     pub tensor_count: usize,
     pub shard_names: Vec<String>,
     pub weight_map: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Qwen35TextTensorRowReadReceipt {
+    pub tensor_name: String,
+    pub shard_name: String,
+    pub row_index: usize,
+    pub dtype: String,
+    pub shape: Vec<usize>,
+    pub row_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Qwen35TextTensorRow {
+    pub values: Vec<f32>,
+    pub receipt: Qwen35TextTensorRowReadReceipt,
 }
 
 #[derive(Debug, Error)]
@@ -599,6 +618,172 @@ pub fn qwen35_text_tensor_admission_report(
     }
 }
 
+pub fn qwen35_text_read_indexed_tensor_row(
+    model_dir: &Path,
+    weight_map: &BTreeMap<String, String>,
+    tensor_name: &str,
+    row_index: usize,
+) -> Result<Qwen35TextTensorRow, Qwen35TextCheckpointError> {
+    let shard_name = weight_map.get(tensor_name).ok_or_else(|| {
+        Qwen35TextCheckpointError::InvalidConfig(format!(
+            "model index does not contain required tensor `{tensor_name}`"
+        ))
+    })?;
+    let shard_path = model_dir.join(shard_name);
+    let mut file = File::open(&shard_path).map_err(|source| Qwen35TextCheckpointError::Io {
+        path: shard_path.clone(),
+        source,
+    })?;
+    let mut len_bytes = [0u8; 8];
+    file.read_exact(&mut len_bytes)
+        .map_err(|source| Qwen35TextCheckpointError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let header_len = u64::from_le_bytes(len_bytes);
+    let header_len_usize =
+        usize::try_from(header_len).map_err(|_| Qwen35TextCheckpointError::InvalidShard {
+            path: shard_path.clone(),
+            detail: String::from("header length does not fit usize"),
+        })?;
+    let mut header_bytes = vec![0u8; header_len_usize];
+    file.read_exact(&mut header_bytes)
+        .map_err(|source| Qwen35TextCheckpointError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let header = serde_json::from_slice::<Value>(header_bytes.as_slice())?;
+    let tensor_value = header.get(tensor_name).ok_or_else(|| {
+        Qwen35TextCheckpointError::InvalidConfig(format!(
+            "safetensors shard `{shard_name}` does not contain tensor `{tensor_name}`"
+        ))
+    })?;
+    let dtype = required_string(tensor_value, "dtype")?;
+    let shape = tensor_value
+        .get("shape")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            Qwen35TextCheckpointError::InvalidConfig(format!(
+                "tensor `{tensor_name}` in `{shard_name}` is missing shape"
+            ))
+        })?
+        .iter()
+        .map(|value| {
+            value
+                .as_u64()
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(|| {
+                    Qwen35TextCheckpointError::InvalidConfig(format!(
+                        "tensor `{tensor_name}` has a non-usize shape entry"
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if shape.is_empty() {
+        return Err(Qwen35TextCheckpointError::InvalidConfig(format!(
+            "indexed tensor read requires at least one dimension; `{tensor_name}` has shape {shape:?}"
+        )));
+    }
+    let row_count = if shape.len() == 1 { 1 } else { shape[0] };
+    if row_index >= row_count {
+        return Err(Qwen35TextCheckpointError::InvalidConfig(format!(
+            "row {row_index} is outside tensor `{tensor_name}` with {row_count} rows"
+        )));
+    }
+    let offsets = tensor_value
+        .get("data_offsets")
+        .and_then(Value::as_array)
+        .filter(|offsets| offsets.len() == 2)
+        .ok_or_else(|| {
+            Qwen35TextCheckpointError::InvalidConfig(format!(
+                "tensor `{tensor_name}` in `{shard_name}` must have two data_offsets"
+            ))
+        })?;
+    let data_offset_start = offsets[0].as_u64().ok_or_else(|| {
+        Qwen35TextCheckpointError::InvalidConfig(format!(
+            "tensor `{tensor_name}` has invalid data_offsets"
+        ))
+    })?;
+    let data_offset_end = offsets[1].as_u64().ok_or_else(|| {
+        Qwen35TextCheckpointError::InvalidConfig(format!(
+            "tensor `{tensor_name}` has invalid data_offsets"
+        ))
+    })?;
+    let element_bytes = safetensors_element_size(dtype.as_str())?;
+    let row_element_count = if shape.len() == 1 {
+        shape[0]
+    } else {
+        shape[1..]
+            .iter()
+            .try_fold(1usize, |count, dimension| count.checked_mul(*dimension))
+            .ok_or_else(|| {
+                Qwen35TextCheckpointError::InvalidConfig(format!(
+                    "tensor `{tensor_name}` row element count overflow"
+                ))
+            })?
+    };
+    let row_bytes_len = row_element_count
+        .checked_mul(element_bytes)
+        .ok_or_else(|| {
+            Qwen35TextCheckpointError::InvalidConfig(format!(
+                "tensor `{tensor_name}` row byte length overflow"
+            ))
+        })?;
+    let tensor_bytes_len = data_offset_end
+        .checked_sub(data_offset_start)
+        .ok_or_else(|| {
+            Qwen35TextCheckpointError::InvalidConfig(format!(
+                "tensor `{tensor_name}` has reversed data_offsets"
+            ))
+        })?;
+    let expected_tensor_bytes = (row_count as u64)
+        .checked_mul(row_bytes_len as u64)
+        .ok_or_else(|| {
+            Qwen35TextCheckpointError::InvalidConfig(format!(
+                "tensor `{tensor_name}` data byte length overflow"
+            ))
+        })?;
+    if tensor_bytes_len != expected_tensor_bytes {
+        return Err(Qwen35TextCheckpointError::InvalidConfig(format!(
+            "tensor `{tensor_name}` data_offsets describe {tensor_bytes_len} bytes, expected {expected_tensor_bytes}"
+        )));
+    }
+    let row_offset = 8u64
+        .checked_add(header_len)
+        .and_then(|offset| offset.checked_add(data_offset_start))
+        .and_then(|offset| {
+            offset.checked_add((row_index as u64).checked_mul(row_bytes_len as u64)?)
+        })
+        .ok_or_else(|| {
+            Qwen35TextCheckpointError::InvalidConfig(format!(
+                "tensor `{tensor_name}` row offset overflow"
+            ))
+        })?;
+    file.seek(SeekFrom::Start(row_offset))
+        .map_err(|source| Qwen35TextCheckpointError::Io {
+            path: shard_path.clone(),
+            source,
+        })?;
+    let mut row_bytes = vec![0u8; row_bytes_len];
+    file.read_exact(&mut row_bytes)
+        .map_err(|source| Qwen35TextCheckpointError::Io {
+            path: shard_path,
+            source,
+        })?;
+    let values = decode_safetensors_row(dtype.as_str(), row_bytes.as_slice())?;
+    Ok(Qwen35TextTensorRow {
+        values,
+        receipt: Qwen35TextTensorRowReadReceipt {
+            tensor_name: String::from(tensor_name),
+            shard_name: shard_name.clone(),
+            row_index,
+            dtype,
+            shape,
+            row_sha256: sha256_hex(row_bytes.as_slice()),
+        },
+    })
+}
+
 fn safetensors_header(
     path: &Path,
 ) -> Result<
@@ -912,6 +1097,39 @@ fn hf_dtype_to_safetensors_dtype(dtype: &str) -> String {
         "float16" => String::from("F16"),
         "float32" => String::from("F32"),
         other => other.to_ascii_uppercase(),
+    }
+}
+
+fn safetensors_element_size(dtype: &str) -> Result<usize, Qwen35TextCheckpointError> {
+    match dtype {
+        "BF16" | "F16" => Ok(2),
+        "F32" => Ok(4),
+        other => Err(Qwen35TextCheckpointError::InvalidConfig(format!(
+            "unsupported row-read dtype `{other}`"
+        ))),
+    }
+}
+
+fn decode_safetensors_row(
+    dtype: &str,
+    bytes: &[u8],
+) -> Result<Vec<f32>, Qwen35TextCheckpointError> {
+    match dtype {
+        "BF16" => Ok(bytes
+            .chunks_exact(2)
+            .map(|bytes| bf16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32())
+            .collect()),
+        "F16" => Ok(bytes
+            .chunks_exact(2)
+            .map(|bytes| f16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32())
+            .collect()),
+        "F32" => Ok(bytes
+            .chunks_exact(4)
+            .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+            .collect()),
+        other => Err(Qwen35TextCheckpointError::InvalidConfig(format!(
+            "unsupported row-read dtype `{other}`"
+        ))),
     }
 }
 

@@ -1,9 +1,10 @@
 # Qwen3.8 Research
 
 > Status: `planned` on 2026-08-14. Upstream research, local artifact
-> acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, and
-> R3 checkpoint admission are `implemented`. Psionic does not yet claim
-> Qwen3.8 inference, serving, training, or multimodal support.
+> acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, R3
+> checkpoint admission, and R4 bounded BF16 evidence are `implemented`.
+> Psionic does not yet claim Qwen3.8 generation, serving, training, or
+> multimodal support.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -139,6 +140,13 @@ family-neutral types. Qwen3.6 retains its public wrapper names. The distinct
 digests, derives 18 shards from the index, admits 851 decoder plus 15 MTP
 tensors, inventories 333 non-text tensors, and records eight split-layer shard
 resolutions. This is checkpoint structure admission, not execution.
+
+R4 adds three reproducible official-BF16 evidence modes and reviewed reports in
+`fixtures/qwen38/reports/`. Header admission replays the complete index.
+Sampled projection reads real embedding and LM-head BF16 rows. Bounded
+row-sparse traversal reads one deterministic row from every required decoder
+and MTP tensor and visits all 65 declared layers in order. These are bounded
+evidence modes. They do not execute full-width model layers or generate tokens.
 
 ## Primary Source
 

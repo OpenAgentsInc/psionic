@@ -285,7 +285,8 @@ into one generic engine claim.
   support claim for Psionic.
 - `qwen38` execution remains `planned`. Current `main` has `implemented`
   Qwen3.8-27B artifact/product identity, prompt/tokenizer contracts, and
-  complete BF16 checkpoint-header admission. The family-neutral
+  complete BF16 checkpoint-header admission plus bounded official BF16 row
+  evidence. The family-neutral
   `qwen3_5_text` contract verifies 851 decoder and 15 MTP tensors across 18
   index-derived shards, inventories 333 non-text tensors, and records eight
   split-layer shard resolutions. The artifact fixture binds the official
@@ -294,8 +295,11 @@ into one generic engine claim.
   tools, grouped results, and media markers. The GGUF runtime gives `qwen35`
   its published NFC and per-code-point numeric pretokenizer. Other variants,
   duplicate mappings, bad shards, wrong shard resolution, and drifted facts
-  refuse. These milestones do not read BF16 tensor payloads, execute layers,
-  generate tokens, serve requests, or execute media inputs.
+  refuse. The retained R4 reports read deterministic embedding, LM-head,
+  decoder, and MTP rows, including one row from all 866 required text tensors,
+  but do not execute full-width attention or MLPs, materialize full-vocabulary
+  logits, generate tokens, serve requests, compute gradients, or execute media
+  inputs.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
 - Current `main` also admits native local execution for the real Hugging Face
