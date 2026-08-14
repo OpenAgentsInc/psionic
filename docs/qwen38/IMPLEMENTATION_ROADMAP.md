@@ -10,9 +10,11 @@ Add a first-class Qwen3.8 model identity to Psionic, reuse the existing
 ship one bounded native text-generation lane with deterministic evidence and
 explicit refusal outside its accepted envelope.
 
-The first claim targets `Qwen/Qwen3.8-27B` text generation from an admitted
-quantized GGUF on CPU and CUDA. The official BF16 safetensors checkpoint remains
-the architecture and tensor-table authority.
+The first claim targets `Qwen/Qwen3.8-27B` text generation from the admitted
+`Qwen3.8-27B-UD-Q3_K_XL.gguf` artifact on CPU and CUDA. The official BF16
+safetensors checkpoint remains the architecture and tensor-table authority.
+The artifact decision and hardware envelope are recorded in
+[FIRST_GGUF_TARGET.md](FIRST_GGUF_TARGET.md).
 
 ## First Claim Boundary
 
@@ -223,8 +225,16 @@ No `implemented_early` inference claim follows from R4.
 
 ## R5: GGUF Qualification Gate
 
-A candidate GGUF is required for the first local native generation lane. It is
-not required for R1-R4.
+The primary candidate for the first local native generation lane is
+`Qwen3.8-27B-UD-Q3_K_XL.gguf` from
+`unsloth/Qwen3.8-27B-GGUF` at observed revision
+`fdd03b8bbd279c1694563650e79d85a2373d9934`. Its published rounded size is
+13.4 GB. The candidate is not required for R1-R4.
+
+Use `Qwen3.8-27B-Q3_K_M.gguf` as the standard K-quant compatibility baseline
+and `Qwen3.8-27B-Q4_K_M.gguf` as an explicit CPU-offload quality comparator.
+Neither comparator replaces the primary artifact in the first CUDA residency
+gate.
 
 Record each candidate with:
 
@@ -249,11 +259,18 @@ Qualification checks:
   path
 - weights plus KV cache, recurrent state, scratch, graphs, and allocator margin
   fit the admitted hardware budget
+- the 4,096-token CUDA envelope is proven before any longer-context claim
+- the 8,192-token CUDA envelope has separate peak-memory and parity evidence
+- output quality is compared with `Q3_K_M` before the Dynamic V3 artifact is
+  made canonical
 
 For the local 16 GiB RTX 4080, do not use file size alone as the admission
 test. The chosen context window must leave explicit memory for KV cache,
 recurrent state, scratch buffers, graph capture, and allocator overhead. A GGUF
 that only fits its weights is not CUDA-admissible.
+
+The first text lane excludes the approximately 930 MB BF16 and F16 vision
+projectors. Native vision remains R11.
 
 Use an operator path rather than a checked-in personal location:
 
@@ -494,7 +511,8 @@ R1-R4 can begin with the current repository and official BF16 artifact.
 
 R5 and later need:
 
-- one smaller Qwen3.8 GGUF candidate with immutable provenance
+- the selected `Qwen3.8-27B-UD-Q3_K_XL.gguf` artifact downloaded and bound to
+  immutable provenance, exact byte size, and SHA-256
 - enough local GPU margin for the chosen artifact and context window, or a
   larger remote GPU for full-BF16 CUDA validation
 - upstream reference outputs for tokenizer, prompt, logits, generation, and

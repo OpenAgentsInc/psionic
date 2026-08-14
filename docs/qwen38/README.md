@@ -7,9 +7,9 @@
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
 
-## Current Target
+## Official Reference Target
 
-The first target is the official dense post-trained checkpoint:
+The official dense post-trained checkpoint is the source-of-truth target:
 
 - model: `Qwen/Qwen3.8-27B`
 - upstream repository revision observed on 2026-08-14:
@@ -17,6 +17,19 @@ The first target is the official dense post-trained checkpoint:
 - upstream license: Apache-2.0
 - pipeline: image-text-to-text
 - native context length: 262,144 tokens
+
+## First Execution Target
+
+The first qualified execution artifact will be
+`Qwen3.8-27B-UD-Q3_K_XL.gguf` from
+`unsloth/Qwen3.8-27B-GGUF` at the observed revision
+`fdd03b8bbd279c1694563650e79d85a2373d9934`.
+
+This 13.4 GB mixed-quantization artifact is the primary candidate for a
+fully-resident text lane on the local 16 GiB RTX 4080. The first CUDA gate is
+4,096 tokens, followed by a separately measured 8,192-token gate. The
+selection and its acceptance requirements are defined in
+[FIRST_GGUF_TARGET.md](FIRST_GGUF_TARGET.md).
 
 ## Local Artifact
 
@@ -44,6 +57,9 @@ the repository.
 - [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) defines the ordered
   implementation milestones, acceptance gates, validation matrix, commit
   sequence, and release claim boundary for Qwen3.8 support.
+- [FIRST_GGUF_TARGET.md](FIRST_GGUF_TARGET.md) selects
+  `Qwen3.8-27B-UD-Q3_K_XL.gguf` as the first execution artifact and defines its
+  local CUDA residency, context, provenance, and comparison gates.
 
 ## Claim Boundary
 
