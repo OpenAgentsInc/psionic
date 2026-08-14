@@ -9,6 +9,9 @@ use psionic_compiler::compile_graph;
 use psionic_core::{
     BackendExtensionKind, BackendExtensionOp, DType, Device, QuantizationMode, Shape, TensorData,
     TensorId, TensorSpec, ViewSemantics,
+    ggml_quantization::{
+        GgmlBlockDecodeError, decode_iq3_s_block, decode_iq4_xs_block, decode_q3_k_block,
+    },
 };
 use psionic_ir::{ExecutionOp, ExecutionPlan, ExecutionStep, Graph};
 use psionic_runtime::{
@@ -1365,10 +1368,19 @@ pub fn quantized_row_dot(
             QuantizationMode::GgmlQ4_0 => dot_q4_0_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_1 => dot_q4_1_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ5_0 => dot_q5_0_block(lhs_block, block_bytes)?,
+            QuantizationMode::GgmlQ3K => {
+                dot_shared_super_block(lhs_block, block_bytes, decode_q3_k_block)?
+            }
             QuantizationMode::GgmlQ5K => dot_q5_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4K => dot_q4_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ6K => dot_q6_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ8_0 => dot_q8_0_block(lhs_block, block_bytes)?,
+            QuantizationMode::GgmlIq3S => {
+                dot_shared_super_block(lhs_block, block_bytes, decode_iq3_s_block)?
+            }
+            QuantizationMode::GgmlIq4Xs => {
+                dot_shared_super_block(lhs_block, block_bytes, decode_iq4_xs_block)?
+            }
             QuantizationMode::None | QuantizationMode::Int8Symmetric => {
                 return Err(RuntimeError::Backend(format!(
                     "unsupported quantized matmul mode {mode:?}",
@@ -1441,10 +1453,19 @@ pub fn decode_quantized_row_into(
             QuantizationMode::GgmlQ4_0 => decode_q4_0_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_1 => decode_q4_1_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ5_0 => decode_q5_0_block_into(block_bytes, output)?,
+            QuantizationMode::GgmlQ3K => {
+                decode_shared_super_block_into(block_bytes, output, decode_q3_k_block)?
+            }
             QuantizationMode::GgmlQ5K => decode_q5_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4K => decode_q4_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ6K => decode_q6_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ8_0 => decode_q8_0_block_into(block_bytes, output)?,
+            QuantizationMode::GgmlIq3S => {
+                decode_shared_super_block_into(block_bytes, output, decode_iq3_s_block)?
+            }
+            QuantizationMode::GgmlIq4Xs => {
+                decode_shared_super_block_into(block_bytes, output, decode_iq4_xs_block)?
+            }
             QuantizationMode::None | QuantizationMode::Int8Symmetric => {
                 return Err(RuntimeError::Backend(format!(
                     "unsupported quantized decode mode {mode:?}",
@@ -1452,6 +1473,31 @@ pub fn decode_quantized_row_into(
             }
         }
     }
+    Ok(())
+}
+
+fn dot_shared_super_block(
+    lhs: &[f32],
+    bytes: &[u8],
+    decode: fn(&[u8]) -> Result<[f32; 256], GgmlBlockDecodeError>,
+) -> Result<f32, RuntimeError> {
+    if lhs.len() != 256 {
+        return Err(RuntimeError::Backend(format!(
+            "GGML super-block dot requires 256 lhs values, found {}",
+            lhs.len()
+        )));
+    }
+    let values = decode(bytes).map_err(|error| RuntimeError::Backend(error.to_string()))?;
+    Ok(lhs.iter().zip(values).map(|(lhs, rhs)| lhs * rhs).sum())
+}
+
+fn decode_shared_super_block_into(
+    bytes: &[u8],
+    output: &mut Vec<f32>,
+    decode: fn(&[u8]) -> Result<[f32; 256], GgmlBlockDecodeError>,
+) -> Result<(), RuntimeError> {
+    let values = decode(bytes).map_err(|error| RuntimeError::Backend(error.to_string()))?;
+    output.extend(values);
     Ok(())
 }
 
@@ -1602,7 +1648,11 @@ fn dot_q5_k_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
             .zip(quant_chunk.iter().copied())
             .zip(high_bits.iter().copied())
         {
-            let lifted = if (high_bits & low_mask) != 0 { 16u8 } else { 0u8 };
+            let lifted = if (high_bits & low_mask) != 0 {
+                16u8
+            } else {
+                0u8
+            };
             sum += lhs_value * (low_scale * f32::from((quant & 0x0f) + lifted) - low_min);
         }
         lhs_offset = lhs_offset.saturating_add(32);
@@ -1807,7 +1857,11 @@ fn decode_q5_k_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), Run
         let low_scale = scale * f32::from(low_scale_value);
         let low_min = minimum * f32::from(low_min_value);
         for (quant, high_bits) in quant_chunk.iter().copied().zip(high_bits.iter().copied()) {
-            let lifted = if (high_bits & low_mask) != 0 { 16u8 } else { 0u8 };
+            let lifted = if (high_bits & low_mask) != 0 {
+                16u8
+            } else {
+                0u8
+            };
             output.push(low_scale * f32::from((quant & 0x0f) + lifted) - low_min);
         }
         scale_index = scale_index.saturating_add(1);
@@ -2820,6 +2874,28 @@ mod tests {
             .sum();
         assert!((dot_q5_k - expected_q5_k).abs() <= 1e-4);
         assert_eq!(decoded_q5_k.len(), 256);
+        Ok(())
+    }
+
+    #[test]
+    fn cpu_quantized_row_helpers_cover_qwen38_super_blocks() -> Result<(), RuntimeError> {
+        let reference = sample_reference_vector_256();
+        for (mode, bytes) in [
+            (QuantizationMode::GgmlQ3K, vec![0_u8; 110]),
+            (QuantizationMode::GgmlIq3S, vec![0_u8; 110]),
+            (QuantizationMode::GgmlIq4Xs, vec![0_u8; 136]),
+        ] {
+            let mut decoded = Vec::new();
+            super::decode_quantized_row_into(mode, &bytes, &mut decoded)?;
+            let dot = super::quantized_row_dot(&reference, mode, &bytes)?;
+            let expected: f32 = reference
+                .iter()
+                .zip(decoded.iter())
+                .map(|(lhs, rhs)| lhs * rhs)
+                .sum();
+            assert!((dot - expected).abs() <= 1e-4, "mode {mode:?}");
+            assert_eq!(decoded.len(), 256, "mode {mode:?}");
+        }
         Ok(())
     }
 
