@@ -60,6 +60,10 @@ the repository.
 - [FIRST_GGUF_TARGET.md](FIRST_GGUF_TARGET.md) selects
   `Qwen3.8-27B-UD-Q3_K_XL.gguf` as the first execution artifact and defines its
   local CUDA residency, context, provenance, and comparison gates.
+- [UNSLOTH_CODE_AUDIT.md](UNSLOTH_CODE_AUDIT.md) audits the pinned Unsloth
+  loader and Studio GGUF paths, identifies the reusable artifact, admission,
+  memory, and prompt-handling patterns, and records the license and native
+  execution boundaries.
 
 ## Claim Boundary
 
