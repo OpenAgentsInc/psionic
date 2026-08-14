@@ -1,11 +1,11 @@
 # Qwen3.8 Research
 
-> Status: `planned` on 2026-08-14. Upstream research, local artifact
+> Status: `partial` on 2026-08-14. Upstream research, local artifact
 > acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, R3
 > checkpoint admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
-> `implemented`.
-> Psionic does not yet claim Qwen3.8 generation, serving, training, or
-> multimodal support.
+> `implemented`. R6 native CPU generation is `implemented` for the internal
+> execution lane. Public serving, accelerated generation, training, and
+> multimodal support remain outside the current claim.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -166,6 +166,19 @@ binds the pinned llama.cpp converter, tiled V-head layout, sampled official
 BF16 rows, all three GGUF profiles, and the Dynamic V3 quality comparison.
 MTP tensors are inventoried and skipped for standard generation. This admits
 artifact storage and memory preflight only; R6 owns token generation.
+
+R6 adds native CPU generation through the shared Qwen3.5 hybrid graph without
+a subprocess or fallback. The admitted Dynamic V3 artifact matches pinned
+llama.cpp revision `9b05354ec6fb58b4e665e9a39ebc40285c015638` for raw-prompt
+first-token and two-token greedy output. The retained recurrent report at
+`fixtures/qwen38/reports/qwen38_cpu_recurrent_intermediate_parity_v1.json`
+covers 14 layer-zero boundaries in both two-token prefill and retained-state
+decode. All 28 comparisons pass; maximum normalized RMSE is
+`0.010121032189794241` and minimum cosine similarity is
+`0.9999686621232524`. The lane also retains deterministic reset, hybrid-state
+allocation, context and memory refusal, cancellation, and typed cooperative
+timeout evidence. This is an internal CPU execution claim. The generic OpenAI
+server continues to refuse Qwen3.8 until R8.
 
 ## Primary Source
 

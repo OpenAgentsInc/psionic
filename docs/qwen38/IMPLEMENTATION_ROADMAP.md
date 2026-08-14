@@ -3,7 +3,8 @@
 > Status: `partial` on 2026-08-14. Upstream research, artifact acquisition, and
 > R1 product/artifact identity, R2 prompt/tokenizer contracts, R3 checkpoint
 > admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
-> `implemented`; R6 native CPU generation is `partial`.
+> `implemented`; R6 native CPU generation is also `implemented` for the
+> internal CPU lane. R7 and later publication milestones remain `planned`.
 
 ## Goal
 
@@ -85,7 +86,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R3 | `implemented` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
 | R4 | `implemented` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
 | R5 | `implemented` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
-| R6 | `partial` | Native CPU token generation | Internal executable text lane; parity closure pending |
+| R6 | `implemented` | Native CPU token generation | Internal executable text lane with retained parity |
 | R7 | `planned` | Native CUDA token generation | First local accelerated lane |
 | R8 | `planned` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `planned` | Comparator, performance, and release gate | Retained `implemented_early` claim |
@@ -435,7 +436,7 @@ unless an explicit, reviewed compatibility receipt proves the conversion.
 
 ## R6: Native CPU Generation
 
-Status: `partial`. The selected Dynamic V3 GGUF now enters a distinct `qwen38`
+Status: `implemented`. The selected Dynamic V3 GGUF enters a distinct `qwen38`
 product family and executes through the native Psionic CPU Qwen3.5 hybrid
 graph. Standard generation excludes the declared MTP tail and reports that
 disposition. The lane remains internal; the generic OpenAI server refuses it
@@ -456,9 +457,31 @@ Retained R6 evidence currently includes:
   subprocess or fallback
 - exact raw-prompt first-token and two-token output parity with pinned
   llama.cpp revision `9b05354ec6fb58b4e665e9a39ebc40285c015638`
+- retained layer-zero recurrent-intermediate parity for two-token prefill
+  `[9419, 11]` and retained-state decode token `[353]`
+- 28 passing tensor comparisons over RMS-normalized input, QKV projection,
+  convolution, alpha/gate/beta, normalized Q/K, V, transposed delta state,
+  recurrent output, gated normalization, and output projection
+- maximum normalized RMSE `0.010121032189794241` and minimum cosine similarity
+  `0.9999686621232524` across those comparisons
 
-R6 remains open until pinned prefill and token-at-a-time recurrent-intermediate
-parity is retained.
+The retained report is
+`fixtures/qwen38/reports/qwen38_cpu_recurrent_intermediate_parity_v1.json`.
+The comparator source and pinned runner are
+`scripts/qwen38-llama-cpp-intermediate-trace.cpp` and
+`scripts/qwen38-llama-cpp-intermediate-trace.sh`. Reproduce and check it with:
+
+```bash
+scripts/qwen38-llama-cpp-intermediate-trace.sh \
+  /home/christopherdavid/code/llama.cpp \
+  target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf \
+  target/qwen38-llama-cpp-intermediate-trace
+cargo run -p psionic-serve --example qwen38_cpu_intermediate_compare -- \
+  target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf \
+  target/qwen38-llama-cpp-intermediate-trace \
+  fixtures/qwen38/reports/qwen38_cpu_recurrent_intermediate_parity_v1.json
+scripts/check-qwen38-cpu-intermediate-parity.sh
+```
 
 Generalize the existing Qwen3.5 hybrid runtime only as far as required for the
 admitted Qwen3.8 GGUF. Validate these boundaries independently:

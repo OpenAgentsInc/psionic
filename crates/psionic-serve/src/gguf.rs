@@ -17907,6 +17907,20 @@ mod tests {
             CpuGgufServiceKind::Qwen35(service) => service.state_allocation_summary(8),
             _ => panic!("qwen38 must route through the qwen35 CPU graph"),
         };
+        let trace = match &service.inner {
+            CpuGgufServiceKind::Qwen35(service) => service.trace_first_recurrent_layer(
+                &TokenSequence::new(vec![TokenId(6), TokenId(7)]),
+                &TokenSequence::new(vec![TokenId(7)]),
+            )?,
+            _ => panic!("qwen38 must route through the qwen35 CPU graph"),
+        };
+        let repeated_trace = match &service.inner {
+            CpuGgufServiceKind::Qwen35(service) => service.trace_first_recurrent_layer(
+                &TokenSequence::new(vec![TokenId(6), TokenId(7)]),
+                &TokenSequence::new(vec![TokenId(7)]),
+            )?,
+            _ => panic!("qwen38 must route through the qwen35 CPU graph"),
+        };
         let request = GenerationRequest::new_text(
             String::from("gguf-qwen38"),
             descriptor.clone(),
@@ -17956,6 +17970,74 @@ mod tests {
         assert_eq!(state_allocations.convolution_state_f32, 576);
         assert_eq!(state_allocations.delta_state_f32, 384);
         assert!(state_allocations.kv_cache_capacity_entries >= 8);
+        assert_eq!(trace, repeated_trace);
+        assert_eq!(trace.model_id, descriptor.model.model_id);
+        assert_eq!(trace.layer_index, 0);
+        assert_eq!(trace.tensors.len(), 42);
+        assert_eq!(
+            trace
+                .tensors
+                .iter()
+                .filter(|tensor| tensor.phase.label() == "prefill")
+                .count(),
+            28
+        );
+        assert_eq!(
+            trace
+                .tensors
+                .iter()
+                .filter(|tensor| tensor.phase.label() == "decode")
+                .count(),
+            14
+        );
+        let trace_stages = trace
+            .tensors
+            .iter()
+            .map(|tensor| tensor.stage.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            trace_stages,
+            std::collections::BTreeSet::from([
+                "a_softplus",
+                "attn_norm",
+                "attn_output",
+                "beta_sigmoid",
+                "conv_output_raw",
+                "conv_output_silu",
+                "final_output",
+                "gate",
+                "k_conv_predelta",
+                "linear_attn_out",
+                "linear_attn_qkv_mixed",
+                "new_state",
+                "q_conv_predelta",
+                "v_conv_predelta",
+            ])
+        );
+        assert_eq!(
+            trace
+                .tensors
+                .iter()
+                .filter(|tensor| tensor.stage == "attn_norm")
+                .map(|tensor| (tensor.position, tensor.token_id))
+                .collect::<Vec<_>>(),
+            vec![(0, TokenId(6)), (1, TokenId(7)), (2, TokenId(7))]
+        );
+        for tensor in &trace.tensors {
+            assert_eq!(
+                tensor.values.len(),
+                tensor.shape.iter().product::<usize>(),
+                "trace shape mismatch at {} position {}",
+                tensor.stage,
+                tensor.position
+            );
+            assert!(
+                tensor.values.iter().all(|value| value.is_finite()),
+                "non-finite trace value at {} position {}",
+                tensor.stage,
+                tensor.position
+            );
+        }
         assert_eq!(first.output.text, "world");
         assert_eq!(second.output, first.output);
         assert_eq!(support.family, GgufDecoderFamily::Qwen38);

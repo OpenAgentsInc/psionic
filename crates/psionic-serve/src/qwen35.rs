@@ -1158,6 +1158,82 @@ pub(crate) struct Qwen35CpuStateAllocationSummary {
     pub(crate) kv_cache_capacity_entries: usize,
 }
 
+/// Phase associated with one native CPU recurrent-intermediate observation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Qwen35CpuRecurrentTracePhase {
+    /// A token supplied as part of the prompt prefill.
+    Prefill,
+    /// A supplied token evaluated after prefill with the retained recurrent state.
+    Decode,
+}
+
+impl Qwen35CpuRecurrentTracePhase {
+    /// Stable machine-facing phase label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Prefill => "prefill",
+            Self::Decode => "decode",
+        }
+    }
+}
+
+/// One named tensor captured from the first Qwen3.5-family recurrent CPU layer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Qwen35CpuRecurrentTraceTensor {
+    /// Prefill or token-at-a-time decode phase.
+    pub phase: Qwen35CpuRecurrentTracePhase,
+    /// Absolute token position in the retained recurrent state.
+    pub position: usize,
+    /// Token evaluated at this position.
+    pub token_id: TokenId,
+    /// llama.cpp-aligned recurrent boundary name.
+    pub stage: String,
+    /// Canonical GGML-order shape with the fastest-moving dimension first.
+    pub shape: [usize; 4],
+    /// F32 values in canonical GGML dimension order.
+    pub values: Vec<f32>,
+}
+
+/// Native CPU trace for the first recurrent layer across prefill and decode.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Qwen35CpuRecurrentTrace {
+    /// Stable model identity bound to this trace.
+    pub model_id: String,
+    /// Runtime-plan digest bound to this trace.
+    pub plan_digest: String,
+    /// Traced recurrent layer index. The current contract is layer zero.
+    pub layer_index: usize,
+    /// Ordered tensor observations.
+    pub tensors: Vec<Qwen35CpuRecurrentTraceTensor>,
+}
+
+struct Qwen35CpuTraceContext<'a> {
+    phase: Qwen35CpuRecurrentTracePhase,
+    position: usize,
+    token_id: TokenId,
+    tensors: &'a mut Vec<Qwen35CpuRecurrentTraceTensor>,
+}
+
+fn push_qwen35_cpu_trace_tensor(
+    trace: &mut Option<Qwen35CpuTraceContext<'_>>,
+    stage: &str,
+    shape: [usize; 4],
+    values: &[f32],
+) {
+    let Some(trace) = trace.as_mut() else {
+        return;
+    };
+    trace.tensors.push(Qwen35CpuRecurrentTraceTensor {
+        phase: trace.phase,
+        position: trace.position,
+        token_id: trace.token_id,
+        stage: stage.to_string(),
+        shape,
+        values: values.to_vec(),
+    });
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Qwen35CpuGenerationDeadline {
     started_at: Instant,
@@ -1261,6 +1337,79 @@ impl CpuGgufQwen35TextGenerationService {
             }
         }
         summary
+    }
+
+    /// Captures layer-zero recurrent intermediates for supplied prefill and decode tokens.
+    ///
+    /// The decode tokens are inputs evaluated after the prompt with the same
+    /// convolution and delta state. This is a diagnostic comparator path and
+    /// does not perform sampling or execute later trunk layers.
+    pub fn trace_first_recurrent_layer(
+        &self,
+        prompt_tokens: &TokenSequence,
+        decode_tokens: &TokenSequence,
+    ) -> Result<Qwen35CpuRecurrentTrace, ReferenceTextGenerationError> {
+        if prompt_tokens.is_empty() {
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+        let layer = self.model.layers.first().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "qwen35 cpu recurrent trace requires layer zero",
+            )))
+        })?;
+        let CpuQwen35LayerKind::Hybrid(hybrid) = &layer.kind else {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen35 cpu recurrent trace requires recurrent layer zero",
+                )),
+            ));
+        };
+        let mut state = CpuQwen35HybridState::new(
+            hybrid.qkv_gate_alpha_beta.rows_per_projection[0]
+                .saturating_mul(hybrid.conv_kernel.saturating_sub(1)),
+            hybrid
+                .time_step_rank
+                .saturating_mul(hybrid.state_size)
+                .saturating_mul(hybrid.state_size),
+        );
+        let mut tensors = Vec::new();
+        let mut position = 0usize;
+        for (phase, tokens) in [
+            (Qwen35CpuRecurrentTracePhase::Prefill, prompt_tokens),
+            (Qwen35CpuRecurrentTracePhase::Decode, decode_tokens),
+        ] {
+            for token in tokens.as_slice() {
+                if token.as_u32() as usize >= self.model.descriptor.config.vocab_size {
+                    return Err(ReferenceTextGenerationError::InvalidToken {
+                        token: token.as_u32(),
+                        vocab_size: self.model.descriptor.config.vocab_size,
+                    });
+                }
+                let hidden = self
+                    .model
+                    .token_embedding
+                    .decode_row(token.as_u32() as usize)?;
+                layer.forward_hybrid_attention(
+                    &self.model.family_metadata,
+                    hybrid,
+                    hidden.as_slice(),
+                    &mut state,
+                    Some(Qwen35CpuTraceContext {
+                        phase,
+                        position,
+                        token_id: *token,
+                        tensors: &mut tensors,
+                    }),
+                )?;
+                position = position.saturating_add(1);
+            }
+        }
+        Ok(Qwen35CpuRecurrentTrace {
+            model_id: self.model.descriptor.model.model_id.clone(),
+            plan_digest: self.model.plan_digest.clone(),
+            layer_index: 0,
+            tensors,
+        })
     }
 
     #[must_use]
@@ -2752,11 +2901,57 @@ impl CpuQwen35Layer {
         input_hidden: Vec<f32>,
         state: &mut CpuQwen35HybridState,
     ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
-        let epsilon = family_metadata.rms_norm_epsilon;
-        let hidden_norm = rms_norm(
+        let projected = self.forward_hybrid_attention(
+            family_metadata,
+            hybrid,
             input_hidden.as_slice(),
-            self.attention_norm.as_slice(),
+            state,
+            None,
+        )?;
+        let epsilon = family_metadata.rms_norm_epsilon;
+        let post_attention = add_vectors(projected.as_slice(), input_hidden.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let post_attention_norm = rms_norm(
+            post_attention.as_slice(),
+            self.post_attention_norm.as_slice(),
             epsilon,
+        );
+        let gate_up = self
+            .ffn_gate_up
+            .host_matvec(post_attention_norm.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let ffn = silu_glu(
+            gate_up
+                .slice(0)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            gate_up
+                .slice(1)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+        );
+        let ffn_down = self
+            .ffn_down
+            .matvec(ffn.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        add_vectors(post_attention.as_slice(), ffn_down.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)
+    }
+
+    fn forward_hybrid_attention(
+        &self,
+        family_metadata: &GgufDecoderFamilyMetadata,
+        hybrid: &CpuQwen35HybridLayer,
+        input_hidden: &[f32],
+        state: &mut CpuQwen35HybridState,
+        mut trace: Option<Qwen35CpuTraceContext<'_>>,
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let tracing = trace.is_some();
+        let epsilon = family_metadata.rms_norm_epsilon;
+        let hidden_norm = rms_norm(input_hidden, self.attention_norm.as_slice(), epsilon);
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "attn_norm",
+            [hidden_norm.len(), 1, 1, 1],
+            hidden_norm.as_slice(),
         );
         let projected = hybrid
             .qkv_gate_alpha_beta
@@ -2778,7 +2973,12 @@ impl CpuQwen35Layer {
         let k_size = q_size;
         let v_size = hybrid.inner_size;
         let v_offset = q_size.saturating_add(k_size);
-
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "linear_attn_qkv_mixed",
+            [qkv.len(), 1, 1, 1],
+            qkv,
+        );
         let mut conv = vec![0.0_f32; qkv.len()];
         causal_depthwise_conv1d_step_in_place(
             qkv,
@@ -2787,17 +2987,56 @@ impl CpuQwen35Layer {
             hybrid.conv_kernel,
             conv.as_mut_slice(),
         )?;
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "conv_output_raw",
+            [conv.len(), 1, 1, 1],
+            conv.as_slice(),
+        );
         silu_forward_in_place(conv.as_mut_slice());
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "conv_output_silu",
+            [conv.len(), 1, 1, 1],
+            conv.as_slice(),
+        );
 
+        let mut alpha_softplus = if tracing {
+            vec![0.0_f32; alpha.len()]
+        } else {
+            Vec::new()
+        };
         let mut gate_preexp = vec![0.0_f32; alpha.len()];
         let mut decay = vec![0.0_f32; alpha.len()];
         let mut beta_sigmoid = vec![0.0_f32; beta.len()];
         for index in 0..alpha.len() {
-            let gate = softplus(alpha[index] + hybrid.ssm_dt[index]) * hybrid.ssm_a[index];
+            let softplus = softplus(alpha[index] + hybrid.ssm_dt[index]);
+            if tracing {
+                alpha_softplus[index] = softplus;
+            }
+            let gate = softplus * hybrid.ssm_a[index];
             gate_preexp[index] = gate;
             decay[index] = gate.exp();
             beta_sigmoid[index] = sigmoid(beta[index]);
         }
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "a_softplus",
+            [alpha_softplus.len(), 1, 1, 1],
+            alpha_softplus.as_slice(),
+        );
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "gate",
+            [gate_preexp.len(), 1, 1, 1],
+            gate_preexp.as_slice(),
+        );
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "beta_sigmoid",
+            [1, beta_sigmoid.len(), 1, 1],
+            beta_sigmoid.as_slice(),
+        );
 
         let mut qkv_norm = vec![0.0_f32; v_offset.saturating_add(v_size)];
         qkv_norm[..q_size].copy_from_slice(&conv[..q_size]);
@@ -2809,6 +3048,21 @@ impl CpuQwen35Layer {
         let mut norm_k = vec![0.0_f32; hybrid.state_size];
         let mut kv_mem = vec![0.0_f32; hybrid.state_size];
         let mut delta = vec![0.0_f32; hybrid.state_size];
+        let mut normalized_q = if tracing {
+            vec![0.0_f32; q_size]
+        } else {
+            Vec::new()
+        };
+        let mut normalized_k = if tracing {
+            vec![0.0_f32; k_size]
+        } else {
+            Vec::new()
+        };
+        let mut normalized_key_heads = if tracing {
+            vec![false; hybrid.group_count]
+        } else {
+            Vec::new()
+        };
         let repeat_factor = hybrid.time_step_rank / hybrid.group_count.max(1);
         for value_head_index in 0..hybrid.time_step_rank {
             let key_head_index = if hybrid.v_head_reordered {
@@ -2845,7 +3099,55 @@ impl CpuQwen35Layer {
                 delta.as_mut_slice(),
                 output_slice,
             );
+            if tracing && !normalized_key_heads[key_head_index] {
+                let start = key_head_index.saturating_mul(hybrid.state_size);
+                let end = start.saturating_add(hybrid.state_size);
+                let q_unscale = (hybrid.state_size as f32).sqrt();
+                for (destination, value) in normalized_q[start..end]
+                    .iter_mut()
+                    .zip(norm_q.iter().copied())
+                {
+                    *destination = value * q_unscale;
+                }
+                normalized_k[start..end].copy_from_slice(norm_k.as_slice());
+                normalized_key_heads[key_head_index] = true;
+            }
         }
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "q_conv_predelta",
+            [hybrid.state_size, hybrid.group_count, 1, 1],
+            normalized_q.as_slice(),
+        );
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "k_conv_predelta",
+            [hybrid.state_size, hybrid.group_count, 1, 1],
+            normalized_k.as_slice(),
+        );
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "v_conv_predelta",
+            [hybrid.state_size, v_size / hybrid.state_size.max(1), 1, 1],
+            &conv[v_offset..v_offset + v_size],
+        );
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "new_state",
+            [
+                hybrid.state_size,
+                hybrid.state_size,
+                hybrid.time_step_rank,
+                1,
+            ],
+            state.delta_state.as_slice(),
+        );
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "attn_output",
+            [hybrid.state_size, v_size / hybrid.state_size.max(1), 1, 1],
+            gated_delta.as_slice(),
+        );
 
         let hybrid_norm = per_head_rms_norm(
             gated_delta.as_slice(),
@@ -2860,35 +3162,23 @@ impl CpuQwen35Layer {
             .zip(z.iter().copied())
             .map(|(value, gate)| value * silu_scalar(gate))
             .collect::<Vec<_>>();
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "final_output",
+            [activated.len(), 1, 1, 1],
+            activated.as_slice(),
+        );
         let projected = hybrid
             .ssm_out
             .matvec(activated.as_slice())
             .map_err(ReferenceTextGenerationError::Runtime)?;
-        let post_attention = add_vectors(projected.as_slice(), input_hidden.as_slice())
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        let post_attention_norm = rms_norm(
-            post_attention.as_slice(),
-            self.post_attention_norm.as_slice(),
-            epsilon,
+        push_qwen35_cpu_trace_tensor(
+            &mut trace,
+            "linear_attn_out",
+            [projected.len(), 1, 1, 1],
+            projected.as_slice(),
         );
-        let gate_up = self
-            .ffn_gate_up
-            .host_matvec(post_attention_norm.as_slice())
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        let ffn = silu_glu(
-            gate_up
-                .slice(0)
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            gate_up
-                .slice(1)
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-        );
-        let ffn_down = self
-            .ffn_down
-            .matvec(ffn.as_slice())
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        add_vectors(post_attention.as_slice(), ffn_down.as_slice())
-            .map_err(ReferenceTextGenerationError::Runtime)
+        Ok(projected)
     }
 
     fn forward_full_attention(
