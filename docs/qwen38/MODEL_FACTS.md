@@ -174,12 +174,41 @@ and do not establish any local capability claim.
 | `README.md` | `57e4bdb258ee1a7d2635c5174ebd4e56abe392505cdb5f8bbb356b0dc4293641` |
 | `config.json` | `191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab` |
 | `generation_config.json` | `e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e` |
-| `tokenizer.json` | `a8c9a997a5892986d41139657243891b53fa81e31e65ea73522717d8691d7a47` |
+| `tokenizer.json` | `0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3` |
 | `tokenizer_config.json` | `b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27` |
 | `chat_template.jinja` | `c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041` |
 | `preprocessor_config.json` | `27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516` |
 | `video_preprocessor_config.json` | `7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13` |
 | `model.safetensors.index.json` | `77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df` |
+
+The `tokenizer.json` digest above is the SHA-256 of the downloaded LFS blob.
+The raw Git representation is an LFS pointer and has a different digest.
+
+## Local Acquisition
+
+The full repository was downloaded on 2026-08-14 with Hugging Face CLI 1.27.0:
+
+```bash
+hf download Qwen/Qwen3.8-27B \
+  --revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 \
+  --local-dir target/models/qwen/Qwen3.8-27B \
+  --max-workers 4
+```
+
+Verification facts:
+
+- local directory: `target/models/qwen/Qwen3.8-27B`
+- repository files verified: 32
+- weight shards: 18
+- incomplete downloads: 0
+- indexed tensors: 1,199
+- indexed tensor bytes: 55,562,855,904
+- complete shard-file bytes including safetensors headers: 55,563,006,776
+- `hf cache verify` result: all checksums match
+
+The local CLI metadata under `.cache/huggingface/` is expected download state
+and is not an upstream repository file. Verification was run with missing-file
+enforcement while allowing that local metadata.
 
 ## Primary Sources
 

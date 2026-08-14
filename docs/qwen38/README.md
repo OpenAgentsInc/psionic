@@ -18,6 +18,19 @@ The first target is the official dense post-trained checkpoint:
 - pipeline: image-text-to-text
 - native context length: 262,144 tokens
 
+## Local Artifact
+
+The complete upstream repository is available locally at:
+
+```text
+target/models/qwen/Qwen3.8-27B
+```
+
+The download is pinned to the revision above. Hugging Face CLI verification
+passed for all 32 repository files, including all 18 weight shards. The
+directory is ignored by Git through `/target/`; model weights are not part of
+the repository.
+
 ## Documents
 
 - [MODEL_FACTS.md](MODEL_FACTS.md) records facts read from the upstream model
