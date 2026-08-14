@@ -60,6 +60,11 @@ equivalent CUDA targets. The first accelerated claim requires the primary
 artifact's admitted weights and runtime state to remain on the GPU without
 unreported host placement.
 
+The exact pinned sizes, LFS SHA-256 values, local destinations, transfer
+commands, projector exclusions, and MTP disposition are fixed in
+[GGUF_DOWNLOAD_PLAN.md](GGUF_DOWNLOAD_PLAN.md). The plan is committed before
+the `Q3_K_M` and `Q4_K_M` comparator transfers begin.
+
 ## Qualification Gates
 
 Before implementation treats the primary artifact as admitted, retain:

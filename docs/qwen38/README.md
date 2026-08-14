@@ -74,6 +74,9 @@ recorded in
   complete pinned Unsloth GGUF tree, records exact sizes and LFS digests, and
   distinguishes the selected local text artifact from deferred comparators,
   BF16 shards, and vision projectors.
+- [GGUF_DOWNLOAD_PLAN.md](GGUF_DOWNLOAD_PLAN.md) fixes the exact primary and
+  comparator transfer set, local destinations, LFS sizes and digests,
+  projector exclusions, and embedded MTP disposition before transfer.
 - [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) defines the ordered
   implementation milestones, acceptance gates, validation matrix, commit
   sequence, and release claim boundary for Qwen3.8 support.
