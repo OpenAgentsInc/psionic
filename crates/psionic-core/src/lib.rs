@@ -3,6 +3,7 @@
 //! This crate intentionally stays small and product-agnostic. It owns public
 //! engine-facing metadata, not backend execution logic.
 
+pub mod ggml_quantization;
 pub mod philox;
 pub mod ternary;
 
@@ -1463,6 +1464,8 @@ pub enum QuantizationMode {
     GgmlQ4_1,
     /// GGML/GGUF Q5_0 block quantization.
     GgmlQ5_0,
+    /// GGML/GGUF Q3_K block quantization.
+    GgmlQ3K,
     /// GGML/GGUF Q5_K block quantization.
     GgmlQ5K,
     /// GGML/GGUF Q4_K block quantization.
@@ -1471,6 +1474,10 @@ pub enum QuantizationMode {
     GgmlQ6K,
     /// GGML/GGUF Q8_0 block quantization.
     GgmlQ8_0,
+    /// GGML/GGUF IQ3_S block quantization.
+    GgmlIq3S,
+    /// GGML/GGUF IQ4_XS block quantization.
+    GgmlIq4Xs,
 }
 
 impl QuantizationMode {
@@ -1484,10 +1491,13 @@ impl QuantizationMode {
             Self::GgmlQ4_0 => "ggml_q4_0",
             Self::GgmlQ4_1 => "ggml_q4_1",
             Self::GgmlQ5_0 => "ggml_q5_0",
+            Self::GgmlQ3K => "ggml_q3_k",
             Self::GgmlQ5K => "ggml_q5_k",
             Self::GgmlQ4K => "ggml_q4_k",
             Self::GgmlQ6K => "ggml_q6_k",
             Self::GgmlQ8_0 => "ggml_q8_0",
+            Self::GgmlIq3S => "ggml_iq3_s",
+            Self::GgmlIq4Xs => "ggml_iq4_xs",
         }
     }
 
@@ -1499,10 +1509,13 @@ impl QuantizationMode {
             Self::GgmlQ4_0 => Some((32, 18)),
             Self::GgmlQ4_1 => Some((32, 20)),
             Self::GgmlQ5_0 => Some((32, 22)),
+            Self::GgmlQ3K => Some((256, 110)),
             Self::GgmlQ5K => Some((256, 176)),
             Self::GgmlQ4K => Some((256, 144)),
             Self::GgmlQ6K => Some((256, 210)),
             Self::GgmlQ8_0 => Some((32, 34)),
+            Self::GgmlIq3S => Some((256, 110)),
+            Self::GgmlIq4Xs => Some((256, 136)),
             Self::None | Self::Int8Symmetric => None,
         }
     }

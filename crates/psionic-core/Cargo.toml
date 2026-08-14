@@ -14,6 +14,7 @@ workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+half = "2.4.1"
 hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
