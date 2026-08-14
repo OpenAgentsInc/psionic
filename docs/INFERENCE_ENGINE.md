@@ -283,6 +283,15 @@ into one generic engine claim.
   development. The repo now admits `Gemma 4` on CPU for bounded debug
   execution, but CPU still does not satisfy the first published `Gemma 4`
   support claim for Psionic.
+- `qwen38` execution remains `planned`. Current `main` has an `implemented`
+  weight-free Qwen3.8-27B artifact-facts and product-identity contract at
+  `fixtures/qwen38/qwen38_27b_artifact_facts_v1.json`. It binds the official
+  revision, source digests, 18-shard inventory, decoder and multimodal wrapper
+  facts, processor identity, and native/extended context posture. The
+  `psionic-models` admission result accepts only the official and explicit
+  short 27B ids and refuses other variants or field drift. This metadata
+  milestone does not admit checkpoint loading, token generation, serving, or
+  media execution.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
 - Current `main` also admits native local execution for the real Hugging Face

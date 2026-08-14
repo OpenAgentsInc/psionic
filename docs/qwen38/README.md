@@ -1,8 +1,8 @@
 # Qwen3.8 Research
 
-> Status: `planned` on 2026-08-14. This directory records upstream facts and
-> Psionic implementation analysis. Psionic does not yet claim Qwen3.8
-> inference, serving, training, or multimodal support.
+> Status: `planned` on 2026-08-14. Upstream research, local artifact
+> acquisition, and R1 product/artifact identity are `implemented`. Psionic does
+> not yet claim Qwen3.8 inference, serving, training, or multimodal support.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -111,6 +111,13 @@ The first implementation must keep all of the following identities explicit:
 - execution backend and bounded execution mode
 - text-only versus native vision execution
 - native 262,144-token context versus any explicitly configured YaRN extension
+
+R1 enforces that boundary through
+`fixtures/qwen38/qwen38_27b_artifact_facts_v1.json` and the exported
+`psionic_models::Qwen38ArtifactFacts` and
+`psionic_models::Qwen38ArtifactAdmissionResult` types. The official and short
+27B model ids normalize deterministically. Served ids, other sizes, other
+products, and drifted fixtures refuse rather than inheriting the 27B contract.
 
 ## Primary Source
 

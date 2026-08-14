@@ -1,7 +1,8 @@
 # Qwen3.8 Implementation Roadmap
 
-> Status: `planned` on 2026-08-14. Upstream research and artifact acquisition
-> are `implemented`; Qwen3.8 execution in Psionic remains `planned`.
+> Status: `planned` on 2026-08-14. Upstream research, artifact acquisition, and
+> R1 product/artifact identity are `implemented`; Qwen3.8 execution in Psionic
+> remains `planned`.
 
 ## Goal
 
@@ -78,7 +79,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | Milestone | Status | Deliverable | Claim impact |
 | --- | --- | --- | --- |
 | R0 | `implemented` | Pinned upstream research and complete verified BF16 artifact | None; research only |
-| R1 | `planned` | Committed Qwen3.8 artifact-fact fixture and product identity | None; metadata only |
+| R1 | `implemented` | Committed Qwen3.8 artifact-fact fixture and product identity | None; metadata only |
 | R2 | `planned` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
 | R3 | `planned` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
 | R4 | `planned` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
@@ -133,6 +134,12 @@ An upstream revision change requires a reviewed digest update and replay of all
 artifact, template, tensor, and parity gates.
 
 ## R1: Artifact Facts And Product Identity
+
+Status: `implemented` in `fixtures/qwen38/qwen38_27b_artifact_facts_v1.json`
+and `crates/psionic-models/src/qwen38.rs`. The stable artifact-facts and
+admission schema versions are `psionic.qwen38.artifact_facts.v1` and
+`psionic.qwen38.artifact_admission.v1`. This milestone adds metadata identity
+and deterministic refusal only; it does not admit checkpoint execution.
 
 Add a small committed fixture under `fixtures/qwen38/` without model weights.
 The fixture should contain:
@@ -652,7 +659,7 @@ regeneration into these commits.
 
 ## External Inputs And Blockers
 
-R1-R4 can begin with the current repository and official BF16 artifact.
+R2-R4 can begin with the current repository and official BF16 artifact.
 
 R5 and later need:
 
@@ -665,8 +672,8 @@ R5 and later need:
   `9b05354ec6fb58b4e665e9a39ebc40285c015638` for tokenizer, prompt,
   intermediates, logits, generation, and eventually vision
 
-These inputs do not block the metadata, template, admission, or bounded BF16
-milestones. They block honest native generation and accelerated release claims.
+These inputs do not block the template, admission, or bounded BF16 milestones.
+They block honest native generation and accelerated release claims.
 
 ## Completion Rules
 
