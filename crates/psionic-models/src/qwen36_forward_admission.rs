@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
@@ -12,8 +12,14 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     PromptMessage, PromptMessageRole, QWEN36_27B_MODEL_ID, QWEN36_27B_SERVED_MODEL_ID,
+    Qwen35TextArchitectureReport, Qwen35TextCheckpointError, Qwen35TextObservedTensorSet,
+    Qwen35TextObservedTensorSpec, Qwen35TextSafetensorsShardHeaderReport,
+    Qwen35TextTensorDtypeMismatch, Qwen35TextTensorShapeMismatch, Qwen35TextTensorSpec,
     Qwen36PromptOptions, Qwen36PromptReceipt, Qwen36PromptRenderer, Qwen36ReasoningMode,
     Qwen36TargetPathError, load_qwen36_model_config, normalize_qwen36_target_model_id,
+    qwen35_text_architecture_report, qwen35_text_expected_tensor_specs,
+    qwen35_text_observed_tensors_from_shards, qwen35_text_shard_paths_from_weight_map,
+    qwen35_text_tensor_admission_report, qwen35_text_weight_index_from_bytes,
 };
 
 pub const QWEN36_FORWARD_ADMISSION_SCHEMA_VERSION: &str = "psionic.qwen36_27b_forward_admission.v1";
@@ -23,74 +29,12 @@ pub const QWEN36_FULL_FORWARD_BACKEND: &str = "local-full-forward";
 const QWEN36_EMBED_TOKENS_WEIGHT: &str = "model.language_model.embed_tokens.weight";
 const QWEN36_LM_HEAD_WEIGHT: &str = "lm_head.weight";
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Qwen36ForwardArchitectureReport {
-    pub root_model_type: String,
-    pub text_model_type: String,
-    pub architectures: Vec<String>,
-    pub hidden_size: usize,
-    pub intermediate_size: usize,
-    pub num_hidden_layers: usize,
-    pub num_attention_heads: usize,
-    pub num_key_value_heads: usize,
-    pub head_dim: usize,
-    pub vocab_size: usize,
-    pub max_position_embeddings: usize,
-    pub torch_dtype: String,
-    pub rms_norm_eps: Option<f64>,
-    pub hidden_act: Option<String>,
-    pub layer_types: Vec<String>,
-    pub full_attention_layers: Vec<usize>,
-    pub linear_attention_layers: Vec<usize>,
-    pub linear_key_head_dim: Option<usize>,
-    pub linear_value_head_dim: Option<usize>,
-    pub linear_num_key_heads: Option<usize>,
-    pub linear_num_value_heads: Option<usize>,
-    pub linear_conv_kernel_dim: Option<usize>,
-    pub attn_output_gate: Option<bool>,
-    pub output_gate_type: Option<String>,
-    pub mtp_num_hidden_layers: usize,
-    pub mtp_use_dedicated_embeddings: Option<bool>,
-    pub rope_parameters_hash: Option<String>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Qwen36TensorSpec {
-    pub name: String,
-    pub dtype: String,
-    pub shape: Vec<usize>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Qwen36ObservedTensorSpec {
-    pub name: String,
-    pub dtype: String,
-    pub shape: Vec<usize>,
-    pub shard: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Qwen36SafetensorsShardHeaderReport {
-    pub path: String,
-    pub shard_name: String,
-    pub byte_len: u64,
-    pub header_sha256: String,
-    pub tensor_count: usize,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Qwen36TensorShapeMismatch {
-    pub name: String,
-    pub expected_shape: Vec<usize>,
-    pub observed_shape: Vec<usize>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Qwen36TensorDtypeMismatch {
-    pub name: String,
-    pub expected_dtype: String,
-    pub observed_dtype: String,
-}
+pub type Qwen36ForwardArchitectureReport = Qwen35TextArchitectureReport;
+pub type Qwen36TensorSpec = Qwen35TextTensorSpec;
+pub type Qwen36ObservedTensorSpec = Qwen35TextObservedTensorSpec;
+pub type Qwen36SafetensorsShardHeaderReport = Qwen35TextSafetensorsShardHeaderReport;
+pub type Qwen36TensorShapeMismatch = Qwen35TextTensorShapeMismatch;
+pub type Qwen36TensorDtypeMismatch = Qwen35TextTensorDtypeMismatch;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Qwen36TensorAdmissionReport {
@@ -409,240 +353,29 @@ pub fn run_qwen36_forward_admission_with_command_line(
 pub fn qwen36_forward_architecture_report(
     config_bytes: &[u8],
 ) -> Result<Qwen36ForwardArchitectureReport, Qwen36TargetPathError> {
-    let root = serde_json::from_slice::<Value>(config_bytes)?;
-    let text = root
-        .get("text_config")
-        .ok_or_else(|| {
-            Qwen36TargetPathError::InvalidConfig(String::from(
-                "Hugging Face Qwen3.6 config must contain text_config",
-            ))
-        })?
-        .clone();
-    let root_model_type = required_string(&root, "model_type")?;
-    let text_model_type = required_string(&text, "model_type")?;
-    if root_model_type != "qwen3_5" || text_model_type != "qwen3_5_text" {
-        return Err(Qwen36TargetPathError::InvalidConfig(format!(
-            "unsupported Qwen3.6 forward config model_type `{root_model_type}` / `{text_model_type}`"
-        )));
-    }
-    let architectures = root
-        .get("architectures")
-        .and_then(Value::as_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(Value::as_str)
-                .map(String::from)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let layer_types = text
-        .get("layer_types")
-        .and_then(Value::as_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(Value::as_str)
-                .map(String::from)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let num_hidden_layers = required_usize(&text, "num_hidden_layers")?;
-    if layer_types.len() != num_hidden_layers {
-        return Err(Qwen36TargetPathError::InvalidConfig(format!(
-            "text_config.layer_types must contain {num_hidden_layers} entries"
-        )));
-    }
-    let full_attention_layers = layer_types
-        .iter()
-        .enumerate()
-        .filter_map(|(index, value)| (value == "full_attention").then_some(index))
-        .collect::<Vec<_>>();
-    let linear_attention_layers = layer_types
-        .iter()
-        .enumerate()
-        .filter_map(|(index, value)| (value == "linear_attention").then_some(index))
-        .collect::<Vec<_>>();
-    if full_attention_layers.len() + linear_attention_layers.len() != layer_types.len() {
-        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-            "text_config.layer_types may only contain full_attention or linear_attention",
-        )));
-    }
-    let hidden_size = required_usize(&text, "hidden_size")?;
-    let num_attention_heads = required_usize(&text, "num_attention_heads")?;
-    let head_dim = optional_usize(&text, "head_dim")
-        .unwrap_or_else(|| hidden_size.checked_div(num_attention_heads).unwrap_or(0));
-    if head_dim == 0 {
-        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-            "Qwen3.6 head_dim must be non-zero",
-        )));
-    }
-    let dtype = text
-        .get("torch_dtype")
-        .or_else(|| text.get("dtype"))
-        .and_then(Value::as_str)
-        .unwrap_or("unknown")
-        .to_string();
-    let rope_parameters_hash = text
-        .get("rope_parameters")
-        .map(|value| sha256_json(value))
-        .transpose()?;
-
-    Ok(Qwen36ForwardArchitectureReport {
-        root_model_type,
-        text_model_type,
-        architectures,
-        hidden_size,
-        intermediate_size: required_usize(&text, "intermediate_size")?,
-        num_hidden_layers,
-        num_attention_heads,
-        num_key_value_heads: required_usize(&text, "num_key_value_heads")?,
-        head_dim,
-        vocab_size: required_usize(&text, "vocab_size")?,
-        max_position_embeddings: required_usize(&text, "max_position_embeddings")?,
-        torch_dtype: dtype,
-        rms_norm_eps: text.get("rms_norm_eps").and_then(Value::as_f64),
-        hidden_act: optional_string(&text, "hidden_act"),
-        layer_types,
-        full_attention_layers,
-        linear_attention_layers,
-        linear_key_head_dim: optional_usize(&text, "linear_key_head_dim"),
-        linear_value_head_dim: optional_usize(&text, "linear_value_head_dim"),
-        linear_num_key_heads: optional_usize(&text, "linear_num_key_heads"),
-        linear_num_value_heads: optional_usize(&text, "linear_num_value_heads"),
-        linear_conv_kernel_dim: optional_usize(&text, "linear_conv_kernel_dim"),
-        attn_output_gate: text.get("attn_output_gate").and_then(Value::as_bool),
-        output_gate_type: optional_string(&text, "output_gate_type"),
-        mtp_num_hidden_layers: optional_usize(&text, "mtp_num_hidden_layers").unwrap_or(0),
-        mtp_use_dedicated_embeddings: text
-            .get("mtp_use_dedicated_embeddings")
-            .and_then(Value::as_bool),
-        rope_parameters_hash,
-    })
+    qwen35_text_architecture_report(config_bytes).map_err(qwen35_checkpoint_error_for_qwen36)
 }
 
 pub fn qwen36_expected_text_tensor_specs(
     architecture: &Qwen36ForwardArchitectureReport,
 ) -> Result<Vec<Qwen36TensorSpec>, Qwen36TargetPathError> {
-    let dtype = hf_dtype_to_safetensors_dtype(architecture.torch_dtype.as_str());
-    let mut specs = Vec::new();
-    specs.push(tensor(
-        "model.language_model.embed_tokens.weight",
-        &dtype,
-        [architecture.vocab_size, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        "model.language_model.norm.weight",
-        &dtype,
-        [architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        "lm_head.weight",
-        &dtype,
-        [architecture.vocab_size, architecture.hidden_size],
-    ));
-
-    for (layer, layer_type) in architecture.layer_types.iter().enumerate() {
-        let prefix = format!("model.language_model.layers.{layer}");
-        push_common_decoder_layer_specs(&mut specs, &prefix, &dtype, architecture);
-        match layer_type.as_str() {
-            "full_attention" => {
-                push_full_attention_specs(&mut specs, &prefix, &dtype, architecture);
-            }
-            "linear_attention" => {
-                push_linear_attention_specs(&mut specs, &prefix, &dtype, architecture)?;
-            }
-            other => {
-                return Err(Qwen36TargetPathError::InvalidConfig(format!(
-                    "unsupported Qwen3.6 layer type `{other}`"
-                )));
-            }
-        }
-    }
-
-    if architecture.mtp_num_hidden_layers > 0 {
-        specs.push(tensor(
-            "mtp.pre_fc_norm_embedding.weight",
-            &dtype,
-            [architecture.hidden_size],
-        ));
-        specs.push(tensor(
-            "mtp.pre_fc_norm_hidden.weight",
-            &dtype,
-            [architecture.hidden_size],
-        ));
-        specs.push(tensor(
-            "mtp.fc.weight",
-            &dtype,
-            [architecture.hidden_size, architecture.hidden_size * 2],
-        ));
-        specs.push(tensor(
-            "mtp.norm.weight",
-            &dtype,
-            [architecture.hidden_size],
-        ));
-        for layer in 0..architecture.mtp_num_hidden_layers {
-            let prefix = format!("mtp.layers.{layer}");
-            push_common_decoder_layer_specs(&mut specs, &prefix, &dtype, architecture);
-            push_full_attention_specs(&mut specs, &prefix, &dtype, architecture);
-        }
-    }
-
-    specs.sort_by(|left, right| left.name.cmp(&right.name));
-    Ok(specs)
+    qwen35_text_expected_tensor_specs(architecture).map_err(qwen35_checkpoint_error_for_qwen36)
 }
 
 pub fn qwen36_weight_index_from_bytes(
     index_bytes: &[u8],
 ) -> Result<BTreeMap<String, String>, Qwen36TargetPathError> {
-    let value = serde_json::from_slice::<Value>(index_bytes)?;
-    let weight_map = value
-        .get("weight_map")
-        .and_then(Value::as_object)
-        .ok_or_else(|| {
-            Qwen36TargetPathError::InvalidConfig(String::from(
-                "model.safetensors.index.json must contain weight_map",
-            ))
-        })?;
-    let mut map = BTreeMap::new();
-    for (tensor_name, shard_name) in weight_map {
-        let Some(shard_name) = shard_name.as_str() else {
-            return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-                "weight_map values must be shard path strings",
-            )));
-        };
-        map.insert(tensor_name.clone(), String::from(shard_name));
-    }
-    if map.is_empty() {
-        return Err(Qwen36TargetPathError::InvalidConfig(String::from(
-            "model.safetensors.index.json has no tensor entries",
-        )));
-    }
-    Ok(map)
+    qwen35_text_weight_index_from_bytes(index_bytes)
+        .map(|index| index.weight_map)
+        .map_err(qwen35_checkpoint_error_for_qwen36)
 }
 
 pub fn qwen36_shard_paths_from_weight_map(
     model_dir: &Path,
     weight_map: &BTreeMap<String, String>,
 ) -> Result<Vec<PathBuf>, Qwen36TargetPathError> {
-    let shard_names = weight_map.values().cloned().collect::<BTreeSet<_>>();
-    let mut paths = Vec::with_capacity(shard_names.len());
-    let mut missing = Vec::new();
-    for shard_name in shard_names {
-        let path = model_dir.join(&shard_name);
-        if path.is_file() {
-            paths.push(path);
-        } else {
-            missing.push(shard_name);
-        }
-    }
-    if !missing.is_empty() {
-        return Err(Qwen36TargetPathError::InvalidConfig(format!(
-            "model directory is incomplete; missing safetensors shards: {}",
-            missing.join(", ")
-        )));
-    }
-    Ok(paths)
+    qwen35_text_shard_paths_from_weight_map(model_dir, weight_map)
+        .map_err(qwen35_checkpoint_error_for_qwen36)
 }
 
 pub fn qwen36_tensor_admission_report(
@@ -650,204 +383,32 @@ pub fn qwen36_tensor_admission_report(
     weight_map: BTreeMap<String, String>,
     observed_tensors: Qwen36ObservedTensorSet,
 ) -> Qwen36TensorAdmissionReport {
-    let expected_by_name = expected_tensors
-        .iter()
-        .map(|spec| (spec.name.clone(), spec.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let observed_by_name = observed_tensors
-        .tensors
-        .iter()
-        .map(|spec| (spec.name.clone(), spec.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let index_names = weight_map.keys().cloned().collect::<BTreeSet<_>>();
-    let header_names = observed_by_name.keys().cloned().collect::<BTreeSet<_>>();
-
-    let mut missing_expected_tensors = Vec::new();
-    let mut shape_mismatches = Vec::new();
-    let mut dtype_mismatches = Vec::new();
-    let mut admitted_text_tensor_count = 0usize;
-    for expected in &expected_tensors {
-        if !index_names.contains(&expected.name) {
-            missing_expected_tensors.push(expected.clone());
-            continue;
-        }
-        let Some(observed) = observed_by_name.get(&expected.name) else {
-            missing_expected_tensors.push(expected.clone());
-            continue;
-        };
-        let mut admitted = true;
-        if observed.shape != expected.shape {
-            shape_mismatches.push(Qwen36TensorShapeMismatch {
-                name: expected.name.clone(),
-                expected_shape: expected.shape.clone(),
-                observed_shape: observed.shape.clone(),
-            });
-            admitted = false;
-        }
-        if observed.dtype != expected.dtype {
-            dtype_mismatches.push(Qwen36TensorDtypeMismatch {
-                name: expected.name.clone(),
-                expected_dtype: expected.dtype.clone(),
-                observed_dtype: observed.dtype.clone(),
-            });
-            admitted = false;
-        }
-        if admitted {
-            admitted_text_tensor_count += 1;
-        }
-    }
-
-    let index_tensors_missing_from_headers = index_names
-        .difference(&header_names)
-        .cloned()
-        .collect::<Vec<_>>();
-    let header_tensors_missing_from_index = header_names
-        .difference(&index_names)
-        .cloned()
-        .collect::<Vec<_>>();
-    let visual_or_other_observed_tensors = header_names
-        .difference(&expected_by_name.keys().cloned().collect::<BTreeSet<_>>())
-        .cloned()
-        .collect::<Vec<_>>();
-    let text_tensor_admission_passed = missing_expected_tensors.is_empty()
-        && index_tensors_missing_from_headers.is_empty()
-        && header_tensors_missing_from_index.is_empty()
-        && shape_mismatches.is_empty()
-        && dtype_mismatches.is_empty();
-
+    let report =
+        qwen35_text_tensor_admission_report(expected_tensors, weight_map, observed_tensors);
     Qwen36TensorAdmissionReport {
-        expected_text_tensor_count: expected_tensors.len(),
-        observed_index_tensor_count: index_names.len(),
-        observed_header_tensor_count: header_names.len(),
-        admitted_text_tensor_count,
-        visual_or_other_observed_tensor_count: visual_or_other_observed_tensors.len(),
-        shard_headers: observed_tensors.shards,
-        missing_expected_tensors,
-        index_tensors_missing_from_headers,
-        header_tensors_missing_from_index,
-        visual_or_other_observed_tensors,
-        shape_mismatches,
-        dtype_mismatches,
-        text_tensor_admission_passed,
+        expected_text_tensor_count: report.expected_text_tensor_count,
+        observed_index_tensor_count: report.observed_index_tensor_count,
+        observed_header_tensor_count: report.observed_header_tensor_count,
+        admitted_text_tensor_count: report.admitted_text_tensor_count,
+        visual_or_other_observed_tensor_count: report.visual_or_other_observed_tensor_count,
+        shard_headers: report.shard_headers,
+        missing_expected_tensors: report.missing_expected_tensors,
+        index_tensors_missing_from_headers: report.index_tensors_missing_from_headers,
+        header_tensors_missing_from_index: report.header_tensors_missing_from_index,
+        visual_or_other_observed_tensors: report.visual_or_other_observed_tensors,
+        shape_mismatches: report.shape_mismatches,
+        dtype_mismatches: report.dtype_mismatches,
+        text_tensor_admission_passed: report.text_tensor_admission_passed,
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Qwen36ObservedTensorSet {
-    pub shards: Vec<Qwen36SafetensorsShardHeaderReport>,
-    pub tensors: Vec<Qwen36ObservedTensorSpec>,
-}
+pub type Qwen36ObservedTensorSet = Qwen35TextObservedTensorSet;
 
 pub fn qwen36_observed_tensors_from_shards(
     shard_paths: &[PathBuf],
 ) -> Result<Qwen36ObservedTensorSet, Qwen36TargetPathError> {
-    let mut shards = Vec::new();
-    let mut tensors = Vec::new();
-    for path in shard_paths {
-        let (shard, mut shard_tensors) = qwen36_safetensors_header(path)?;
-        shards.push(shard);
-        tensors.append(&mut shard_tensors);
-    }
-    tensors.sort_by(|left, right| left.name.cmp(&right.name));
-    shards.sort_by(|left, right| left.shard_name.cmp(&right.shard_name));
-    Ok(Qwen36ObservedTensorSet { shards, tensors })
-}
-
-fn qwen36_safetensors_header(
-    path: &Path,
-) -> Result<
-    (
-        Qwen36SafetensorsShardHeaderReport,
-        Vec<Qwen36ObservedTensorSpec>,
-    ),
-    Qwen36TargetPathError,
-> {
-    let mut file = File::open(path).map_err(|source| Qwen36TargetPathError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let mut len_bytes = [0u8; 8];
-    file.read_exact(&mut len_bytes)
-        .map_err(|source| Qwen36TargetPathError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    let header_len = u64::from_le_bytes(len_bytes);
-    let header_len = usize::try_from(header_len).map_err(|_| {
-        Qwen36TargetPathError::InvalidConfig(format!(
-            "safetensors header is too large in `{}`",
-            path.display()
-        ))
-    })?;
-    let mut header_bytes = vec![0u8; header_len];
-    file.read_exact(&mut header_bytes)
-        .map_err(|source| Qwen36TargetPathError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    let byte_len = file
-        .metadata()
-        .map_err(|source| Qwen36TargetPathError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?
-        .len();
-    let value = serde_json::from_slice::<Value>(header_bytes.as_slice())?;
-    let object = value.as_object().ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(format!(
-            "safetensors header is not a JSON object in `{}`",
-            path.display()
-        ))
-    })?;
-    let shard_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default()
-        .to_string();
-    let mut tensors = Vec::new();
-    for (name, tensor_value) in object {
-        if name == "__metadata__" {
-            continue;
-        }
-        let dtype = required_string(tensor_value, "dtype")?;
-        let shape = tensor_value
-            .get("shape")
-            .and_then(Value::as_array)
-            .ok_or_else(|| {
-                Qwen36TargetPathError::InvalidConfig(format!(
-                    "tensor `{name}` in `{}` is missing shape",
-                    path.display()
-                ))
-            })?
-            .iter()
-            .map(|value| {
-                value
-                    .as_u64()
-                    .and_then(|value| usize::try_from(value).ok())
-                    .ok_or_else(|| {
-                        Qwen36TargetPathError::InvalidConfig(format!(
-                            "tensor `{name}` in `{}` has a non-usize shape entry",
-                            path.display()
-                        ))
-                    })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        tensors.push(Qwen36ObservedTensorSpec {
-            name: name.clone(),
-            dtype,
-            shape,
-            shard: shard_name.clone(),
-        });
-    }
-    tensors.sort_by(|left, right| left.name.cmp(&right.name));
-    let shard = Qwen36SafetensorsShardHeaderReport {
-        path: path.display().to_string(),
-        shard_name,
-        byte_len,
-        header_sha256: sha256_hex(header_bytes.as_slice()),
-        tensor_count: tensors.len(),
-    };
-    Ok((shard, tensors))
+    qwen35_text_observed_tensors_from_shards(shard_paths)
+        .map_err(qwen35_checkpoint_error_for_qwen36)
 }
 
 pub fn qwen36_sampled_projection_training_surface(
@@ -1951,174 +1512,6 @@ fn token_label(token_id: u32) -> String {
     format!("token:{token_id}")
 }
 
-fn push_common_decoder_layer_specs(
-    specs: &mut Vec<Qwen36TensorSpec>,
-    prefix: &str,
-    dtype: &str,
-    architecture: &Qwen36ForwardArchitectureReport,
-) {
-    specs.push(tensor(
-        format!("{prefix}.input_layernorm.weight"),
-        dtype,
-        [architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.post_attention_layernorm.weight"),
-        dtype,
-        [architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.mlp.gate_proj.weight"),
-        dtype,
-        [architecture.intermediate_size, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.mlp.up_proj.weight"),
-        dtype,
-        [architecture.intermediate_size, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.mlp.down_proj.weight"),
-        dtype,
-        [architecture.hidden_size, architecture.intermediate_size],
-    ));
-}
-
-fn push_full_attention_specs(
-    specs: &mut Vec<Qwen36TensorSpec>,
-    prefix: &str,
-    dtype: &str,
-    architecture: &Qwen36ForwardArchitectureReport,
-) {
-    let q_proj_out = architecture.num_attention_heads * architecture.head_dim * 2;
-    let kv_proj_out = architecture.num_key_value_heads * architecture.head_dim;
-    let o_proj_in = architecture.num_attention_heads * architecture.head_dim;
-    specs.push(tensor(
-        format!("{prefix}.self_attn.q_proj.weight"),
-        dtype,
-        [q_proj_out, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.self_attn.k_proj.weight"),
-        dtype,
-        [kv_proj_out, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.self_attn.v_proj.weight"),
-        dtype,
-        [kv_proj_out, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.self_attn.o_proj.weight"),
-        dtype,
-        [architecture.hidden_size, o_proj_in],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.self_attn.q_norm.weight"),
-        dtype,
-        [architecture.head_dim],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.self_attn.k_norm.weight"),
-        dtype,
-        [architecture.head_dim],
-    ));
-}
-
-fn push_linear_attention_specs(
-    specs: &mut Vec<Qwen36TensorSpec>,
-    prefix: &str,
-    dtype: &str,
-    architecture: &Qwen36ForwardArchitectureReport,
-) -> Result<(), Qwen36TargetPathError> {
-    let key_heads = architecture.linear_num_key_heads.ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(String::from(
-            "linear_attention layers require linear_num_key_heads",
-        ))
-    })?;
-    let value_heads = architecture.linear_num_value_heads.ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(String::from(
-            "linear_attention layers require linear_num_value_heads",
-        ))
-    })?;
-    let key_dim = architecture.linear_key_head_dim.ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(String::from(
-            "linear_attention layers require linear_key_head_dim",
-        ))
-    })?;
-    let value_dim = architecture.linear_value_head_dim.ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(String::from(
-            "linear_attention layers require linear_value_head_dim",
-        ))
-    })?;
-    let conv_kernel = architecture.linear_conv_kernel_dim.ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(String::from(
-            "linear_attention layers require linear_conv_kernel_dim",
-        ))
-    })?;
-    let key_width = key_heads * key_dim;
-    let value_width = value_heads * value_dim;
-    let qkv_width = key_width * 2 + value_width;
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.A_log"),
-        dtype,
-        [value_heads],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.dt_bias"),
-        dtype,
-        [value_heads],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.in_proj_a.weight"),
-        dtype,
-        [value_heads, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.in_proj_b.weight"),
-        dtype,
-        [value_heads, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.in_proj_qkv.weight"),
-        dtype,
-        [qkv_width, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.in_proj_z.weight"),
-        dtype,
-        [value_width, architecture.hidden_size],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.out_proj.weight"),
-        dtype,
-        [architecture.hidden_size, value_width],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.norm.weight"),
-        dtype,
-        [value_dim],
-    ));
-    specs.push(tensor(
-        format!("{prefix}.linear_attn.conv1d.weight"),
-        dtype,
-        [qkv_width, 1, conv_kernel],
-    ));
-    Ok(())
-}
-
-fn tensor<const N: usize>(
-    name: impl Into<String>,
-    dtype: &str,
-    shape: [usize; N],
-) -> Qwen36TensorSpec {
-    Qwen36TensorSpec {
-        name: name.into(),
-        dtype: String::from(dtype),
-        shape: shape.to_vec(),
-    }
-}
-
 fn required_string(value: &Value, key: &str) -> Result<String, Qwen36TargetPathError> {
     value
         .get(key)
@@ -2129,29 +1522,13 @@ fn required_string(value: &Value, key: &str) -> Result<String, Qwen36TargetPathE
         })
 }
 
-fn optional_string(value: &Value, key: &str) -> Option<String> {
-    value.get(key).and_then(Value::as_str).map(String::from)
-}
-
-fn required_usize(value: &Value, key: &str) -> Result<usize, Qwen36TargetPathError> {
-    optional_usize(value, key).ok_or_else(|| {
-        Qwen36TargetPathError::InvalidConfig(format!("Qwen3.6 config is missing numeric `{key}`"))
-    })
-}
-
-fn optional_usize(value: &Value, key: &str) -> Option<usize> {
-    value
-        .get(key)
-        .and_then(Value::as_u64)
-        .and_then(|value| usize::try_from(value).ok())
-}
-
-fn hf_dtype_to_safetensors_dtype(dtype: &str) -> String {
-    match dtype {
-        "bfloat16" => String::from("BF16"),
-        "float16" => String::from("F16"),
-        "float32" => String::from("F32"),
-        other => other.to_ascii_uppercase(),
+fn qwen35_checkpoint_error_for_qwen36(error: Qwen35TextCheckpointError) -> Qwen36TargetPathError {
+    match error {
+        Qwen35TextCheckpointError::Io { path, source } => {
+            Qwen36TargetPathError::Io { path, source }
+        }
+        Qwen35TextCheckpointError::Json(error) => Qwen36TargetPathError::Json(error),
+        other => Qwen36TargetPathError::InvalidConfig(other.to_string()),
     }
 }
 
@@ -2181,6 +1558,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
     use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
 
@@ -2265,6 +1644,16 @@ mod tests {
         );
         assert_eq!(report.visual_or_other_observed_tensor_count, 1);
         assert!(!report.text_tensor_admission_passed);
+        let serialized = serde_json::to_value(&report).expect("serialize Qwen3.6 admission");
+        let fields = serialized
+            .as_object()
+            .expect("Qwen3.6 admission object")
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        assert!(!fields.contains("expected_decoder_tensor_count"));
+        assert!(!fields.contains("expected_mtp_tensor_count"));
+        assert!(!fields.contains("shard_mismatches"));
     }
 
     #[test]

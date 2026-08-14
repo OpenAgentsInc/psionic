@@ -1,9 +1,9 @@
 # Qwen3.8 Research
 
 > Status: `planned` on 2026-08-14. Upstream research, local artifact
-> acquisition, R1 product/artifact identity, and R2 prompt/tokenizer contracts
-> are `implemented`. Psionic does not yet claim Qwen3.8 inference, serving,
-> training, or multimodal support.
+> acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, and
+> R3 checkpoint admission are `implemented`. Psionic does not yet claim
+> Qwen3.8 inference, serving, training, or multimodal support.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -131,6 +131,14 @@ The same fixture retains a pinned `llama-tokenize` comparison. Eight of nine
 cases match the official tokenizer exactly. llama.cpp does not NFC-normalize
 the decomposed-accent case when reading the selected GGUF, so Psionic keeps the
 official normalized IDs and records llama.cpp's divergent IDs explicitly.
+
+R3 extracts the reusable `qwen3_5_text` architecture and safetensors-header
+contract into `psionic_models::Qwen35TextArchitectureReport` and related
+family-neutral types. Qwen3.6 retains its public wrapper names. The distinct
+`psionic_models::Qwen38ForwardAdmissionReport` binds the R1 config and index
+digests, derives 18 shards from the index, admits 851 decoder plus 15 MTP
+tensors, inventories 333 non-text tensors, and records eight split-layer shard
+resolutions. This is checkpoint structure admission, not execution.
 
 ## Primary Source
 

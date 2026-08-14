@@ -1,8 +1,9 @@
 # Qwen3.8 Implementation Roadmap
 
 > Status: `planned` on 2026-08-14. Upstream research, artifact acquisition, and
-> R1 product/artifact identity and R2 prompt/tokenizer contracts are
-> `implemented`; Qwen3.8 execution in Psionic remains `planned`.
+> R1 product/artifact identity, R2 prompt/tokenizer contracts, and R3
+> checkpoint admission are `implemented`; Qwen3.8 execution in Psionic remains
+> `planned`.
 
 ## Goal
 
@@ -81,7 +82,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R0 | `implemented` | Pinned upstream research and complete verified BF16 artifact | None; research only |
 | R1 | `implemented` | Committed Qwen3.8 artifact-fact fixture and product identity | None; metadata only |
 | R2 | `implemented` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
-| R3 | `planned` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
+| R3 | `implemented` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
 | R4 | `planned` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
 | R5 | `planned` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `planned` | Native CPU token generation | First executable text lane |
@@ -245,6 +246,21 @@ cargo test -p psionic-models qwen38_tokenizer
 ```
 
 ## R3: Family-Neutral Checkpoint Admission
+
+Status: `implemented` in `qwen35_text_checkpoint.rs`, the compatibility
+wrappers in `qwen36_forward_admission.rs`, and
+`qwen38_forward_admission.rs`. The Qwen3.8 report schema is
+`psionic.qwen38_27b_forward_admission.v1`. The official checkpoint admits 851
+decoder tensors and 15 MTP tensors across 18 index-derived shards. The other
+333 indexed tensors remain separately inventoried. Eight decoder layers span
+two shard files and publish explicit tensor-to-shard resolutions.
+
+The shared parser rejects duplicate tensor keys before they can collapse into
+a map. Header inspection also rejects a tensor observed in multiple shards.
+Admission reports retain missing tensors, shape drift, dtype drift, index and
+header disagreement, and index-to-observed shard drift separately. This phase
+reads safetensors headers only. It does not read tensor data or execute the
+checkpoint. The tensor-admission digest excludes local filesystem paths.
 
 Extract the reusable dense `qwen3_5_text` tensor specification from
 `qwen36_forward_admission.rs`. Preserve Qwen3.6 public wrappers while moving

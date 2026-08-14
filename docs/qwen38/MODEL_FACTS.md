@@ -1,7 +1,8 @@
 # Qwen3.8-27B Model Facts
 
-> Status: `planned`. Facts were read from the official Hugging Face repository
-> at revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` on 2026-08-14.
+> Status: checkpoint facts and header admission are `implemented`; execution is
+> `planned`. Facts were read from the official Hugging Face repository at
+> revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` on 2026-08-14.
 
 ## Artifact Identity
 
@@ -23,6 +24,20 @@
 The model card calls this a 27B causal language model with a vision encoder.
 The checkpoint is post-trained and includes both text and native image/video
 components.
+
+The R3 family-neutral tensor specification and the complete official header
+pass classify the 1,199 indexed tensors as follows:
+
+| Inventory | Count |
+| --- | ---: |
+| Decoder trunk, embeddings, norm, and LM head | 851 |
+| MTP projection, norm, and appended layer | 15 |
+| Vision or other non-text tensors | 333 |
+
+The index resolves 18 shards. Decoder layers `4`, `15`, `21`, `29`, `37`,
+`45`, `53`, and `61` span two shard files; their shard sets are retained in the
+Qwen3.8 forward-admission report. Header admission validates names, dtypes,
+shapes, and exact tensor-to-shard mapping without reading tensor payloads.
 
 ## Text Architecture
 

@@ -284,16 +284,18 @@ into one generic engine claim.
   execution, but CPU still does not satisfy the first published `Gemma 4`
   support claim for Psionic.
 - `qwen38` execution remains `planned`. Current `main` has `implemented`
-  weight-free Qwen3.8-27B artifact/product identity and prompt/tokenizer
-  contracts. The artifact fixture binds the official revision, source digests,
-  18-shard inventory, decoder and multimodal wrapper facts, processors, and
-  context posture. The prompt contract binds the distinct Qwen3.8 template,
-  official tokenizer, reasoning and preserved-thinking settings, tools,
-  grouped results, and media markers. The GGUF runtime now gives `qwen35` its
-  published NFC and per-code-point numeric pretokenizer instead of the generic
-  three-digit grouping. Other variants and drifted facts refuse. These
-  frontend milestones do not admit checkpoint loading, token generation,
-  serving, or media execution.
+  Qwen3.8-27B artifact/product identity, prompt/tokenizer contracts, and
+  complete BF16 checkpoint-header admission. The family-neutral
+  `qwen3_5_text` contract verifies 851 decoder and 15 MTP tensors across 18
+  index-derived shards, inventories 333 non-text tensors, and records eight
+  split-layer shard resolutions. The artifact fixture binds the official
+  revision and source digests. The prompt contract binds the distinct Qwen3.8
+  template, official tokenizer, reasoning and preserved-thinking settings,
+  tools, grouped results, and media markers. The GGUF runtime gives `qwen35`
+  its published NFC and per-code-point numeric pretokenizer. Other variants,
+  duplicate mappings, bad shards, wrong shard resolution, and drifted facts
+  refuse. These milestones do not read BF16 tensor payloads, execute layers,
+  generate tokens, serve requests, or execute media inputs.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
 - Current `main` also admits native local execution for the real Hugging Face
