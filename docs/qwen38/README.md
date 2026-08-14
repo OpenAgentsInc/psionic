@@ -46,19 +46,19 @@ passed for all 32 repository files, including all 18 weight shards. The
 directory is ignored by Git through `/target/`; model weights are not part of
 the repository.
 
-The selected Unsloth GGUF and its three small repository companions are
-materialized separately at:
+The selected Unsloth GGUF, the two planned comparison GGUFs, and the three
+small repository companions are materialized separately at:
 
 ```text
 target/models/qwen/unsloth/Qwen3.8-27B-GGUF
 ```
 
-The selected file is exactly 13,441,059,904 bytes with SHA-256
-`00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2`.
-Other quantizations, BF16 GGUF shards, and vision projectors are not downloaded.
-Their immutable sizes, digests, purposes, and materialization posture are
-recorded in
-[UNSLOTH_GGUF_ARTIFACT_INDEX.md](UNSLOTH_GGUF_ARTIFACT_INDEX.md).
+The primary, `Q3_K_M`, and `Q4_K_M` files match their exact pinned sizes and
+SHA-256 values. Other quantizations, BF16 GGUF shards, and vision projectors
+are not downloaded. Their immutable sizes, digests, purposes, and
+materialization posture are recorded in
+[UNSLOTH_GGUF_ARTIFACT_INDEX.md](UNSLOTH_GGUF_ARTIFACT_INDEX.md) and
+[GGUF_DOWNLOAD_PLAN.md](GGUF_DOWNLOAD_PLAN.md).
 
 ## Documents
 
@@ -72,8 +72,8 @@ recorded in
   prompt rendering, preprocessing, or weight materialization.
 - [UNSLOTH_GGUF_ARTIFACT_INDEX.md](UNSLOTH_GGUF_ARTIFACT_INDEX.md) indexes the
   complete pinned Unsloth GGUF tree, records exact sizes and LFS digests, and
-  distinguishes the selected local text artifact from deferred comparators,
-  BF16 shards, and vision projectors.
+  distinguishes the three local text artifacts from deferred variants, BF16
+  shards, and vision projectors.
 - [GGUF_DOWNLOAD_PLAN.md](GGUF_DOWNLOAD_PLAN.md) fixes the exact primary and
   comparator transfer set, local destinations, LFS sizes and digests,
   projector exclusions, and embedded MTP disposition before transfer.

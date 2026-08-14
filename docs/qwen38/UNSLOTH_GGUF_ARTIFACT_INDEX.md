@@ -67,9 +67,10 @@ that 24 remote files were intentionally absent and that local CLI cache state
 was not present upstream. The independent SHA-256 matched the pinned LFS
 digest exactly.
 
-The first local lane explicitly excludes all comparison weights, both vision
-projectors, and both BF16 shards. They remain indexed below so later download
-plans can name exact immutable inputs before transfer.
+The first local execution lane uses only the primary weight artifact. The two
+comparison weights are materialized for R5 qualification but remain outside
+the primary CUDA residency claim. Both vision projectors and both BF16 shards
+remain excluded.
 
 ## Repository Metadata
 
@@ -85,8 +86,8 @@ plans can name exact immutable inputs before transfer.
 | File | Bytes | SHA-256 | Psionic role |
 | --- | ---: | --- | --- |
 | [`Qwen3.8-27B-UD-Q3_K_XL.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-UD-Q3_K_XL.gguf) | 13,441,059,904 | `00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2` | Downloaded primary target. The profile name does not prove concrete tensor-type support. |
-| [`Qwen3.8-27B-Q3_K_M.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-Q3_K_M.gguf) | 13,818,690,528 | `7f3b845b563888ec3abc269474cf744bf703a7ce8766dbb7f696c63975facfd7` | Planned standard K-quant compatibility and output-quality baseline. |
-| [`Qwen3.8-27B-Q4_K_M.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-Q4_K_M.gguf) | 17,106,775,008 | `7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169` | Planned CPU-offload quality comparator; not a replacement for the primary CUDA residency target. |
+| [`Qwen3.8-27B-Q3_K_M.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-Q3_K_M.gguf) | 13,818,690,528 | `7f3b845b563888ec3abc269474cf744bf703a7ce8766dbb7f696c63975facfd7` | Downloaded standard K-quant compatibility and output-quality baseline. |
+| [`Qwen3.8-27B-Q4_K_M.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-Q4_K_M.gguf) | 17,106,775,008 | `7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169` | Downloaded CPU-offload quality comparator; not a replacement for the primary CUDA residency target. |
 
 ## Other Standard Quantizations
 

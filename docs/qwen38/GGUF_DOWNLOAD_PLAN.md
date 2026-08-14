@@ -23,8 +23,8 @@ committed.
 | Artifact | Exact bytes | Expected SHA-256 | Classification | Local disposition |
 | --- | ---: | --- | --- | --- |
 | `Qwen3.8-27B-UD-Q3_K_XL.gguf` | 13,441,059,904 | `00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2` | Primary text artifact | Materialized and verified at the local root |
-| `Qwen3.8-27B-Q3_K_M.gguf` | 13,818,690,528 | `7f3b845b563888ec3abc269474cf744bf703a7ce8766dbb7f696c63975facfd7` | Standard K-quant compatibility and quality baseline | Download to the local root with one worker, then verify size and SHA-256 |
-| `Qwen3.8-27B-Q4_K_M.gguf` | 17,106,775,008 | `7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169` | CPU-offload quality comparator | Download to the local root with one worker, then verify size and SHA-256 |
+| `Qwen3.8-27B-Q3_K_M.gguf` | 13,818,690,528 | `7f3b845b563888ec3abc269474cf744bf703a7ce8766dbb7f696c63975facfd7` | Standard K-quant compatibility and quality baseline | Materialized and verified at the local root |
+| `Qwen3.8-27B-Q4_K_M.gguf` | 17,106,775,008 | `7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169` | CPU-offload quality comparator | Materialized and verified at the local root |
 
 Each planned model is one GGUF file rather than a split artifact. The transfer
 therefore has no additional weight shards.
@@ -61,6 +61,9 @@ hf download unsloth/Qwen3.8-27B-GGUF \
 
 After each transfer, compare the observed byte size and SHA-256 with the table
 before using the artifact for qualification or comparison.
+
+Both comparator transfers completed on 2026-08-14. Their observed byte sizes
+and SHA-256 values match the plan exactly.
 
 ## Admission Boundary
 
