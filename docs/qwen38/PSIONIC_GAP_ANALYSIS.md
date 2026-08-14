@@ -1,7 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
-> Status: `planned` on 2026-08-14. This document defines an implementation
-> direction. It does not claim that Qwen3.8 executes in Psionic.
+> Status: `planned` on 2026-08-14. This document defines the implementation
+> direction. R1-R5 are implemented. It does not claim that Qwen3.8 generates
+> tokens in Psionic.
 
 ## Compatibility Result
 
@@ -68,20 +69,17 @@ fixture and explicit request controls.
 
 ### Audit-derived concrete gaps
 
-The pinned Unsloth and llama.cpp audits identify three blockers inside the
-otherwise reusable Qwen3.5 path:
+The pinned Unsloth and llama.cpp audits identified three initial blockers
+inside the otherwise reusable Qwen3.5 path:
 
-- Psionic recognizes GGUF type code 11 as Q3_K but does not map it to a
-  runtime quantization mode or implement its block decoder and native
-  projections. The selected `UD-Q3_K_XL` artifact is expected to require this
-  support, subject to exact tensor-table inspection.
-- Psionic currently routes the `qwen35` pretokenizer through a generic
-  byte-level BPE regex that groups one to three digits. Qwen3.5 and Qwen3.8
-  split each numeric code point and require explicit combining-mark behavior.
-- llama.cpp conversion rewrites recurrent V-head axes from grouped to tiled
-  order without emitting a layout metadata flag. Psionic's current default of
-  tiled order matches that converter, but arbitrary community artifacts need
-  converter provenance or tensor-level parity evidence.
+- R5 resolves native loader, CPU, and CUDA storage support for every concrete
+  GGML type in the selected local GGUF set: `Q3_K`, `Q4_K`, `Q5_K`, `Q6_K`,
+  `Q8_0`, `IQ3_S`, and `IQ4_XS`.
+- R2 resolves the Qwen3.5/Qwen3.8 pretokenizer behavior for the selected GGUF
+  family.
+- R5 binds the llama.cpp converter and sampled BF16 parity evidence for the
+  tiled V-head layout. Arbitrary community artifacts still need converter
+  provenance or tensor-level parity evidence.
 
 The audits also show that ordinary generation should skip the appended MTP
 block. MTP speculative decoding requires a separate recurrent rollback and

@@ -1,0 +1,4700 @@
+{
+  "schema_version": "psionic.qwen38_27b_gguf_converter_parity.v1",
+  "official_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "gguf_repository_id": "unsloth/Qwen3.8-27B-GGUF",
+  "gguf_repository_revision": "fdd03b8bbd279c1694563650e79d85a2373d9934",
+  "converter_repository": "ggml-org/llama.cpp",
+  "converter_revision": "9b05354ec6fb58b4e665e9a39ebc40285c015638",
+  "converter_source_path": "conversion/qwen.py",
+  "converter_contract": [
+    "A_log -> -exp(A_log) -> tiled V-head order",
+    "dt_bias -> ssm_dt.bias -> tiled V-head order",
+    "non-linear-attention norm weights -> weight + 1",
+    "linear-attention norm weight remains unshifted",
+    "QKV V rows, Z rows, alpha rows, beta rows, and convolution V channels -> tiled V-head order",
+    "linear-attention output projection columns -> tiled V-head order",
+    "dense transform checks require exact bounded error; quantized tiled-vs-untransformed row RMSE allows a 5 percent quantization-noise margin"
+  ],
+  "profiles": [
+    {
+      "profile": "dynamic_v3_ud_q3_k_xl",
+      "artifact_filename": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+      "artifact_sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2",
+      "sampled_rows": [
+        {
+          "transform": "negative_exponential_A_log_and_tiled_v_heads",
+          "official_tensor": "model.language_model.layers.0.linear_attn.A_log",
+          "gguf_tensor": "blk.0.ssm_a",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.A_log",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              48
+            ],
+            "row_sha256": "429d53cd15ec0ea1a2d638100c3bbdf8d53505e69110fb17ee09d055c1fdbd34"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_a",
+            "tensor_shape": {
+              "dims": [
+                48
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 48,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1599958080,
+            "byte_length": 192,
+            "row_sha256": "6fa020e5e381129d391bccf078e2926e67203bd70d765ad1cb590ddad40b9c07"
+          },
+          "metrics": {
+            "element_count": 48,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999998,
+            "reference_projection_output": -0.2991125626158757,
+            "gguf_projection_output": -0.2991125626158757,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "time_step_bias_rename_and_tiled_v_heads",
+          "official_tensor": "model.language_model.layers.0.linear_attn.dt_bias",
+          "gguf_tensor": "blk.0.ssm_dt.bias",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.dt_bias",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              48
+            ],
+            "row_sha256": "969ce6b2149d20f0c365373fd89613167e373905c15f0e1cf5af62adf52228de"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_dt.bias",
+            "tensor_shape": {
+              "dims": [
+                48
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 48,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1600383232,
+            "byte_length": 192,
+            "row_sha256": "bf313b166f0b8c1253b041d381699f2b55921ac5dc32aed460db0fae70d4de83"
+          },
+          "metrics": {
+            "element_count": 48,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": 16.93347499751159,
+            "gguf_projection_output": 16.93347499751159,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "non_linear_attention_norm_plus_one",
+          "official_tensor": "model.language_model.layers.0.input_layernorm.weight",
+          "gguf_tensor": "blk.0.attn_norm.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.input_layernorm.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              5120
+            ],
+            "row_sha256": "853b5989bfb677b1761540ee97c09bbf8d90fd825c9ae6ca74ef5853cba3c075"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_norm.weight",
+            "tensor_shape": {
+              "dims": [
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1448119360,
+            "byte_length": 20480,
+            "row_sha256": "ba6e15470f040f5b46b0533ee632b3db609cee947fe1f2b59a8b3f8d3ca9488c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": -0.07500176231801194,
+            "gguf_projection_output": -0.07500176231801194,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "linear_attention_norm_unshifted",
+          "official_tensor": "model.language_model.layers.0.linear_attn.norm.weight",
+          "gguf_tensor": "blk.0.ssm_norm.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.norm.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              128
+            ],
+            "row_sha256": "70d11f294923a94aac97bedd27e596dbf496746c6b9e3b2b7c38798a0d2522cc"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_norm.weight",
+            "tensor_shape": {
+              "dims": [
+                128
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 128,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1600383424,
+            "byte_length": 512,
+            "row_sha256": "9b99b9e43d21529320cfb320ad2ffc630b0d0d373369011261b623fe9de66891"
+          },
+          "metrics": {
+            "element_count": 128,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 10.033387371631537,
+            "gguf_projection_output": 10.033387371631537,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 4224,
+          "official_source_row": 4480,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4480,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "23308fc04b64105f71f5e14bc5ee1ce1404e833a9d112ab014b67ddb4fac3bf7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 4224,
+            "row_width": 5120,
+            "tensor_byte_offset": 11489280,
+            "blob_byte_offset": 1459629120,
+            "byte_length": 2720,
+            "row_sha256": "eb7ca61252725f937ed2e452fc1d6aa0fe92b0e88b0be214f879308be28caacd"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0011123583875321255,
+            "mean_absolute_error": 0.0009100680937990547,
+            "maximum_absolute_error": 0.0054128170013427734,
+            "cosine_similarity": 0.9967260373772009,
+            "reference_projection_output": 0.012314586615293612,
+            "gguf_projection_output": 0.012925820984885879,
+            "projection_output_absolute_error": 0.0006112343695922669
+          },
+          "untransformed_root_mean_square_error": 0.02164887541828206,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 128,
+          "official_source_row": 384,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 384,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "4451e8a4e1e0e300b8bfa201b76b6e501de711f6da1d41d83980617915577cfc"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 128,
+            "row_width": 5120,
+            "tensor_byte_offset": 348160,
+            "blob_byte_offset": 1431755840,
+            "byte_length": 2720,
+            "row_sha256": "1070ef3a5eb21dc3c066a4c8ab4e39afc8745e404bf8137cf8672c4bd8e486b3"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0014717051033073369,
+            "mean_absolute_error": 0.0012030148049234413,
+            "maximum_absolute_error": 0.0064029693603515625,
+            "cosine_similarity": 0.9965971299960183,
+            "reference_projection_output": -0.02046806281885901,
+            "gguf_projection_output": -0.02070815147952536,
+            "projection_output_absolute_error": 0.0002400886606663509
+          },
+          "untransformed_root_mean_square_error": 0.02419024427128705,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 4224,
+          "official_source_row": 4480,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4480,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "673ea8d1175eb6c1858473ed119762584070fd415840ee55389d06b9f3fe2d12"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 4224,
+            "row_width": 4,
+            "tensor_byte_offset": 67584,
+            "blob_byte_offset": 1600286976,
+            "byte_length": 16,
+            "row_sha256": "2189e40b34d47f92010a38a6227087b2544bf9ea2616fc13b7a12f6ea962e46a"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": 0.00790178560321408,
+            "gguf_projection_output": 0.00790178560321408,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.02239219959578449,
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 6272,
+          "official_source_row": 4608,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4608,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "71791a6118934014316600645da428ff8cc11616c3b1bfab976e9482a34bda45"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 6272,
+            "row_width": 5120,
+            "tensor_byte_offset": 17059840,
+            "blob_byte_offset": 1465199680,
+            "byte_length": 2720,
+            "row_sha256": "867c37d3b7aba39d3b1fe53cd0e69167c163789f99b3d7d005e9666d85c1848d"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0010593366920669455,
+            "mean_absolute_error": 0.0008667127389344387,
+            "maximum_absolute_error": 0.004253387451171875,
+            "cosine_similarity": 0.996668824337315,
+            "reference_projection_output": 0.005165739245013322,
+            "gguf_projection_output": 0.00448112787492442,
+            "projection_output_absolute_error": 0.0006846113700889021
+          },
+          "untransformed_root_mean_square_error": 0.0202163212873918,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 2176,
+          "official_source_row": 512,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 512,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "6eb185973fae87ead9b2d95de438e457267583e2b323c2092cf134c962b1ec8b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 2176,
+            "row_width": 5120,
+            "tensor_byte_offset": 5918720,
+            "blob_byte_offset": 1437326400,
+            "byte_length": 2720,
+            "row_sha256": "2ac1bd1f963210742a55cbe62b5a3de5c0d0653a32dd0f24b3dcac8e60522981"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0013666587871788887,
+            "mean_absolute_error": 0.001112976724471082,
+            "maximum_absolute_error": 0.0072803497314453125,
+            "cosine_similarity": 0.9964395914498648,
+            "reference_projection_output": 0.0014109747378978498,
+            "gguf_projection_output": 0.0020915628537845174,
+            "projection_output_absolute_error": 0.0006805881158866676
+          },
+          "untransformed_root_mean_square_error": 0.0218863059908932,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 6272,
+          "official_source_row": 4608,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4608,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "2bb0275c6d184c67062c3d49d0c8d012b0a8f4f36508573d10104c4eb8c68815"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 6272,
+            "row_width": 4,
+            "tensor_byte_offset": 100352,
+            "blob_byte_offset": 1600319744,
+            "byte_length": 16,
+            "row_sha256": "130881c186c6ba63c9e65d0e9b0d11a1e8e7b3ef4df08f66aefa3d78192a0679"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.009234899237117894,
+            "gguf_projection_output": 0.009234899237117894,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.013089342133676433,
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 8191,
+          "official_source_row": 10111,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 10111,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "a2c8736317c5371a36e656fab279c55173ab8cc2f72001c2bb041b7461096dd0"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 8191,
+            "row_width": 5120,
+            "tensor_byte_offset": 22279520,
+            "blob_byte_offset": 1470419360,
+            "byte_length": 2720,
+            "row_sha256": "8a5f184da1227b7d89c2efad52712a8ee4cb24047c7640c7ee5a6e8e4dd1c39f"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0013967822885130542,
+            "mean_absolute_error": 0.0011406253323002602,
+            "maximum_absolute_error": 0.004855453968048096,
+            "cosine_similarity": 0.9965028833244581,
+            "reference_projection_output": -0.008317209099162138,
+            "gguf_projection_output": -0.008883998578607727,
+            "projection_output_absolute_error": 0.000566789479445589
+          },
+          "untransformed_root_mean_square_error": 0.02372011162411394,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 4095,
+          "official_source_row": 6015,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 6015,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "657c08d9e9a87090079f3010be7596f584f62c3516557f7e453018bcd4811d93"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 4095,
+            "row_width": 5120,
+            "tensor_byte_offset": 11138400,
+            "blob_byte_offset": 1442546080,
+            "byte_length": 2720,
+            "row_sha256": "deab8f1515cf770224f52f6f9745315f3946ac57afc6d46e3e58d29b2a98985d"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0014258424258165867,
+            "mean_absolute_error": 0.0011687362159136683,
+            "maximum_absolute_error": 0.005955100059509277,
+            "cosine_similarity": 0.9964589409127595,
+            "reference_projection_output": 0.03264535658087414,
+            "gguf_projection_output": 0.033390997278807684,
+            "projection_output_absolute_error": 0.0007456406979335431
+          },
+          "untransformed_root_mean_square_error": 0.019980991632952392,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 8191,
+          "official_source_row": 10111,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 10111,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "10a9e51f76065aaa31e8ecc1b0d872518ef177b854e53c3098bdc911f4503068"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 8191,
+            "row_width": 4,
+            "tensor_byte_offset": 131056,
+            "blob_byte_offset": 1600350448,
+            "byte_length": 16,
+            "row_sha256": "b5fe4f1dcd164cf4b7b42ed37dfc49046ee07e36840a0767c5da1c8cc3ba84f9"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999999,
+            "reference_projection_output": 0.007427874996683066,
+            "gguf_projection_output": 0.007427874996683066,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.0313450197685936,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 1,
+          "official_source_row": 3,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 3,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "36ea176fb234263cfe74614fb8011b01b6afa7980438b7e2ea65012849d2bcd7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 1,
+            "row_width": 5120,
+            "tensor_byte_offset": 2720,
+            "blob_byte_offset": 1599960992,
+            "byte_length": 2720,
+            "row_sha256": "41b6e23b9f59485af8248987b51ecdb78ab9dbdbd8675b9f767adf3410a256c5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0014334161308548858,
+            "mean_absolute_error": 0.0011849366361275314,
+            "maximum_absolute_error": 0.006775617599487305,
+            "cosine_similarity": 0.9970162772523135,
+            "reference_projection_output": -0.009872500563891275,
+            "gguf_projection_output": -0.01065656301359624,
+            "projection_output_absolute_error": 0.0007840624497049645
+          },
+          "untransformed_root_mean_square_error": 0.03271662225086902,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 1,
+          "official_source_row": 3,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 3,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "e1f6b27b3b1c089a66b6db37b0ea3cb0de2599a38dac06ea60761237016a822b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 1,
+            "row_width": 5120,
+            "tensor_byte_offset": 2720,
+            "blob_byte_offset": 1600091552,
+            "byte_length": 2720,
+            "row_sha256": "a4b99453f1c6727441a279cf0f769332ea54cbe8802b1488031b822d497984d6"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.000907712727818107,
+            "mean_absolute_error": 0.0007530489368946291,
+            "maximum_absolute_error": 0.004199981689453125,
+            "cosine_similarity": 0.996913998349506,
+            "reference_projection_output": 0.007778047750117871,
+            "gguf_projection_output": 0.007940561712407373,
+            "projection_output_absolute_error": 0.00016251396228950197
+          },
+          "untransformed_root_mean_square_error": 0.012555517584992905,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 16,
+          "official_source_row": 1,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "d3dcd8f8805d328e7e5ee79e8fbb3cd477796611ac31d80a49824de8460ec974"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 16,
+            "row_width": 5120,
+            "tensor_byte_offset": 43520,
+            "blob_byte_offset": 1600001792,
+            "byte_length": 2720,
+            "row_sha256": "9f91fdcbe6c9395d84514174ba7e61565a9c5ab2074c3bcda173facc84ea46a9"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0019853502379674516,
+            "mean_absolute_error": 0.0016497280215844513,
+            "maximum_absolute_error": 0.009198665618896484,
+            "cosine_similarity": 0.9970822950108061,
+            "reference_projection_output": 0.0008412026544992596,
+            "gguf_projection_output": -0.00041990063667031615,
+            "projection_output_absolute_error": 0.0012611032911695758
+          },
+          "untransformed_root_mean_square_error": 0.030027089018736183,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 16,
+          "official_source_row": 1,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "1d57ac09af4762c7dfbc0c10705f21407e2581ed53578c5fc610dfe594c44722"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 16,
+            "row_width": 5120,
+            "tensor_byte_offset": 43520,
+            "blob_byte_offset": 1600132352,
+            "byte_length": 2720,
+            "row_sha256": "8a6ba8ad1b3710128202585bb5e69b894112655286476c15eb30f239ba991309"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0007594230934243148,
+            "mean_absolute_error": 0.0006267023680265992,
+            "maximum_absolute_error": 0.0030193328857421875,
+            "cosine_similarity": 0.9969587313582118,
+            "reference_projection_output": 0.008813392760801533,
+            "gguf_projection_output": 0.009935867536657025,
+            "projection_output_absolute_error": 0.0011224747758554927
+          },
+          "untransformed_root_mean_square_error": 0.01290649696262521,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 31,
+          "official_source_row": 46,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 46,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "cb1d3871b04afa869cd92adfa17a802216b69478437c6a68029390adac4220a2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 31,
+            "row_width": 5120,
+            "tensor_byte_offset": 84320,
+            "blob_byte_offset": 1600042592,
+            "byte_length": 2720,
+            "row_sha256": "3a1d943669da972e768759692902f734385b6cd7bfadd153277b907d8308cd4d"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0020740960194260646,
+            "mean_absolute_error": 0.0017238138942047953,
+            "maximum_absolute_error": 0.007785797119140625,
+            "cosine_similarity": 0.9969044250431263,
+            "reference_projection_output": -0.02383337543124597,
+            "gguf_projection_output": -0.02449353082587675,
+            "projection_output_absolute_error": 0.0006601553946307785
+          },
+          "untransformed_root_mean_square_error": 0.03142403664052831,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 31,
+          "official_source_row": 46,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 46,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "ee4e857a21b0ba2a2e182ecf0d913312f5b975e6af64c905a401f903e3ec4033"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 31,
+            "row_width": 5120,
+            "tensor_byte_offset": 84320,
+            "blob_byte_offset": 1600173152,
+            "byte_length": 2720,
+            "row_sha256": "9c9652868ee74408fa50fa88d0df09309c57eec6e957bd7b63393c8e29e0de04"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0008550056401143269,
+            "mean_absolute_error": 0.0007077936228597536,
+            "maximum_absolute_error": 0.003953456878662109,
+            "cosine_similarity": 0.9968615781662911,
+            "reference_projection_output": 0.003528117753218561,
+            "gguf_projection_output": 0.004383748588953411,
+            "projection_output_absolute_error": 0.0008556308357348498
+          },
+          "untransformed_root_mean_square_error": 0.011312392860765607,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "887c59c2a4b950db885cee1d4149d7219ea8f53a10d960f26bae8e8465b0fb55"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 0,
+            "row_width": 6144,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1600383936,
+            "byte_length": 3264,
+            "row_sha256": "e28fb262f1b249289761e95746c0b9b6da54ec443fe3c003fcf98a17ad38674c"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.001098274486671239,
+            "mean_absolute_error": 0.000902071718883235,
+            "maximum_absolute_error": 0.0051686763763427734,
+            "cosine_similarity": 0.9969024302839601,
+            "reference_projection_output": 0.013968392649271745,
+            "gguf_projection_output": 0.012977950874499065,
+            "projection_output_absolute_error": 0.00099044177477268
+          },
+          "untransformed_root_mean_square_error": 0.019435771186764508,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 2559,
+          "official_source_row": 2559,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 2559,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "a4a308992a7cadb2c8c001ceaff2a769623aecd93041a60797d7fa1ef686d76c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 2559,
+            "row_width": 6144,
+            "tensor_byte_offset": 8352576,
+            "blob_byte_offset": 1608736512,
+            "byte_length": 3264,
+            "row_sha256": "b49c887885ba4e55c121293ee7bbcd64a00a7c47f3ef68f8cd0dedd81accbd4f"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0011387120765270467,
+            "mean_absolute_error": 0.0009044561326542558,
+            "maximum_absolute_error": 0.01733982563018799,
+            "cosine_similarity": 0.9966485125459036,
+            "reference_projection_output": -0.010030303495338058,
+            "gguf_projection_output": -0.009813889004009882,
+            "projection_output_absolute_error": 0.0002164144913281759
+          },
+          "untransformed_root_mean_square_error": 0.019217002489508164,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 5119,
+          "official_source_row": 5119,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 5119,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "5500c6bed69f50a3d9adad285ee442fc62d53e4cd5f73630868ae00827f94a8c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "IQ4XS",
+            "row_index": 5119,
+            "row_width": 6144,
+            "tensor_byte_offset": 16708416,
+            "blob_byte_offset": 1617092352,
+            "byte_length": 3264,
+            "row_sha256": "0c38848d553a992ed57c80af3f82635303af955e35b83c0dfa82527dd7f764b3"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.001135732944026036,
+            "mean_absolute_error": 0.0009006052083956698,
+            "maximum_absolute_error": 0.016328155994415283,
+            "cosine_similarity": 0.9965328798345143,
+            "reference_projection_output": -0.0007111928073081741,
+            "gguf_projection_output": -0.0013581001768092186,
+            "projection_output_absolute_error": 0.0006469073695010445
+          },
+          "untransformed_root_mean_square_error": 0.018974752153950582,
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "dd99e391f1ce5450b9d8214427e6476466629583aba0c8d717f3ed4907d8a203"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 885103680,
+            "byte_length": 2200,
+            "row_sha256": "20229e0e9cb27be1ccd5d5f77b9b6c76061231538938b1f9b8b5d226eb785f48"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.002764938428804159,
+            "mean_absolute_error": 0.0020897453556244726,
+            "maximum_absolute_error": 0.017333984375,
+            "cosine_similarity": 0.9823693666837554,
+            "reference_projection_output": 0.0018951177373262296,
+            "gguf_projection_output": 0.0024325936993783337,
+            "projection_output_absolute_error": 0.0005374759620521041
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 1000,
+          "official_source_row": 1000,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 1000,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "5ffcc88efb918cee5c19c6fa1b92f7f69188fddfff738225c29284a40c2c17b5"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 1000,
+            "row_width": 5120,
+            "tensor_byte_offset": 2200000,
+            "blob_byte_offset": 887303680,
+            "byte_length": 2200,
+            "row_sha256": "6a6587cdcef3b6201fe684f4cf26f6eca6d5c97839f5bbd57c12caed15e737d6"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.002927147014073306,
+            "mean_absolute_error": 0.0022921257565030827,
+            "maximum_absolute_error": 0.0137481689453125,
+            "cosine_similarity": 0.9831791530227102,
+            "reference_projection_output": 0.012668927139148104,
+            "gguf_projection_output": 0.01115967253377814,
+            "projection_output_absolute_error": 0.001509254605369964
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 248319,
+          "official_source_row": 248319,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 248319,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "22559323ac4a954c9987b1e574d9a6384aeb0c27a0ec59794b38efe2c088b8f2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 248319,
+            "row_width": 5120,
+            "tensor_byte_offset": 546301800,
+            "blob_byte_offset": 1431405480,
+            "byte_length": 2200,
+            "row_sha256": "f4634b2c68f4699868408f2346e8265645d3c76679aa44c1a37896f5a81f47d4"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0004767406252128917,
+            "mean_absolute_error": 0.00039812771983633867,
+            "maximum_absolute_error": 0.0015238523483276367,
+            "cosine_similarity": 0.9884624809921726,
+            "reference_projection_output": 0.003340551076229544,
+            "gguf_projection_output": 0.0036531021633229633,
+            "projection_output_absolute_error": 0.00031255108709341917
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "7c158670b1454ca1bae9d43d4c147fb2c72b5d9649a9ef056b97249092ad7fc7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "IQ3S",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1523342400,
+            "byte_length": 2200,
+            "row_sha256": "ac5839c9a2751aaec7140c26cb34478037e632cc35b3dae65a899d5a78f74d44"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0016436018982565665,
+            "mean_absolute_error": 0.0013002244522795081,
+            "maximum_absolute_error": 0.006434142589569092,
+            "cosine_similarity": 0.9893283812177719,
+            "reference_projection_output": 0.006057436798703161,
+            "gguf_projection_output": 0.00707965767489501,
+            "projection_output_absolute_error": 0.001022220876191849
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 8704,
+          "official_source_row": 8704,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 8704,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "2d6fec068a6ec721ab867e7daea09f19a77a46fa07b8943994531e37955b086c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "IQ3S",
+            "row_index": 8704,
+            "row_width": 5120,
+            "tensor_byte_offset": 19148800,
+            "blob_byte_offset": 1542491200,
+            "byte_length": 2200,
+            "row_sha256": "3cd8983cc3b429ab7db0a63af1cd9e5872c0162984e24615a4b15975e61edc3f"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0014593956635901469,
+            "mean_absolute_error": 0.0011513474892126396,
+            "maximum_absolute_error": 0.00587916374206543,
+            "cosine_similarity": 0.9893023791914235,
+            "reference_projection_output": 0.011473124743189636,
+            "gguf_projection_output": 0.013140631831022263,
+            "projection_output_absolute_error": 0.001667507087832627
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 17407,
+          "official_source_row": 17407,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 17407,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "4b7e6006f46434cc523c5d2c87ca82dd70e1197d7ed88d08a6f886a30a5ef9c4"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "IQ3S",
+            "row_index": 17407,
+            "row_width": 5120,
+            "tensor_byte_offset": 38295400,
+            "blob_byte_offset": 1561637800,
+            "byte_length": 2200,
+            "row_sha256": "c30ab9fba5b78b292617a4d0fb1b87576912f4b75fe93f313504a5810fd2b08c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0015172003117237876,
+            "mean_absolute_error": 0.0012002973846392706,
+            "maximum_absolute_error": 0.005969703197479248,
+            "cosine_similarity": 0.9888395799919373,
+            "reference_projection_output": 0.004163428288662196,
+            "gguf_projection_output": 0.004984750676825069,
+            "projection_output_absolute_error": 0.0008213223881628727
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "8606fbbf84811aee32030a0086e49747e27d22b66981c8b61546213b5618afa2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2041414336,
+            "byte_length": 3520,
+            "row_sha256": "d5b47ef9b42eff5f0282994a98443a2f55002b1054ed25c11c5e3c24e3255c8b"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0005376269503665943,
+            "mean_absolute_error": 0.00044644896988756957,
+            "maximum_absolute_error": 0.00157243013381958,
+            "cosine_similarity": 0.9993211419905143,
+            "reference_projection_output": -0.005914443988055033,
+            "gguf_projection_output": -0.005556016165715319,
+            "projection_output_absolute_error": 0.00035842782233971426
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 511,
+          "official_source_row": 511,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 511,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "f16949e9bdac405b99e642b625a6611154d98e30358560b693e67697c6e3520f"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 511,
+            "row_width": 5120,
+            "tensor_byte_offset": 1798720,
+            "blob_byte_offset": 2043213056,
+            "byte_length": 3520,
+            "row_sha256": "6bd8c1b398a95f478ab1ba5a98afb233b0733194f63c46d42685ee07072d3085"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0007641047466040259,
+            "mean_absolute_error": 0.000635931984288618,
+            "maximum_absolute_error": 0.0024099349975585938,
+            "cosine_similarity": 0.9992942940870704,
+            "reference_projection_output": -0.008797876589352044,
+            "gguf_projection_output": -0.008242813335708943,
+            "projection_output_absolute_error": 0.000555063253643101
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 1023,
+          "official_source_row": 1023,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1023,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "f48070eac859dd685651effbf0bfcf304114d6d6a3da2f33cf1b75d2e4a0b62a"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 1023,
+            "row_width": 5120,
+            "tensor_byte_offset": 3600960,
+            "blob_byte_offset": 2045015296,
+            "byte_length": 3520,
+            "row_sha256": "07b3c54d4c7feb1e951d1c4cc96dd8f29c12c5d5136481cbbcd92afe39398af6"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0005473453151029976,
+            "mean_absolute_error": 0.000455267055076547,
+            "maximum_absolute_error": 0.0018178224563598633,
+            "cosine_similarity": 0.99924951361624,
+            "reference_projection_output": 0.02097263549653486,
+            "gguf_projection_output": 0.020272232257079956,
+            "projection_output_absolute_error": 0.000700403239454906
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "ec86c0b4d477ac670e076d21dc09e7e01f038d4f0296d1650e05d46fd0a939d3"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 10996800,
+            "byte_length": 3520,
+            "row_sha256": "322b44357eb95468b3ba8763ab8b1fff90a002a3d49702e4037553f0cc0e370f"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.000568634118655161,
+            "mean_absolute_error": 0.00047510266995232087,
+            "maximum_absolute_error": 0.0018588900566101074,
+            "cosine_similarity": 0.999335518425735,
+            "reference_projection_output": 0.013427465022875586,
+            "gguf_projection_output": 0.013933385993418847,
+            "projection_output_absolute_error": 0.0005059209705432603
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 1000,
+          "official_source_row": 1000,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 1000,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "1cb2b6e082aae599a524fd4d3d247c96fa34ae9f4b1c225da8445c5ed377370b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 1000,
+            "row_width": 5120,
+            "tensor_byte_offset": 3520000,
+            "blob_byte_offset": 14516800,
+            "byte_length": 3520,
+            "row_sha256": "f0319588f783a81cf6b0e07daad9508e2378f9ae1e0193f26413535a493339f7"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00038846563314301057,
+            "mean_absolute_error": 0.00032724550983402877,
+            "maximum_absolute_error": 0.001313924789428711,
+            "cosine_similarity": 0.9994236373272416,
+            "reference_projection_output": -0.006916661279767039,
+            "gguf_projection_output": -0.006856281028222938,
+            "projection_output_absolute_error": 0.00006038025154410029
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 248319,
+          "official_source_row": 248319,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 248319,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "8055d5d7e771950f56e7095aaa25c0d71831be7d76c9bf5525f0397d720e103d"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 248319,
+            "row_width": 5120,
+            "tensor_byte_offset": 874082880,
+            "blob_byte_offset": 885079680,
+            "byte_length": 3520,
+            "row_sha256": "a1fa472612a01290557348c5b95bac8f4946181281fef8a231c5fcfd5da55eb4"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0002606698201678266,
+            "mean_absolute_error": 0.00019374322509975174,
+            "maximum_absolute_error": 0.0019248127937316895,
+            "cosine_similarity": 0.9989401963383611,
+            "reference_projection_output": 0.0035672280074365774,
+            "gguf_projection_output": 0.0037193808439911656,
+            "projection_output_absolute_error": 0.0001521528365545882
+          },
+          "parity_passed": true
+        }
+      ],
+      "sampled_row_count": 34,
+      "mean_root_mean_square_error": 0.0009728316931454377,
+      "mean_cosine_similarity": 0.9961252993566818,
+      "mean_projection_output_absolute_error": 0.0005420981593936145,
+      "transform_layout_passed": true
+    },
+    {
+      "profile": "q3_k_m",
+      "artifact_filename": "Qwen3.8-27B-Q3_K_M.gguf",
+      "artifact_sha256": "7f3b845b563888ec3abc269474cf744bf703a7ce8766dbb7f696c63975facfd7",
+      "sampled_rows": [
+        {
+          "transform": "negative_exponential_A_log_and_tiled_v_heads",
+          "official_tensor": "model.language_model.layers.0.linear_attn.A_log",
+          "gguf_tensor": "blk.0.ssm_a",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.A_log",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              48
+            ],
+            "row_sha256": "429d53cd15ec0ea1a2d638100c3bbdf8d53505e69110fb17ee09d055c1fdbd34"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_a",
+            "tensor_shape": {
+              "dims": [
+                48
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 48,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1787739104,
+            "byte_length": 192,
+            "row_sha256": "6fa020e5e381129d391bccf078e2926e67203bd70d765ad1cb590ddad40b9c07"
+          },
+          "metrics": {
+            "element_count": 48,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999998,
+            "reference_projection_output": -0.2991125626158757,
+            "gguf_projection_output": -0.2991125626158757,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "time_step_bias_rename_and_tiled_v_heads",
+          "official_tensor": "model.language_model.layers.0.linear_attn.dt_bias",
+          "gguf_tensor": "blk.0.ssm_dt.bias",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.dt_bias",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              48
+            ],
+            "row_sha256": "969ce6b2149d20f0c365373fd89613167e373905c15f0e1cf5af62adf52228de"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_dt.bias",
+            "tensor_shape": {
+              "dims": [
+                48
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 48,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1789869216,
+            "byte_length": 192,
+            "row_sha256": "bf313b166f0b8c1253b041d381699f2b55921ac5dc32aed460db0fae70d4de83"
+          },
+          "metrics": {
+            "element_count": 48,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": 16.93347499751159,
+            "gguf_projection_output": 16.93347499751159,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "non_linear_attention_norm_plus_one",
+          "official_tensor": "model.language_model.layers.0.input_layernorm.weight",
+          "gguf_tensor": "blk.0.attn_norm.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.input_layernorm.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              5120
+            ],
+            "row_sha256": "853b5989bfb677b1761540ee97c09bbf8d90fd825c9ae6ca74ef5853cba3c075"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_norm.weight",
+            "tensor_shape": {
+              "dims": [
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1613781984,
+            "byte_length": 20480,
+            "row_sha256": "ba6e15470f040f5b46b0533ee632b3db609cee947fe1f2b59a8b3f8d3ca9488c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": -0.07500176231801194,
+            "gguf_projection_output": -0.07500176231801194,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "linear_attention_norm_unshifted",
+          "official_tensor": "model.language_model.layers.0.linear_attn.norm.weight",
+          "gguf_tensor": "blk.0.ssm_norm.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.norm.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              128
+            ],
+            "row_sha256": "70d11f294923a94aac97bedd27e596dbf496746c6b9e3b2b7c38798a0d2522cc"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_norm.weight",
+            "tensor_shape": {
+              "dims": [
+                128
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 128,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1789869408,
+            "byte_length": 512,
+            "row_sha256": "9b99b9e43d21529320cfb320ad2ffc630b0d0d373369011261b623fe9de66891"
+          },
+          "metrics": {
+            "element_count": 128,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 10.033387371631537,
+            "gguf_projection_output": 10.033387371631537,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 4224,
+          "official_source_row": 4480,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4480,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "23308fc04b64105f71f5e14bc5ee1ce1404e833a9d112ab014b67ddb4fac3bf7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 4224,
+            "row_width": 5120,
+            "tensor_byte_offset": 14868480,
+            "blob_byte_offset": 1628670944,
+            "byte_length": 3520,
+            "row_sha256": "0bb4431f867c04b1c8c5168c542ee1a2ebd607bf5ab69bdecb698cd4cbc384d5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0004903377978829633,
+            "mean_absolute_error": 0.00041000620694831014,
+            "maximum_absolute_error": 0.0015260577201843262,
+            "cosine_similarity": 0.9993644388157475,
+            "reference_projection_output": 0.012314586615293612,
+            "gguf_projection_output": 0.012653420109549582,
+            "projection_output_absolute_error": 0.0003388334942559697
+          },
+          "untransformed_root_mean_square_error": 0.02165867876528831,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 128,
+          "official_source_row": 384,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 384,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "4451e8a4e1e0e300b8bfa201b76b6e501de711f6da1d41d83980617915577cfc"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 128,
+            "row_width": 5120,
+            "tensor_byte_offset": 281600,
+            "blob_byte_offset": 1600546784,
+            "byte_length": 2200,
+            "row_sha256": "a45f2c7a7a2204f632e86312ca1548faf0abc7b253856d1d98a5ae355390a967"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0026675769526312066,
+            "mean_absolute_error": 0.0021777424481115304,
+            "maximum_absolute_error": 0.014024734497070312,
+            "cosine_similarity": 0.9887761611529395,
+            "reference_projection_output": -0.02046806281885901,
+            "gguf_projection_output": -0.022201740204416492,
+            "projection_output_absolute_error": 0.0017336773855574812
+          },
+          "untransformed_root_mean_square_error": 0.024125234557254967,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 4224,
+          "official_source_row": 4480,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4480,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "673ea8d1175eb6c1858473ed119762584070fd415840ee55389d06b9f3fe2d12"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 4224,
+            "row_width": 4,
+            "tensor_byte_offset": 67584,
+            "blob_byte_offset": 1789772960,
+            "byte_length": 16,
+            "row_sha256": "2189e40b34d47f92010a38a6227087b2544bf9ea2616fc13b7a12f6ea962e46a"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": 0.00790178560321408,
+            "gguf_projection_output": 0.00790178560321408,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.02239219959578449,
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 6272,
+          "official_source_row": 4608,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4608,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "71791a6118934014316600645da428ff8cc11616c3b1bfab976e9482a34bda45"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 6272,
+            "row_width": 5120,
+            "tensor_byte_offset": 22077440,
+            "blob_byte_offset": 1635879904,
+            "byte_length": 3520,
+            "row_sha256": "12c72c2de0d201a5863bef3625055f3926bb8c63d37c5d948662f6f0e453ed29"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0004623761101290475,
+            "mean_absolute_error": 0.00038313068362185734,
+            "maximum_absolute_error": 0.001912236213684082,
+            "cosine_similarity": 0.9993657740579345,
+            "reference_projection_output": 0.005165739245013322,
+            "gguf_projection_output": 0.004248516814695692,
+            "projection_output_absolute_error": 0.0009172224303176301
+          },
+          "untransformed_root_mean_square_error": 0.02020517343102519,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 2176,
+          "official_source_row": 512,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 512,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "6eb185973fae87ead9b2d95de438e457267583e2b323c2092cf134c962b1ec8b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 2176,
+            "row_width": 5120,
+            "tensor_byte_offset": 4787200,
+            "blob_byte_offset": 1605052384,
+            "byte_length": 2200,
+            "row_sha256": "a21f861bb2047eeaf6e7de5748d8d16906e01fecd33738af13aab25dcb9bbf58"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0024353514612153633,
+            "mean_absolute_error": 0.0019749670998862713,
+            "maximum_absolute_error": 0.015439987182617188,
+            "cosine_similarity": 0.9886578916727231,
+            "reference_projection_output": 0.0014109747378978498,
+            "gguf_projection_output": 0.000811744135959387,
+            "projection_output_absolute_error": 0.0005992306019384628
+          },
+          "untransformed_root_mean_square_error": 0.02183411165709151,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 6272,
+          "official_source_row": 4608,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4608,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "2bb0275c6d184c67062c3d49d0c8d012b0a8f4f36508573d10104c4eb8c68815"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 6272,
+            "row_width": 4,
+            "tensor_byte_offset": 100352,
+            "blob_byte_offset": 1789805728,
+            "byte_length": 16,
+            "row_sha256": "130881c186c6ba63c9e65d0e9b0d11a1e8e7b3ef4df08f66aefa3d78192a0679"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.009234899237117894,
+            "gguf_projection_output": 0.009234899237117894,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.013089342133676433,
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 8191,
+          "official_source_row": 10111,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 10111,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "a2c8736317c5371a36e656fab279c55173ab8cc2f72001c2bb041b7461096dd0"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 8191,
+            "row_width": 5120,
+            "tensor_byte_offset": 28832320,
+            "blob_byte_offset": 1642634784,
+            "byte_length": 3520,
+            "row_sha256": "cb97be835cfcadf6912be9e64735d3444819b980c7a6094daa89f4c7259b0ef0"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0006220362130823812,
+            "mean_absolute_error": 0.0005146879879248445,
+            "maximum_absolute_error": 0.0028783082962036133,
+            "cosine_similarity": 0.9993066598135139,
+            "reference_projection_output": -0.008317209099162138,
+            "gguf_projection_output": -0.008660692428392354,
+            "projection_output_absolute_error": 0.00034348332923021634
+          },
+          "untransformed_root_mean_square_error": 0.023710916965866177,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 4095,
+          "official_source_row": 6015,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 6015,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "657c08d9e9a87090079f3010be7596f584f62c3516557f7e453018bcd4811d93"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 4095,
+            "row_width": 5120,
+            "tensor_byte_offset": 9009000,
+            "blob_byte_offset": 1609274184,
+            "byte_length": 2200,
+            "row_sha256": "4fa54e50d2eb211416c50808cec105b3d7aa9d91b83616c75210d79c7e1e532a"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0025242691278999562,
+            "mean_absolute_error": 0.002057169988984242,
+            "maximum_absolute_error": 0.016768455505371094,
+            "cosine_similarity": 0.9888555818090771,
+            "reference_projection_output": 0.03264535658087414,
+            "gguf_projection_output": 0.03354036503345849,
+            "projection_output_absolute_error": 0.0008950084525843477
+          },
+          "untransformed_root_mean_square_error": 0.0198889926315746,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 8191,
+          "official_source_row": 10111,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 10111,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "10a9e51f76065aaa31e8ecc1b0d872518ef177b854e53c3098bdc911f4503068"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 8191,
+            "row_width": 4,
+            "tensor_byte_offset": 131056,
+            "blob_byte_offset": 1789836432,
+            "byte_length": 16,
+            "row_sha256": "b5fe4f1dcd164cf4b7b42ed37dfc49046ee07e36840a0767c5da1c8cc3ba84f9"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999999,
+            "reference_projection_output": 0.007427874996683066,
+            "gguf_projection_output": 0.007427874996683066,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.0313450197685936,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 1,
+          "official_source_row": 3,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 3,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "36ea176fb234263cfe74614fb8011b01b6afa7980438b7e2ea65012849d2bcd7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 1,
+            "row_width": 5120,
+            "tensor_byte_offset": 20480,
+            "blob_byte_offset": 1787759776,
+            "byte_length": 20480,
+            "row_sha256": "5d4c612932348e910210162583c0b4aa299ba8ae26a23184e865bd45c8690916"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": -0.009872500563891275,
+            "gguf_projection_output": -0.009872500563891275,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.032730942270208056,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 1,
+          "official_source_row": 3,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 3,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "e1f6b27b3b1c089a66b6db37b0ea3cb0de2599a38dac06ea60761237016a822b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 1,
+            "row_width": 5120,
+            "tensor_byte_offset": 20480,
+            "blob_byte_offset": 1788742816,
+            "byte_length": 20480,
+            "row_sha256": "5428997f2410c26507e92f364fd724eaa1776001addbb87c584f44e2c66dc669"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.007778047750117871,
+            "gguf_projection_output": 0.007778047750117871,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.012571403015313115,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 16,
+          "official_source_row": 1,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "d3dcd8f8805d328e7e5ee79e8fbb3cd477796611ac31d80a49824de8460ec974"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 16,
+            "row_width": 5120,
+            "tensor_byte_offset": 327680,
+            "blob_byte_offset": 1788066976,
+            "byte_length": 20480,
+            "row_sha256": "e792c6eb66f2d62e2ec04f03ef49a1f3d210d2fe0212a30e24a397671d7f81b5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999999,
+            "reference_projection_output": 0.0008412026544992596,
+            "gguf_projection_output": 0.0008412026544992596,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.03005633516910203,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 16,
+          "official_source_row": 1,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "1d57ac09af4762c7dfbc0c10705f21407e2581ed53578c5fc610dfe594c44722"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 16,
+            "row_width": 5120,
+            "tensor_byte_offset": 327680,
+            "blob_byte_offset": 1789050016,
+            "byte_length": 20480,
+            "row_sha256": "5972e15bcc0cb05f39b63def7ffe9ca51d5915ef83701c110b3ff1bb5bce7f34"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.008813392760801533,
+            "gguf_projection_output": 0.008813392760801533,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.01290779865428083,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 31,
+          "official_source_row": 46,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 46,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "cb1d3871b04afa869cd92adfa17a802216b69478437c6a68029390adac4220a2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 31,
+            "row_width": 5120,
+            "tensor_byte_offset": 634880,
+            "blob_byte_offset": 1788374176,
+            "byte_length": 20480,
+            "row_sha256": "70d12ee3b4298c0c83ddb548656ca6efc698fd8a964bab67418939108616e7ab"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": -0.02383337543124597,
+            "gguf_projection_output": -0.02383337543124597,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.0314621259544119,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 31,
+          "official_source_row": 46,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 46,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "ee4e857a21b0ba2a2e182ecf0d913312f5b975e6af64c905a401f903e3ec4033"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 31,
+            "row_width": 5120,
+            "tensor_byte_offset": 634880,
+            "blob_byte_offset": 1789357216,
+            "byte_length": 20480,
+            "row_sha256": "bdce910394f3c7eed333884c877f407846b49dd2cf2040fe953c9bbfe9bbe71e"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.003528117753218561,
+            "gguf_projection_output": 0.003528117753218561,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.011323963677849925,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "887c59c2a4b950db885cee1d4149d7219ea8f53a10d960f26bae8e8465b0fb55"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 0,
+            "row_width": 6144,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1789869920,
+            "byte_length": 3456,
+            "row_sha256": "4b67df99b585fd88f29d2cc4f7872e90cb60eb5d0486abfd559b482a489579e1"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0010693033480432535,
+            "mean_absolute_error": 0.0008826297974640814,
+            "maximum_absolute_error": 0.006042957305908203,
+            "cosine_similarity": 0.9970641137920915,
+            "reference_projection_output": 0.013968392649271745,
+            "gguf_projection_output": 0.014544347662462757,
+            "projection_output_absolute_error": 0.000575955013191012
+          },
+          "untransformed_root_mean_square_error": 0.019453125635364873,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 2559,
+          "official_source_row": 2559,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 2559,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "a4a308992a7cadb2c8c001ceaff2a769623aecd93041a60797d7fa1ef686d76c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 2559,
+            "row_width": 6144,
+            "tensor_byte_offset": 8843904,
+            "blob_byte_offset": 1798713824,
+            "byte_length": 3456,
+            "row_sha256": "52aacd2b0109a0c88bbdf679b403cfac77044ffdd4f663dce73a2f56fd6d83a4"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0010429956118839614,
+            "mean_absolute_error": 0.0008675900971866213,
+            "maximum_absolute_error": 0.004437446594238281,
+            "cosine_similarity": 0.9971870259320736,
+            "reference_projection_output": -0.010030303495338058,
+            "gguf_projection_output": -0.00975958193510331,
+            "projection_output_absolute_error": 0.0002707215602347473
+          },
+          "untransformed_root_mean_square_error": 0.019255003340056264,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 5119,
+          "official_source_row": 5119,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 5119,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "5500c6bed69f50a3d9adad285ee442fc62d53e4cd5f73630868ae00827f94a8c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 5119,
+            "row_width": 6144,
+            "tensor_byte_offset": 17691264,
+            "blob_byte_offset": 1807561184,
+            "byte_length": 3456,
+            "row_sha256": "6aad19a64a6565a73eceb5ad003605a9d56531d4765a86204226ee7e81552b1b"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0010113856316098617,
+            "mean_absolute_error": 0.0008377582222844163,
+            "maximum_absolute_error": 0.004155158996582031,
+            "cosine_similarity": 0.9972502464767338,
+            "reference_projection_output": -0.0007111928073081741,
+            "gguf_projection_output": -0.0019233489639037522,
+            "projection_output_absolute_error": 0.0012121561565955781
+          },
+          "untransformed_root_mean_square_error": 0.018978457320300055,
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "dd99e391f1ce5450b9d8214427e6476466629583aba0c8d717f3ed4907d8a203"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1053961184,
+            "byte_length": 2200,
+            "row_sha256": "20229e0e9cb27be1ccd5d5f77b9b6c76061231538938b1f9b8b5d226eb785f48"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.002764938428804159,
+            "mean_absolute_error": 0.0020897453556244726,
+            "maximum_absolute_error": 0.017333984375,
+            "cosine_similarity": 0.9823693666837554,
+            "reference_projection_output": 0.0018951177373262296,
+            "gguf_projection_output": 0.0024325936993783337,
+            "projection_output_absolute_error": 0.0005374759620521041
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 1000,
+          "official_source_row": 1000,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 1000,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "5ffcc88efb918cee5c19c6fa1b92f7f69188fddfff738225c29284a40c2c17b5"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 1000,
+            "row_width": 5120,
+            "tensor_byte_offset": 2200000,
+            "blob_byte_offset": 1056161184,
+            "byte_length": 2200,
+            "row_sha256": "6a6587cdcef3b6201fe684f4cf26f6eca6d5c97839f5bbd57c12caed15e737d6"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.002927147014073306,
+            "mean_absolute_error": 0.0022921257565030827,
+            "maximum_absolute_error": 0.0137481689453125,
+            "cosine_similarity": 0.9831791530227102,
+            "reference_projection_output": 0.012668927139148104,
+            "gguf_projection_output": 0.01115967253377814,
+            "projection_output_absolute_error": 0.001509254605369964
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 248319,
+          "official_source_row": 248319,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 248319,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "22559323ac4a954c9987b1e574d9a6384aeb0c27a0ec59794b38efe2c088b8f2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 248319,
+            "row_width": 5120,
+            "tensor_byte_offset": 546301800,
+            "blob_byte_offset": 1600262984,
+            "byte_length": 2200,
+            "row_sha256": "f4634b2c68f4699868408f2346e8265645d3c76679aa44c1a37896f5a81f47d4"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0004767406252128917,
+            "mean_absolute_error": 0.00039812771983633867,
+            "maximum_absolute_error": 0.0015238523483276367,
+            "cosine_similarity": 0.9884624809921726,
+            "reference_projection_output": 0.003340551076229544,
+            "gguf_projection_output": 0.0036531021633229633,
+            "projection_output_absolute_error": 0.00031255108709341917
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "7c158670b1454ca1bae9d43d4c147fb2c72b5d9649a9ef056b97249092ad7fc7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1711123424,
+            "byte_length": 2200,
+            "row_sha256": "4e9641a4ef18ef435b283512b78e61cc5f6dc01a7948a69ddeb7990c0d1c14a5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0016062463270738205,
+            "mean_absolute_error": 0.0013211777433753014,
+            "maximum_absolute_error": 0.00750732421875,
+            "cosine_similarity": 0.9892407662222313,
+            "reference_projection_output": 0.006057436798703161,
+            "gguf_projection_output": 0.007657651198911292,
+            "projection_output_absolute_error": 0.0016002144002081305
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 8704,
+          "official_source_row": 8704,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 8704,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "2d6fec068a6ec721ab867e7daea09f19a77a46fa07b8943994531e37955b086c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 8704,
+            "row_width": 5120,
+            "tensor_byte_offset": 19148800,
+            "blob_byte_offset": 1730272224,
+            "byte_length": 2200,
+            "row_sha256": "d8f713a76ab4fa99514c6d3f196c2486994874aabbdcb956e2f12c1e7df04979"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.001401354649720028,
+            "mean_absolute_error": 0.0011513856035890058,
+            "maximum_absolute_error": 0.009099960327148438,
+            "cosine_similarity": 0.9893581017940232,
+            "reference_projection_output": 0.011473124743189636,
+            "gguf_projection_output": 0.010833981000687425,
+            "projection_output_absolute_error": 0.0006391437425022108
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 17407,
+          "official_source_row": 17407,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 17407,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "4b7e6006f46434cc523c5d2c87ca82dd70e1197d7ed88d08a6f886a30a5ef9c4"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "Q3K",
+            "row_index": 17407,
+            "row_width": 5120,
+            "tensor_byte_offset": 38295400,
+            "blob_byte_offset": 1749418824,
+            "byte_length": 2200,
+            "row_sha256": "0b15a0e8cd855a929534f8e5b367b818f8e9e4b5955f8e91181bf0634f6d10f2"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0014905178836715504,
+            "mean_absolute_error": 0.001223519610357471,
+            "maximum_absolute_error": 0.008304595947265625,
+            "cosine_similarity": 0.9885105472409588,
+            "reference_projection_output": 0.004163428288662196,
+            "gguf_projection_output": 0.0030401273362327514,
+            "projection_output_absolute_error": 0.0011233009524294446
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "8606fbbf84811aee32030a0086e49747e27d22b66981c8b61546213b5618afa2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2262613600,
+            "byte_length": 2880,
+            "row_sha256": "15ad0636873eba2f777470c89c54e696534f120f2f7a7c4426856e673758647c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0010689131778451161,
+            "mean_absolute_error": 0.0008901072607841343,
+            "maximum_absolute_error": 0.004008769989013672,
+            "cosine_similarity": 0.9973128538585798,
+            "reference_projection_output": -0.005914443988055033,
+            "gguf_projection_output": -0.005225040728775381,
+            "projection_output_absolute_error": 0.0006894032592796515
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 511,
+          "official_source_row": 511,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 511,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "f16949e9bdac405b99e642b625a6611154d98e30358560b693e67697c6e3520f"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 511,
+            "row_width": 5120,
+            "tensor_byte_offset": 1471680,
+            "blob_byte_offset": 2264085280,
+            "byte_length": 2880,
+            "row_sha256": "23f790c639d1c39f4f028045acaae0c25e1898a1430cf1ad35574be673ad4af5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0015125802598295265,
+            "mean_absolute_error": 0.0012563024822156877,
+            "maximum_absolute_error": 0.0054988861083984375,
+            "cosine_similarity": 0.9972333713520348,
+            "reference_projection_output": -0.008797876589352044,
+            "gguf_projection_output": -0.009206616835321056,
+            "projection_output_absolute_error": 0.00040874024596901197
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 1023,
+          "official_source_row": 1023,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1023,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "f48070eac859dd685651effbf0bfcf304114d6d6a3da2f33cf1b75d2e4a0b62a"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 1023,
+            "row_width": 5120,
+            "tensor_byte_offset": 2946240,
+            "blob_byte_offset": 2265559840,
+            "byte_length": 2880,
+            "row_sha256": "fa1c4d46f092b047c217e37cc3b96971c85466cd1ccd8cd3e61525a4206bd7ca"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0010792440445296545,
+            "mean_absolute_error": 0.0008910632197512314,
+            "maximum_absolute_error": 0.0034668445587158203,
+            "cosine_similarity": 0.9970819772843768,
+            "reference_projection_output": 0.02097263549653486,
+            "gguf_projection_output": 0.021582401894571824,
+            "projection_output_absolute_error": 0.0006097663980369622
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "ec86c0b4d477ac670e076d21dc09e7e01f038d4f0296d1650e05d46fd0a939d3"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 10996704,
+            "byte_length": 4200,
+            "row_sha256": "a4ec4b69ed12c751c09b0831ac1778ff193bd460b0f161f6ca7a0ea7cebffe09"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0002852268568283394,
+            "mean_absolute_error": 0.00023095469914551358,
+            "maximum_absolute_error": 0.001373291015625,
+            "cosine_similarity": 0.9998329487253913,
+            "reference_projection_output": 0.013427465022875586,
+            "gguf_projection_output": 0.013670345854110937,
+            "projection_output_absolute_error": 0.00024288083123535052
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 1000,
+          "official_source_row": 1000,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 1000,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "1cb2b6e082aae599a524fd4d3d247c96fa34ae9f4b1c225da8445c5ed377370b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 1000,
+            "row_width": 5120,
+            "tensor_byte_offset": 4200000,
+            "blob_byte_offset": 15196704,
+            "byte_length": 4200,
+            "row_sha256": "f8a00c3803b5c8f1fa7b7365b1eb04a210af607710158864ed940c4fc85c40a5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00019077378923500166,
+            "mean_absolute_error": 0.00015771343896631151,
+            "maximum_absolute_error": 0.000579833984375,
+            "cosine_similarity": 0.9998610142247925,
+            "reference_projection_output": -0.006916661279767039,
+            "gguf_projection_output": -0.0069657567859634315,
+            "projection_output_absolute_error": 0.00004909550619639283
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 248319,
+          "official_source_row": 248319,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 248319,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "8055d5d7e771950f56e7095aaa25c0d71831be7d76c9bf5525f0397d720e103d"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 248319,
+            "row_width": 5120,
+            "tensor_byte_offset": 1042939800,
+            "blob_byte_offset": 1053936504,
+            "byte_length": 4200,
+            "row_sha256": "726bcf5590fd3b4c1762ccde2fb3c198b808798714678c3e902c6f218996cb4a"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0001478033817101579,
+            "mean_absolute_error": 0.00009543113919789903,
+            "maximum_absolute_error": 0.00156402587890625,
+            "cosine_similarity": 0.99965940552337,
+            "reference_projection_output": 0.0035672280074365774,
+            "gguf_projection_output": 0.0034017044226718907,
+            "projection_output_absolute_error": 0.00016552358476468665
+          },
+          "parity_passed": true
+        }
+      ],
+      "sampled_row_count": 34,
+      "mean_root_mean_square_error": 0.0008022681968503395,
+      "mean_cosine_similarity": 0.9961155847190364,
+      "mean_projection_output_absolute_error": 0.00043451879408949344,
+      "transform_layout_passed": true
+    },
+    {
+      "profile": "q4_k_m",
+      "artifact_filename": "Qwen3.8-27B-Q4_K_M.gguf",
+      "artifact_sha256": "7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169",
+      "sampled_rows": [
+        {
+          "transform": "negative_exponential_A_log_and_tiled_v_heads",
+          "official_tensor": "model.language_model.layers.0.linear_attn.A_log",
+          "gguf_tensor": "blk.0.ssm_a",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.A_log",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              48
+            ],
+            "row_sha256": "429d53cd15ec0ea1a2d638100c3bbdf8d53505e69110fb17ee09d055c1fdbd34"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_a",
+            "tensor_shape": {
+              "dims": [
+                48
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 48,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2003250144,
+            "byte_length": 192,
+            "row_sha256": "6fa020e5e381129d391bccf078e2926e67203bd70d765ad1cb590ddad40b9c07"
+          },
+          "metrics": {
+            "element_count": 48,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999998,
+            "reference_projection_output": -0.2991125626158757,
+            "gguf_projection_output": -0.2991125626158757,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "time_step_bias_rename_and_tiled_v_heads",
+          "official_tensor": "model.language_model.layers.0.linear_attn.dt_bias",
+          "gguf_tensor": "blk.0.ssm_dt.bias",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.dt_bias",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              48
+            ],
+            "row_sha256": "969ce6b2149d20f0c365373fd89613167e373905c15f0e1cf5af62adf52228de"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_dt.bias",
+            "tensor_shape": {
+              "dims": [
+                48
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 48,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2005380256,
+            "byte_length": 192,
+            "row_sha256": "bf313b166f0b8c1253b041d381699f2b55921ac5dc32aed460db0fae70d4de83"
+          },
+          "metrics": {
+            "element_count": 48,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": 16.93347499751159,
+            "gguf_projection_output": 16.93347499751159,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "non_linear_attention_norm_plus_one",
+          "official_tensor": "model.language_model.layers.0.input_layernorm.weight",
+          "gguf_tensor": "blk.0.attn_norm.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.input_layernorm.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              5120
+            ],
+            "row_sha256": "853b5989bfb677b1761540ee97c09bbf8d90fd825c9ae6ca74ef5853cba3c075"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_norm.weight",
+            "tensor_shape": {
+              "dims": [
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1786817504,
+            "byte_length": 20480,
+            "row_sha256": "ba6e15470f040f5b46b0533ee632b3db609cee947fe1f2b59a8b3f8d3ca9488c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": -0.07500176231801194,
+            "gguf_projection_output": -0.07500176231801194,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "linear_attention_norm_unshifted",
+          "official_tensor": "model.language_model.layers.0.linear_attn.norm.weight",
+          "gguf_tensor": "blk.0.ssm_norm.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.norm.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              128
+            ],
+            "row_sha256": "70d11f294923a94aac97bedd27e596dbf496746c6b9e3b2b7c38798a0d2522cc"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_norm.weight",
+            "tensor_shape": {
+              "dims": [
+                128
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 0,
+            "row_width": 128,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2005380448,
+            "byte_length": 512,
+            "row_sha256": "9b99b9e43d21529320cfb320ad2ffc630b0d0d373369011261b623fe9de66891"
+          },
+          "metrics": {
+            "element_count": 128,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 10.033387371631537,
+            "gguf_projection_output": 10.033387371631537,
+            "projection_output_absolute_error": 0.0
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 4224,
+          "official_source_row": 4480,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4480,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "23308fc04b64105f71f5e14bc5ee1ce1404e833a9d112ab014b67ddb4fac3bf7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 4224,
+            "row_width": 5120,
+            "tensor_byte_offset": 17740800,
+            "blob_byte_offset": 1804578784,
+            "byte_length": 4200,
+            "row_sha256": "4cf343dcfabee4ae6bc6736aae4cd0f50e2ef3fc19cdb99a40d3eb37b2850e36"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0002447099078732007,
+            "mean_absolute_error": 0.00020112601341679693,
+            "maximum_absolute_error": 0.000946044921875,
+            "cosine_similarity": 0.99984180510276,
+            "reference_projection_output": 0.012314586615293612,
+            "gguf_projection_output": 0.012155459982061629,
+            "projection_output_absolute_error": 0.00015912663323198323
+          },
+          "untransformed_root_mean_square_error": 0.021647255967866343,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 128,
+          "official_source_row": 384,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 384,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "4451e8a4e1e0e300b8bfa201b76b6e501de711f6da1d41d83980617915577cfc"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 128,
+            "row_width": 5120,
+            "tensor_byte_offset": 368640,
+            "blob_byte_offset": 1769491424,
+            "byte_length": 2880,
+            "row_sha256": "8d19228b611d5d95245d002415fca14e110618bdaedeaaa6406bad8121b9e152"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.001317677562723062,
+            "mean_absolute_error": 0.0010956039433949627,
+            "maximum_absolute_error": 0.004148006439208984,
+            "cosine_similarity": 0.997272539717886,
+            "reference_projection_output": -0.02046806281885901,
+            "gguf_projection_output": -0.020301034282692313,
+            "projection_output_absolute_error": 0.00016702853616669747
+          },
+          "untransformed_root_mean_square_error": 0.024199974407637975,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 4224,
+          "official_source_row": 4480,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4480,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "673ea8d1175eb6c1858473ed119762584070fd415840ee55389d06b9f3fe2d12"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 4224,
+            "row_width": 4,
+            "tensor_byte_offset": 67584,
+            "blob_byte_offset": 2005284000,
+            "byte_length": 16,
+            "row_sha256": "2189e40b34d47f92010a38a6227087b2544bf9ea2616fc13b7a12f6ea962e46a"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": 0.00790178560321408,
+            "gguf_projection_output": 0.00790178560321408,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.02239219959578449,
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 6272,
+          "official_source_row": 4608,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4608,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "71791a6118934014316600645da428ff8cc11616c3b1bfab976e9482a34bda45"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 6272,
+            "row_width": 5120,
+            "tensor_byte_offset": 26342400,
+            "blob_byte_offset": 1813180384,
+            "byte_length": 4200,
+            "row_sha256": "bb86a4fd1a542f39385ee97d9ec964033eff263be968ae006fcd56aa9137353c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00022638157705122554,
+            "mean_absolute_error": 0.00018641955830389634,
+            "maximum_absolute_error": 0.0009822845458984375,
+            "cosine_similarity": 0.9998479949304431,
+            "reference_projection_output": 0.005165739245013322,
+            "gguf_projection_output": 0.005362068559782315,
+            "projection_output_absolute_error": 0.00019632931476899328
+          },
+          "untransformed_root_mean_square_error": 0.02020665291891196,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 2176,
+          "official_source_row": 512,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 512,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "6eb185973fae87ead9b2d95de438e457267583e2b323c2092cf134c962b1ec8b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 2176,
+            "row_width": 5120,
+            "tensor_byte_offset": 6266880,
+            "blob_byte_offset": 1775389664,
+            "byte_length": 2880,
+            "row_sha256": "3947096770e0ea33e86f80f72ab8bcf0b417ca6d9142c1f1eb221ba6e7123d72"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00120632551966783,
+            "mean_absolute_error": 0.0010028185311966808,
+            "maximum_absolute_error": 0.00433349609375,
+            "cosine_similarity": 0.997227728012153,
+            "reference_projection_output": 0.0014109747378978498,
+            "gguf_projection_output": 0.003172302603128269,
+            "projection_output_absolute_error": 0.001761327865230419
+          },
+          "untransformed_root_mean_square_error": 0.021894866764521695,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 6272,
+          "official_source_row": 4608,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 4608,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "2bb0275c6d184c67062c3d49d0c8d012b0a8f4f36508573d10104c4eb8c68815"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 6272,
+            "row_width": 4,
+            "tensor_byte_offset": 100352,
+            "blob_byte_offset": 2005316768,
+            "byte_length": 16,
+            "row_sha256": "130881c186c6ba63c9e65d0e9b0d11a1e8e7b3ef4df08f66aefa3d78192a0679"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.009234899237117894,
+            "gguf_projection_output": 0.009234899237117894,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.013089342133676433,
+          "parity_passed": true
+        },
+        {
+          "transform": "qkv_v_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+          "gguf_tensor": "blk.0.attn_qkv.weight",
+          "target_row": 8191,
+          "official_source_row": 10111,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 10111,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              5120
+            ],
+            "row_sha256": "a2c8736317c5371a36e656fab279c55173ab8cc2f72001c2bb041b7461096dd0"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_qkv.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 8191,
+            "row_width": 5120,
+            "tensor_byte_offset": 34402200,
+            "blob_byte_offset": 1821240184,
+            "byte_length": 4200,
+            "row_sha256": "12e3eeb3ce4906590974536614a7f338d7477f9bbd05fa3d8d5779b6d33cc974"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0003081906803352304,
+            "mean_absolute_error": 0.00024947643960331333,
+            "maximum_absolute_error": 0.002300262451171875,
+            "cosine_similarity": 0.999829816192725,
+            "reference_projection_output": -0.008317209099162138,
+            "gguf_projection_output": -0.008606968768582085,
+            "projection_output_absolute_error": 0.0002897596694199471
+          },
+          "untransformed_root_mean_square_error": 0.023717504642048342,
+          "parity_passed": true
+        },
+        {
+          "transform": "z_gate_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+          "gguf_tensor": "blk.0.attn_gate.weight",
+          "target_row": 4095,
+          "official_source_row": 6015,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 6015,
+            "dtype": "BF16",
+            "shape": [
+              6144,
+              5120
+            ],
+            "row_sha256": "657c08d9e9a87090079f3010be7596f584f62c3516557f7e453018bcd4811d93"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.attn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                6144,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 4095,
+            "row_width": 5120,
+            "tensor_byte_offset": 11793600,
+            "blob_byte_offset": 1780916384,
+            "byte_length": 2880,
+            "row_sha256": "d927fe60402f5c8b0346c74e5da658af92f6c37f947101229de814f4b88bc405"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0012568829535651324,
+            "mean_absolute_error": 0.001042892987607047,
+            "maximum_absolute_error": 0.003961682319641113,
+            "cosine_similarity": 0.9972483954057647,
+            "reference_projection_output": 0.03264535658087414,
+            "gguf_projection_output": 0.03298224117702111,
+            "projection_output_absolute_error": 0.0003368845961469677
+          },
+          "untransformed_root_mean_square_error": 0.01998673127406739,
+          "parity_passed": true
+        },
+        {
+          "transform": "convolution_v_channels_tiled_after_squeeze",
+          "official_tensor": "model.language_model.layers.0.linear_attn.conv1d.weight",
+          "gguf_tensor": "blk.0.ssm_conv1d.weight",
+          "target_row": 8191,
+          "official_source_row": 10111,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 10111,
+            "dtype": "BF16",
+            "shape": [
+              10240,
+              1,
+              4
+            ],
+            "row_sha256": "10a9e51f76065aaa31e8ecc1b0d872518ef177b854e53c3098bdc911f4503068"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_conv1d.weight",
+            "tensor_shape": {
+              "dims": [
+                10240,
+                4
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 8191,
+            "row_width": 4,
+            "tensor_byte_offset": 131056,
+            "blob_byte_offset": 2005347472,
+            "byte_length": 16,
+            "row_sha256": "b5fe4f1dcd164cf4b7b42ed37dfc49046ee07e36840a0767c5da1c8cc3ba84f9"
+          },
+          "metrics": {
+            "element_count": 4,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999999,
+            "reference_projection_output": 0.007427874996683066,
+            "gguf_projection_output": 0.007427874996683066,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.0313450197685936,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 1,
+          "official_source_row": 3,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 3,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "36ea176fb234263cfe74614fb8011b01b6afa7980438b7e2ea65012849d2bcd7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 1,
+            "row_width": 5120,
+            "tensor_byte_offset": 20480,
+            "blob_byte_offset": 2003270816,
+            "byte_length": 20480,
+            "row_sha256": "5d4c612932348e910210162583c0b4aa299ba8ae26a23184e865bd45c8690916"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": -0.009872500563891275,
+            "gguf_projection_output": -0.009872500563891275,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.032730942270208056,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 1,
+          "official_source_row": 3,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 3,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "e1f6b27b3b1c089a66b6db37b0ea3cb0de2599a38dac06ea60761237016a822b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 1,
+            "row_width": 5120,
+            "tensor_byte_offset": 20480,
+            "blob_byte_offset": 2004253856,
+            "byte_length": 20480,
+            "row_sha256": "5428997f2410c26507e92f364fd724eaa1776001addbb87c584f44e2c66dc669"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.007778047750117871,
+            "gguf_projection_output": 0.007778047750117871,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.012571403015313115,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 16,
+          "official_source_row": 1,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "d3dcd8f8805d328e7e5ee79e8fbb3cd477796611ac31d80a49824de8460ec974"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 16,
+            "row_width": 5120,
+            "tensor_byte_offset": 327680,
+            "blob_byte_offset": 2003578016,
+            "byte_length": 20480,
+            "row_sha256": "e792c6eb66f2d62e2ec04f03ef49a1f3d210d2fe0212a30e24a397671d7f81b5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 0.9999999999999999,
+            "reference_projection_output": 0.0008412026544992596,
+            "gguf_projection_output": 0.0008412026544992596,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.03005633516910203,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 16,
+          "official_source_row": 1,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "1d57ac09af4762c7dfbc0c10705f21407e2581ed53578c5fc610dfe594c44722"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 16,
+            "row_width": 5120,
+            "tensor_byte_offset": 327680,
+            "blob_byte_offset": 2004561056,
+            "byte_length": 20480,
+            "row_sha256": "5972e15bcc0cb05f39b63def7ffe9ca51d5915ef83701c110b3ff1bb5bce7f34"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.008813392760801533,
+            "gguf_projection_output": 0.008813392760801533,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.01290779865428083,
+          "parity_passed": true
+        },
+        {
+          "transform": "alpha_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+          "gguf_tensor": "blk.0.ssm_alpha.weight",
+          "target_row": 31,
+          "official_source_row": 46,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 46,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "cb1d3871b04afa869cd92adfa17a802216b69478437c6a68029390adac4220a2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_alpha.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 31,
+            "row_width": 5120,
+            "tensor_byte_offset": 634880,
+            "blob_byte_offset": 2003885216,
+            "byte_length": 20480,
+            "row_sha256": "70d12ee3b4298c0c83ddb548656ca6efc698fd8a964bab67418939108616e7ab"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0000000000000002,
+            "reference_projection_output": -0.02383337543124597,
+            "gguf_projection_output": -0.02383337543124597,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.0314621259544119,
+          "parity_passed": true
+        },
+        {
+          "transform": "beta_rows_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+          "gguf_tensor": "blk.0.ssm_beta.weight",
+          "target_row": 31,
+          "official_source_row": 46,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 46,
+            "dtype": "BF16",
+            "shape": [
+              48,
+              5120
+            ],
+            "row_sha256": "ee4e857a21b0ba2a2e182ecf0d913312f5b975e6af64c905a401f903e3ec4033"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_beta.weight",
+            "tensor_shape": {
+              "dims": [
+                48,
+                5120
+              ]
+            },
+            "tensor_type": "F32",
+            "row_index": 31,
+            "row_width": 5120,
+            "tensor_byte_offset": 634880,
+            "blob_byte_offset": 2004868256,
+            "byte_length": 20480,
+            "row_sha256": "bdce910394f3c7eed333884c877f407846b49dd2cf2040fe953c9bbfe9bbe71e"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0,
+            "mean_absolute_error": 0.0,
+            "maximum_absolute_error": 0.0,
+            "cosine_similarity": 1.0,
+            "reference_projection_output": 0.003528117753218561,
+            "gguf_projection_output": 0.003528117753218561,
+            "projection_output_absolute_error": 0.0
+          },
+          "untransformed_root_mean_square_error": 0.011323963677849925,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "887c59c2a4b950db885cee1d4149d7219ea8f53a10d960f26bae8e8465b0fb55"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 0,
+            "row_width": 6144,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2005380960,
+            "byte_length": 4224,
+            "row_sha256": "321708808693e4142650a6580749b815dbd8ce2cedb9846d5178e620cd30775e"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0005226535088923084,
+            "mean_absolute_error": 0.0004321515710519937,
+            "maximum_absolute_error": 0.0023346543312072754,
+            "cosine_similarity": 0.9992993485854719,
+            "reference_projection_output": 0.013968392649271745,
+            "gguf_projection_output": 0.014997704884735952,
+            "projection_output_absolute_error": 0.0010293122354642064
+          },
+          "untransformed_root_mean_square_error": 0.0194562950434911,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 2559,
+          "official_source_row": 2559,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 2559,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "a4a308992a7cadb2c8c001ceaff2a769623aecd93041a60797d7fa1ef686d76c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 2559,
+            "row_width": 6144,
+            "tensor_byte_offset": 10809216,
+            "blob_byte_offset": 2016190176,
+            "byte_length": 4224,
+            "row_sha256": "11e56d44d645c1507561e4ca694e8fd082d4539572007c6e55519acf3468a77f"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0005169956413126097,
+            "mean_absolute_error": 0.0004301735777213859,
+            "maximum_absolute_error": 0.002012193202972412,
+            "cosine_similarity": 0.9993095404392148,
+            "reference_projection_output": -0.010030303495338058,
+            "gguf_projection_output": -0.01064991614341134,
+            "projection_output_absolute_error": 0.0006196126480732828
+          },
+          "untransformed_root_mean_square_error": 0.019255371641156576,
+          "parity_passed": true
+        },
+        {
+          "transform": "output_projection_columns_tiled",
+          "official_tensor": "model.language_model.layers.0.linear_attn.out_proj.weight",
+          "gguf_tensor": "blk.0.ssm_out.weight",
+          "target_row": 5119,
+          "official_source_row": 5119,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 5119,
+            "dtype": "BF16",
+            "shape": [
+              5120,
+              6144
+            ],
+            "row_sha256": "5500c6bed69f50a3d9adad285ee442fc62d53e4cd5f73630868ae00827f94a8c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ssm_out.weight",
+            "tensor_shape": {
+              "dims": [
+                5120,
+                6144
+              ]
+            },
+            "tensor_type": "Q5K",
+            "row_index": 5119,
+            "row_width": 6144,
+            "tensor_byte_offset": 21622656,
+            "blob_byte_offset": 2027003616,
+            "byte_length": 4224,
+            "row_sha256": "c5462dd286fc90ac1893037fb867c332bb1e5cc3864e7468e12eeed9b9b17231"
+          },
+          "metrics": {
+            "element_count": 6144,
+            "root_mean_square_error": 0.0005015289229029389,
+            "mean_absolute_error": 0.00041636720319123316,
+            "maximum_absolute_error": 0.0023651123046875,
+            "cosine_similarity": 0.999324561278878,
+            "reference_projection_output": -0.0007111928073081741,
+            "gguf_projection_output": -0.0009582777759640685,
+            "projection_output_absolute_error": 0.0002470849686558944
+          },
+          "untransformed_root_mean_square_error": 0.01897536178829701,
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "dd99e391f1ce5450b9d8214427e6476466629583aba0c8d717f3ed4907d8a203"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1053961184,
+            "byte_length": 2880,
+            "row_sha256": "c1795850b672078daca4ce8724969cc019becb56ea6a2f201f14b99663d78bb3"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.001283641785656652,
+            "mean_absolute_error": 0.0010245141478662846,
+            "maximum_absolute_error": 0.004753828048706055,
+            "cosine_similarity": 0.9961454182146564,
+            "reference_projection_output": 0.0018951177373262296,
+            "gguf_projection_output": 0.002740274839604444,
+            "projection_output_absolute_error": 0.0008451571022782146
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 1000,
+          "official_source_row": 1000,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 1000,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "5ffcc88efb918cee5c19c6fa1b92f7f69188fddfff738225c29284a40c2c17b5"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 1000,
+            "row_width": 5120,
+            "tensor_byte_offset": 2880000,
+            "blob_byte_offset": 1056841184,
+            "byte_length": 2880,
+            "row_sha256": "a0c16683be9d772e5ec55d5297088f544c956c93b736a3c3547432680ff777af"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0013894168586150797,
+            "mean_absolute_error": 0.0011146742064738647,
+            "maximum_absolute_error": 0.006822347640991211,
+            "cosine_similarity": 0.9961688520180323,
+            "reference_projection_output": 0.012668927139148104,
+            "gguf_projection_output": 0.01225949168327837,
+            "projection_output_absolute_error": 0.000409435455869734
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.embed_tokens.weight",
+          "gguf_tensor": "token_embd.weight",
+          "target_row": 248319,
+          "official_source_row": 248319,
+          "official_receipt": {
+            "tensor_name": "model.language_model.embed_tokens.weight",
+            "shard_name": "model-00003-of-00018.safetensors",
+            "row_index": 248319,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "22559323ac4a954c9987b1e574d9a6384aeb0c27a0ec59794b38efe2c088b8f2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "token_embd.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 248319,
+            "row_width": 5120,
+            "tensor_byte_offset": 715158720,
+            "blob_byte_offset": 1769119904,
+            "byte_length": 2880,
+            "row_sha256": "4fe63ae699cd893e0f1d31c50eea30ee37893185e05a40e8dfa9a5add7a8df8c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00022389866786476427,
+            "mean_absolute_error": 0.00018656513739188086,
+            "maximum_absolute_error": 0.0006513595581054688,
+            "cosine_similarity": 0.9974348479375946,
+            "reference_projection_output": 0.003340551076229544,
+            "gguf_projection_output": 0.003261035904755988,
+            "projection_output_absolute_error": 0.00007951517147355633
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "7c158670b1454ca1bae9d43d4c147fb2c72b5d9649a9ef056b97249092ad7fc7"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 1902959584,
+            "byte_length": 2880,
+            "row_sha256": "50d788e47a35e0b5fda2ca6fe35b6bcc6f726301291e11c9b5a492e95539c61f"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0007966998699320676,
+            "mean_absolute_error": 0.000665366998873651,
+            "maximum_absolute_error": 0.0029377341270446777,
+            "cosine_similarity": 0.9973617414367476,
+            "reference_projection_output": 0.006057436798703161,
+            "gguf_projection_output": 0.005788487448909561,
+            "projection_output_absolute_error": 0.00026894934979360043
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 8704,
+          "official_source_row": 8704,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 8704,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "2d6fec068a6ec721ab867e7daea09f19a77a46fa07b8943994531e37955b086c"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 8704,
+            "row_width": 5120,
+            "tensor_byte_offset": 25067520,
+            "blob_byte_offset": 1928027104,
+            "byte_length": 2880,
+            "row_sha256": "b1a56b04537a87b03f06c0d6d314c03941762df4b3a837550bb8d87f72640d7f"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0007051924163215108,
+            "mean_absolute_error": 0.000588729398441501,
+            "maximum_absolute_error": 0.00233381986618042,
+            "cosine_similarity": 0.9973109734663785,
+            "reference_projection_output": 0.011473124743189636,
+            "gguf_projection_output": 0.01131929420213204,
+            "projection_output_absolute_error": 0.0001538305410575952
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.0.mlp.gate_proj.weight",
+          "gguf_tensor": "blk.0.ffn_gate.weight",
+          "target_row": 17407,
+          "official_source_row": 17407,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 17407,
+            "dtype": "BF16",
+            "shape": [
+              17408,
+              5120
+            ],
+            "row_sha256": "4b7e6006f46434cc523c5d2c87ca82dd70e1197d7ed88d08a6f886a30a5ef9c4"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.0.ffn_gate.weight",
+            "tensor_shape": {
+              "dims": [
+                17408,
+                5120
+              ]
+            },
+            "tensor_type": "Q4K",
+            "row_index": 17407,
+            "row_width": 5120,
+            "tensor_byte_offset": 50132160,
+            "blob_byte_offset": 1953091744,
+            "byte_length": 2880,
+            "row_sha256": "9fe4497ce29934d8311dfc51b499feca6462084589b8203b27ce9c709409f741"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.000725841117257739,
+            "mean_absolute_error": 0.0006037624058080837,
+            "maximum_absolute_error": 0.0028558969497680664,
+            "cosine_similarity": 0.9972867565604404,
+            "reference_projection_output": 0.004163428288662196,
+            "gguf_projection_output": 0.0039755569320111366,
+            "projection_output_absolute_error": 0.00018787135665105942
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "8606fbbf84811aee32030a0086e49747e27d22b66981c8b61546213b5618afa2"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 2598833760,
+            "byte_length": 4200,
+            "row_sha256": "0b6b2583e42f924aefb9a739be1d475aad27440c0baa41c0fd234a47cbe3f2e1"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0003154480594693919,
+            "mean_absolute_error": 0.0002162145741749555,
+            "maximum_absolute_error": 0.009063720703125,
+            "cosine_similarity": 0.9997663875238616,
+            "reference_projection_output": -0.005914443988055033,
+            "gguf_projection_output": -0.006085843097152984,
+            "projection_output_absolute_error": 0.0001713991090979512
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 511,
+          "official_source_row": 511,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 511,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "f16949e9bdac405b99e642b625a6611154d98e30358560b693e67697c6e3520f"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 511,
+            "row_width": 5120,
+            "tensor_byte_offset": 2146200,
+            "blob_byte_offset": 2600979960,
+            "byte_length": 4200,
+            "row_sha256": "06aeaac2c679b4467b6166f33137fa2297b57d736dec98a7b087c4237db1c5b3"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0003723589510502921,
+            "mean_absolute_error": 0.00030157947912812233,
+            "maximum_absolute_error": 0.0031604766845703125,
+            "cosine_similarity": 0.9998328852476357,
+            "reference_projection_output": -0.008797876589352044,
+            "gguf_projection_output": -0.008666682355797211,
+            "projection_output_absolute_error": 0.00013119423355483287
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "model.language_model.layers.3.self_attn.v_proj.weight",
+          "gguf_tensor": "blk.3.attn_v.weight",
+          "target_row": 1023,
+          "official_source_row": 1023,
+          "official_receipt": {
+            "tensor_name": "model.language_model.layers.3.self_attn.v_proj.weight",
+            "shard_name": "model-00001-of-00018.safetensors",
+            "row_index": 1023,
+            "dtype": "BF16",
+            "shape": [
+              1024,
+              5120
+            ],
+            "row_sha256": "f48070eac859dd685651effbf0bfcf304114d6d6a3da2f33cf1b75d2e4a0b62a"
+          },
+          "gguf_receipt": {
+            "tensor_name": "blk.3.attn_v.weight",
+            "tensor_shape": {
+              "dims": [
+                1024,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 1023,
+            "row_width": 5120,
+            "tensor_byte_offset": 4296600,
+            "blob_byte_offset": 2603130360,
+            "byte_length": 4200,
+            "row_sha256": "5c5f64b9e5266d2d2ac2bd127a23a073a553a1cfba96ae79f28f832675a0807c"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00030333464531341305,
+            "mean_absolute_error": 0.00021401407138910145,
+            "maximum_absolute_error": 0.008890151977539062,
+            "cosine_similarity": 0.9997699055678788,
+            "reference_projection_output": 0.02097263549653486,
+            "gguf_projection_output": 0.02109631387042289,
+            "projection_output_absolute_error": 0.00012367837388802677
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 0,
+          "official_source_row": 0,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 0,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "ec86c0b4d477ac670e076d21dc09e7e01f038d4f0296d1650e05d46fd0a939d3"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 0,
+            "row_width": 5120,
+            "tensor_byte_offset": 0,
+            "blob_byte_offset": 10996704,
+            "byte_length": 4200,
+            "row_sha256": "a4ec4b69ed12c751c09b0831ac1778ff193bd460b0f161f6ca7a0ea7cebffe09"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0002852268568283394,
+            "mean_absolute_error": 0.00023095469914551358,
+            "maximum_absolute_error": 0.001373291015625,
+            "cosine_similarity": 0.9998329487253913,
+            "reference_projection_output": 0.013427465022875586,
+            "gguf_projection_output": 0.013670345854110937,
+            "projection_output_absolute_error": 0.00024288083123535052
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 1000,
+          "official_source_row": 1000,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 1000,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "1cb2b6e082aae599a524fd4d3d247c96fa34ae9f4b1c225da8445c5ed377370b"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 1000,
+            "row_width": 5120,
+            "tensor_byte_offset": 4200000,
+            "blob_byte_offset": 15196704,
+            "byte_length": 4200,
+            "row_sha256": "f8a00c3803b5c8f1fa7b7365b1eb04a210af607710158864ed940c4fc85c40a5"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.00019077378923500166,
+            "mean_absolute_error": 0.00015771343896631151,
+            "maximum_absolute_error": 0.000579833984375,
+            "cosine_similarity": 0.9998610142247925,
+            "reference_projection_output": -0.006916661279767039,
+            "gguf_projection_output": -0.0069657567859634315,
+            "projection_output_absolute_error": 0.00004909550619639283
+          },
+          "parity_passed": true
+        },
+        {
+          "transform": "unmodified_weight_row_projection_quality",
+          "official_tensor": "lm_head.weight",
+          "gguf_tensor": "output.weight",
+          "target_row": 248319,
+          "official_source_row": 248319,
+          "official_receipt": {
+            "tensor_name": "lm_head.weight",
+            "shard_name": "model-00018-of-00018.safetensors",
+            "row_index": 248319,
+            "dtype": "BF16",
+            "shape": [
+              248320,
+              5120
+            ],
+            "row_sha256": "8055d5d7e771950f56e7095aaa25c0d71831be7d76c9bf5525f0397d720e103d"
+          },
+          "gguf_receipt": {
+            "tensor_name": "output.weight",
+            "tensor_shape": {
+              "dims": [
+                248320,
+                5120
+              ]
+            },
+            "tensor_type": "Q6K",
+            "row_index": 248319,
+            "row_width": 5120,
+            "tensor_byte_offset": 1042939800,
+            "blob_byte_offset": 1053936504,
+            "byte_length": 4200,
+            "row_sha256": "726bcf5590fd3b4c1762ccde2fb3c198b808798714678c3e902c6f218996cb4a"
+          },
+          "metrics": {
+            "element_count": 5120,
+            "root_mean_square_error": 0.0001478033817101579,
+            "mean_absolute_error": 0.00009543113919789903,
+            "maximum_absolute_error": 0.00156402587890625,
+            "cosine_similarity": 0.99965940552337,
+            "reference_projection_output": 0.0035672280074365774,
+            "gguf_projection_output": 0.0034017044226718907,
+            "projection_output_absolute_error": 0.00016552358476468665
+          },
+          "parity_passed": true
+        }
+      ],
+      "sampled_row_count": 34,
+      "mean_root_mean_square_error": 0.0003776759609875867,
+      "mean_cosine_similarity": 0.9991068490032964,
+      "mean_projection_output_absolute_error": 0.0002245587377358645,
+      "transform_layout_passed": true
+    }
+  ],
+  "quality_comparison": {
+    "measurement_scope": "deterministic sampled transformed-weight rows and their scalar projection outputs",
+    "primary_mean_root_mean_square_error": 0.0009728316931454377,
+    "q3_k_m_mean_root_mean_square_error": 0.0008022681968503395,
+    "q4_k_m_mean_root_mean_square_error": 0.0003776759609875867,
+    "primary_to_q3_k_m_rmse_ratio": 1.2126015925406504,
+    "primary_mean_cosine_similarity": 0.9961252993566818,
+    "q3_k_m_mean_cosine_similarity": 0.9961155847190364,
+    "q4_k_m_mean_cosine_similarity": 0.9991068490032964,
+    "result": "primary_sampled_projection_quality_below_q3_k_m",
+    "generated_text_quality_status": "not_measured_until_real_generation_exists_in_r6;_dynamic_v3_remains_candidate_only"
+  },
+  "all_transform_layout_checks_passed": true,
+  "claim_boundary": "This proves sampled converter-layout and projection-output parity. It does not prove generated-token parity or make Dynamic V3 canonical.",
+  "report_sha256": "537d142a546a7d477eac2d2338761dbd38b24b9dbc3ea7fd56b9f70ba10cba7e"
+}

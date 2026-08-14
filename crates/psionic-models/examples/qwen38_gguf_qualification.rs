@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut gguf_dir = PathBuf::from("target/models/qwen/unsloth/Qwen3.8-27B-GGUF");
     let mut fixture_path = PathBuf::from(QWEN38_GGUF_PROMPT_TOKENIZER_FIXTURE_PATH);
     let mut output_dir = PathBuf::from("fixtures/qwen38/reports");
+    let mut reuse_parity = None::<PathBuf>;
     let mut args = env::args().skip(1);
     while let Some(argument) = args.next() {
         match argument.as_str() {
@@ -26,9 +27,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--output-dir" => {
                 output_dir = PathBuf::from(args.next().ok_or("--output-dir requires a path")?);
             }
+            "--reuse-parity" => {
+                reuse_parity = Some(PathBuf::from(
+                    args.next().ok_or("--reuse-parity requires a path")?,
+                ));
+            }
             "--help" | "-h" => {
                 println!(
-                    "usage: qwen38_gguf_qualification [--official-model-dir PATH] [--gguf-dir PATH] [--fixture PATH] [--output-dir PATH]"
+                    "usage: qwen38_gguf_qualification [--official-model-dir PATH] [--gguf-dir PATH] [--fixture PATH] [--output-dir PATH] [--reuse-parity PATH]"
                 );
                 return Ok(());
             }
@@ -37,7 +43,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     fs::create_dir_all(&output_dir)?;
-    let parity = run_qwen38_gguf_converter_parity(&official_model_dir, &gguf_dir)?;
+    let parity = if let Some(path) = reuse_parity {
+        serde_json::from_slice(&fs::read(path)?)?
+    } else {
+        run_qwen38_gguf_converter_parity(&official_model_dir, &gguf_dir)?
+    };
     write_report(
         output_dir.join("qwen38_gguf_converter_parity_v1.json"),
         &parity,

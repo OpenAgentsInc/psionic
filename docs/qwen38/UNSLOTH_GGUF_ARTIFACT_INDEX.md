@@ -1,7 +1,7 @@
 # Unsloth Qwen3.8-27B GGUF Artifact Index
 
-> Status: `implemented` for source inventory and the selected local artifact on
-> 2026-08-14. Native Psionic admission and execution remain `planned`.
+> Status: `implemented` for source inventory, selected local artifacts, and R5
+> native storage admission on 2026-08-14. Token generation remains `planned`.
 
 This index pins `unsloth/Qwen3.8-27B-GGUF` at revision
 `fdd03b8bbd279c1694563650e79d85a2373d9934`. It records the complete source
@@ -40,7 +40,7 @@ therefore contains only these four upstream files:
 | [`.gitattributes`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/.gitattributes) | 3,175 | Git blob `5b36aa9079a4e144a6547dcb8b8e7b417933d78a` | LFS transport rules; not a runtime input. |
 | [`README.md`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/README.md) | 6,583 | Git blob `992ca5f077d4514e193063181de944c594033f89` | Quantization catalog, usage guidance, and published size labels. |
 | [`config.json`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/config.json) | 3,760 | Git blob `c2bb5cf2a82d965d5b11aa078ba9571fe949a4d5` | Companion Transformers topology. Psionic still treats the pinned official Qwen repository as architecture authority. |
-| [`Qwen3.8-27B-UD-Q3_K_XL.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-UD-Q3_K_XL.gguf) | 13,441,059,904 | SHA-256 `00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2` | Primary text-generation candidate. R5 must inspect its actual tensor types, metadata, tokenizer, template, converter layout, MTP disposition, and memory envelope before admission. |
+| [`Qwen3.8-27B-UD-Q3_K_XL.gguf`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/blob/fdd03b8bbd279c1694563650e79d85a2373d9934/Qwen3.8-27B-UD-Q3_K_XL.gguf) | 13,441,059,904 | SHA-256 `00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2` | Primary text-generation candidate. R5 admits its actual tensor types, metadata, tokenizer, template, converter layout, MTP disposition, and 4,096-token CUDA preflight. |
 
 The Hugging Face CLI creates `.cache/huggingface/` download state inside the
 local root. It is not part of the upstream tree or the Psionic artifact
@@ -70,7 +70,8 @@ digest exactly.
 The first local execution lane uses only the primary weight artifact. The two
 comparison weights are materialized for R5 qualification but remain outside
 the primary CUDA residency claim. Both vision projectors and both BF16 shards
-remain excluded.
+remain excluded. R5 admits storage and memory preflight only; generation starts
+in R6.
 
 ## Repository Metadata
 
@@ -158,7 +159,8 @@ sampled converter checks.
 4. Validate converter provenance and sampled transforms against the official
    BF16 source. Unknown V-head layout refuses.
 5. Map every concrete stored type to an implemented loader and native CPU/CUDA
-   runtime. A profile label cannot satisfy this gate.
+   runtime. A profile label cannot satisfy this gate. R5 covers the
+   materialized artifacts only.
 6. Build explicit weights, KV, recurrent-state, scratch, graph, and allocator
    memory plans for each admitted context and backend.
 7. Admit standard text generation while explicitly skipping and reporting MTP

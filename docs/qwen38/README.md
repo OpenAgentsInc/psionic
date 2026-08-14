@@ -2,7 +2,8 @@
 
 > Status: `planned` on 2026-08-14. Upstream research, local artifact
 > acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, R3
-> checkpoint admission, and R4 bounded BF16 evidence are `implemented`.
+> checkpoint admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
+> `implemented`.
 > Psionic does not yet claim Qwen3.8 generation, serving, training, or
 > multimodal support.
 
@@ -59,6 +60,13 @@ are not downloaded. Their immutable sizes, digests, purposes, and
 materialization posture are recorded in
 [UNSLOTH_GGUF_ARTIFACT_INDEX.md](UNSLOTH_GGUF_ARTIFACT_INDEX.md) and
 [GGUF_DOWNLOAD_PLAN.md](GGUF_DOWNLOAD_PLAN.md).
+
+R5 retained qualification reports for all three local GGUFs under
+`fixtures/qwen38/reports/`. The primary `UD-Q3_K_XL` artifact is admitted for
+native runtime implementation and 4,096-token CUDA residency preflight only.
+The `Q3_K_M` artifact is retained as a standard K-quant comparison baseline.
+The `Q4_K_M` artifact is retained as a CPU-offload quality comparator because
+full CUDA residency refuses on the local 16 GiB RTX 4080 estimate.
 
 ## Documents
 
@@ -150,6 +158,14 @@ Sampled projection reads real embedding and LM-head BF16 rows. Bounded
 row-sparse traversal reads one deterministic row from every required decoder
 and MTP tensor and visits all 65 declared layers in order. These are bounded
 evidence modes. They do not execute full-width model layers or generate tokens.
+
+R5 adds native loader, CPU, and CUDA storage support for the concrete GGML
+families needed by the selected GGUF set, including `Q3_K`, `Q4_K`, `Q5_K`,
+`Q6_K`, `Q8_0`, `IQ3_S`, and `IQ4_XS`. The retained converter-parity report
+binds the pinned llama.cpp converter, tiled V-head layout, sampled official
+BF16 rows, all three GGUF profiles, and the Dynamic V3 quality comparison.
+MTP tensors are inventoried and skipped for standard generation. This admits
+artifact storage and memory preflight only; R6 owns token generation.
 
 ## Primary Source
 

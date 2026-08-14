@@ -9820,10 +9820,13 @@ fn decode_q6_k_blocks(
         let qh = &block[128..192];
         let scales = &block[192..208];
         let scale = decode_f16([block[208], block[209]]);
+        let block_start = output.len();
+        output.resize(block_start + 256, 0.0);
         for chunk_index in 0..2 {
             let ql_chunk = &ql[chunk_index * 64..(chunk_index + 1) * 64];
             let qh_chunk = &qh[chunk_index * 32..(chunk_index + 1) * 32];
             let scale_chunk = &scales[chunk_index * 8..(chunk_index + 1) * 8];
+            let chunk_start = block_start + chunk_index * 128;
             for l in 0..32 {
                 let is = l / 16;
                 let q1 = (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
@@ -9832,10 +9835,13 @@ fn decode_q6_k_blocks(
                 let q3 = (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
                 let q4 =
                     (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
-                output.push(scale * f32::from(scale_chunk[is] as i8) * f32::from(q1));
-                output.push(scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
-                output.push(scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
-                output.push(scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4));
+                output[chunk_start + l] = scale * f32::from(scale_chunk[is] as i8) * f32::from(q1);
+                output[chunk_start + l + 32] =
+                    scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2);
+                output[chunk_start + l + 64] =
+                    scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3);
+                output[chunk_start + l + 96] =
+                    scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4);
             }
         }
     })
@@ -12098,6 +12104,28 @@ mod tests {
             assert_eq!(tensor.metadata().quantization, mode);
             assert_eq!(tensor.values()?.as_ref(), expected.as_slice());
         }
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_loader_decode_preserves_llama_cpp_lane_order()
+    -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut block = vec![0_u8; 210];
+        block[0] = 0x21;
+        block[32] = 0x43;
+        block[192..200].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        block[208..210].copy_from_slice(&0x3c00_u16.to_le_bytes());
+
+        let values =
+            super::decode_q6_k_blocks(QuantizedBlockLayout::new(256, 210, 1), block.as_slice())?;
+        assert_eq!(values.len(), 256);
+        assert_eq!(values[0], -31.0);
+        assert_eq!(values[32], -87.0);
+        assert_eq!(values[64], -150.0);
+        assert_eq!(values[96], -196.0);
+        assert_eq!(values[1], -32.0);
+        assert_eq!(values[33], -96.0);
         Ok(())
     }
 

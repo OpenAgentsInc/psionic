@@ -1,7 +1,7 @@
 # Qwen3.8 GGUF Download Plan
 
-> Status: `implemented` on 2026-08-14 for the transfer plan. Artifact
-> qualification and execution remain `planned`.
+> Status: `implemented` on 2026-08-14 for the transfer plan and R5
+> qualification. Token generation remains `planned`.
 
 ## Source
 
@@ -65,9 +65,16 @@ before using the artifact for qualification or comparison.
 Both comparator transfers completed on 2026-08-14. Their observed byte sizes
 and SHA-256 values match the plan exactly.
 
+R5 retained qualification reports for the primary, `Q3_K_M`, and `Q4_K_M`
+artifacts under `fixtures/qwen38/reports/`. They bind the same revision,
+filename, byte count, SHA-256, tensor inventory, converter-layout evidence,
+MTP disposition, and memory-envelope decisions recorded here.
+
 ## Admission Boundary
 
 The profile name does not define the concrete tensor storage types. Psionic
 must inspect each GGUF tensor table and refuse any required storage type that
 lacks native loader and backend support. Download and digest verification do
-not establish runtime admission.
+not establish runtime admission. R5 establishes runtime storage admission only
+for the three materialized local files and the exact tensor families observed
+inside them.

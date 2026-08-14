@@ -2,8 +2,8 @@
 
 > Status: `planned` on 2026-08-14. Upstream research, artifact acquisition, and
 > R1 product/artifact identity, R2 prompt/tokenizer contracts, R3 checkpoint
-> admission, and R4 bounded BF16 evidence are `implemented`; Qwen3.8 generation
-> in Psionic remains `planned`.
+> admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
+> `implemented`; Qwen3.8 generation in Psionic remains `planned`.
 
 ## Goal
 
@@ -84,7 +84,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R2 | `implemented` | Exact Qwen3.5 pretokenizer and Qwen3.8 prompt-template contract | None; frontend only |
 | R3 | `implemented` | Family-neutral `qwen3_5_text` checkpoint admission | None; admission only |
 | R4 | `implemented` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
-| R5 | `planned` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
+| R5 | `implemented` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `planned` | Native CPU token generation | First executable text lane |
 | R7 | `planned` | Native CUDA token generation | First local accelerated lane |
 | R8 | `planned` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
@@ -330,6 +330,22 @@ No `implemented_early` inference claim follows from R4.
 
 ## R5: GGUF Qualification Gate
 
+Status: `implemented` through the GGUF loader/storage support and the retained
+reports under `fixtures/qwen38/reports/`:
+
+- `qwen38_gguf_converter_parity_v1.json`
+- `qwen38_gguf_dynamic_v3_qualification_v1.json`
+- `qwen38_gguf_q3_k_m_qualification_v1.json`
+- `qwen38_gguf_q4_k_m_qualification_v1.json`
+
+The primary Dynamic V3 artifact is admitted for native runtime implementation
+and 4,096-token CUDA residency preflight. The 8,192-token estimate remains
+unadmitted until R7 runtime peak memory and parity evidence exist. `Q3_K_M` is
+retained as the standard K-quant comparison baseline. `Q4_K_M` is retained as a
+CPU-offload quality comparator because full CUDA residency refuses on the
+local RTX 4080 estimate. This phase does not generate tokens, serve requests,
+or make Dynamic V3 canonical for output quality.
+
 The primary candidate for the first local native generation lane is
 `Qwen3.8-27B-UD-Q3_K_XL.gguf` from
 `unsloth/Qwen3.8-27B-GGUF` at observed revision
@@ -360,13 +376,11 @@ Build the exact download plan before transfer. The plan must name every target
 shard, expected byte size, expected digest, companion classification, and local
 materialization path. The first text plan excludes `mmproj`.
 
-The target filename is a profile label, not a runtime tensor type. Inspect the
-actual GGUF tensor table and implement every required storage type. Psionic
-currently recognizes GGUF type code 11 as Q3_K but cannot map it to a runtime
-quantization mode or decode its blocks. Q3_K CPU and CUDA support is therefore
-an explicit expected blocker for `UD-Q3_K_XL`, subject to confirmation from
-the downloaded artifact. Any IQ or other K types in the mixed profile are
-additional blockers.
+The target filename is a profile label, not a runtime tensor type. R5 inspects
+the actual GGUF tensor table and implements every required storage type for
+the selected local set: `F32`, `Q3_K`, `Q4_K`, `Q5_K`, `Q6_K`, `Q8_0`,
+`IQ3_S`, and `IQ4_XS`. Other community GGUFs still need independent tensor
+inventory and support checks.
 
 Validate the llama.cpp conversion contract with sampled official BF16 values:
 
@@ -711,18 +725,18 @@ regeneration into these commits.
 
 ## External Inputs And Blockers
 
-R2-R4 can begin with the current repository and official BF16 artifact.
+R6 can begin from the retained R0-R5 artifact, tokenizer, checkpoint,
+converter, storage, and memory-preflight evidence.
 
-R5 and later need:
+R6 and later need:
 
-- the selected `Qwen3.8-27B-UD-Q3_K_XL.gguf` artifact downloaded and bound to
-  immutable provenance, exact byte size, and SHA-256
-- its exact tensor-type inventory and converter-layout evidence
-- enough local GPU margin for the chosen artifact and context window, or a
-  larger remote GPU for full-BF16 CUDA validation
 - reference outputs from pinned llama.cpp revision
   `9b05354ec6fb58b4e665e9a39ebc40285c015638` for tokenizer, prompt,
   intermediates, logits, generation, and eventually vision
+- prefill, decode, cache-reset, timeout, cancellation, and memory-refusal
+  evidence for the admitted GGUF
+- runtime-measured local GPU margin for the chosen artifact and context window,
+  or a larger remote GPU for full-BF16 CUDA validation
 
 These inputs do not block the template, admission, or bounded BF16 milestones.
 They block honest native generation and accelerated release claims.

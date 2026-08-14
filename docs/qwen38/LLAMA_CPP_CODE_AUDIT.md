@@ -355,26 +355,27 @@ Sources:
 - [`ggml/src/ggml-cpu/ggml-cpu.c`, Q3_K CPU dot product registration](https://github.com/ggml-org/llama.cpp/blob/9b05354ec6fb58b4e665e9a39ebc40285c015638/ggml/src/ggml-cpu/ggml-cpu.c#L298-L314)
 - [`ggml/src/ggml-cuda/mmvq.cu`, Q3_K CUDA matvec registration](https://github.com/ggml-org/llama.cpp/blob/9b05354ec6fb58b4e665e9a39ebc40285c015638/ggml/src/ggml-cuda/mmvq.cu#L22-L51)
 
-### Concrete Psionic blocker
+### Psionic R5 resolution
 
-Psionic currently recognizes GGUF type code 11 as `GgufTensorType::Q3K`, but
-`GgufTensorType::quantization_mode()` returns no runtime mode for Q3_K. It has
-no Q3_K block decoder or native Q3_K projection path.
+R5 resolves the original Q3_K blocker for the selected Qwen3.8 artifact set.
+Psionic now maps the concrete GGUF tensor types found in the three
+materialized files to native loader, CPU, and CUDA storage paths: `Q3_K`,
+`Q4_K`, `Q5_K`, `Q6_K`, `Q8_0`, `IQ3_S`, and `IQ4_XS`.
 
 Relevant Psionic sources:
 
 - `crates/psionic-models/src/lib.rs`, `GgufTensorType`, around lines
-  1850-1950
+  1850-2000
 - `crates/psionic-models/src/lib.rs`, GGML block decoders, around lines
-  9362-9379
-- `crates/psionic-serve/src/qwen35.rs`, admitted quantized projection modes,
-  around lines 4330-4380
+  9600-9860
+- `crates/psionic-backend-cpu/src/lib.rs`, GGML row dot/decode helpers
+- `crates/psionic-backend-cuda/src/kernels/quantized_matvec.cu`, native CUDA
+  super-block kernels
 
-R5 must inspect the exact target artifact and list every tensor type before
-implementation. At minimum, Q3_K becomes a required CPU load/decode mode and
-CUDA projection mode if it appears in any required projection. Any additional
-IQ or K types in the Dynamic V3 mix become equally mandatory. The runtime must
-not create unreported dense F16 mirrors that defeat the 16 GiB residency plan.
+The R5 retained reports inspect the exact target artifacts and list every
+required tensor type. Future community GGUFs still need the same inventory
+gate before execution. The runtime must not create unreported dense F16
+mirrors that defeat the 16 GiB residency plan.
 
 ## Tokenizer
 

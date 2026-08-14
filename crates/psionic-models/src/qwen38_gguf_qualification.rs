@@ -269,7 +269,7 @@ pub fn qualify_qwen38_gguf(
         gguf_path,
         LocalBlobOpenOptions::default()
             .with_read_preference(BlobReadPreference::RequireMemoryMap)
-            .with_expected_sha256(profile.sha256()),
+            .with_expected_sha256(format!("sha256:{}", profile.sha256())),
     )?;
     let content = artifact.content();
     if artifact.blob_metadata().byte_length != profile.byte_length() {
@@ -708,7 +708,7 @@ fn expected_tensor_shapes() -> BTreeMap<String, Vec<usize>> {
         ("nextn.eh_proj.weight", vec![5120, 10_240]),
         ("nextn.enorm.weight", vec![5120]),
         ("nextn.hnorm.weight", vec![5120]),
-        ("nextn.shared_head.norm.weight", vec![5120]),
+        ("nextn.shared_head_norm.weight", vec![5120]),
     ] {
         expected.insert(format!("blk.64.{suffix}"), shape);
     }
@@ -736,7 +736,12 @@ fn required_usize(
 ) -> Result<usize, Qwen38GgufQualificationError> {
     metadata
         .get(key)
-        .and_then(GgufMetadataValue::as_u64)
+        .and_then(|value| {
+            value.as_u64().or_else(|| {
+                let value = value.as_f32()?;
+                (value.is_finite() && value >= 0.0 && value.fract() == 0.0).then_some(value as u64)
+            })
+        })
         .and_then(|value| usize::try_from(value).ok())
         .ok_or_else(|| {
             Qwen38GgufQualificationError::Qualification(format!(

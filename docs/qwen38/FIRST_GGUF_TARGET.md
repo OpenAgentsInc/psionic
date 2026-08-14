@@ -1,8 +1,8 @@
 # Qwen3.8 First GGUF Target
 
-> Status: `planned` on 2026-08-14. This document selects the first GGUF
-> artifact for qualification. It does not claim that Psionic can execute the
-> artifact yet.
+> Status: `implemented` on 2026-08-14 for R5 artifact qualification and
+> 4,096-token CUDA residency preflight. It does not claim that Psionic can
+> generate tokens from the artifact yet.
 
 ## Decision
 
@@ -64,6 +64,12 @@ The exact pinned sizes, LFS SHA-256 values, local destinations, transfer
 commands, projector exclusions, and MTP disposition are fixed in
 [GGUF_DOWNLOAD_PLAN.md](GGUF_DOWNLOAD_PLAN.md). The plan is committed before
 the `Q3_K_M` and `Q4_K_M` comparator transfers begin.
+
+R5 qualification admits the primary `UD-Q3_K_XL` artifact for native runtime
+implementation and 4,096-token CUDA residency preflight. The retained report
+records 866 required tensors with `F32`, `IQ3_S`, `IQ4_XS`, `Q3_K`, and
+`Q5_K` storage. `Q3_K_M` is retained as the standard K-quant baseline, and
+`Q4_K_M` is retained as a CPU-offload comparator.
 
 ## Qualification Gates
 
