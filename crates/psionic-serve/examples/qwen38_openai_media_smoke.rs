@@ -82,7 +82,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             "tool_choice": "none",
             "temperature": 0.0,
             "max_tokens": 2,
-            "reasoning_effort": "low",
             "psionic_enable_thinking": false
         }),
     )?;
@@ -102,7 +101,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             "stream": true,
             "temperature": 0.0,
             "max_tokens": 2,
-            "reasoning_effort": "low",
             "psionic_enable_thinking": false
         }),
     )?;
@@ -122,7 +120,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             }],
             "temperature": 0.0,
             "max_output_tokens": 2,
-            "reasoning_effort": "low",
             "psionic_enable_thinking": false
         }),
     )?;
