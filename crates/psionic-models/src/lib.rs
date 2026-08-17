@@ -11929,6 +11929,10 @@ mod tests {
             Some(ReasoningParser::GptOssHarmony)
         );
         assert_eq!(
+            reasoning_parser_for_decoder_family(GgufDecoderFamily::Qwen38),
+            Some(ReasoningParser::Qwen38Thinking)
+        );
+        assert_eq!(
             reasoning_parser_for_decoder_family(GgufDecoderFamily::Llama),
             None
         );
@@ -11944,6 +11948,16 @@ mod tests {
         .expect("gpt-oss family should parse");
         assert_eq!(parsed.final_content.as_deref(), Some("323"));
         assert_eq!(parsed.reasoning_content.as_deref(), Some("thinking"));
+
+        let qwen38 = parse_reasoning_response_text_for_decoder_family(
+            GgufDecoderFamily::Qwen38,
+            "careful work\n</think>\n\nfinal answer",
+            GptOssHarmonyParseOptions::default(),
+        )?
+        .expect("qwen38 family should parse");
+        assert_eq!(qwen38.parser, ReasoningParser::Qwen38Thinking);
+        assert_eq!(qwen38.reasoning_content.as_deref(), Some("careful work"));
+        assert_eq!(qwen38.final_content.as_deref(), Some("final answer"));
 
         let unsupported = parse_reasoning_response_text_for_decoder_family(
             GgufDecoderFamily::Llama,
@@ -12173,8 +12187,7 @@ mod tests {
     }
 
     #[test]
-    fn q6_k_loader_decode_preserves_llama_cpp_lane_order()
-    -> Result<(), Box<dyn std::error::Error>>
+    fn q6_k_loader_decode_preserves_llama_cpp_lane_order() -> Result<(), Box<dyn std::error::Error>>
     {
         let mut block = vec![0_u8; 210];
         block[0] = 0x21;

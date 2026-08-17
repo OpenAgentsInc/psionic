@@ -9,8 +9,8 @@ use openai_harmony::chat::{
     ToolNamespaceConfig as HarmonyToolNamespaceConfig,
 };
 use openai_harmony::{
-    load_harmony_encoding, HarmonyEncodingName, ParseOptions as HarmonyParseOptions,
-    StreamableParser as HarmonyStreamableParser,
+    HarmonyEncodingName, ParseOptions as HarmonyParseOptions,
+    StreamableParser as HarmonyStreamableParser, load_harmony_encoding,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -145,6 +145,8 @@ pub struct GptOssHarmonyParsedOutput {
 pub enum ReasoningParser {
     /// GPT-OSS / Harmony parser contract.
     GptOssHarmony,
+    /// Qwen3.8 thinking-block parser contract.
+    Qwen38Thinking,
 }
 
 impl ReasoningParser {
@@ -153,6 +155,7 @@ impl ReasoningParser {
     pub const fn label(self) -> &'static str {
         match self {
             Self::GptOssHarmony => "gpt_oss_harmony",
+            Self::Qwen38Thinking => "qwen38_thinking",
         }
     }
 }
@@ -272,12 +275,12 @@ impl GptOssHarmonyParsedOutput {
 pub fn reasoning_parser_for_decoder_family(family: GgufDecoderFamily) -> Option<ReasoningParser> {
     match family {
         GgufDecoderFamily::GptOss => Some(ReasoningParser::GptOssHarmony),
+        GgufDecoderFamily::Qwen38 => Some(ReasoningParser::Qwen38Thinking),
         GgufDecoderFamily::Llama
         | GgufDecoderFamily::Gemma4
         | GgufDecoderFamily::Qwen
         | GgufDecoderFamily::Qwen3
         | GgufDecoderFamily::Qwen35
-        | GgufDecoderFamily::Qwen38
         | GgufDecoderFamily::Mistral => None,
     }
 }
@@ -292,6 +295,7 @@ pub fn parse_reasoning_response_tokens_for_decoder_family(
         Some(ReasoningParser::GptOssHarmony) => Ok(Some(
             parse_gpt_oss_harmony_tokens(tokens, options)?.reasoning_response(),
         )),
+        Some(ReasoningParser::Qwen38Thinking) => Ok(None),
         None => Ok(None),
     }
 }
@@ -306,7 +310,64 @@ pub fn parse_reasoning_response_text_for_decoder_family(
         Some(ReasoningParser::GptOssHarmony) => Ok(Some(
             parse_gpt_oss_harmony_text(text, options)?.reasoning_response(),
         )),
+        Some(ReasoningParser::Qwen38Thinking) => Ok(Some(parse_qwen38_thinking_text(text))),
         None => Ok(None),
+    }
+}
+
+/// Parses the Qwen3.8 `<think>` response envelope from decoded model text.
+#[must_use]
+pub fn parse_qwen38_thinking_text(text: &str) -> ParsedReasoningResponse {
+    const THINK_START: &str = "<think>";
+    const THINK_END: &str = "</think>";
+
+    let trimmed = text.trim();
+    let (reasoning_content, final_content) = if let Some(end) = trimmed.find(THINK_END) {
+        let reasoning = trimmed[..end]
+            .trim_start_matches(THINK_START)
+            .trim()
+            .to_string();
+        let final_content = trimmed[end + THINK_END.len()..].trim().to_string();
+        (
+            (!reasoning.is_empty()).then_some(reasoning),
+            (!final_content.is_empty()).then_some(final_content),
+        )
+    } else if let Some(reasoning) = trimmed.strip_prefix(THINK_START) {
+        let reasoning = reasoning.trim().to_string();
+        ((!reasoning.is_empty()).then_some(reasoning), None)
+    } else {
+        (None, (!trimmed.is_empty()).then_some(trimmed.to_string()))
+    };
+
+    let mut parts = Vec::new();
+    if let Some(reasoning) = reasoning_content.as_ref() {
+        parts.push(ReasoningResponsePart {
+            kind: ReasoningResponsePartKind::Reasoning,
+            role: PromptMessageRole::Assistant,
+            content: reasoning.clone(),
+            author_name: None,
+            recipient: None,
+            channel: None,
+            content_type: None,
+        });
+    }
+    if let Some(final_content) = final_content.as_ref() {
+        parts.push(ReasoningResponsePart {
+            kind: ReasoningResponsePartKind::Final,
+            role: PromptMessageRole::Assistant,
+            content: final_content.clone(),
+            author_name: None,
+            recipient: None,
+            channel: None,
+            content_type: None,
+        });
+    }
+    ParsedReasoningResponse {
+        parser: ReasoningParser::Qwen38Thinking,
+        source: ReasoningParseSource::Text,
+        final_content,
+        reasoning_content,
+        parts,
     }
 }
 
@@ -1373,14 +1434,14 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        gguf_token_to_raw_bytes, gpt_unicode_to_byte_map, render_gpt_oss_harmony_prompt,
-        GptOssHarmonyRenderContext, GptOssTokenizer, PromptChannelConfig, PromptMessage,
-        PromptMessageRole, PromptReasoningEffort, PromptRenderOptions, GPT_4O_BPE_PATTERN,
-        LLAMA_TOKEN_TYPE_CONTROL,
+        GPT_4O_BPE_PATTERN, GptOssHarmonyRenderContext, GptOssTokenizer, LLAMA_TOKEN_TYPE_CONTROL,
+        PromptChannelConfig, PromptMessage, PromptMessageRole, PromptReasoningEffort,
+        PromptRenderOptions, gguf_token_to_raw_bytes, gpt_unicode_to_byte_map,
+        render_gpt_oss_harmony_prompt,
     };
     use crate::{
-        golden_tokenizer_fixture, GgufContent, GgufTokenizerMetadata, GgufTokenizerModel,
-        GgufTokenizerPretokenizer, GgufTokenizerVocabulary, TokenId, TokenizerBoundary,
+        GgufContent, GgufTokenizerMetadata, GgufTokenizerModel, GgufTokenizerPretokenizer,
+        GgufTokenizerVocabulary, TokenId, TokenizerBoundary, golden_tokenizer_fixture,
     };
 
     fn real_gpt_oss_gguf_path() -> Option<PathBuf> {
@@ -1450,8 +1511,8 @@ mod tests {
     }
 
     #[test]
-    fn gpt_oss_real_gguf_prompt_token_count_matches_tracked_local_oracle(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gpt_oss_real_gguf_prompt_token_count_matches_tracked_local_oracle()
+    -> Result<(), Box<dyn std::error::Error>> {
         let Some(path) = real_gpt_oss_gguf_path() else {
             return Ok(());
         };
@@ -1486,8 +1547,8 @@ mod tests {
     }
 
     #[test]
-    fn gpt_oss_real_short_contract_prompt_tokens_match_local_llama_cpp_oracle(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gpt_oss_real_short_contract_prompt_tokens_match_local_llama_cpp_oracle()
+    -> Result<(), Box<dyn std::error::Error>> {
         let Some(path) = real_gpt_oss_gguf_path() else {
             return Ok(());
         };

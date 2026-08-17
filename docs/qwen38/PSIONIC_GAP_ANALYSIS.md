@@ -1,8 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
-> Status: `partial` on 2026-08-17. R1-R7 are implemented. Public serving and
-> later release, backend, multimodal, training, and performance milestones
-> remain open.
+> Status: `partial` on 2026-08-17. R1-R7 are implemented, and R8
+> OpenAI-compatible CPU/CUDA serving is `implemented_early`. Later release,
+> backend, multimodal, training, and performance milestones remain open.
 
 ## Compatibility Result
 
@@ -214,6 +214,14 @@ with exact prompt token `[9419]`, deterministic outputs, zero host fallback,
 and a measured `13,390,641,048` byte allocator high-water mark inside the
 preflight envelope.
 
-The generic OpenAI server, Metal, media, adapters, session reuse, and MTP
-speculative-decoding surfaces still refuse Qwen3.8. R8 owns public server
-registration and capability publication.
+R8 registers the admitted CPU and CUDA runtimes with the generic OpenAI
+server. Health, model-list, chat, streaming, Responses, and stored replay
+surfaces publish Qwen3.8 model/artifact identity, execution truth, prompt
+digests, effective reasoning controls, prompt-cache identity, and raw-logit
+posture. Native XML tool calls support `none`, `auto`, `required`, named,
+ordered parallel, and streamed-delta behavior. Structured output remains
+bounded by the existing proven runtime envelope.
+
+Metal, image/video execution, adapters, session reuse, and MTP speculative
+decoding still refuse Qwen3.8. The serving lane publishes those limits
+explicitly. R9 owns the consolidated comparator and release gate.

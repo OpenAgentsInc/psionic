@@ -41,10 +41,12 @@ use psionic_models::{
     GgufDecoderFamily, GgufDecoderServingAdmissionKind, GgufPromptTemplateRenderer,
     GptOssHarmonyParseOptions, GptOssHarmonyParsedOutput, GptOssHarmonyRenderContext,
     GptOssTokenizer, ParsedReasoningResponse, PromptChannelConfig, PromptMessage,
-    PromptMessageRole, PromptReasoningEffort, PromptRenderOptions,
-    Qwen35MultimodalProjectionConfig, ReasoningParser, parse_gpt_oss_harmony_text,
-    parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
-    render_gpt_oss_harmony_prompt,
+    PromptMessageRole, PromptReasoningEffort, PromptRenderOptions, QWEN38_TEMPLATE_ID,
+    QWEN38_TEMPLATE_SHA256, QWEN38_TOKENIZER_SHA256, Qwen35MultimodalProjectionConfig,
+    Qwen38PromptContent, Qwen38PromptMessage, Qwen38PromptOptions, Qwen38PromptReceipt,
+    Qwen38PromptRole, Qwen38ToolDefinition, Qwen38ToolFunctionDefinition, ReasoningParser,
+    parse_gpt_oss_harmony_text, parse_reasoning_response_text_for_decoder_family,
+    reasoning_parser_for_decoder_family, render_gpt_oss_harmony_prompt, render_qwen38_prompt,
 };
 use psionic_net::{
     PersistedClusterNetworkState, PersistedImportedJoinBundle, PersistedJoinedMeshPreference,
@@ -129,6 +131,12 @@ const OPENAI_COMPAT_PRODUCT_ID: &str = "psionic.openai_compat";
 const GEMMA4_TOOL_CALL_START: &str = "<|tool_call>";
 const GEMMA4_TOOL_CALL_END: &str = "<tool_call|>";
 const GEMMA4_CUSTOM_STRING_QUOTE: &str = "<|\"|>";
+const QWEN38_TOOL_CALL_START: &str = "<tool_call>";
+const QWEN38_TOOL_CALL_END: &str = "</tool_call>";
+const QWEN38_FUNCTION_START: &str = "<function=";
+const QWEN38_FUNCTION_END: &str = "</function>";
+const QWEN38_PARAMETER_START: &str = "<parameter=";
+const QWEN38_PARAMETER_END: &str = "</parameter>";
 const MESH_COORDINATION_FEED_PATH: &str = "/psionic/management/coordination/feed";
 const MESH_COORDINATION_SEARCH_PATH: &str = "/psionic/management/coordination/search";
 const MESH_COORDINATION_POST_PATH: &str = "/psionic/management/coordination/post";
@@ -297,6 +305,7 @@ fn unsupported_structured_output_capabilities(detail: &str) -> Vec<StructuredOut
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum ToolCallingSupportLevel {
+    Native,
     Fallback,
     Unsupported,
 }
@@ -305,6 +314,7 @@ impl ToolCallingSupportLevel {
     #[cfg(test)]
     fn label(self) -> &'static str {
         match self {
+            Self::Native => "native",
             Self::Fallback => "fallback",
             Self::Unsupported => "unsupported",
         }
@@ -2144,6 +2154,25 @@ impl OpenAiCompatLoadedModel {
         self.serving_truth.execution_engine_label
     }
 
+    fn artifact_digest(&self) -> Option<&str> {
+        match &self.kind {
+            OpenAiCompatLoadedModelKind::Decoder(model) => Some(
+                model
+                    .descriptor
+                    .weights
+                    .primary_artifact_digest()
+                    .unwrap_or(model.descriptor.weights.digest.as_str()),
+            ),
+            OpenAiCompatLoadedModelKind::Embeddings(model) => Some(
+                model
+                    .descriptor
+                    .weights
+                    .primary_artifact_digest()
+                    .unwrap_or(model.descriptor.weights.digest.as_str()),
+            ),
+        }
+    }
+
     fn local_serving_truth(&self) -> LocalServingTruth {
         self.serving_truth.local_serving_truth
     }
@@ -2205,6 +2234,9 @@ impl OpenAiCompatLoadedModel {
                 parser: "not_available",
                 argument_validation: "not_available",
             },
+            Some(model) if matches!(model.family, GgufDecoderFamily::Qwen38) => {
+                qwen38_tool_calling_capability()
+            }
             Some(model) if matches!(model.family, GgufDecoderFamily::Gemma4) => {
                 ToolCallingCapability {
                     support_level: ToolCallingSupportLevel::Fallback,
@@ -4716,6 +4748,8 @@ struct ModelCard {
     owned_by: &'static str,
     psionic_supported_endpoints: Vec<&'static str>,
     psionic_model_family: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_artifact_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     psionic_route_workers: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -4782,6 +4816,74 @@ struct ModelCard {
     psionic_embedding_normalization: Option<EmbeddingNormalization>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_medical_policy: Option<MedicalModelPolicyCard>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_qwen38: Option<Qwen38OpenAiCapability>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct Qwen38OpenAiCapability {
+    prompt_template_id: &'static str,
+    prompt_template_sha256: &'static str,
+    tokenizer_sha256: &'static str,
+    thinking_enabled_by_default: bool,
+    reasoning_effort_default: &'static str,
+    reasoning_effort_supported: Vec<&'static str>,
+    preserve_thinking_by_default: bool,
+    tool_format: &'static str,
+    structured_output_contract: &'static str,
+    raw_logits_contract: &'static str,
+    response_state: &'static str,
+    session_reuse: &'static str,
+    adapters: &'static str,
+    prefix_cache: &'static str,
+    supported_sampling_controls: Vec<&'static str>,
+    unsupported_sampling_controls: Vec<&'static str>,
+    image_input: &'static str,
+    video_input: &'static str,
+}
+
+fn qwen38_openai_capability(model: &OpenAiCompatLoadedModel) -> Option<Qwen38OpenAiCapability> {
+    model
+        .decoder()
+        .filter(|decoder| matches!(decoder.family, GgufDecoderFamily::Qwen38))?;
+    Some(Qwen38OpenAiCapability {
+        prompt_template_id: QWEN38_TEMPLATE_ID,
+        prompt_template_sha256: QWEN38_TEMPLATE_SHA256,
+        tokenizer_sha256: QWEN38_TOKENIZER_SHA256,
+        thinking_enabled_by_default: true,
+        reasoning_effort_default: "xhigh",
+        reasoning_effort_supported: vec!["low", "medium", "xhigh"],
+        preserve_thinking_by_default: true,
+        tool_format: "qwen38_tool_xml",
+        structured_output_contract: "runtime_masked_proven_subset",
+        raw_logits_contract: if model.backend_label() == "cuda" {
+            "bounded_candidate_fast_path_with_exact_raw_logits_fallback"
+        } else {
+            "native_cpu_full_logits"
+        },
+        response_state: "bounded_prompt_replay",
+        session_reuse: "unsupported",
+        adapters: "unsupported",
+        prefix_cache: "request_prefix_reuse",
+        supported_sampling_controls: vec![
+            "temperature",
+            "top_k",
+            "top_p",
+            "min_p",
+            "typical_p",
+            "mirostat",
+            "mirostat_tau",
+            "mirostat_eta",
+            "repeat_penalty",
+            "repeat_last_n",
+            "presence_penalty",
+            "frequency_penalty",
+            "seed",
+        ],
+        unsupported_sampling_controls: vec!["logit_bias", "n", "best_of"],
+        image_input: "refuse_text_only_lane",
+        video_input: "refuse_text_only_lane",
+    })
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -4850,6 +4952,15 @@ fn fallback_tool_calling_capability() -> ToolCallingCapability {
         support_level: ToolCallingSupportLevel::Fallback,
         supported_modes: vec!["none", "auto", "required", "named"],
         parser: "tagged_json_schema",
+        argument_validation: "json_schema_subset",
+    }
+}
+
+fn qwen38_tool_calling_capability() -> ToolCallingCapability {
+    ToolCallingCapability {
+        support_level: ToolCallingSupportLevel::Native,
+        supported_modes: vec!["none", "auto", "required", "named"],
+        parser: "qwen38_tool_xml",
         argument_validation: "json_schema_subset",
     }
 }
@@ -5431,6 +5542,14 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             owned_by: "psionic",
             psionic_supported_endpoints: vec![RoutingEndpoint::ChatCompletions.path()],
             psionic_model_family: state.descriptor.model.family.clone(),
+            psionic_artifact_sha256: Some(
+                state
+                    .descriptor
+                    .weights
+                    .primary_artifact_digest()
+                    .unwrap_or(state.descriptor.weights.digest.as_str())
+                    .to_string(),
+            ),
             psionic_route_workers: Vec::new(),
             psionic_route_backends: Vec::new(),
             psionic_route_execution_modes: Vec::new(),
@@ -5464,6 +5583,7 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_embedding_dimensions: None,
             psionic_embedding_normalization: None,
             psionic_medical_policy: None,
+            psionic_qwen38: None,
         }],
     })
 }
@@ -5519,6 +5639,8 @@ struct GenericHealthResponse {
     audio_input_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     audio_input_parts: Option<Vec<&'static str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qwen38: Option<Qwen38OpenAiCapability>,
 }
 
 async fn generic_health(
@@ -5582,6 +5704,8 @@ async fn generic_health(
         ),
         audio_input_mode: published_model_audio_input_mode(state.as_ref(), &default_model),
         audio_input_parts: published_model_audio_input_parts(state.as_ref(), &default_model),
+        qwen38: published_model_loaded_model(state.as_ref(), &default_model)
+            .and_then(qwen38_openai_capability),
     })
 }
 
@@ -6280,6 +6404,9 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                     owned_by: "psionic",
                     psionic_supported_endpoints: published_model_supported_endpoint_paths(&model),
                     psionic_model_family: model.family.clone(),
+                    psionic_artifact_sha256: published_model_loaded_model(state.as_ref(), &model)
+                        .and_then(OpenAiCompatLoadedModel::artifact_digest)
+                        .map(String::from),
                     psionic_route_workers: model.route_workers.clone(),
                     psionic_route_backends: model.route_backends.clone(),
                     psionic_route_execution_modes: model.route_execution_modes.clone(),
@@ -6362,6 +6489,8 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                         &model,
                     ),
                     psionic_medical_policy: published_model_medical_policy(&model),
+                    psionic_qwen38: published_model_loaded_model(state.as_ref(), &model)
+                        .and_then(qwen38_openai_capability),
                 }
             })
             .collect(),
@@ -6420,6 +6549,12 @@ struct ChatCompletionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_reasoning: Option<PsionicReasoningRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    reasoning_effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    psionic_enable_thinking: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    psionic_preserve_thinking: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_prefix_cache: Option<PrefixCacheControl>,
 }
 
@@ -6451,6 +6586,9 @@ impl Default for ChatCompletionRequest {
             psionic_grammar: None,
             psionic_structured_output: None,
             psionic_reasoning: None,
+            reasoning_effort: None,
+            psionic_enable_thinking: None,
+            psionic_preserve_thinking: None,
             psionic_prefix_cache: None,
         }
     }
@@ -6518,6 +6656,8 @@ struct ChatCompletionMessage {
     tool_calls: Option<Vec<ChatCompletionToolCall>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
 }
 
 impl ChatCompletionMessage {
@@ -6528,6 +6668,7 @@ impl ChatCompletionMessage {
             name: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning_content: None,
         }
     }
 
@@ -6543,6 +6684,7 @@ impl ChatCompletionMessage {
             name: Some(name.into()),
             tool_calls: None,
             tool_call_id: None,
+            reasoning_content: None,
         }
     }
 
@@ -6554,6 +6696,7 @@ impl ChatCompletionMessage {
             name: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning_content: None,
         }
     }
 }
@@ -6721,6 +6864,12 @@ struct ResponsesRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_reasoning: Option<PsionicReasoningRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    reasoning_effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    psionic_enable_thinking: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    psionic_preserve_thinking: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_response_state: Option<PsionicResponseStateRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_prefix_cache: Option<PrefixCacheControl>,
@@ -6755,6 +6904,9 @@ impl Default for ResponsesRequest {
             previous_response_id: None,
             psionic_structured_output: None,
             psionic_reasoning: None,
+            reasoning_effort: None,
+            psionic_enable_thinking: None,
+            psionic_preserve_thinking: None,
             psionic_response_state: None,
             psionic_prefix_cache: None,
         }
@@ -6896,6 +7048,47 @@ fn decoder_family_label(family: GgufDecoderFamily) -> &'static str {
         GgufDecoderFamily::Mistral => "mistral",
         GgufDecoderFamily::GptOss => "gpt_oss",
     }
+}
+
+fn qwen38_prompt_options_for_request(
+    family: GgufDecoderFamily,
+    reasoning_effort: Option<&str>,
+    enable_thinking: Option<bool>,
+    preserve_thinking: Option<bool>,
+) -> Result<Option<Qwen38PromptOptions>, OpenAiCompatHttpError> {
+    let controls_requested =
+        reasoning_effort.is_some() || enable_thinking.is_some() || preserve_thinking.is_some();
+    if !matches!(family, GgufDecoderFamily::Qwen38) {
+        if controls_requested {
+            return Err(OpenAiCompatHttpError::BadRequest(format!(
+                "Qwen3.8 prompt controls are unavailable for model family `{}`",
+                decoder_family_label(family)
+            )));
+        }
+        return Ok(None);
+    }
+
+    if let Some(reasoning_effort) = reasoning_effort
+        && !matches!(reasoning_effort, "low" | "medium" | "xhigh")
+    {
+        return Err(OpenAiCompatHttpError::BadRequest(format!(
+            "unsupported Qwen3.8 reasoning effort `{reasoning_effort}`; expected low, medium, or xhigh"
+        )));
+    }
+    let enable_thinking = enable_thinking.unwrap_or(true);
+    if !enable_thinking && reasoning_effort.is_some() {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "`reasoning_effort` cannot be set when `psionic_enable_thinking` is false",
+        )));
+    }
+    Ok(Some(Qwen38PromptOptions {
+        enable_thinking,
+        reasoning_effort: reasoning_effort.map(String::from),
+        preserve_thinking: preserve_thinking.unwrap_or(true),
+        add_generation_prompt: true,
+        add_vision_id: false,
+        tools: Vec::new(),
+    }))
 }
 
 fn default_response_state_store() -> bool {
@@ -7186,10 +7379,37 @@ fn required_tool_call_floor_from_chat_messages(
 }
 
 fn tool_prompt_message(contract: &ToolCallingContract, family: GgufDecoderFamily) -> PromptMessage {
+    if matches!(family, GgufDecoderFamily::Qwen38) {
+        return qwen38_tool_prompt_message(contract);
+    }
     if matches!(family, GgufDecoderFamily::Gemma4) {
         return gemma4_tool_prompt_message(contract);
     }
     generic_json_tool_prompt_message(contract)
+}
+
+fn qwen38_tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
+    let instruction = match contract.mode {
+        ToolChoiceMode::None => String::from("Do not call tools for this turn."),
+        ToolChoiceMode::Auto if contract.allows_parallel_tool_calls() => String::from(
+            "Tool choice is automatic. Call zero or more declared tools as needed, preserving request order when multiple calls are emitted.",
+        ),
+        ToolChoiceMode::Auto => String::from(
+            "Tool choice is automatic. Emit at most one declared tool call for this turn.",
+        ),
+        ToolChoiceMode::Required if contract.allows_parallel_tool_calls() => format!(
+            "You must emit at least {} declared tool call(s) for this turn, preserving request order.",
+            contract.minimum_required_tool_calls.max(1)
+        ),
+        ToolChoiceMode::Required => {
+            String::from("You must emit exactly one declared tool call for this turn.")
+        }
+        ToolChoiceMode::Named => format!(
+            "You must emit exactly one call to the declared `{}` tool for this turn.",
+            contract.named_tool.as_deref().unwrap_or_default()
+        ),
+    };
+    PromptMessage::new(PromptMessageRole::Developer, instruction)
 }
 
 fn generic_json_tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
@@ -7369,7 +7589,10 @@ fn structured_output_from_tool_contract(
     if matches!(contract.mode, ToolChoiceMode::None) {
         return Ok(None);
     }
-    if matches!(family, GgufDecoderFamily::Gemma4) {
+    if matches!(
+        family,
+        GgufDecoderFamily::Gemma4 | GgufDecoderFamily::Qwen38
+    ) {
         return Ok(None);
     }
 
@@ -7502,6 +7725,15 @@ fn tool_call_outcome_from_response(
     }
 
     let Some(structured) = response.output.structured.clone() else {
+        if matches!(family, GgufDecoderFamily::Qwen38) {
+            if let Some(outcome) = qwen38_tool_call_outcome_from_text(
+                request_id,
+                response.output.text.as_str(),
+                contract,
+            )? {
+                return Ok(Some(outcome));
+            }
+        }
         if matches!(family, GgufDecoderFamily::Gemma4) {
             if let Some(outcome) = gemma4_tool_call_outcome_from_text(
                 request_id,
@@ -7603,6 +7835,199 @@ fn tool_call_outcome_from_response(
             )));
         }
     }
+}
+
+fn qwen38_tool_call_outcome_from_text(
+    request_id: &str,
+    text: &str,
+    contract: &ToolCallingContract,
+) -> Result<Option<ToolCallOutcome>, OpenAiCompatHttpError> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let Some(first_tool_offset) = trimmed.find(QWEN38_TOOL_CALL_START) else {
+        return Ok(None);
+    };
+
+    let prefix = trimmed[..first_tool_offset].trim();
+    let content = if prefix.is_empty() {
+        None
+    } else {
+        parse_reasoning_response_for_family(GgufDecoderFamily::Qwen38, prefix)?
+            .and_then(|parsed| parsed.final_content)
+            .filter(|value| !value.trim().is_empty())
+    };
+    let mut cursor = first_tool_offset;
+    let mut tool_calls = Vec::new();
+    while cursor < trimmed.len() {
+        while let Some(ch) = trimmed[cursor..].chars().next() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            cursor += ch.len_utf8();
+        }
+        if cursor == trimmed.len() {
+            break;
+        }
+        if !trimmed[cursor..].starts_with(QWEN38_TOOL_CALL_START) {
+            return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                "Qwen3.8 tool-call reply mixed trailing assistant text after tool blocks",
+            )));
+        }
+        cursor += QWEN38_TOOL_CALL_START.len();
+        let end_offset = trimmed[cursor..]
+            .find(QWEN38_TOOL_CALL_END)
+            .ok_or_else(|| {
+                OpenAiCompatHttpError::BadRequest(String::from(
+                    "Qwen3.8 tool-call reply is missing `</tool_call>`",
+                ))
+            })?;
+        let block = trimmed[cursor..cursor + end_offset].trim();
+        tool_calls.push(parse_qwen38_tool_call_block(
+            request_id,
+            tool_calls.len(),
+            block,
+            contract,
+        )?);
+        cursor += end_offset + QWEN38_TOOL_CALL_END.len();
+    }
+    if tool_calls.is_empty() {
+        return Ok(None);
+    }
+    if !contract.allows_parallel_tool_calls() && tool_calls.len() != 1 {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "Qwen3.8 tool-call reply returned more than one tool call while `parallel_tool_calls` is disabled",
+        )));
+    }
+    if matches!(contract.mode, ToolChoiceMode::Required)
+        && tool_calls.len() < contract.minimum_required_tool_calls.max(1)
+    {
+        return Err(OpenAiCompatHttpError::BadRequest(format!(
+            "Qwen3.8 tool-call reply returned {} call(s), below the required minimum of {}",
+            tool_calls.len(),
+            contract.minimum_required_tool_calls.max(1)
+        )));
+    }
+    Ok(Some(ToolCallOutcome {
+        content,
+        tool_calls,
+    }))
+}
+
+fn parse_qwen38_tool_call_block(
+    request_id: &str,
+    index: usize,
+    block: &str,
+    contract: &ToolCallingContract,
+) -> Result<ResolvedToolCall, OpenAiCompatHttpError> {
+    let function = block.strip_prefix(QWEN38_FUNCTION_START).ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(String::from(
+            "Qwen3.8 tool-call block must start with `<function=`",
+        ))
+    })?;
+    let name_end = function.find('>').ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(String::from(
+            "Qwen3.8 tool-call function tag is missing `>`",
+        ))
+    })?;
+    let tool_name = function[..name_end].trim();
+    let tool = contract.tools.get(tool_name).ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(format!("model selected undeclared tool `{tool_name}`"))
+    })?;
+    if matches!(contract.mode, ToolChoiceMode::Named)
+        && contract.named_tool.as_deref() != Some(tool_name)
+    {
+        return Err(OpenAiCompatHttpError::BadRequest(format!(
+            "Qwen3.8 named tool choice required `{}`, but the model selected `{tool_name}`",
+            contract.named_tool.as_deref().unwrap_or_default()
+        )));
+    }
+    let function_body = &function[name_end + 1..];
+    let function_end = function_body.find(QWEN38_FUNCTION_END).ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(format!(
+            "Qwen3.8 tool call `{tool_name}` is missing `</function>`"
+        ))
+    })?;
+    if !function_body[function_end + QWEN38_FUNCTION_END.len()..]
+        .trim()
+        .is_empty()
+    {
+        return Err(OpenAiCompatHttpError::BadRequest(format!(
+            "Qwen3.8 tool call `{tool_name}` contains content after `</function>`"
+        )));
+    }
+
+    let mut parameters = serde_json::Map::new();
+    let mut remaining = function_body[..function_end].trim();
+    while !remaining.is_empty() {
+        let parameter = remaining
+            .strip_prefix(QWEN38_PARAMETER_START)
+            .ok_or_else(|| {
+                OpenAiCompatHttpError::BadRequest(format!(
+                    "Qwen3.8 tool call `{tool_name}` contains content outside `<parameter=...>` blocks"
+                ))
+            })?;
+        let name_end = parameter.find('>').ok_or_else(|| {
+            OpenAiCompatHttpError::BadRequest(format!(
+                "Qwen3.8 tool call `{tool_name}` parameter tag is missing `>`"
+            ))
+        })?;
+        let parameter_name = parameter[..name_end].trim();
+        if parameter_name.is_empty() {
+            return Err(OpenAiCompatHttpError::BadRequest(format!(
+                "Qwen3.8 tool call `{tool_name}` has an empty parameter name"
+            )));
+        }
+        let parameter_body = &parameter[name_end + 1..];
+        let parameter_end = parameter_body
+            .find(QWEN38_PARAMETER_END)
+            .ok_or_else(|| {
+                OpenAiCompatHttpError::BadRequest(format!(
+                    "Qwen3.8 tool call `{tool_name}` parameter `{parameter_name}` is missing `</parameter>`"
+                ))
+            })?;
+        let raw_value = parameter_body[..parameter_end].trim();
+        let value = qwen38_tool_argument_value(tool, parameter_name, raw_value)?;
+        if parameters
+            .insert(parameter_name.to_string(), value)
+            .is_some()
+        {
+            return Err(OpenAiCompatHttpError::BadRequest(format!(
+                "Qwen3.8 tool call `{tool_name}` repeated parameter `{parameter_name}`"
+            )));
+        }
+        remaining = parameter_body[parameter_end + QWEN38_PARAMETER_END.len()..].trim();
+    }
+    let arguments = serde_json::Value::Object(parameters);
+    validate_tool_arguments(tool, &arguments)?;
+    Ok(ResolvedToolCall {
+        id: format!("{request_id}-tool-{index}"),
+        name: tool_name.to_string(),
+        arguments,
+    })
+}
+
+fn qwen38_tool_argument_value(
+    tool: &ToolDefinitionRequest,
+    parameter_name: &str,
+    raw_value: &str,
+) -> Result<serde_json::Value, OpenAiCompatHttpError> {
+    let schema = normalized_tool_parameters_schema(tool)?;
+    let expected_type = schema
+        .get("properties")
+        .and_then(|properties| properties.get(parameter_name))
+        .and_then(|property| property.get("type"))
+        .and_then(serde_json::Value::as_str);
+    if expected_type == Some("string") {
+        return Ok(serde_json::Value::String(raw_value.to_string()));
+    }
+    serde_json::from_str(raw_value).map_err(|error| {
+        OpenAiCompatHttpError::BadRequest(format!(
+            "Qwen3.8 tool `{}` parameter `{parameter_name}` is not valid JSON for its declared schema: {error}",
+            tool.name
+        ))
+    })
 }
 
 fn gemma4_tool_call_outcome_from_text(
@@ -8057,6 +8482,7 @@ async fn handle_chat_completions(
         psionic_cluster_execution: None,
         psionic_claim_posture: None,
         psionic_scheduler: None,
+        psionic_qwen38: None,
     })
     .into_response();
     insert_execution_headers(response.headers_mut(), state.as_ref());
@@ -8218,6 +8644,12 @@ async fn handle_generic_chat_completions(
     enforce_medpsy_medical_request_policy(model, &request.messages)?;
     let reasoning_request =
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
+    let qwen38_prompt_options = qwen38_prompt_options_for_request(
+        model.family,
+        request.reasoning_effort.as_deref(),
+        request.psionic_enable_thinking,
+        request.psionic_preserve_thinking,
+    )?;
     let mut tool_contract = tool_contract;
     if let Some(contract) = tool_contract.as_mut() {
         contract.minimum_required_tool_calls = required_tool_call_floor_from_chat_messages(
@@ -8233,7 +8665,13 @@ async fn handle_generic_chat_completions(
         tool_contract.as_ref(),
         model.family,
     );
-    let rendered = render_prompt_for_model(loaded_model, prompt_messages.as_slice())?;
+    let rendered = render_prompt_for_model_with_request(
+        loaded_model,
+        prompt_messages.as_slice(),
+        qwen38_prompt_options.as_ref(),
+        tool_contract.as_ref(),
+    )?;
+    let qwen38_prompt_receipt = rendered.qwen38_receipt.clone();
     let request_id = next_generic_request_id(&state, "psionic-chatcmpl");
     let response_model_name = request
         .model
@@ -8354,6 +8792,11 @@ async fn handle_generic_chat_completions(
         });
     let time_to_first_token_ns = response.metrics.time_to_first_token_ns;
     let inter_token_latency_ns = response.metrics.inter_token_latency_ns;
+    let qwen38_receipt = qwen38_openai_receipt(
+        loaded_model,
+        qwen38_prompt_receipt.as_ref(),
+        &response.metrics,
+    );
     if request.stream {
         let terminal_chunk = completion_terminal_chunk(
             request_id.as_str(),
@@ -8393,6 +8836,11 @@ async fn handle_generic_chat_completions(
             prefix_cache_state,
             prefix_cache_refusal_reason,
             prefix_tokens_reused,
+        );
+        insert_loaded_model_identity_headers(
+            response.headers_mut(),
+            loaded_model,
+            qwen38_receipt.as_ref(),
         );
         return Ok(response);
     }
@@ -8458,6 +8906,7 @@ async fn handle_generic_chat_completions(
             .include_psionic_fields
             .then(|| scheduler_receipt.clone())
             .flatten(),
+        psionic_qwen38: qwen38_receipt.clone(),
     };
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
@@ -8474,6 +8923,11 @@ async fn handle_generic_chat_completions(
         prefix_cache_state,
         prefix_cache_refusal_reason,
         prefix_tokens_reused,
+    );
+    insert_loaded_model_identity_headers(
+        response.headers_mut(),
+        loaded_model,
+        qwen38_receipt.as_ref(),
     );
     Ok(response)
 }
@@ -8631,6 +9085,12 @@ async fn handle_generic_responses(
     }
     let reasoning_request =
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
+    let qwen38_prompt_options = qwen38_prompt_options_for_request(
+        model.family,
+        request.reasoning_effort.as_deref(),
+        request.psionic_enable_thinking,
+        request.psionic_preserve_thinking,
+    )?;
     let appended_prompt_messages = response_input_to_prompt_messages_with_options(
         &request,
         model,
@@ -8644,7 +9104,13 @@ async fn handle_generic_responses(
         tool_contract.as_ref(),
         model.family,
     );
-    let rendered = render_prompt_for_model(loaded_model, prompt_messages.as_slice())?;
+    let rendered = render_prompt_for_model_with_request(
+        loaded_model,
+        prompt_messages.as_slice(),
+        qwen38_prompt_options.as_ref(),
+        tool_contract.as_ref(),
+    )?;
+    let qwen38_prompt_receipt = rendered.qwen38_receipt.clone();
     let request_id = next_generic_request_id(&state, "psionic-resp");
     let response_model_name = request
         .model
@@ -8765,10 +9231,16 @@ async fn handle_generic_responses(
         });
     let time_to_first_token_ns = response.metrics.time_to_first_token_ns;
     let inter_token_latency_ns = response.metrics.inter_token_latency_ns;
+    let qwen38_receipt = qwen38_openai_receipt(
+        loaded_model,
+        qwen38_prompt_receipt.as_ref(),
+        &response.metrics,
+    );
     let assistant_history = assistant_history_from_response(
         model.family,
         response.output.text.as_str(),
         parsed.as_ref(),
+        parsed_reasoning.as_ref(),
     );
     let response_state_capability = current_response_state_capability(state.as_ref());
     let assigned_conversation_id = response_state_request.store.then(|| {
@@ -8903,6 +9375,7 @@ async fn handle_generic_responses(
             .include_psionic_fields
             .then(|| scheduler_receipt.clone())
             .flatten(),
+        psionic_qwen38: qwen38_receipt.clone(),
     };
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
@@ -8919,6 +9392,11 @@ async fn handle_generic_responses(
         prefix_cache_state,
         prefix_cache_refusal_reason,
         prefix_tokens_reused,
+    );
+    insert_loaded_model_identity_headers(
+        response.headers_mut(),
+        loaded_model,
+        qwen38_receipt.as_ref(),
     );
     Ok(response)
 }
@@ -9239,6 +9717,8 @@ struct ChatCompletionResponse {
     psionic_claim_posture: Option<crate::PsionServedOutputClaimPosture>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler: Option<GenerationSchedulerRequestReceipt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_qwen38: Option<Qwen38OpenAiReceipt>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -9279,6 +9759,46 @@ struct ResponsesResponse {
     psionic_claim_posture: Option<crate::PsionServedOutputClaimPosture>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler: Option<GenerationSchedulerRequestReceipt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_qwen38: Option<Qwen38OpenAiReceipt>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct Qwen38OpenAiReceipt {
+    schema_version: &'static str,
+    model_key: String,
+    served_model: String,
+    artifact_sha256: String,
+    backend: &'static str,
+    execution_mode: &'static str,
+    execution_engine: &'static str,
+    prompt: Qwen38PromptReceipt,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw_logits_materialized: Option<bool>,
+}
+
+fn qwen38_openai_receipt(
+    model: &OpenAiCompatLoadedModel,
+    prompt: Option<&Qwen38PromptReceipt>,
+    metrics: &GenerationMetrics,
+) -> Option<Qwen38OpenAiReceipt> {
+    model
+        .decoder()
+        .filter(|decoder| matches!(decoder.family, GgufDecoderFamily::Qwen38))?;
+    Some(Qwen38OpenAiReceipt {
+        schema_version: "psionic.qwen38.openai_receipt.v1",
+        model_key: model.model_key.clone(),
+        served_model: model.canonical_name.clone(),
+        artifact_sha256: model.artifact_digest()?.to_string(),
+        backend: model.backend_label(),
+        execution_mode: model.execution_mode_label(),
+        execution_engine: model.execution_engine_label(),
+        prompt: prompt?.clone(),
+        raw_logits_materialized: metrics
+            .qwen35_cuda_decode
+            .as_ref()
+            .map(|decode| decode.raw_logits_materialized),
+    })
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -9699,6 +10219,83 @@ fn next_generic_request_id(state: &OpenAiCompatState, prefix: &str) -> String {
     format!("{prefix}-{}-{next}", state.request_id_prefix)
 }
 
+fn insert_loaded_model_identity_headers(
+    headers: &mut HeaderMap,
+    model: &OpenAiCompatLoadedModel,
+    qwen38_receipt: Option<&Qwen38OpenAiReceipt>,
+) {
+    for (name, value) in [
+        ("x-psionic-model-key", model.model_key.as_str()),
+        ("x-psionic-served-model", model.canonical_name.as_str()),
+    ] {
+        if let Ok(value) = HeaderValue::from_str(value) {
+            headers.insert(HeaderName::from_static(name), value);
+        }
+    }
+    if let Some(artifact_digest) = model.artifact_digest()
+        && let Ok(value) = HeaderValue::from_str(artifact_digest)
+    {
+        headers.insert(HeaderName::from_static("x-psionic-artifact-sha256"), value);
+    }
+    let Some(receipt) = qwen38_receipt else {
+        return;
+    };
+    for (name, value) in [
+        (
+            "x-psionic-qwen38-template",
+            receipt.prompt.template_id.as_str(),
+        ),
+        (
+            "x-psionic-qwen38-template-sha256",
+            receipt.prompt.template_sha256.as_str(),
+        ),
+        (
+            "x-psionic-qwen38-tokenizer-sha256",
+            receipt.prompt.tokenizer_sha256.as_str(),
+        ),
+        (
+            "x-psionic-qwen38-prompt-cache-identity",
+            receipt.prompt.prompt_cache_identity.as_str(),
+        ),
+    ] {
+        if let Ok(value) = HeaderValue::from_str(value) {
+            headers.insert(HeaderName::from_static(name), value);
+        }
+    }
+    headers.insert(
+        HeaderName::from_static("x-psionic-qwen38-thinking"),
+        HeaderValue::from_static(if receipt.prompt.thinking_enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }),
+    );
+    headers.insert(
+        HeaderName::from_static("x-psionic-qwen38-preserve-thinking"),
+        HeaderValue::from_static(if receipt.prompt.preserve_thinking {
+            "true"
+        } else {
+            "false"
+        }),
+    );
+    if let Some(reasoning_effort) = receipt.prompt.reasoning_effort {
+        headers.insert(
+            HeaderName::from_static("x-psionic-qwen38-reasoning-effort"),
+            HeaderValue::from_static(reasoning_effort.as_str()),
+        );
+    }
+    if let Some(raw_logits_materialized) = receipt.raw_logits_materialized {
+        headers.insert(
+            HeaderName::from_static("x-psionic-raw-logits-materialized"),
+            HeaderValue::from_static(if raw_logits_materialized {
+                "true"
+            } else {
+                "false"
+            }),
+        );
+    }
+}
+
 fn insert_generic_execution_headers(
     headers: &mut HeaderMap,
     local_serving_truth: LocalServingTruth,
@@ -9941,6 +10538,7 @@ struct GenericRenderedPrompt {
     input: crate::GenerationInput,
     text: String,
     stop_sequences: Vec<String>,
+    qwen38_receipt: Option<Qwen38PromptReceipt>,
 }
 
 struct ResolvedGenericRoute<'a> {
@@ -10365,12 +10963,6 @@ fn load_generic_decoder_model(
         (OpenAiCompatBackend::Cpu, _, true) => {
             OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
         }
-        (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen38, false) => {
-            return Err(format!(
-                "qwen38 native CPU generation is currently an internal qualification lane; `{}` is not admitted on the generic OpenAI surface",
-                model_path.display(),
-            ));
-        }
         (OpenAiCompatBackend::Cpu, _, false) => OpenAiCompatRuntimeKind::GgufDecoderCpu,
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4, true) => {
             OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
@@ -10378,12 +10970,14 @@ fn load_generic_decoder_model(
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4, false) => {
             OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4
         }
-        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35, false) => {
-            OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35
-        }
+        (
+            OpenAiCompatBackend::Cuda,
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38,
+            false,
+        ) => OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35,
         (OpenAiCompatBackend::Cuda, _, _) => {
             return Err(format!(
-                "generic OpenAI cuda backend currently supports only gemma4 and qwen35 GGUF decoders; `{}` resolved to `{}`",
+                "generic OpenAI cuda backend currently supports only gemma4, qwen35, and qwen38 GGUF decoders; `{}` resolved to `{}`",
                 model_path.display(),
                 decoder_family_label(family),
             ));
@@ -10400,6 +10994,12 @@ fn load_generic_decoder_model(
         }
         (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35, false) => {
             OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35
+        }
+        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen38, false) => {
+            return Err(format!(
+                "qwen38 native Metal generation is not admitted on the generic OpenAI surface until R10; `{}` remains CPU/CUDA-only",
+                model_path.display(),
+            ));
         }
         (OpenAiCompatBackend::Metal, _, _) => {
             return Err(format!(
@@ -10535,6 +11135,7 @@ fn generic_decoder_serving_truth(
         (backend, family),
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
+            | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen38)
     ) {
         OpenAiCompatServingTruth::cuda_native()
     } else if matches!(
@@ -10563,6 +11164,7 @@ fn generic_decoder_execution_profile(
         (backend, family),
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
+            | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen38)
             | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35)
     ) {
@@ -10769,6 +11371,19 @@ fn render_prompt_for_model(
     model: &OpenAiCompatLoadedModel,
     messages: &[PromptMessage],
 ) -> Result<GenericRenderedPrompt, OpenAiCompatHttpError> {
+    let qwen38_options = model
+        .decoder()
+        .filter(|decoder| matches!(decoder.family, GgufDecoderFamily::Qwen38))
+        .map(|_| Qwen38PromptOptions::default());
+    render_prompt_for_model_with_request(model, messages, qwen38_options.as_ref(), None)
+}
+
+fn render_prompt_for_model_with_request(
+    model: &OpenAiCompatLoadedModel,
+    messages: &[PromptMessage],
+    qwen38_options: Option<&Qwen38PromptOptions>,
+    tool_contract: Option<&ToolCallingContract>,
+) -> Result<GenericRenderedPrompt, OpenAiCompatHttpError> {
     let decoder = model.decoder().ok_or_else(|| {
         OpenAiCompatHttpError::BadRequest(format!(
             "model `{}` does not support text-generation prompts",
@@ -10789,6 +11404,7 @@ fn render_prompt_for_model(
                 String::from(HARMONY_RETURN_STOP),
                 String::from(HARMONY_CALL_STOP),
             ],
+            qwen38_receipt: None,
         });
     }
     let renderer = decoder.prompt_renderer.as_ref().ok_or_else(|| {
@@ -10797,6 +11413,27 @@ fn render_prompt_for_model(
             model.model_key
         ))
     })?;
+    if matches!(decoder.family, GgufDecoderFamily::Qwen38) {
+        let mut options = qwen38_options.cloned().unwrap_or_default();
+        options.tools = qwen38_tool_definitions(tool_contract)?;
+        let rendered = render_qwen38_prompt(&qwen38_prompt_messages(messages), &options)
+            .map_err(|error| OpenAiCompatHttpError::BadRequest(error.to_string()))?;
+        let input = renderer
+            .tokenize_rendered_prompt(rendered.text.as_str())
+            .map(crate::GenerationInput::Tokens)
+            .map_err(|error| {
+                OpenAiCompatHttpError::Internal(format!(
+                    "model `{}` failed to tokenize Qwen3.8 rendered prompt: {error}",
+                    model.model_key
+                ))
+            })?;
+        return Ok(GenericRenderedPrompt {
+            input,
+            text: rendered.text,
+            stop_sequences: Vec::new(),
+            qwen38_receipt: Some(rendered.receipt),
+        });
+    }
     let rendered = match renderer.render_with_options(None, messages, true, &decoder.prompt_options)
     {
         Ok(rendered) => rendered,
@@ -10810,6 +11447,7 @@ fn render_prompt_for_model(
                 input: crate::GenerationInput::Text(text.clone()),
                 text,
                 stop_sequences: Vec::new(),
+                qwen38_receipt: None,
             });
         }
         Err(error) => return Err(error.into()),
@@ -10827,7 +11465,56 @@ fn render_prompt_for_model(
         input,
         text: rendered.text,
         stop_sequences: rendered.stop_sequences,
+        qwen38_receipt: None,
     })
+}
+
+fn qwen38_prompt_messages(messages: &[PromptMessage]) -> Vec<Qwen38PromptMessage> {
+    messages
+        .iter()
+        .map(|message| {
+            let role = match message.role {
+                PromptMessageRole::System => Qwen38PromptRole::System,
+                PromptMessageRole::Developer => Qwen38PromptRole::Developer,
+                PromptMessageRole::User => Qwen38PromptRole::User,
+                PromptMessageRole::Assistant => Qwen38PromptRole::Assistant,
+                PromptMessageRole::Tool => Qwen38PromptRole::Tool,
+            };
+            let mut rendered = Qwen38PromptMessage {
+                role,
+                content: Qwen38PromptContent::Text(message.content.clone()),
+                reasoning_content: None,
+                tool_calls: Vec::new(),
+            };
+            if let Some(reasoning_content) = message.reasoning_content.as_ref() {
+                rendered.reasoning_content = Some(reasoning_content.clone());
+            }
+            rendered
+        })
+        .collect()
+}
+
+fn qwen38_tool_definitions(
+    contract: Option<&ToolCallingContract>,
+) -> Result<Vec<Qwen38ToolDefinition>, OpenAiCompatHttpError> {
+    let Some(contract) = contract.filter(|contract| !matches!(contract.mode, ToolChoiceMode::None))
+    else {
+        return Ok(Vec::new());
+    };
+    contract
+        .tools
+        .values()
+        .map(|tool| {
+            Ok(Qwen38ToolDefinition {
+                tool_type: String::from("function"),
+                function: Qwen38ToolFunctionDefinition {
+                    name: tool.name.clone(),
+                    description: tool.description.clone(),
+                    parameters: normalized_tool_parameters_schema(tool)?,
+                },
+            })
+        })
+        .collect()
 }
 
 fn fallback_prompt_text(messages: &[PromptMessage]) -> String {
@@ -10866,12 +11553,11 @@ fn completion_choice_for_family(
             .collect::<Result<Vec<_>, OpenAiCompatHttpError>>()?;
         return Ok(ParsedCompletionChoice {
             content: tool_outcome.content.clone(),
-            reasoning_content: reasoning_request.and_then(|request| match request.mode {
-                PsionicReasoningMode::Separate => {
-                    parsed_reasoning.and_then(|parsed| parsed.reasoning_content.clone())
-                }
-                PsionicReasoningMode::Suppress => None,
-            }),
+            reasoning_content: completion_reasoning_content(
+                family,
+                parsed_reasoning,
+                reasoning_request,
+            ),
             finish_reason: if tool_calls.is_empty() {
                 finish_reason(response.termination)
             } else {
@@ -10887,12 +11573,41 @@ fn completion_choice_for_family(
             reasoning_request,
         ));
     }
+    if matches!(family, GgufDecoderFamily::Qwen38) {
+        return Ok(ParsedCompletionChoice {
+            content: parsed_reasoning.map_or_else(
+                || Some(response.output.text.clone()),
+                |parsed| parsed.final_content.clone(),
+            ),
+            reasoning_content: completion_reasoning_content(
+                family,
+                parsed_reasoning,
+                reasoning_request,
+            ),
+            tool_calls: Vec::new(),
+            finish_reason: finish_reason(response.termination),
+        });
+    }
     Ok(ParsedCompletionChoice {
         content: Some(response.output.text.clone()),
         reasoning_content: None,
         tool_calls: Vec::new(),
         finish_reason: finish_reason(response.termination),
     })
+}
+
+fn completion_reasoning_content(
+    family: GgufDecoderFamily,
+    parsed_reasoning: Option<&ParsedReasoningResponse>,
+    reasoning_request: Option<&ResolvedReasoningRequest>,
+) -> Option<String> {
+    let reasoning = parsed_reasoning.and_then(|parsed| parsed.reasoning_content.clone());
+    match reasoning_request.map(|request| request.mode) {
+        Some(PsionicReasoningMode::Suppress) => None,
+        Some(PsionicReasoningMode::Separate) => reasoning,
+        None if matches!(family, GgufDecoderFamily::Qwen38) => reasoning,
+        None => None,
+    }
 }
 
 fn prompt_request_cache_key(messages: &[PromptMessage]) -> String {
@@ -11129,12 +11844,25 @@ fn assistant_history_from_response(
     family: GgufDecoderFamily,
     raw_output: &str,
     parsed_harmony: Option<&GptOssHarmonyParsedOutput>,
+    parsed_reasoning: Option<&ParsedReasoningResponse>,
 ) -> Vec<PromptMessage> {
     if matches!(family, GgufDecoderFamily::GptOss)
         && let Some(parsed_harmony) = parsed_harmony
         && !parsed_harmony.messages.is_empty()
     {
         return parsed_harmony.messages.clone();
+    }
+    if matches!(family, GgufDecoderFamily::Qwen38)
+        && let Some(parsed_reasoning) = parsed_reasoning
+    {
+        let mut message = PromptMessage::new(
+            PromptMessageRole::Assistant,
+            parsed_reasoning.final_content.clone().unwrap_or_default(),
+        );
+        if let Some(reasoning_content) = parsed_reasoning.reasoning_content.as_ref() {
+            message = message.with_reasoning_content(reasoning_content.clone());
+        }
+        return vec![message];
     }
     vec![PromptMessage::new(PromptMessageRole::Assistant, raw_output)]
 }
@@ -11278,10 +12006,14 @@ fn chat_messages_to_prompt_messages_generic(
             for tool_call in tool_calls {
                 tool_names_by_id.insert(tool_call.id.clone(), tool_call.function.name.clone());
             }
-            prompt_messages.push(PromptMessage::new(
+            let mut prompt = PromptMessage::new(
                 PromptMessageRole::Assistant,
                 assistant_tool_call_text(tool_calls, family)?,
-            ));
+            );
+            if let Some(reasoning_content) = message.reasoning_content.as_ref() {
+                prompt = prompt.with_reasoning_content(reasoning_content.clone());
+            }
+            prompt_messages.push(prompt);
             continue;
         }
         let mut prompt = PromptMessage::new(
@@ -11308,6 +12040,11 @@ fn chat_messages_to_prompt_messages_generic(
             };
             prompt = prompt.with_author_name(name);
         }
+        if role == PromptMessageRole::Assistant
+            && let Some(reasoning_content) = message.reasoning_content.as_ref()
+        {
+            prompt = prompt.with_reasoning_content(reasoning_content.clone());
+        }
         prompt_messages.push(prompt);
     }
     Ok(prompt_messages)
@@ -11317,10 +12054,60 @@ fn assistant_tool_call_text(
     tool_calls: &[ChatCompletionToolCall],
     family: GgufDecoderFamily,
 ) -> Result<String, OpenAiCompatHttpError> {
+    if matches!(family, GgufDecoderFamily::Qwen38) {
+        return qwen38_assistant_tool_call_text(tool_calls);
+    }
     if matches!(family, GgufDecoderFamily::Gemma4) {
         return gemma4_assistant_tool_call_text(tool_calls);
     }
     assistant_tool_call_envelope_json(tool_calls)
+}
+
+fn qwen38_assistant_tool_call_text(
+    tool_calls: &[ChatCompletionToolCall],
+) -> Result<String, OpenAiCompatHttpError> {
+    let mut rendered_calls = Vec::with_capacity(tool_calls.len());
+    for tool_call in tool_calls {
+        let arguments = serde_json::from_str::<BTreeMap<String, serde_json::Value>>(
+            tool_call.function.arguments.as_str(),
+        )
+        .map_err(|error| {
+            OpenAiCompatHttpError::BadRequest(format!(
+                "assistant tool call `{}` arguments are not a JSON object: {error}",
+                tool_call.function.name
+            ))
+        })?;
+        let mut rendered = format!(
+            "{QWEN38_TOOL_CALL_START}\n{QWEN38_FUNCTION_START}{}>\n",
+            tool_call.function.name
+        );
+        for (name, value) in arguments {
+            rendered.push_str(QWEN38_PARAMETER_START);
+            rendered.push_str(name.as_str());
+            rendered.push_str(">\n");
+            if let Some(value) = value.as_str() {
+                rendered.push_str(value);
+            } else {
+                rendered.push_str(
+                    serde_json::to_string(&value)
+                        .map_err(|error| {
+                            OpenAiCompatHttpError::Internal(format!(
+                                "failed to serialize Qwen3.8 tool argument `{name}`: {error}"
+                            ))
+                        })?
+                        .as_str(),
+                );
+            }
+            rendered.push_str("\n");
+            rendered.push_str(QWEN38_PARAMETER_END);
+            rendered.push('\n');
+        }
+        rendered.push_str(QWEN38_FUNCTION_END);
+        rendered.push('\n');
+        rendered.push_str(QWEN38_TOOL_CALL_END);
+        rendered_calls.push(rendered);
+    }
+    Ok(rendered_calls.join("\n"))
 }
 
 fn assistant_tool_call_envelope_json(
@@ -11576,17 +12363,18 @@ mod tests {
         THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract, ToolChoiceMode, ToolChoiceRequest,
         ToolDefinitionEnvelope, ToolDefinitionRequest, WARMING_FALLBACK_POSTURE,
         apply_tool_contract_to_prompt_messages, assistant_prompt_message_for_tool_loop,
-        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
-        chat_messages_to_prompt_messages_generic, completion_choice, ensure_harmony_stop_sequences,
-        generation_options_from_chat_request, generation_options_from_chat_request_for_family,
-        generation_options_from_responses_request, generic_embeddings, generic_health,
-        generic_list_models, generic_management_coordination_feed,
-        generic_management_coordination_post, generic_management_coordination_redact,
-        generic_management_coordination_search, generic_management_coordination_status,
-        generic_management_status, gpt_oss_local_serving_truth, handle_generic_chat_completions,
-        handle_generic_embeddings, handle_generic_responses, insert_local_serving_truth_headers,
-        load_generic_decoder_model, local_loaded_model_for_route, model_endpoint_paths,
-        prompt_request_cache_key, render_prompt_for_model,
+        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_decoder,
+        chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
+        completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
+        generation_options_from_chat_request_for_family, generation_options_from_responses_request,
+        generic_embeddings, generic_health, generic_list_models,
+        generic_management_coordination_feed, generic_management_coordination_post,
+        generic_management_coordination_redact, generic_management_coordination_search,
+        generic_management_coordination_status, generic_management_status,
+        gpt_oss_local_serving_truth, handle_generic_chat_completions, handle_generic_embeddings,
+        handle_generic_responses, insert_local_serving_truth_headers, load_generic_decoder_model,
+        local_loaded_model_for_route, model_endpoint_paths, prompt_request_cache_key,
+        render_prompt_for_model, render_prompt_for_model_with_request,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
         resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
@@ -11621,8 +12409,9 @@ mod tests {
         ByteProjectionEmbedder, GgufContent, GgufDecoderFamily, GgufMetadataValue,
         GgufPromptTemplateRenderer, GgufTensorType, GptOssHarmonyParseOptions,
         GptOssHarmonyRenderContext, PromptChannelConfig, PromptMessage, PromptMessageRole,
-        PromptReasoningEffort, PromptRenderOptions, Qwen35MultimodalProjectionConfig,
-        ReasoningParser, TokenId, TokenSequence, golden_prompt_fixture, parse_gpt_oss_harmony_text,
+        PromptReasoningEffort, PromptRenderOptions, QWEN38_TEMPLATE_ID,
+        Qwen35MultimodalProjectionConfig, Qwen38PromptOptions, ReasoningParser, TokenId,
+        TokenSequence, golden_prompt_fixture, parse_gpt_oss_harmony_text,
         render_gpt_oss_harmony_prompt,
     };
     use psionic_net::{
@@ -11704,6 +12493,7 @@ mod tests {
                         },
                     }]),
                     tool_call_id: None,
+                    reasoning_content: None,
                 },
                 ChatCompletionMessage {
                     role: String::from("tool"),
@@ -11713,6 +12503,7 @@ mod tests {
                     name: None,
                     tool_calls: None,
                     tool_call_id: Some(String::from("call-1")),
+                    reasoning_content: None,
                 },
             ],
             GgufDecoderFamily::Qwen35,
@@ -16083,45 +16874,775 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_qwen38_cpu_remains_internal_until_r8()
+    fn qwen38_openai_cpu_health_models_chat_stream_and_identity_receipts()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
-        let qwen38_path = temp.path().join("tiny-qwen38.gguf");
-        let mut metadata = qwen35_decoder_metadata("tiny internal qwen38");
-        if let Some((_, value)) = metadata
-            .iter_mut()
-            .find(|(key, _)| key == "qwen35.block_count")
-        {
-            *value = GgufMetadataValue::U32(2);
-        }
-        metadata.extend([
-            (
-                String::from("general.base_model.0.name"),
-                GgufMetadataValue::String(String::from("Qwen3.8 27B")),
-            ),
-            (
-                String::from("general.base_model.0.repo_url"),
-                GgufMetadataValue::String(String::from("https://huggingface.co/Qwen/Qwen3.8-27B")),
-            ),
-            (
-                String::from("qwen35.nextn_predict_layers"),
-                GgufMetadataValue::U32(1),
-            ),
-        ]);
+        let qwen38_path = temp.path().join("tiny-qwen38-openai.gguf");
         write_test_gguf(
             &qwen38_path,
-            metadata.as_slice(),
-            qwen35_decoder_tensors().as_slice(),
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 openai cpu",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "answer",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path))?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.status, "ok");
+        assert_eq!(health.0.backend, "cpu");
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+        assert_eq!(
+            health.0.default_model_supported_endpoints,
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        let health_qwen38 = health.0.qwen38.expect("qwen38 health capability");
+        assert_eq!(health_qwen38.prompt_template_id, QWEN38_TEMPLATE_ID);
+        assert_eq!(health_qwen38.reasoning_effort_default, "xhigh");
+        assert_eq!(health_qwen38.raw_logits_contract, "native_cpu_full_logits");
+        assert_eq!(health_qwen38.session_reuse, "unsupported");
+        assert_eq!(health_qwen38.adapters, "unsupported");
+        assert_eq!(health_qwen38.image_input, "refuse_text_only_lane");
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models.0.data.first().expect("qwen38 model card");
+        assert_eq!(model.psionic_model_family, "qwen38");
+        assert!(model.psionic_artifact_sha256.is_some());
+        assert_eq!(
+            model
+                .psionic_tool_calling
+                .as_ref()
+                .map(|capability| (capability.support_level.label(), capability.parser,)),
+            Some(("native", "qwen38_tool_xml"))
+        );
+        assert!(model.psionic_structured_outputs.is_some());
+        assert!(model.psionic_response_state.is_some());
+        assert_eq!(
+            model
+                .psionic_qwen38
+                .as_ref()
+                .map(|capability| capability.prefix_cache),
+            Some("request_prefix_reuse")
+        );
+
+        let request = ChatCompletionRequest {
+            model: Some(String::from("tiny-qwen38-openai")),
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
+            temperature: Some(0.0),
+            max_tokens: Some(1),
+            reasoning_effort: Some(String::from("low")),
+            psionic_preserve_thinking: Some(false),
+            ..Default::default()
+        };
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            request.clone(),
+        ))?;
+        let artifact_sha256 = model
+            .psionic_artifact_sha256
+            .as_deref()
+            .expect("artifact digest");
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-model-key"),
+            Some(server.state.default_model_key.clone())
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-artifact-sha256").as_deref(),
+            Some(artifact_sha256)
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-qwen38-template").as_deref(),
+            Some(QWEN38_TEMPLATE_ID)
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-qwen38-reasoning-effort").as_deref(),
+            Some("low")
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-qwen38-preserve-thinking").as_deref(),
+            Some("false")
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("answer")
+        );
+        assert_eq!(
+            payload["psionic_qwen38"]["schema_version"],
+            serde_json::json!("psionic.qwen38.openai_receipt.v1")
+        );
+        assert_eq!(
+            payload["psionic_qwen38"]["prompt"]["reasoning_effort"],
+            serde_json::json!("low")
+        );
+        assert_eq!(
+            payload["psionic_qwen38"]["prompt"]["preserve_thinking"],
+            serde_json::json!(false)
+        );
+
+        let streamed = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                stream: true,
+                ..request
+            },
+        ))?;
+        assert_eq!(
+            header_value(streamed.headers(), "x-psionic-qwen38-reasoning-effort").as_deref(),
+            Some("low")
+        );
+        let stream_body = runtime.block_on(response_text(streamed))?;
+        let events = sse_json_events(stream_body.as_str())?;
+        assert!(events.iter().any(|event| {
+            event["choices"][0]["delta"]["content"] == serde_json::json!("answer")
+        }));
+        assert!(stream_body.contains("data: [DONE]"));
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_openai_reasoning_controls_and_preserved_history()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-qwen38-reasoning.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 reasoning",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "careful work\n</think>\n\nfinal answer",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path))?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                reasoning_effort: Some(String::from("medium")),
+                psionic_reasoning: Some(PsionicReasoningRequest {
+                    parser: Some(ReasoningParser::Qwen38Thinking),
+                    mode: PsionicReasoningMode::Separate,
+                }),
+                ..Default::default()
+            },
+        ))?;
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["reasoning_content"],
+            serde_json::json!("careful work")
+        );
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("final answer")
+        );
+        assert_eq!(
+            payload["psionic_reasoning"]["parser"],
+            serde_json::json!("qwen38_thinking")
+        );
+
+        let loaded_model = server
+            .state
+            .models_by_key
+            .values()
+            .next()
+            .expect("loaded qwen38 model");
+        let model = loaded_model.decoder().expect("qwen38 decoder");
+        let history = chat_messages_to_prompt_messages_for_decoder(
+            &[
+                ChatCompletionMessage::text("user", "first question"),
+                ChatCompletionMessage {
+                    role: String::from("assistant"),
+                    content: ChatCompletionMessageContent::Text(String::from("first answer")),
+                    name: None,
+                    tool_calls: None,
+                    tool_call_id: None,
+                    reasoning_content: Some(String::from("private prior reasoning")),
+                },
+                ChatCompletionMessage::text("user", "follow up"),
+            ],
+            model,
+        )?;
+        let preserved = render_prompt_for_model_with_request(
+            loaded_model,
+            history.as_slice(),
+            Some(&Qwen38PromptOptions {
+                reasoning_effort: Some(String::from("xhigh")),
+                ..Qwen38PromptOptions::default()
+            }),
+            None,
+        )?;
+        assert!(preserved.text.contains("private prior reasoning"));
+        assert!(
+            preserved
+                .qwen38_receipt
+                .as_ref()
+                .is_some_and(|receipt| receipt.preserve_thinking)
+        );
+        let not_preserved = render_prompt_for_model_with_request(
+            loaded_model,
+            history.as_slice(),
+            Some(&Qwen38PromptOptions {
+                preserve_thinking: false,
+                ..Qwen38PromptOptions::default()
+            }),
+            None,
+        )?;
+        assert!(!not_preserved.text.contains("private prior reasoning"));
+
+        let invalid = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    reasoning_effort: Some(String::from("high")),
+                    max_tokens: Some(1),
+                    ..Default::default()
+                },
+            ))
+            .expect_err("unsupported Qwen3.8 effort must refuse");
+        assert!(
+            invalid
+                .to_string()
+                .contains("expected low, medium, or xhigh")
+        );
+
+        let contradictory = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    reasoning_effort: Some(String::from("low")),
+                    psionic_enable_thinking: Some(false),
+                    max_tokens: Some(1),
+                    ..Default::default()
+                },
+            ))
+            .expect_err("disabled thinking with an effort must refuse");
+        assert!(contradictory.to_string().contains("cannot be set"));
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_openai_tool_modes_parallel_order_and_streamed_deltas()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let weather_call = "<tool_call>\n<function=get_weather>\n<parameter=latitude>\n48.8566\n</parameter>\n<parameter=longitude>\n2.3522\n</parameter>\n</function>\n</tool_call>";
+        let output = format!("tool reasoning\n</think>\n\n{weather_call}");
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-qwen38-tools.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 tools",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    output.as_str(),
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path))?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let required_request = ChatCompletionRequest {
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
+            temperature: Some(0.0),
+            max_tokens: Some(1),
+            tools: vec![weather_tool_definition()],
+            tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+            parallel_tool_calls: Some(false),
+            ..Default::default()
+        };
+        let required = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            required_request.clone(),
+        ))?;
+        let required_payload = runtime.block_on(response_json(required))?;
+        assert_eq!(
+            required_payload["choices"][0]["finish_reason"],
+            serde_json::json!("tool_calls")
+        );
+        assert_eq!(
+            required_payload["choices"][0]["message"]["reasoning_content"],
+            serde_json::json!("tool reasoning")
+        );
+        assert_eq!(
+            required_payload["choices"][0]["message"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            required_payload["psionic_tool_calls"][0]["arguments"],
+            serde_json::json!({"latitude": 48.8566, "longitude": 2.3522})
+        );
+        assert_eq!(
+            required_payload["psionic_qwen38"]["prompt"]["tool_count"],
+            serde_json::json!(1)
+        );
+
+        let streamed = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                stream: true,
+                ..required_request.clone()
+            },
+        ))?;
+        let stream_body = runtime.block_on(response_text(streamed))?;
+        let stream_events = sse_json_events(stream_body.as_str())?;
+        assert!(stream_events.iter().any(|event| {
+            event["choices"][0]["delta"]["tool_calls"][0]["function"]["name"]
+                == serde_json::json!("get_weather")
+        }));
+        assert!(stream_body.contains("latitude"));
+        assert!(stream_body.contains("longitude"));
+
+        let named = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                tool_choice: Some(ToolChoiceRequest::Named(NamedToolChoiceRequest {
+                    kind: String::from("function"),
+                    function: NamedToolChoiceFunction {
+                        name: String::from("get_weather"),
+                    },
+                })),
+                ..required_request.clone()
+            },
+        ))?;
+        let named_payload = runtime.block_on(response_json(named))?;
+        assert_eq!(
+            named_payload["choices"][0]["message"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+
+        let auto_call = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("auto"))),
+                ..required_request.clone()
+            },
+        ))?;
+        let auto_call_payload = runtime.block_on(response_json(auto_call))?;
+        assert_eq!(
+            auto_call_payload["choices"][0]["message"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+
+        let none = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("none"))),
+                ..required_request
+            },
+        ))?;
+        let none_payload = runtime.block_on(response_json(none))?;
+        assert!(none_payload["choices"][0]["message"]["tool_calls"].is_null());
+        assert_eq!(
+            none_payload["psionic_qwen38"]["prompt"]["tool_count"],
+            serde_json::json!(0)
+        );
+
+        let auto_contract = ToolCallingContract {
+            tools: BTreeMap::from([(
+                String::from("get_weather"),
+                weather_tool_definition().function,
+            )]),
+            mode: ToolChoiceMode::Auto,
+            named_tool: None,
+            parallel_tool_calls: true,
+            minimum_required_tool_calls: 1,
+        };
+        let auto = tool_call_outcome_from_response(
+            "qwen38-auto",
+            GgufDecoderFamily::Qwen38,
+            &test_generation_response("plain answer"),
+            Some(&auto_contract),
+        )?
+        .expect("auto tool outcome");
+        assert_eq!(auto.content.as_deref(), Some("plain answer"));
+        assert!(auto.tool_calls.is_empty());
+
+        let parallel_text = format!(
+            "parallel reasoning\n</think>\n\n{weather_call}\n<tool_call>\n<function=get_time>\n<parameter=timezone>\nEurope/Paris\n</parameter>\n</function>\n</tool_call>"
+        );
+        let parallel_path = temp.path().join("tiny-qwen38-parallel-tools.gguf");
+        write_test_gguf(
+            &parallel_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 parallel tools",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    parallel_text.as_str(),
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+        let parallel_server =
+            OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&parallel_path))?;
+        let parallel = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&parallel_server.state),
+            ChatCompletionRequest {
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                tools: vec![weather_tool_definition(), time_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(true),
+                ..Default::default()
+            },
+        ))?;
+        let parallel_payload = runtime.block_on(response_json(parallel))?;
+        let parallel_calls = parallel_payload["choices"][0]["message"]["tool_calls"]
+            .as_array()
+            .expect("parallel endpoint tool calls");
+        assert_eq!(parallel_calls.len(), 2);
+        assert_eq!(
+            parallel_calls[0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            parallel_calls[1]["function"]["name"],
+            serde_json::json!("get_time")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_openai_responses_store_and_replay_tool_turn_with_preserved_thinking()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let weather_call = "<tool_call>\n<function=get_weather>\n<parameter=latitude>\n48.8566\n</parameter>\n<parameter=longitude>\n2.3522\n</parameter>\n</function>\n</tool_call>";
+        let tool_output = format!("stored reasoning\n</think>\n\n{weather_call}");
+        let temp = tempfile::tempdir()?;
+        let tool_path = temp.path().join("tiny-qwen38-response-tool.gguf");
+        write_test_gguf(
+            &tool_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 response tool",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    tool_output.as_str(),
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+        let tool_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&tool_path))?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        let first = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&tool_server.state),
+            ResponsesRequest {
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                tools: vec![weather_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
+                ..Default::default()
+            },
+        ))?;
+        let first_payload = runtime.block_on(response_json(first))?;
+        assert_eq!(
+            first_payload["psionic_tool_calls"][0]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            first_payload["psionic_response_state"]["stored"],
+            serde_json::json!(true)
+        );
+        let first_response_id = first_payload["id"]
+            .as_str()
+            .expect("stored qwen38 response id")
+            .to_string();
+        let first_context = tool_server
+            .state
+            .response_state
+            .lock()
+            .expect("qwen38 response state")
+            .load_context(Some(first_response_id.as_str()), None)?;
+        assert_eq!(first_context.prompt_history.len(), 2);
+        assert_eq!(
+            first_context.prompt_history[1].reasoning_content.as_deref(),
+            Some("stored reasoning")
+        );
+        assert_eq!(first_context.prompt_history[1].content, weather_call);
+
+        let tool_result = "{\"forecast\":\"sunny\",\"tomorrow\":\"sunny\"}";
+        let mut replay_history = first_context.prompt_history.clone();
+        replay_history.push(tool_result_prompt_message("get_weather", tool_result));
+        replay_history.push(PromptMessage::new(
+            PromptMessageRole::User,
+            "what about tomorrow?",
+        ));
+        let tool_loaded_model = tool_server
+            .state
+            .models_by_key
+            .values()
+            .next()
+            .expect("tool qwen38 model");
+        let replay_rendered = render_prompt_for_model_with_request(
+            tool_loaded_model,
+            replay_history.as_slice(),
+            Some(&Qwen38PromptOptions::default()),
+            None,
+        )?;
+        assert!(replay_rendered.text.contains("stored reasoning"));
+        assert!(replay_rendered.text.contains("<tool_response>"));
+        assert!(replay_rendered.text.contains(tool_result));
+
+        let final_path = temp.path().join("tiny-qwen38-response-final.gguf");
+        write_test_gguf(
+            &final_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 response final",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "Tomorrow will also be sunny.",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+        let final_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&final_path))?;
+        let conversation_id = String::from("conv-qwen38-tool-replay");
+        let seeded_response_id = String::from("resp-qwen38-tool-replay");
+        let mut seeded_history = first_context.prompt_history;
+        seeded_history.push(tool_result_prompt_message("get_weather", tool_result));
+        final_server
+            .state
+            .response_state
+            .lock()
+            .expect("final response state")
+            .record_response(ResponseStateRecord {
+                response_id: seeded_response_id.clone(),
+                model_key: final_server.state.default_model_key.clone(),
+                worker_id: String::from(OPENAI_COMPAT_WORKER_ID),
+                conversation_id: Some(conversation_id.clone()),
+                sparse_route_binding: None,
+                prompt_history: seeded_history,
+            })?;
+        let continued = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&final_server.state),
+            ResponsesRequest {
+                conversation: Some(conversation_id.clone()),
+                input: ResponsesInput::Text(String::from("what about tomorrow?")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let continued_payload = runtime.block_on(response_json(continued))?;
+        assert_eq!(
+            continued_payload["output_text"],
+            serde_json::json!("Tomorrow will also be sunny.")
+        );
+        assert_eq!(
+            continued_payload["previous_response_id"],
+            serde_json::json!(seeded_response_id)
+        );
+        assert_eq!(
+            continued_payload["conversation"]["id"],
+            serde_json::json!(conversation_id)
+        );
+        assert!(
+            continued_payload["psionic_response_state"]["replayed_prompt_messages"]
+                .as_u64()
+                .is_some_and(|count| count >= 3)
+        );
+        assert_eq!(
+            continued_payload["psionic_qwen38"]["prompt"]["preserve_thinking"],
+            serde_json::json!(true)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_openai_cpu_cuda_capability_rows_structured_envelope_and_media_refusals()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-qwen38-capabilities.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 capabilities",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "{\"answer\":\"yes\"}",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
         )?;
 
-        let result = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path));
-        let error = match result {
-            Ok(_) => panic!("R6 qwen38 CPU lane must remain internal until R8"),
-            Err(error) => error,
-        };
-        let error = error.to_string();
-        assert!(error.contains("internal qualification lane"));
-        assert!(error.contains("not admitted on the generic OpenAI surface"));
+        let (cpu_model, _, cpu_plan) =
+            load_generic_decoder_model(&qwen38_path, 0, OpenAiCompatBackend::Cpu)?;
+        assert_eq!(
+            cpu_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderCpu
+        );
+        assert_eq!(cpu_model.backend_label(), "cpu");
+        assert_eq!(
+            super::qwen38_openai_capability(&cpu_model)
+                .expect("CPU qwen38 capability")
+                .raw_logits_contract,
+            "native_cpu_full_logits"
+        );
+
+        let (cuda_model, _, cuda_plan) =
+            load_generic_decoder_model(&qwen38_path, 0, OpenAiCompatBackend::Cuda)?;
+        assert_eq!(
+            cuda_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35
+        );
+        assert_eq!(cuda_model.backend_label(), "cuda");
+        let cuda_capability =
+            super::qwen38_openai_capability(&cuda_model).expect("CUDA qwen38 capability");
+        assert_eq!(
+            cuda_capability.raw_logits_contract,
+            "bounded_candidate_fast_path_with_exact_raw_logits_fallback"
+        );
+        assert!(
+            cuda_capability
+                .supported_sampling_controls
+                .contains(&"mirostat")
+        );
+        assert_eq!(
+            cuda_capability.unsupported_sampling_controls,
+            vec!["logit_bias", "n", "best_of"]
+        );
+        assert_eq!(cuda_capability.session_reuse, "unsupported");
+        assert_eq!(cuda_capability.adapters, "unsupported");
+
+        let metal_error =
+            match load_generic_decoder_model(&qwen38_path, 0, OpenAiCompatBackend::Metal) {
+                Ok(_) => panic!("Qwen3.8 Metal must remain refused until R10"),
+                Err(error) => error,
+            };
+        assert!(metal_error.contains("until R10"));
+        assert!(metal_error.contains("CPU/CUDA-only"));
+
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path))?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        let structured = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                psionic_structured_output: Some(StructuredOutputRequest::JsonSchema {
+                    name: Some(String::from("qwen38_answer")),
+                    schema: serde_json::json!({
+                        "type": "object",
+                        "properties": {"answer": {"const": "yes"}},
+                        "required": ["answer"],
+                        "additionalProperties": false
+                    }),
+                }),
+                ..Default::default()
+            },
+        ))?;
+        let structured_payload = runtime.block_on(response_json(structured))?;
+        assert_eq!(
+            structured_payload["psionic_structured_value"]["value"],
+            serde_json::json!({"answer": "yes"})
+        );
+        assert_eq!(
+            structured_payload["psionic_structured_output"]["kind"],
+            serde_json::json!("json_schema")
+        );
+        assert_eq!(
+            structured_payload["psionic_structured_output"]["support_level"],
+            serde_json::json!("fallback")
+        );
+
+        for media in [
+            ChatCompletionContentPart::image_url("https://example.invalid/image.png"),
+            ChatCompletionContentPart::video_url("https://example.invalid/video.mp4"),
+        ] {
+            let error = runtime
+                .block_on(handle_generic_chat_completions(
+                    std::sync::Arc::clone(&server.state),
+                    ChatCompletionRequest {
+                        messages: vec![ChatCompletionMessage::multimodal("user", vec![media])],
+                        max_tokens: Some(1),
+                        ..Default::default()
+                    },
+                ))
+                .expect_err("Qwen3.8 text-only media must refuse");
+            let message = error.to_string();
+            assert!(message.contains("multimodal inputs are unavailable"));
+            assert!(message.contains("qwen38"));
+        }
         Ok(())
     }
 
@@ -17160,6 +18681,7 @@ mod tests {
                         },
                     }]),
                     tool_call_id: None,
+                    reasoning_content: None,
                 },
                 ChatCompletionMessage {
                     role: String::from("tool"),
@@ -17169,6 +18691,7 @@ mod tests {
                     name: None,
                     tool_calls: None,
                     tool_call_id: Some(String::from("call-1")),
+                    reasoning_content: None,
                 },
             ],
             temperature: Some(0.0),
@@ -20385,6 +21908,7 @@ mod tests {
             psionic_cluster_execution: None,
             psionic_claim_posture: Some(psion_claim_posture),
             psionic_scheduler: None,
+            psionic_qwen38: None,
         })?;
 
         assert_eq!(
@@ -20433,6 +21957,7 @@ mod tests {
             psionic_cluster_execution: Some(sample_gemma4_pipeline_sharded_cluster_execution()),
             psionic_claim_posture: None,
             psionic_scheduler: None,
+            psionic_qwen38: None,
         })?;
 
         assert_eq!(
@@ -21534,6 +23059,48 @@ mod tests {
         metadata
     }
 
+    fn qwen38_openai_decoder_metadata_with_tokens(
+        name: &str,
+        tokens: Vec<&str>,
+    ) -> Vec<(String, GgufMetadataValue)> {
+        assert_eq!(tokens.len(), 10);
+        let mut metadata = qwen35_decoder_metadata(name);
+        metadata.retain(|(key, _)| !key.starts_with("tokenizer.ggml."));
+        for (key, value) in &mut metadata {
+            match key.as_str() {
+                "qwen35.context_length" => *value = GgufMetadataValue::U32(4096),
+                "qwen35.block_count" => *value = GgufMetadataValue::U32(2),
+                _ => {}
+            }
+        }
+        let tokens = tokens
+            .into_iter()
+            .map(|token| gpt2_test_vocab_token(token.as_bytes()))
+            .collect::<Vec<_>>();
+        metadata.extend(qwen35_tokenizer_metadata_entries_with_tokens(
+            tokens.iter().map(String::as_str).collect(),
+        ));
+        metadata.extend([
+            (
+                String::from("general.base_model.0.name"),
+                GgufMetadataValue::String(String::from("Qwen3.8 27B")),
+            ),
+            (
+                String::from("general.base_model.0.repo_url"),
+                GgufMetadataValue::String(String::from("https://huggingface.co/Qwen/Qwen3.8-27B")),
+            ),
+            (
+                String::from("qwen35.nextn_predict_layers"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("qwen35.ssm.v_head_reordered"),
+                GgufMetadataValue::Bool(true),
+            ),
+        ]);
+        metadata
+    }
+
     fn qwen35_native_full_attention_decoder_metadata(
         name: &str,
     ) -> Vec<(String, GgufMetadataValue)> {
@@ -21869,6 +23436,35 @@ mod tests {
         ]
     }
 
+    fn gpt2_test_vocab_token(bytes: &[u8]) -> String {
+        let mut characters = ['\0'; 256];
+        let mut assigned = [false; 256];
+        for byte in 0x21_u32..=0x7e {
+            characters[byte as usize] = char::from_u32(byte).unwrap_or('\0');
+            assigned[byte as usize] = true;
+        }
+        for byte in 0xa1_u32..=0xac {
+            characters[byte as usize] = char::from_u32(byte).unwrap_or('\0');
+            assigned[byte as usize] = true;
+        }
+        for byte in 0xae_u32..=0xff {
+            characters[byte as usize] = char::from_u32(byte).unwrap_or('\0');
+            assigned[byte as usize] = true;
+        }
+        let mut next_codepoint = 256_u32;
+        for (byte, is_assigned) in assigned.iter().enumerate() {
+            if *is_assigned {
+                continue;
+            }
+            characters[byte] = char::from_u32(next_codepoint).unwrap_or('\0');
+            next_codepoint += 1;
+        }
+        bytes
+            .iter()
+            .map(|byte| characters[*byte as usize])
+            .collect()
+    }
+
     fn dense_decoder_tensors(
         include_qkv_bias: bool,
         hello_token_index: usize,
@@ -22002,17 +23598,28 @@ mod tests {
     }
 
     fn qwen35_decoder_tensors() -> Vec<TestGgufTensor> {
+        qwen35_decoder_tensors_with_token_ids(6, 7)
+    }
+
+    fn qwen38_openai_decoder_tensors() -> Vec<TestGgufTensor> {
+        qwen35_decoder_tensors_with_token_ids(2, 7)
+    }
+
+    fn qwen35_decoder_tensors_with_token_ids(
+        input_token_index: usize,
+        output_token_index: usize,
+    ) -> Vec<TestGgufTensor> {
         vec![
             dense_tensor(
                 "token_embd.weight",
                 vec![10, 32],
-                token_embedding_values_with_hidden(10, 32, 6),
+                token_embedding_values_with_hidden(10, 32, input_token_index),
             ),
             dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
             dense_tensor(
                 "output.weight",
                 vec![10, 32],
-                output_values_with_hidden(10, 32, 7),
+                output_values_with_hidden(10, 32, output_token_index),
             ),
             dense_tensor("blk.0.attn_norm.weight", vec![32], vec![1.0; 32]),
             dense_tensor("blk.0.ffn_gate.weight", vec![32, 32], vec![0.0; 32 * 32]),

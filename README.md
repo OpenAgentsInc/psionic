@@ -76,10 +76,11 @@ promotion decision that refuses held-out regressions or failed operator review.
     controls, and approved prompt-codebook descriptor contracts; Python remains
     offline reference fixture input only, not runtime substrate
   - hardware validation and backend truth
-  - bounded non-`GptOss` lanes including `qwen35`, the internal native CPU and
-    CUDA `qwen38` lane with implemented identity, prompt/tokenizer, BF16 header
-    admission, bounded BF16 row evidence, and retained CUDA generation tracked
-    in [docs/qwen38/README.md](docs/qwen38/README.md), the published dense
+  - bounded non-`GptOss` lanes including `qwen35`, the `implemented_early`
+    OpenAI-compatible CPU/CUDA `qwen38` text lane with implemented identity,
+    prompt/tokenizer, BF16 header admission, bounded BF16 row evidence,
+    retained CUDA generation, tools, streaming, and response replay tracked in
+    [docs/qwen38/README.md](docs/qwen38/README.md), the published dense
     `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` single-node text lane plus
     its optional admitted distributed sparse extension, and the optional dense
     `Gemma 4 31B` validation repeat that keeps the same family contract without

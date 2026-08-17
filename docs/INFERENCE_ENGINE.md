@@ -283,7 +283,8 @@ into one generic engine claim.
   development. The repo now admits `Gemma 4` on CPU for bounded debug
   execution, but CPU still does not satisfy the first published `Gemma 4`
   support claim for Psionic.
-- `qwen38` execution is `partial`. Current `main` has `implemented`
+- The `qwen38` CPU/CUDA text-serving lane is `implemented_early`; the wider
+  Qwen3.8 program remains `partial`. Current `main` has `implemented`
   Qwen3.8-27B artifact/product identity, prompt/tokenizer contracts, complete
   BF16 checkpoint-header admission plus bounded official BF16 row evidence,
   and GGUF qualification for the selected local artifact set. The
@@ -307,8 +308,7 @@ into one generic engine claim.
   pinned llama.cpp revision `9b05354ec6fb58b4e665e9a39ebc40285c015638`.
   Tiny-fixture evidence covers recurrent/full-attention state allocation,
   MTP-tail exclusion, deterministic reset, context and memory refusal, and
-  cancellation. The generic OpenAI server still refuses Qwen3.8 until R8. R7
-  adds an internal native CUDA lane over the same graph. The selected
+  cancellation. R7 adds an internal native CUDA lane over the same graph. The selected
   Dynamic V3 weights remain compressed on device, including native `Q3_K`
   token-embedding lookup and mixed-quantized full-attention Q/K/V parts. The
   lane uses Qwen3.8-specific execution-plan and graph-cache namespaces, caps
@@ -325,8 +325,15 @@ into one generic engine claim.
   host fallback, graph replay without shape drift, mean decode throughput of
   `10.995421174982495` and `10.874144370111445` tokens/s, and a measured
   `13,390,641,048` byte Psionic CUDA allocator high-water mark inside the
-  preflight envelope. Metal, media, adapters, session reuse, and MTP
-  speculative decoding remain unsupported. The internal CPU service now has a
+  preflight envelope. R8 registers both runtimes with the generic
+  OpenAI-compatible server. Health, model-list, chat, streaming, Responses,
+  and stored replay surfaces bind Qwen3.8 model/artifact identity, backend and
+  execution truth, prompt-template and tokenizer digests, effective reasoning
+  controls, prompt-cache identity, and raw-logit posture. Native Qwen3.8 XML
+  tools cover all tool-choice modes, ordered parallel calls, and streamed tool
+  arguments. Structured output remains inside the proven runtime envelope.
+  Metal, media, adapters, session reuse, and MTP speculative decoding remain
+  unsupported and are published or refused explicitly. The internal CPU service now has a
   typed cooperative generation timeout checked at token-step boundaries with
   stable `timed_out` and HTTP `504` diagnostics. R6 is `implemented` for the
   internal CPU lane.
@@ -335,8 +342,8 @@ into one generic engine claim.
   pinned llama.cpp revision. All 28 comparisons pass, with maximum normalized
   RMSE `0.010121032189794241` and minimum cosine similarity
   `0.9999686621232524`; the transposed delta state matches directly without a
-  layout transform. Qwen3.8 remains `partial` overall because public serving
-  and later milestones are not complete. The retained R4 and R5
+  layout transform. Qwen3.8 remains `partial` overall because the R9 release
+  gate and later milestones are not complete. The retained R4 and R5
   reports themselves still do not execute full-width
   attention or MLPs, materialize full-vocabulary logits, generate tokens,
   serve requests, compute gradients, or execute media inputs.

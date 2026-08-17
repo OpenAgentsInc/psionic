@@ -4,8 +4,10 @@
 > acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, R3
 > checkpoint admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
 > `implemented`. R6 native CPU generation is `implemented` for the internal
-> execution lane. R7 native CUDA generation is `implemented`. Public serving,
-> training, and multimodal support remain outside the current claim.
+> execution lane. R7 native CUDA generation is `implemented`. R8
+> OpenAI-compatible CPU/CUDA serving is `implemented_early`. Training, Metal,
+> native multimodal execution, and later release gates remain outside the
+> current claim.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -177,8 +179,8 @@ decode. All 28 comparisons pass; maximum normalized RMSE is
 `0.010121032189794241` and minimum cosine similarity is
 `0.9999686621232524`. The lane also retains deterministic reset, hybrid-state
 allocation, context and memory refusal, cancellation, and typed cooperative
-timeout evidence. This is an internal CPU execution claim. The generic OpenAI
-server continues to refuse Qwen3.8 until R8.
+timeout evidence. This remains the retained CPU execution evidence used by the
+R8 generic-server lane.
 
 R7 adds native CUDA generation for the same selected artifact with compressed
 weights, Qwen3.8-specific execution-plan and graph-cache identities, live
@@ -188,7 +190,19 @@ Greedy output is `[11, 353]` on both repeats at mean
 `10.995421174982495` tokens/s. Seeded bounded-sampling output is `[11, 271]`
 on both repeats at mean `10.874144370111445` tokens/s. The measured allocator
 peak is `13,390,641,048` bytes inside the admitted 4,096-token envelope. R7
-does not publish the generic OpenAI server or an 8,192-token context claim.
+does not publish an 8,192-token context claim.
+
+R8 registers Qwen3.8 with the generic OpenAI-compatible server on CPU and
+CUDA. `/health`, `/v1/models`, chat completions, streamed deltas, Responses,
+and stored response replay publish model, artifact, backend, execution,
+template, tokenizer, prompt-cache, reasoning, and raw-logit truth. The serving
+lane supports default thinking, `low`/`medium`/`xhigh` reasoning effort,
+preserved-thinking replay, native Qwen3.8 XML tool calls, all tool-choice
+modes, ordered parallel calls, streamed tool arguments, and structured output
+inside the existing proven runtime envelope. It refuses image/video input and
+publishes adapters and session reuse as unsupported. Metal remains refused
+until R10. The R8 serving lane is `implemented_early`; R9 still owns the
+consolidated comparator and release gate.
 
 ## Primary Source
 

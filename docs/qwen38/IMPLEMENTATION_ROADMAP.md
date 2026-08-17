@@ -4,8 +4,9 @@
 > R1 product/artifact identity, R2 prompt/tokenizer contracts, R3 checkpoint
 > admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
 > `implemented`; R6 native CPU generation is also `implemented` for the
-> internal CPU lane. R7 native CUDA generation is `implemented`. R8 and later
-> publication milestones remain `planned`.
+> internal CPU lane. R7 native CUDA generation is `implemented`. R8
+> OpenAI-compatible CPU/CUDA serving is `implemented_early`; R9 and later
+> release milestones remain `planned`.
 
 ## Goal
 
@@ -602,6 +603,10 @@ without loading the model while any compute process is resident.
 
 ## R8: OpenAI-Compatible Serving
 
+Status: `implemented_early` on 2026-08-17. The generic server admits Qwen3.8
+on CPU and CUDA while preserving the external `qwen38` product identity.
+Metal remains refused until R10.
+
 Register the admitted Qwen3.8 runtime with the generic
 `psionic-openai-server`. Publication must remain model-specific.
 
@@ -634,9 +639,16 @@ Acceptance:
 cargo test -p psionic-serve qwen38_openai
 ```
 
-R8 is the earliest point at which the lane may move from `planned` to
-`implemented_early`, provided R0-R8 evidence is retained and the full claim
-matrix is green.
+The focused acceptance suite covers health and model publication, chat and
+streamed deltas, Responses storage and replay, reasoning controls, preserved
+thinking, native Qwen3.8 XML tool calls, all tool-choice modes, ordered and
+parallel calls, streamed tool arguments, structured output inside the proven
+runtime envelope, CPU/CUDA capability rows, and text-only media refusal.
+Responses and headers bind model key, served identity, artifact SHA-256,
+backend, execution mode, prompt-template and tokenizer digests, prompt-cache
+identity, effective thinking settings, and raw-logit posture. The lane has
+therefore moved to `implemented_early`. R9 still owns the consolidated release
+checker and comparator gate.
 
 ## R9: Comparator And Release Gate
 
