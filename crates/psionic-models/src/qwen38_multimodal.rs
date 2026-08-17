@@ -6,7 +6,8 @@ use crate::{
     QWEN38_IMAGE_PROCESSOR_SHA256, QWEN38_VIDEO_PROCESSOR_SHA256,
     QWEN38_VISION_RUNTIME_SCHEMA_VERSION, QWEN38_VISION_SPATIAL_MERGE_SIZE, Qwen38RenderedPrompt,
     Qwen38Tokenizer, Qwen38TokenizerError, Qwen38VisionMediaKind, Qwen38VisionPreprocessedInput,
-    Qwen38VisionRuntimeOutput, validate_qwen38_vision_preprocessed_input,
+    Qwen38VisionRuntimeOutput, qwen38_vision_runtime::qwen38_vision_embeddings_sha256,
+    validate_qwen38_vision_preprocessed_input,
 };
 
 pub const QWEN38_MULTIMODAL_DECODER_PLAN_SCHEMA_VERSION: &str =
@@ -354,7 +355,9 @@ fn validate_decoder_media_input(
             "vision output width must be {QWEN38_DECODER_HIDDEN_SIZE}",
         )));
     }
-    if embeddings_sha256(runtime.embeddings.as_slice()) != runtime.receipt.output_sha256 {
+    if qwen38_vision_embeddings_sha256(runtime.embeddings.as_slice())
+        != runtime.receipt.output_sha256
+    {
         return Err(invalid(String::from(
             "vision output digest does not match materialized embeddings",
         )));
@@ -608,16 +611,6 @@ fn build_mrope_positions(
     Ok((positions, delta))
 }
 
-fn embeddings_sha256(embeddings: &[Vec<f32>]) -> String {
-    let mut hasher = Sha256::new();
-    for embedding in embeddings {
-        for value in embedding {
-            hasher.update(value.to_le_bytes());
-        }
-    }
-    hex::encode(hasher.finalize())
-}
-
 fn sha256_u32(values: &[u32]) -> String {
     let mut hasher = Sha256::new();
     for value in values {
@@ -671,7 +664,7 @@ mod tests {
         let embeddings = (0..token_count)
             .map(|index| vec![index as f32; QWEN38_DECODER_HIDDEN_SIZE])
             .collect::<Vec<_>>();
-        let output_sha256 = embeddings_sha256(embeddings.as_slice());
+        let output_sha256 = qwen38_vision_embeddings_sha256(embeddings.as_slice());
         let patch_count = grid_thw.iter().product::<usize>();
         let pixel_values = vec![0.0_f32; patch_count * 1_536];
         let pixel_values_sha256 = f32_values_sha256(pixel_values.as_slice());

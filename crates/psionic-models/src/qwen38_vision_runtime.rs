@@ -240,7 +240,7 @@ impl Qwen38NativeVisionRuntime {
             .map_err(|error| Qwen38VisionRuntimeError::Execution(error.to_string()))?;
         let output_token_count = embeddings.len();
         let output_width = embeddings.first().map_or(0, Vec::len);
-        let output_sha256 = embeddings_sha256(embeddings.as_slice());
+        let output_sha256 = qwen38_vision_embeddings_sha256(embeddings.as_slice());
         let elapsed_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
         Ok(Qwen38VisionRuntimeOutput {
             embeddings,
@@ -766,7 +766,7 @@ fn execution_error(error: candle::Error) -> Qwen38VisionRuntimeError {
     Qwen38VisionRuntimeError::Execution(error.to_string())
 }
 
-fn embeddings_sha256(embeddings: &[Vec<f32>]) -> String {
+pub(crate) fn qwen38_vision_embeddings_sha256(embeddings: &[Vec<f32>]) -> String {
     let mut hasher = Sha256::new();
     hasher.update((embeddings.len() as u64).to_le_bytes());
     for embedding in embeddings {
