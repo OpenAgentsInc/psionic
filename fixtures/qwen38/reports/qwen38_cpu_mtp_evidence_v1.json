@@ -1,0 +1,81 @@
+{
+  "schema_version": "psionic.qwen38.mtp_real_artifact_evidence.v1",
+  "source": {
+    "revision": "666f23fc6ae1c3430acae9deb20a2d3bd732ffc2",
+    "dirty": false
+  },
+  "artifact": {
+    "path": "/home/christopherdavid/code/psionic/target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf",
+    "byte_length": 13441059904,
+    "sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2"
+  },
+  "backend": "native_psionic_cpu",
+  "prompt_token_ids": [
+    9419,
+    11
+  ],
+  "max_output_tokens": 2,
+  "baseline": {
+    "plan_digest": "02fc203e5acda1eedd27931bc8cb203778a6fd8af7a792c63ea48018258ef849",
+    "output_token_ids": [
+      353,
+      2688
+    ],
+    "output_text": " I'm",
+    "prompt_eval_duration_ns": 141768509398,
+    "decode_duration_ns": 141378640909,
+    "decode_tokens_per_second": 0.014146408447138228,
+    "wall_duration_ns": 283150630645
+  },
+  "mtp": {
+    "plan_digest": "cf204dea2cae9012895fffed9e5f740fa2fc90c67e2e37980003a1a0a25c9b86",
+    "output_token_ids": [
+      353,
+      2688
+    ],
+    "output_text": " I'm",
+    "prompt_eval_duration_ns": 141638111349,
+    "decode_duration_ns": 148142258229,
+    "decode_tokens_per_second": 0.013500536740221532,
+    "wall_duration_ns": 289783683441
+  },
+  "mtp_execution": {
+    "schema_version": "psionic.qwen38.mtp_execution.v1",
+    "backend": "cpu",
+    "enabled": true,
+    "max_draft_tokens_per_cycle": 1,
+    "draft_count": 1,
+    "accepted_count": 1,
+    "rejected_count": 0,
+    "acceptance_rate": 1.0,
+    "mtp_forward_count": 2,
+    "mtp_alignment_forward_count": 1,
+    "target_forward_count": 2,
+    "target_replay_count": 0,
+    "rollback_count": 0,
+    "restored_state_parity": true,
+    "mtp_weight_residency_bytes": 208427008,
+    "mtp_kv_cache_peak_bytes": 19456,
+    "rollback_snapshot_peak_bytes": 157159936,
+    "added_peak_residency_bytes": 365606400,
+    "decode_duration_ns": 148142258229,
+    "generated_token_count": 2,
+    "generated_tokens_per_second": 0.013500536740221532,
+    "performance_claim": "correctness_only_no_acceleration_claim"
+  },
+  "correctness": {
+    "output_token_parity": true,
+    "output_text_parity": true,
+    "restored_state_parity": true,
+    "passed": true
+  },
+  "performance": {
+    "baseline_decode_tokens_per_second": 0.014146408447138228,
+    "mtp_decode_tokens_per_second": 0.013500536740221532,
+    "mtp_to_baseline_ratio": 0.9543437679372707,
+    "observed_outcome": "slowdown_observed",
+    "acceleration_claimed": false
+  },
+  "all_passed": true,
+  "claim_boundary": "This retained CPU run proves optional NextN loading, aligned draft execution, target-state rollback, disabled-path output parity, memory accounting, and measured performance on the selected Qwen3.8 artifact. Token-at-a-time target verification is a correctness implementation and does not claim MTP acceleration, CUDA MTP, sampling MTP, or production speculative throughput."
+}

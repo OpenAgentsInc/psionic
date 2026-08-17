@@ -93,7 +93,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R7 | `implemented` | Native CUDA token generation | First local accelerated lane |
 | R8 | `implemented_early` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `implemented` | Comparator and correctness-first release gate | Retained `implemented_early` claim |
-| R9A | `implemented_early` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
+| R9A | `implemented` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
 | R10 | `planned` | Native Metal generation | Separate Apple backend claim |
 | R11 | `planned` | Native vision lane | Separate multimodal claim |
 | R12 | `planned` | Training and adapter lane | Separate training claim |
@@ -726,7 +726,7 @@ be regenerated.
 MTP is not required for the first Qwen3.8 text claim. Add it only after the
 base trunk is stable.
 
-Status: `implemented_early` on 2026-08-17. The native CPU service exposes an
+Status: `implemented` on 2026-08-17. The native CPU service exposes an
 explicit `from_gguf_path_with_qwen38_mtp` constructor. The default constructor
 still excludes the MTP tail and preserves the R6/R9 output path. The opt-in
 constructor requires one declared NextN block and loads its 15 `blk.64.*`
@@ -752,6 +752,17 @@ latency, and throughput facts. The producer and checker are
 `scripts/check-qwen38-cpu-mtp-evidence.sh`. Token-at-a-time target verification
 is a correctness implementation. It does not claim acceleration. CUDA MTP,
 sampling, structured output, and draft batches wider than one remain refused.
+
+The retained selected-artifact report is
+`fixtures/qwen38/reports/qwen38_cpu_mtp_evidence_v1.json`, generated from clean
+revision `666f23fc6ae1c3430acae9deb20a2d3bd732ffc2`. Prompt tokens `[9419, 11]`
+produce `[353, 2688]` with and without MTP. The one real draft is accepted, the
+separate MTP KV cache peaks at `19,456` bytes, the target rollback snapshot
+peaks at `157,159,936` bytes, and the `208,427,008` bytes of appended weights
+bring added peak residency to `365,606,400` bytes. Baseline decode measures
+`0.014146408447138228` tokens/s and MTP decode measures
+`0.013500536740221532` tokens/s, a ratio of `0.9543437679372707`. The retained
+outcome is `slowdown_observed`; no acceleration claim is published.
 
 Required work:
 
@@ -861,7 +872,7 @@ tokens, memory metrics, and the Psionic commit that produced the winning row.
 | Structured output | required | no | required | required | required or refused | planned or refused |
 | Media | marker/refusal | processor facts | marker/refusal | refused | refused | refused |
 | Performance | no | no | required | informational | retained | follow-on retained |
-| MTP and rollback | accept/reject/partial plus tiny graph | bounded source | optional follow-on | implemented_early CPU | planned | planned |
+| MTP and rollback | accept/reject/partial plus tiny graph | bounded source | optional follow-on | implemented CPU | planned | planned |
 
 Synthetic fixtures cover deterministic failures and small numerics. They do
 not replace real-artifact tests. Full-model tests should use environment-gated

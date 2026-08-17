@@ -353,7 +353,7 @@ into one generic engine claim.
   performance claim. Qwen3.8 remains `partial` overall because Metal,
   multimodal execution, training and adapters, MTP acceleration, long-context
   widening, and the competitive performance milestone are not complete. The
-  optional R9A CPU lane is `implemented_early` behind an explicit constructor.
+  optional R9A CPU lane is `implemented` behind an explicit constructor.
   It conditionally loads the appended 15-tensor NextN block, shares the base
   embedding and LM head, keeps a separate dense-attention MTP KV cache, and
   aligns the prior target final-hidden row with the accepted next-token
@@ -366,6 +366,13 @@ into one generic engine claim.
   snapshots, draft acceptance, rollback activity, latency, and throughput are
   explicit. This token-at-a-time CPU path is correctness evidence and makes no
   acceleration claim. The default CPU and generic-serving paths still skip MTP.
+  The retained clean-checkout selected-artifact report generates tokens
+  `[353, 2688]` on both paths. Its one draft is accepted, MTP weights account
+  for `208,427,008` bytes, separate MTP KV peaks at `19,456` bytes, the target
+  snapshot peaks at `157,159,936` bytes, and total added peak residency is
+  `365,606,400` bytes. Baseline decode is `0.014146408447138228` tokens/s versus
+  `0.013500536740221532` tokens/s with MTP. The report records
+  `slowdown_observed` and keeps `acceleration_claimed = false`.
   The
   retained R4 and R5
   reports themselves still do not execute full-width
