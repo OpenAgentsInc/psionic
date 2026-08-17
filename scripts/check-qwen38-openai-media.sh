@@ -35,6 +35,8 @@ jq -e \
     .request_contract.video_source_frames == 8 and
     .request_contract.video_source_fps == 4 and
     .request_contract.chat_tools_present == true and
+    .request_contract.chat_tool_choice == "auto" and
+    .request_contract.chat_max_tokens == 64 and
     .request_contract.responses_official_input_parts == ["input_image", "input_text"] and
     .claim_boundary.cpu_vision == true and
     .claim_boundary.cuda_decoder == true and
@@ -51,7 +53,10 @@ jq -e \
 jq -e '
   .generation.chat_image_with_tools as $row |
   $row.status == 200 and
-  ($row.body.choices[0].message.content | length) > 0 and
+  $row.body.choices[0].finish_reason == "tool_calls" and
+  ($row.body.choices[0].message.tool_calls | length) == 1 and
+  $row.body.choices[0].message.tool_calls[0].function.name == "record_visual_summary" and
+  (($row.body.choices[0].message.tool_calls[0].function.arguments | fromjson).summary | length) > 0 and
   $row.body.psionic_qwen38.backend == "cuda" and
   $row.body.psionic_qwen38.execution_mode == "native" and
   $row.body.psionic_qwen38.execution_engine == "psionic" and

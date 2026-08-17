@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }],
             "tool_choice": "auto",
             "temperature": 0.0,
-            "max_tokens": 2,
+            "max_tokens": 64,
             "psionic_enable_thinking": false
         }),
     )?;
@@ -222,6 +222,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "video_source_frames": 8,
                 "video_source_fps": 4.0,
                 "chat_tools_present": true,
+                "chat_tool_choice": "auto",
+                "chat_max_tokens": 64,
                 "responses_official_input_parts": ["input_image", "input_text"],
             },
             "claim_boundary": {
