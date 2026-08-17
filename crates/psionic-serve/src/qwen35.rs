@@ -7385,6 +7385,18 @@ impl CudaQwen35Model {
                 }
             }
             if std::env::var_os("PSIONIC_QWEN38_DEBUG_NONFINITE").is_some() {
+                if let (Qwen35LayerKind::Hybrid(hybrid), Qwen35LayerState::Hybrid(hybrid_state)) =
+                    (&layer.kind, &*layer_state)
+                {
+                    emit_qwen35_hybrid_intermediate_debug(
+                        position,
+                        layer_index,
+                        hybrid,
+                        hybrid_state,
+                        plan,
+                        self.descriptor.config.hidden_size,
+                    )?;
+                }
                 emit_qwen35_hidden_debug(
                     position,
                     layer_index,
