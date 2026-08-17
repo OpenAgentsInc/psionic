@@ -126,20 +126,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             "psionic_enable_thinking": false
         }),
     )?;
-    let response_id = responses_image.body["id"]
-        .as_str()
-        .ok_or("Responses image generation did not return an id")?;
-
-    let responses_media_continuation = post_json(
-        &client,
-        responses_url.as_str(),
-        &json!({
-            "model": model_id,
-            "previous_response_id": response_id,
-            "input": "Continue without replaying the attachment.",
-            "max_output_tokens": 1
-        }),
-    )?;
+    let responses_media_continuation = if let Some(response_id) =
+        responses_image.body["id"].as_str()
+    {
+        post_json(
+            &client,
+            responses_url.as_str(),
+            &json!({
+                "model": model_id,
+                "previous_response_id": response_id,
+                "input": "Continue without replaying the attachment.",
+                "max_output_tokens": 1
+            }),
+        )?
+    } else {
+        JsonResponseCapture {
+            status: 0,
+            headers: BTreeMap::new(),
+            body: json!({
+                "error": {
+                    "message": "continuation probe skipped because Responses image generation returned no id"
+                }
+            }),
+        }
+    };
     let remote_image = post_json(
         &client,
         chat_url.as_str(),
