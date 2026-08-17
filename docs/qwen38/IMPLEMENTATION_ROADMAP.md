@@ -96,7 +96,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R9A | `implemented` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
 | R10 | `partial` | Native Metal generation | Runtime admitted; retained Apple evidence pending |
 | R11 | `partial` | Native vision lane | Separate multimodal claim |
-| R12 | `planned` | Training and adapter lane | Separate training claim |
+| R12 | `implemented_early` | Training and adapter identity/reference-gradient lane | Bounded reference claim; native training remains open |
 | R13 | `planned` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
 
 ## Issue Tracking
@@ -993,6 +993,27 @@ Prompt marker projection without an admitted native vision runtime and decoder
 plan must not be described as image or video understanding.
 
 ## R12: Training And Adapters
+
+Status: `implemented_early` on 2026-08-17. The first bounded tranche lives in
+`crates/psionic-train/src/qwen38_training_adapter.rs` and retains
+`fixtures/qwen38/reports/qwen38_training_adapter_evidence_v1.json`. It defines
+a Qwen3.8-only base identity from the canonical artifact-facts digest, upstream
+revision, and safetensors-index digest; binds adapter identity to that base;
+and refuses Qwen3.5/Qwen3.6 ids, artifact drift, missing corpus/evaluation
+lineage, unsupported targets, unapproved resource budgets, and native backend
+requests before training starts.
+
+The only admitted execution mode is `tiny_reference_cpu`, under the default
+one-core/one-worker budget, for `lm_head.weight`. Its F32 LoRA reference
+computes analytical gradients for both low-rank matrices, checks every element
+against central finite differences, performs one update, proves loss reduction
+and deterministic replay, and keeps base weights frozen. The checker is
+`scripts/check-qwen38-training-adapter.sh`.
+
+This tranche writes no adapter artifact and does not admit real-checkpoint
+training, native CPU/CUDA/Metal backward execution, decoder-layer or vision
+targets, adapter serving, checkpoint recovery, evaluation gains, or promotion.
+Those remain required before R12 can become `implemented`.
 
 Training remains separate from inference support. Reuse the Qwen legal and
 open-adapter substrate only after native base-model execution is stable.

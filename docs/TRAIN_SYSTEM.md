@@ -259,6 +259,21 @@ submissions so retries cannot be paid twice. Tailnet and production mode
 commands are available with `--mode tailnet` and `--mode production`; they
 currently produce typed blocked-mode reports until real Pylon TLS endpoints are
 available.
+The Qwen3.8 training/adapter lane is now `implemented_early` for one bounded
+reference contract in
+`crates/psionic-train/src/qwen38_training_adapter.rs`. It pins the exact
+`Qwen/Qwen3.8-27B` upstream revision and canonical artifact identity, gives
+Qwen3.8 adapters their own base binding, carries corpus/evaluation hashes and
+the one-core/one-worker budget in the plan, and refuses inherited Qwen3.5 or
+Qwen3.6 identities. Its only admitted target and execution mode are
+`lm_head.weight` and `tiny_reference_cpu`: a deterministic F32 LoRA
+forward/backward/update fixture checks analytical gradients against central
+finite differences. The retained report is
+`fixtures/qwen38/reports/qwen38_training_adapter_evidence_v1.json`; validate it
+with `scripts/check-qwen38-training-adapter.sh`. No adapter artifact is written,
+and real-checkpoint/native-backend training, decoder/vision backward kernels,
+adapter serving, checkpoint recovery, evaluation gains, and promotion remain
+open.
 The Qwen3.6-27B legal fine-tuning milestone command is
 `cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads
 the Qwen3.6-27B smoke target artifacts, runs the base model through the public

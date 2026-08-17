@@ -331,6 +331,7 @@ fn validate_endpoint(endpoint: String) -> Result<String, HttpBuyModeDispatchConf
 mod tests {
     use super::*;
     use crate::{BuyModeEvalJob, VerificationClass, VerificationClassVerdict};
+    use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::thread;
 
