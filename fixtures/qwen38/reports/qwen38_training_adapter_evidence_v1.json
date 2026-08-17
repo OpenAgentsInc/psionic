@@ -59,8 +59,8 @@
     "cpu_budget": {
       "kind": "bounded_single_core"
     },
-    "claim_boundary": "This admits deterministic tiny-reference CPU math for an F32 Qwen3.8 LM-head LoRA adapter. It does not admit real-checkpoint training, native CPU/CUDA/Metal backward execution, decoder-layer or vision targets, adapter serving, checkpoint recovery, evaluation gains, or promotion.",
-    "plan_digest": "8f15b7bb7a985c50b1f38133fec629ac19b5194a051949300d9f384aa90d1267"
+    "claim_boundary": "This admits deterministic tiny-reference CPU math for an F32 Qwen3.8 LM-head LoRA adapter. It does not admit real-checkpoint training, native CPU/CUDA/Metal backward execution, decoder-layer or vision targets, native adapter serving, real/native checkpoint recovery, evaluation gains, or promotion.",
+    "plan_digest": "3e9e511e47539d68a2df1ed46ee4a20be4e0d1a562551658365d130f82cbc691"
   },
   "backward_receipt": {
     "schema_version": "psionic.qwen38.lm_head_lora_backward_receipt.v1",
@@ -180,6 +180,97 @@
     "tampered_checkpoint_refused": true,
     "claim_boundary": "This proves exact JSON checkpoint and AdamW-state recovery for the tiny Qwen3.8 LM-head reference lane only. It is not a real-checkpoint or native-backend training recovery claim.",
     "receipt_digest": "47dcb9ed21e5c0f7c4d707b700e006bbfe9b73eef22cd677fc36292bf2ce6465"
+  },
+  "adapter_artifact": {
+    "schema_version": "psionic.qwen38.lm_head_lora_adapter_artifact_receipt.v1",
+    "fixture_id": "qwen38-lm-head-lora-tiny-v1",
+    "artifact_ref": "fixtures/qwen38/adapters/qwen38_lm_head_lora_tiny_v1.safetensors",
+    "trained_step": 2,
+    "tensor_names": [
+      "lm_head.lora_A.weight",
+      "lm_head.lora_B.weight"
+    ],
+    "lora_a_shape": [
+      2,
+      4
+    ],
+    "lora_b_shape": [
+      3,
+      2
+    ],
+    "artifact_byte_length": 1176,
+    "artifact_sha256": "c53e1ff96b3aba97d298274b383d979f4515126b3e28b8e36198074382f348d4",
+    "metadata": {
+      "schema_version": "psionic.qwen38.lm_head_lora_adapter_artifact_metadata.v1",
+      "fixture_id": "qwen38-lm-head-lora-tiny-v1",
+      "base_model_id": "Qwen/Qwen3.8-27B",
+      "base_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+      "adapter_id": "qwen38-lm-head-reference-001",
+      "adapter_revision": "reference-step-001",
+      "adapter_binding_digest": "1ec068c7b3510811b41d5c00b3c0b3f027bdc2e20ddb20cabfc4a18912f63148",
+      "plan_digest": "3e9e511e47539d68a2df1ed46ee4a20be4e0d1a562551658365d130f82cbc691",
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "trained_step": 2,
+      "target": "lm_head.weight",
+      "lora_rank": 2,
+      "lora_alpha": 4.0
+    },
+    "adapter_identity": {
+      "adapter_id": "qwen38-lm-head-reference-001",
+      "adapter_revision": "reference-step-001",
+      "kind": "lora",
+      "format": "safetensors",
+      "base_model_id": "Qwen/Qwen3.8-27B",
+      "base_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "base_served_artifact_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+      "artifact_digest": "c53e1ff96b3aba97d298274b383d979f4515126b3e28b8e36198074382f348d4",
+      "quantization": "none",
+      "target_family": "decoder_composite",
+      "parameter_count": 14,
+      "provenance_digest": "3e9e511e47539d68a2df1ed46ee4a20be4e0d1a562551658365d130f82cbc691"
+    },
+    "adapter_identity_digest": "f5c13c14cb59a4be0cab242b06097587a8b9ca7ad8156bec7bd24af76e80d56a",
+    "serving_binding": {
+      "binding_id": "qwen38-lm-head-reference-serving-v1",
+      "base_model_id": "Qwen/Qwen3.8-27B",
+      "base_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "base_served_artifact_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+      "served_adapter_digest": "c2a8fb34a696413f1638f90cb09dbb486a9af89387d58243edfad3e2f394617c",
+      "residency_mode": "hot_swap_overlay",
+      "adapters": [
+        {
+          "adapter_id": "qwen38-lm-head-reference-001",
+          "adapter_revision": "reference-step-001",
+          "kind": "lora",
+          "format": "safetensors",
+          "base_model_id": "Qwen/Qwen3.8-27B",
+          "base_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "base_served_artifact_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+          "artifact_digest": "c53e1ff96b3aba97d298274b383d979f4515126b3e28b8e36198074382f348d4",
+          "quantization": "none",
+          "target_family": "decoder_composite",
+          "parameter_count": 14,
+          "provenance_digest": "3e9e511e47539d68a2df1ed46ee4a20be4e0d1a562551658365d130f82cbc691"
+        }
+      ]
+    },
+    "loaded_rank": 2,
+    "loaded_hidden_size": 4,
+    "loaded_vocabulary_size": 3,
+    "loaded_lora_a_sha256": "dcb0f007f2e59a759b1a82a6ba1e59fc34e4170d995eb778164cf0393b522e4e",
+    "loaded_lora_b_sha256": "9fdfae73f32e0ff1a93c3829a08d038c6ec61d673d0d398631c2387c42b57ed5",
+    "expected_logits_sha256": "90297c0bf71e3dd76d1bdd61a78e01a87152a609ed7bbcd505013fdd4e7608c2",
+    "served_logits_sha256": "90297c0bf71e3dd76d1bdd61a78e01a87152a609ed7bbcd505013fdd4e7608c2",
+    "save_load_exact_match": true,
+    "serve_logits_exact_match": true,
+    "deterministic_serve_replay": true,
+    "tampered_artifact_refused": true,
+    "metadata_drift_refused": true,
+    "claim_boundary": "This proves Qwen3.8-bound tiny-reference safetensors save/load parity and logits-overlay parity through the generic LM-head adapter runtime. It does not prove adapter execution on the native Qwen3.8 CPU, CUDA, or Metal decoder runtime.",
+    "receipt_digest": "957d47ea85b41d5c39c0e5c809bda8ab0996963faa4dff6fa5de5ff0111ebf20"
   },
   "refusals": {
     "artifact_drift": {
@@ -443,11 +534,12 @@
   },
   "real_checkpoint_training_admitted": false,
   "native_backward_admitted": false,
-  "adapter_artifact_written": false,
+  "adapter_artifact_written": true,
+  "tiny_reference_adapter_serving_parity_admitted": true,
   "adapter_serving_admitted": false,
   "tiny_reference_checkpoint_recovery_admitted": true,
   "checkpoint_recovery_admitted": false,
   "promotion_admitted": false,
-  "claim_boundary": "This report proves Qwen3.8-specific base/adapter admission, deterministic tiny-reference F32 LM-head LoRA gradients, and exact tiny-reference AdamW checkpoint recovery. It retains no trained adapter and makes no real-checkpoint training, native backward or recovery, serving, evaluation, or promotion claim.",
-  "report_digest": "1434b7db60000bd8d1ec6afa579a519ae197005fd54f92cb8c37d2ab091b5374"
+  "claim_boundary": "This report proves Qwen3.8-specific base/adapter admission, deterministic tiny-reference F32 LM-head LoRA gradients, exact tiny-reference AdamW checkpoint recovery, and generic LM-head safetensors save/load/overlay parity. It makes no real-checkpoint training, native backward or recovery, native Qwen3.8 adapter serving, evaluation, or promotion claim.",
+  "report_digest": "93e9845b77e20260d55a76a6df635c75ba9fa85b30665fb43f85d3b4a45e3625"
 }
