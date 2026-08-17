@@ -1010,10 +1010,17 @@ against central finite differences, performs one update, proves loss reduction
 and deterministic replay, and keeps base weights frozen. The checker is
 `scripts/check-qwen38-training-adapter.sh`.
 
+The same tiny lane now serializes a digest-bound JSON checkpoint containing the
+LoRA matrices, AdamW first/second moments, step, optimizer config, Qwen3.8 base
+and adapter binding, corpus/evaluation lineage, and seed. A retained recovery
+row proves that checkpoint-at-step-one plus resume produces the exact same
+step-two weights, moments, state digest, and loss as uninterrupted execution;
+tampering with checkpoint state refuses before resume.
+
 This tranche writes no adapter artifact and does not admit real-checkpoint
 training, native CPU/CUDA/Metal backward execution, decoder-layer or vision
-targets, adapter serving, checkpoint recovery, evaluation gains, or promotion.
-Those remain required before R12 can become `implemented`.
+targets, adapter serving, real/native checkpoint recovery, evaluation gains,
+or promotion. Those remain required before R12 can become `implemented`.
 
 Training remains separate from inference support. Reuse the Qwen legal and
 open-adapter substrate only after native base-model execution is stable.

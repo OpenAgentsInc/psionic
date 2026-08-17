@@ -270,9 +270,12 @@ Qwen3.6 identities. Its only admitted target and execution mode are
 forward/backward/update fixture checks analytical gradients against central
 finite differences. The retained report is
 `fixtures/qwen38/reports/qwen38_training_adapter_evidence_v1.json`; validate it
-with `scripts/check-qwen38-training-adapter.sh`. No adapter artifact is written,
-and real-checkpoint/native-backend training, decoder/vision backward kernels,
-adapter serving, checkpoint recovery, evaluation gains, and promotion remain
+with `scripts/check-qwen38-training-adapter.sh`. The tiny lane also checkpoints
+the LoRA matrices, AdamW moments, step, optimizer config, base/adapter binding,
+lineage, and seed; resumed step two exactly matches uninterrupted step two, and
+checkpoint tampering refuses. No adapter artifact is written, and
+real-checkpoint/native-backend training, decoder/vision backward kernels,
+adapter serving, real/native recovery, evaluation gains, and promotion remain
 open.
 The Qwen3.6-27B legal fine-tuning milestone command is
 `cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads

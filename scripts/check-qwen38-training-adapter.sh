@@ -34,6 +34,19 @@ jq -e '
   .backward_receipt.deterministic_replay == true and
   .backward_receipt.base_weights_frozen == true and
   (.backward_receipt.receipt_digest | test("^[0-9a-f]{64}$")) and
+  .checkpoint_recovery.schema_version == "psionic.qwen38.lm_head_lora_recovery_receipt.v1" and
+  .checkpoint_recovery.checkpoint.schema_version == "psionic.qwen38.lm_head_lora_checkpoint.v1" and
+  .checkpoint_recovery.checkpoint.base_artifact_identity_digest == .base_identity.base_artifact_identity_digest and
+  .checkpoint_recovery.checkpoint.adapter_binding_digest == .admitted_plan.adapter_binding.binding_digest and
+  .checkpoint_recovery.checkpoint_step == 1 and
+  .checkpoint_recovery.resumed_step == 2 and
+  .checkpoint_recovery.exact_state_match == true and
+  .checkpoint_recovery.optimizer_state_exact_match == true and
+  .checkpoint_recovery.second_step_loss_exact_match == true and
+  .checkpoint_recovery.tampered_checkpoint_refused == true and
+  .checkpoint_recovery.uninterrupted_state_digest == .checkpoint_recovery.resumed_state_digest and
+  (.checkpoint_recovery.checkpoint_bytes_sha256 | test("^[0-9a-f]{64}$")) and
+  (.checkpoint_recovery.receipt_digest | test("^[0-9a-f]{64}$")) and
   .refusals.inherited_model.refusal.code == "unsupported_model" and
   .refusals.inherited_adapter.refusal.code == "inherited_adapter_identity" and
   .refusals.decoder_target.refusal.code == "unsupported_target" and
@@ -45,6 +58,7 @@ jq -e '
   .native_backward_admitted == false and
   .adapter_artifact_written == false and
   .adapter_serving_admitted == false and
+  .tiny_reference_checkpoint_recovery_admitted == true and
   .checkpoint_recovery_admitted == false and
   .promotion_admitted == false and
   (.report_digest | test("^[0-9a-f]{64}$"))

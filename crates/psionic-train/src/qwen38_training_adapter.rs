@@ -24,6 +24,10 @@ pub const QWEN38_LM_HEAD_BACKWARD_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.qwen38.lm_head_lora_backward_receipt.v1";
 pub const QWEN38_TRAINING_EVIDENCE_SCHEMA_VERSION: &str =
     "psionic.qwen38.training_adapter_evidence.v1";
+pub const QWEN38_LM_HEAD_CHECKPOINT_SCHEMA_VERSION: &str =
+    "psionic.qwen38.lm_head_lora_checkpoint.v1";
+pub const QWEN38_LM_HEAD_RECOVERY_RECEIPT_SCHEMA_VERSION: &str =
+    "psionic.qwen38.lm_head_lora_recovery_receipt.v1";
 pub const QWEN38_LM_HEAD_TARGET: &str = "lm_head.weight";
 pub const QWEN38_LM_HEAD_BACKWARD_CONTRACT: &str = "qwen38_lm_head_lora_f32_reference_backward_v1";
 pub const QWEN38_DEFERRED_ADAPTER_TARGETS: &[&str] = &[
@@ -235,6 +239,84 @@ pub struct Qwen38LmHeadLoraBackwardReceipt {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadAdamWConfig {
+    pub learning_rate: f32,
+    pub beta1: f32,
+    pub beta2: f32,
+    pub epsilon: f32,
+    pub weight_decay: f32,
+}
+
+impl Default for Qwen38LmHeadAdamWConfig {
+    fn default() -> Self {
+        Self {
+            learning_rate: 0.01,
+            beta1: 0.9,
+            beta2: 0.999,
+            epsilon: 1.0e-8,
+            weight_decay: 0.01,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadLoraTrainingState {
+    pub step: u64,
+    pub lora_a: Vec<f32>,
+    pub lora_b: Vec<f32>,
+    pub adam_m_a: Vec<f32>,
+    pub adam_v_a: Vec<f32>,
+    pub adam_m_b: Vec<f32>,
+    pub adam_v_b: Vec<f32>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadAdamWStepReceipt {
+    pub step: u64,
+    pub loss_before: f32,
+    pub loss_after: f32,
+    pub loss_improved: bool,
+    pub gradient_a_sha256: String,
+    pub gradient_b_sha256: String,
+    pub state_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadLoraCheckpoint {
+    pub schema_version: String,
+    pub fixture_id: String,
+    pub base_artifact_identity_digest: String,
+    pub adapter_binding_digest: String,
+    pub corpus_manifest_sha256: String,
+    pub evaluation_manifest_sha256: String,
+    pub seed: u64,
+    pub optimizer: Qwen38LmHeadAdamWConfig,
+    pub state: Qwen38LmHeadLoraTrainingState,
+    pub state_digest: String,
+    pub checkpoint_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadLoraRecoveryReceipt {
+    pub schema_version: String,
+    pub fixture_id: String,
+    pub checkpoint: Qwen38LmHeadLoraCheckpoint,
+    pub checkpoint_bytes_sha256: String,
+    pub checkpoint_step: u64,
+    pub resumed_step: u64,
+    pub uninterrupted_state_digest: String,
+    pub resumed_state_digest: String,
+    pub exact_state_match: bool,
+    pub optimizer_state_exact_match: bool,
+    pub uninterrupted_second_step_loss: f32,
+    pub resumed_second_step_loss: f32,
+    pub second_step_loss_exact_match: bool,
+    pub tampered_checkpoint_refused: bool,
+    pub claim_boundary: String,
+    pub receipt_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Qwen38TrainingAdapterEvidenceReport {
     pub schema_version: String,
     pub phase: String,
@@ -242,11 +324,13 @@ pub struct Qwen38TrainingAdapterEvidenceReport {
     pub base_identity: Qwen38TrainingBaseIdentity,
     pub admitted_plan: Qwen38TrainingAdapterPlan,
     pub backward_receipt: Qwen38LmHeadLoraBackwardReceipt,
+    pub checkpoint_recovery: Qwen38LmHeadLoraRecoveryReceipt,
     pub refusals: BTreeMap<String, Qwen38TrainingAdapterPlan>,
     pub real_checkpoint_training_admitted: bool,
     pub native_backward_admitted: bool,
     pub adapter_artifact_written: bool,
     pub adapter_serving_admitted: bool,
+    pub tiny_reference_checkpoint_recovery_admitted: bool,
     pub checkpoint_recovery_admitted: bool,
     pub promotion_admitted: bool,
     pub claim_boundary: String,
@@ -275,10 +359,28 @@ pub enum Qwen38AdapterIdentityError {
     UnsupportedArtifactShape,
 }
 
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Debug, Error)]
+pub enum Qwen38TrainingRecoveryError {
+    #[error(transparent)]
+    Backward(#[from] Qwen38LmHeadBackwardError),
+    #[error("Qwen3.8 recovery requires an admitted adapter plan")]
+    PlanNotAdmitted,
+    #[error("invalid Qwen3.8 AdamW config: {0}")]
+    InvalidOptimizer(String),
+    #[error("invalid Qwen3.8 training state: {0}")]
+    InvalidState(String),
+    #[error("invalid Qwen3.8 checkpoint: {0}")]
+    InvalidCheckpoint(String),
+    #[error("Qwen3.8 checkpoint JSON failed: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+#[derive(Debug, Error)]
 pub enum Qwen38TrainingEvidenceError {
     #[error(transparent)]
     Backward(#[from] Qwen38LmHeadBackwardError),
+    #[error(transparent)]
+    Recovery(#[from] Qwen38TrainingRecoveryError),
 }
 
 #[must_use]
@@ -500,7 +602,12 @@ pub fn run_qwen38_lm_head_lora_backward_reference(
         fixture.lora_a.as_slice(),
         fixture.lora_b.as_slice(),
     );
-    let (gradient_a, gradient_b) = analytic_gradients(fixture, &initial_logits);
+    let (gradient_a, gradient_b) = analytic_gradients(
+        fixture,
+        &initial_logits,
+        fixture.lora_a.as_slice(),
+        fixture.lora_b.as_slice(),
+    );
     let finite_difference_a = finite_difference_gradient(fixture, true);
     let finite_difference_b = finite_difference_gradient(fixture, false);
     let gradient_max_abs_error = gradient_a
@@ -555,12 +662,214 @@ pub fn run_qwen38_lm_head_lora_backward_reference(
     Ok(receipt)
 }
 
+pub fn qwen38_lm_head_initial_training_state(
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+) -> Result<Qwen38LmHeadLoraTrainingState, Qwen38TrainingRecoveryError> {
+    validate_backward_fixture(fixture)?;
+    Ok(Qwen38LmHeadLoraTrainingState {
+        step: 0,
+        lora_a: fixture.lora_a.clone(),
+        lora_b: fixture.lora_b.clone(),
+        adam_m_a: vec![0.0; fixture.lora_a.len()],
+        adam_v_a: vec![0.0; fixture.lora_a.len()],
+        adam_m_b: vec![0.0; fixture.lora_b.len()],
+        adam_v_b: vec![0.0; fixture.lora_b.len()],
+    })
+}
+
+pub fn run_qwen38_lm_head_adamw_step(
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+    optimizer: &Qwen38LmHeadAdamWConfig,
+    state: &mut Qwen38LmHeadLoraTrainingState,
+) -> Result<Qwen38LmHeadAdamWStepReceipt, Qwen38TrainingRecoveryError> {
+    validate_backward_fixture(fixture)?;
+    validate_optimizer(optimizer)?;
+    validate_training_state(fixture, state)?;
+    let (logits_before, loss_before) =
+        loss_and_logits(fixture, state.lora_a.as_slice(), state.lora_b.as_slice());
+    let (gradient_a, gradient_b) = analytic_gradients(
+        fixture,
+        logits_before.as_slice(),
+        state.lora_a.as_slice(),
+        state.lora_b.as_slice(),
+    );
+    state.step = state.step.saturating_add(1);
+    adamw_update(
+        state.lora_a.as_mut_slice(),
+        state.adam_m_a.as_mut_slice(),
+        state.adam_v_a.as_mut_slice(),
+        gradient_a.as_slice(),
+        state.step,
+        optimizer,
+    );
+    adamw_update(
+        state.lora_b.as_mut_slice(),
+        state.adam_m_b.as_mut_slice(),
+        state.adam_v_b.as_mut_slice(),
+        gradient_b.as_slice(),
+        state.step,
+        optimizer,
+    );
+    let (_, loss_after) =
+        loss_and_logits(fixture, state.lora_a.as_slice(), state.lora_b.as_slice());
+    Ok(Qwen38LmHeadAdamWStepReceipt {
+        step: state.step,
+        loss_before,
+        loss_after,
+        loss_improved: loss_after < loss_before,
+        gradient_a_sha256: sha256_f32(&gradient_a),
+        gradient_b_sha256: sha256_f32(&gradient_b),
+        state_digest: training_state_digest(state),
+    })
+}
+
+pub fn export_qwen38_lm_head_checkpoint(
+    plan: &Qwen38TrainingAdapterPlan,
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+    optimizer: &Qwen38LmHeadAdamWConfig,
+    state: &Qwen38LmHeadLoraTrainingState,
+) -> Result<Vec<u8>, Qwen38TrainingRecoveryError> {
+    validate_checkpoint_inputs(plan, fixture, optimizer, state)?;
+    let binding = plan
+        .adapter_binding
+        .as_ref()
+        .ok_or(Qwen38TrainingRecoveryError::PlanNotAdmitted)?;
+    let mut checkpoint = Qwen38LmHeadLoraCheckpoint {
+        schema_version: String::from(QWEN38_LM_HEAD_CHECKPOINT_SCHEMA_VERSION),
+        fixture_id: fixture.fixture_id.clone(),
+        base_artifact_identity_digest: plan.base_identity.base_artifact_identity_digest.clone(),
+        adapter_binding_digest: binding.binding_digest.clone(),
+        corpus_manifest_sha256: plan.corpus_manifest_sha256.clone(),
+        evaluation_manifest_sha256: plan.evaluation_manifest_sha256.clone(),
+        seed: plan.seed,
+        optimizer: optimizer.clone(),
+        state: state.clone(),
+        state_digest: training_state_digest(state),
+        checkpoint_digest: String::new(),
+    };
+    checkpoint.checkpoint_digest = checkpoint_digest(&checkpoint);
+    Ok(serde_json::to_vec(&checkpoint)?)
+}
+
+pub fn restore_qwen38_lm_head_checkpoint(
+    bytes: &[u8],
+    plan: &Qwen38TrainingAdapterPlan,
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+    optimizer: &Qwen38LmHeadAdamWConfig,
+) -> Result<Qwen38LmHeadLoraTrainingState, Qwen38TrainingRecoveryError> {
+    if !plan.is_admitted() {
+        return Err(Qwen38TrainingRecoveryError::PlanNotAdmitted);
+    }
+    let binding = plan
+        .adapter_binding
+        .as_ref()
+        .ok_or(Qwen38TrainingRecoveryError::PlanNotAdmitted)?;
+    let checkpoint = serde_json::from_slice::<Qwen38LmHeadLoraCheckpoint>(bytes)?;
+    if checkpoint.schema_version != QWEN38_LM_HEAD_CHECKPOINT_SCHEMA_VERSION
+        || checkpoint.fixture_id != fixture.fixture_id
+        || checkpoint.base_artifact_identity_digest
+            != plan.base_identity.base_artifact_identity_digest
+        || checkpoint.adapter_binding_digest != binding.binding_digest
+        || checkpoint.corpus_manifest_sha256 != plan.corpus_manifest_sha256
+        || checkpoint.evaluation_manifest_sha256 != plan.evaluation_manifest_sha256
+        || checkpoint.seed != plan.seed
+        || checkpoint.optimizer != *optimizer
+    {
+        return Err(Qwen38TrainingRecoveryError::InvalidCheckpoint(
+            String::from(
+                "checkpoint identity, lineage, seed, or optimizer does not match the admitted plan",
+            ),
+        ));
+    }
+    validate_training_state(fixture, &checkpoint.state)?;
+    if checkpoint.state_digest != training_state_digest(&checkpoint.state) {
+        return Err(Qwen38TrainingRecoveryError::InvalidCheckpoint(
+            String::from("checkpoint training-state digest mismatch"),
+        ));
+    }
+    if checkpoint.checkpoint_digest != checkpoint_digest(&checkpoint) {
+        return Err(Qwen38TrainingRecoveryError::InvalidCheckpoint(
+            String::from("checkpoint envelope digest mismatch"),
+        ));
+    }
+    Ok(checkpoint.state)
+}
+
+pub fn qwen38_lm_head_checkpoint_recovery_evidence(
+    plan: &Qwen38TrainingAdapterPlan,
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+) -> Result<Qwen38LmHeadLoraRecoveryReceipt, Qwen38TrainingRecoveryError> {
+    let optimizer = Qwen38LmHeadAdamWConfig::default();
+    let mut uninterrupted = qwen38_lm_head_initial_training_state(fixture)?;
+    run_qwen38_lm_head_adamw_step(fixture, &optimizer, &mut uninterrupted)?;
+    let uninterrupted_second =
+        run_qwen38_lm_head_adamw_step(fixture, &optimizer, &mut uninterrupted)?;
+
+    let mut staged = qwen38_lm_head_initial_training_state(fixture)?;
+    run_qwen38_lm_head_adamw_step(fixture, &optimizer, &mut staged)?;
+    let checkpoint_bytes = export_qwen38_lm_head_checkpoint(plan, fixture, &optimizer, &staged)?;
+    let checkpoint =
+        serde_json::from_slice::<Qwen38LmHeadLoraCheckpoint>(checkpoint_bytes.as_slice())?;
+    let mut resumed =
+        restore_qwen38_lm_head_checkpoint(checkpoint_bytes.as_slice(), plan, fixture, &optimizer)?;
+    let optimizer_state_after_restore = (
+        resumed.adam_m_a.clone(),
+        resumed.adam_v_a.clone(),
+        resumed.adam_m_b.clone(),
+        resumed.adam_v_b.clone(),
+    );
+    let optimizer_state_before_checkpoint = (
+        staged.adam_m_a.clone(),
+        staged.adam_v_a.clone(),
+        staged.adam_m_b.clone(),
+        staged.adam_v_b.clone(),
+    );
+    let resumed_second = run_qwen38_lm_head_adamw_step(fixture, &optimizer, &mut resumed)?;
+
+    let mut tampered = serde_json::from_slice::<serde_json::Value>(checkpoint_bytes.as_slice())?;
+    tampered["state"]["step"] = serde_json::Value::from(99_u64);
+    let tampered_bytes = serde_json::to_vec(&tampered)?;
+    let tampered_checkpoint_refused =
+        restore_qwen38_lm_head_checkpoint(tampered_bytes.as_slice(), plan, fixture, &optimizer)
+            .is_err();
+    let uninterrupted_state_digest = training_state_digest(&uninterrupted);
+    let resumed_state_digest = training_state_digest(&resumed);
+    let exact_state_match = uninterrupted == resumed;
+    let mut receipt = Qwen38LmHeadLoraRecoveryReceipt {
+        schema_version: String::from(QWEN38_LM_HEAD_RECOVERY_RECEIPT_SCHEMA_VERSION),
+        fixture_id: fixture.fixture_id.clone(),
+        checkpoint,
+        checkpoint_bytes_sha256: sha256_bytes(checkpoint_bytes.as_slice()),
+        checkpoint_step: staged.step,
+        resumed_step: resumed.step,
+        uninterrupted_state_digest,
+        resumed_state_digest,
+        exact_state_match,
+        optimizer_state_exact_match: optimizer_state_before_checkpoint
+            == optimizer_state_after_restore,
+        uninterrupted_second_step_loss: uninterrupted_second.loss_after,
+        resumed_second_step_loss: resumed_second.loss_after,
+        second_step_loss_exact_match: uninterrupted_second.loss_after == resumed_second.loss_after,
+        tampered_checkpoint_refused,
+        claim_boundary: String::from(
+            "This proves exact JSON checkpoint and AdamW-state recovery for the tiny Qwen3.8 LM-head reference lane only. It is not a real-checkpoint or native-backend training recovery claim.",
+        ),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = stable_json_digest(b"qwen38_lm_head_recovery_receipt|", &receipt);
+    Ok(receipt)
+}
+
 pub fn qwen38_training_adapter_evidence_report()
 -> Result<Qwen38TrainingAdapterEvidenceReport, Qwen38TrainingEvidenceError> {
     let request = Qwen38TrainingAdapterRequest::default();
     let admitted_plan = admit_qwen38_training_adapter(&request);
     let backward_receipt =
         run_qwen38_lm_head_lora_backward_reference(&Qwen38LmHeadLoraBackwardFixture::default())?;
+    let checkpoint_recovery = qwen38_lm_head_checkpoint_recovery_evidence(
+        &admitted_plan,
+        &Qwen38LmHeadLoraBackwardFixture::default(),
+    )?;
     let refusals = [
         (
             "inherited_model",
@@ -615,15 +924,17 @@ pub fn qwen38_training_adapter_evidence_report()
         base_identity: qwen38_training_base_identity(),
         admitted_plan,
         backward_receipt,
+        checkpoint_recovery,
         refusals,
         real_checkpoint_training_admitted: false,
         native_backward_admitted: false,
         adapter_artifact_written: false,
         adapter_serving_admitted: false,
+        tiny_reference_checkpoint_recovery_admitted: true,
         checkpoint_recovery_admitted: false,
         promotion_admitted: false,
         claim_boundary: String::from(
-            "This report proves Qwen3.8-specific base/adapter admission and deterministic tiny-reference F32 LM-head LoRA gradients. It retains no trained adapter and makes no real-checkpoint training, native backward, serving, recovery, evaluation, or promotion claim.",
+            "This report proves Qwen3.8-specific base/adapter admission, deterministic tiny-reference F32 LM-head LoRA gradients, and exact tiny-reference AdamW checkpoint recovery. It retains no trained adapter and makes no real-checkpoint training, native backward or recovery, serving, evaluation, or promotion claim.",
         ),
         report_digest: String::new(),
     };
@@ -738,6 +1049,108 @@ fn validate_backward_fixture(
     Ok(())
 }
 
+fn validate_checkpoint_inputs(
+    plan: &Qwen38TrainingAdapterPlan,
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+    optimizer: &Qwen38LmHeadAdamWConfig,
+    state: &Qwen38LmHeadLoraTrainingState,
+) -> Result<(), Qwen38TrainingRecoveryError> {
+    if !plan.is_admitted() || plan.adapter_binding.is_none() {
+        return Err(Qwen38TrainingRecoveryError::PlanNotAdmitted);
+    }
+    validate_backward_fixture(fixture)?;
+    validate_optimizer(optimizer)?;
+    validate_training_state(fixture, state)
+}
+
+fn validate_optimizer(
+    optimizer: &Qwen38LmHeadAdamWConfig,
+) -> Result<(), Qwen38TrainingRecoveryError> {
+    if !optimizer.learning_rate.is_finite()
+        || optimizer.learning_rate <= 0.0
+        || !optimizer.beta1.is_finite()
+        || !(0.0..1.0).contains(&optimizer.beta1)
+        || !optimizer.beta2.is_finite()
+        || !(0.0..1.0).contains(&optimizer.beta2)
+        || !optimizer.epsilon.is_finite()
+        || optimizer.epsilon <= 0.0
+        || !optimizer.weight_decay.is_finite()
+        || optimizer.weight_decay < 0.0
+    {
+        return Err(Qwen38TrainingRecoveryError::InvalidOptimizer(String::from(
+            "AdamW values must be finite and inside their admitted ranges",
+        )));
+    }
+    Ok(())
+}
+
+fn validate_training_state(
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+    state: &Qwen38LmHeadLoraTrainingState,
+) -> Result<(), Qwen38TrainingRecoveryError> {
+    let a_len = fixture.lora_a.len();
+    let b_len = fixture.lora_b.len();
+    if state.lora_a.len() != a_len
+        || state.adam_m_a.len() != a_len
+        || state.adam_v_a.len() != a_len
+        || state.lora_b.len() != b_len
+        || state.adam_m_b.len() != b_len
+        || state.adam_v_b.len() != b_len
+    {
+        return Err(Qwen38TrainingRecoveryError::InvalidState(String::from(
+            "LoRA and AdamW state shapes do not match the admitted fixture",
+        )));
+    }
+    if state
+        .lora_a
+        .iter()
+        .chain(state.lora_b.iter())
+        .chain(state.adam_m_a.iter())
+        .chain(state.adam_v_a.iter())
+        .chain(state.adam_m_b.iter())
+        .chain(state.adam_v_b.iter())
+        .any(|value| !value.is_finite())
+    {
+        return Err(Qwen38TrainingRecoveryError::InvalidState(String::from(
+            "LoRA and AdamW state values must be finite",
+        )));
+    }
+    Ok(())
+}
+
+fn adamw_update(
+    weights: &mut [f32],
+    first_moment: &mut [f32],
+    second_moment: &mut [f32],
+    gradients: &[f32],
+    step: u64,
+    optimizer: &Qwen38LmHeadAdamWConfig,
+) {
+    let first_correction = 1.0 - optimizer.beta1.powf(step as f32);
+    let second_correction = 1.0 - optimizer.beta2.powf(step as f32);
+    for index in 0..weights.len() {
+        first_moment[index] =
+            optimizer.beta1 * first_moment[index] + (1.0 - optimizer.beta1) * gradients[index];
+        second_moment[index] = optimizer.beta2 * second_moment[index]
+            + (1.0 - optimizer.beta2) * gradients[index] * gradients[index];
+        let corrected_first = first_moment[index] / first_correction;
+        let corrected_second = second_moment[index] / second_correction;
+        let update = corrected_first / (corrected_second.sqrt() + optimizer.epsilon)
+            + optimizer.weight_decay * weights[index];
+        weights[index] -= optimizer.learning_rate * update;
+    }
+}
+
+fn training_state_digest(state: &Qwen38LmHeadLoraTrainingState) -> String {
+    stable_json_digest(b"qwen38_lm_head_training_state|", state)
+}
+
+fn checkpoint_digest(checkpoint: &Qwen38LmHeadLoraCheckpoint) -> String {
+    let mut digestible = checkpoint.clone();
+    digestible.checkpoint_digest.clear();
+    stable_json_digest(b"qwen38_lm_head_checkpoint|", &digestible)
+}
+
 fn loss_and_logits(
     fixture: &Qwen38LmHeadLoraBackwardFixture,
     lora_a: &[f32],
@@ -763,18 +1176,19 @@ fn loss_and_logits(
 fn analytic_gradients(
     fixture: &Qwen38LmHeadLoraBackwardFixture,
     logits: &[f32],
+    lora_a: &[f32],
+    lora_b: &[f32],
 ) -> (Vec<f32>, Vec<f32>) {
     let hidden_size = fixture.hidden.len();
     let rank = fixture.lora_rank;
     let scale = fixture.lora_alpha / rank as f32;
-    let intermediate = fixture
-        .lora_a
+    let intermediate = lora_a
         .chunks_exact(hidden_size)
         .map(|row| dot(row, fixture.hidden.as_slice()))
         .collect::<Vec<_>>();
     let mut d_logits = softmax(logits);
     d_logits[fixture.target_token_id] -= 1.0;
-    let mut gradient_b = vec![0.0; fixture.lora_b.len()];
+    let mut gradient_b = vec![0.0; lora_b.len()];
     for (vocabulary_index, d_logit) in d_logits.iter().copied().enumerate() {
         for rank_index in 0..rank {
             gradient_b[vocabulary_index * rank + rank_index] =
@@ -788,11 +1202,11 @@ fn analytic_gradients(
                 .iter()
                 .enumerate()
                 .map(|(vocabulary_index, d_logit)| {
-                    fixture.lora_b[vocabulary_index * rank + rank_index] * d_logit
+                    lora_b[vocabulary_index * rank + rank_index] * d_logit
                 })
                 .sum::<f32>();
     }
-    let mut gradient_a = vec![0.0; fixture.lora_a.len()];
+    let mut gradient_a = vec![0.0; lora_a.len()];
     for rank_index in 0..rank {
         for hidden_index in 0..hidden_size {
             gradient_a[rank_index * hidden_size + hidden_index] =
@@ -1009,6 +1423,27 @@ mod tests {
         assert!(receipt.base_weights_frozen);
         assert!(receipt.gradient_max_abs_error <= receipt.gradient_tolerance);
         assert_ne!(receipt.initial_logits_sha256, receipt.updated_logits_sha256);
+    }
+
+    #[test]
+    fn qwen38_lm_head_checkpoint_restores_exact_adamw_state() {
+        let plan = admit_qwen38_training_adapter(&Qwen38TrainingAdapterRequest::default());
+        let receipt = qwen38_lm_head_checkpoint_recovery_evidence(
+            &plan,
+            &Qwen38LmHeadLoraBackwardFixture::default(),
+        )
+        .expect("checkpoint recovery");
+
+        assert_eq!(receipt.checkpoint_step, 1);
+        assert_eq!(receipt.resumed_step, 2);
+        assert!(receipt.exact_state_match);
+        assert!(receipt.optimizer_state_exact_match);
+        assert!(receipt.second_step_loss_exact_match);
+        assert!(receipt.tampered_checkpoint_refused);
+        assert_eq!(
+            receipt.uninterrupted_state_digest,
+            receipt.resumed_state_digest
+        );
     }
 
     #[test]
