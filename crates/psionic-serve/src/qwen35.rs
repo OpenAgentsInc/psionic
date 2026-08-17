@@ -7344,7 +7344,7 @@ impl CudaQwen35Model {
                 .is_none()
                 .then(|| self.captured_initial_token(layer_index, token))
                 .flatten();
-            match (&layer.kind, layer_state) {
+            match (&layer.kind, &mut *layer_state) {
                 (Qwen35LayerKind::Hybrid(_), Qwen35LayerState::Hybrid(hybrid_state)) => {
                     layer.forward_hybrid_device(
                         backend,
