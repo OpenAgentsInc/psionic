@@ -182,7 +182,8 @@ pub(super) fn prepare_qwen38_openai_media(
     let source_sha256 = hex::encode(Sha256::digest(source_bytes.as_slice()));
     let source_byte_count = source_bytes.len();
     let attachment_id = format!("{}-{source_sha256}", kind.label());
-    let limits = Qwen38VisionAdmissionLimits::default();
+    let mut limits = Qwen38VisionAdmissionLimits::default();
+    limits.timeout_ms = 120_000;
     let (preprocessing, source_fps) = match kind {
         Qwen38OpenAiMediaKind::Image => {
             let frame = decode_image(mime_type.as_str(), source_bytes.as_slice())?;

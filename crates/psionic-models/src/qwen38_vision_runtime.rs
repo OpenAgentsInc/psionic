@@ -62,6 +62,22 @@ impl Qwen38VisionRuntimeBackend {
             Self::Cuda { .. } => "psionic_candle_qwen38_vision_cuda",
         }
     }
+
+    const fn runtime_dtype(self) -> DType {
+        match self {
+            Self::Cpu => DType::F32,
+            #[cfg(feature = "qwen38-vision-cuda")]
+            Self::Cuda { .. } => DType::BF16,
+        }
+    }
+
+    const fn resident_tensor_bytes(self) -> u64 {
+        match self {
+            Self::Cpu => QWEN38_VISION_TENSOR_BYTES * 2,
+            #[cfg(feature = "qwen38-vision-cuda")]
+            Self::Cuda { .. } => QWEN38_VISION_TENSOR_BYTES,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -147,8 +163,10 @@ impl Qwen38NativeVisionRuntime {
         let device = backend.device()?;
         let shard_path = model_dir.join(QWEN38_VISION_SOURCE_SHARD);
         let weights = [shard_path.as_path()];
-        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&weights, DType::BF16, &device) }
-            .map_err(|error| Qwen38VisionRuntimeError::ModelLoad(error.to_string()))?;
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(&weights, backend.runtime_dtype(), &device)
+        }
+        .map_err(|error| Qwen38VisionRuntimeError::ModelLoad(error.to_string()))?;
         let model = VisionModel::new(&VisionConfig::official(), vb.pp("model").pp("visual"))
             .map_err(|error| Qwen38VisionRuntimeError::ModelLoad(error.to_string()))?;
         Ok(Self {
@@ -254,7 +272,7 @@ impl Qwen38NativeVisionRuntime {
                 image_processor_sha256: self.admission.image_processor_sha256.clone(),
                 video_processor_sha256: self.admission.video_processor_sha256.clone(),
                 resident_tensor_count: QWEN38_VISION_TENSOR_COUNT,
-                resident_tensor_bytes: QWEN38_VISION_TENSOR_BYTES,
+                resident_tensor_bytes: self.backend.resident_tensor_bytes(),
                 resident_layer_count: self.model.config.depth,
                 expected_layer_count: 27,
                 full_stack_resident: self.model.config.depth == 27,
@@ -922,6 +940,15 @@ mod tests {
         assert_eq!(
             output.to_vec2::<f32>().expect("output values"),
             vec![vec![0.0; 6]]
+        );
+    }
+
+    #[test]
+    fn qwen38_cpu_vision_runtime_uses_supported_f32_residency() {
+        assert_eq!(Qwen38VisionRuntimeBackend::Cpu.runtime_dtype(), DType::F32);
+        assert_eq!(
+            Qwen38VisionRuntimeBackend::Cpu.resident_tensor_bytes(),
+            QWEN38_VISION_TENSOR_BYTES * 2
         );
     }
 

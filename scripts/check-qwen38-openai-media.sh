@@ -67,6 +67,7 @@ jq -e '
   $row.body.psionic_qwen38.multimodal.preprocessing[0].width == 256 and
   $row.body.psionic_qwen38.multimodal.preprocessing[0].height == 256 and
   $row.body.psionic_qwen38.multimodal.vision_runtime[0].backend == "cpu" and
+  $row.body.psionic_qwen38.multimodal.vision_runtime[0].resident_tensor_bytes == 1842920384 and
   $row.body.psionic_qwen38.multimodal.vision_runtime[0].fallback_policy == "refuse" and
   $row.body.psionic_qwen38.multimodal.decoder_plan.image_count == 1 and
   $row.body.psionic_qwen38.multimodal.decoder_plan.video_count == 0 and

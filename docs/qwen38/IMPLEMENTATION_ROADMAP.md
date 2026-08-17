@@ -928,7 +928,11 @@ the official tokenizer and native vision stack on CPU, then sends the strict
 decoder-input plan to the admitted CPU or CUDA decoder. Keeping vision on CPU
 prevents its full-model residency from overlapping the CUDA decoder weights.
 Metal configuration refuses because Metal decoder consumption is not
-implemented.
+implemented. The CPU vision loader materializes the admitted BF16 source
+weights as F32 because Candle CPU matmul does not support BF16. Runtime receipts
+therefore report `1,842,920,384` resident tensor bytes on CPU while preserving
+the original BF16 shard digest and tensor-byte identity. CUDA vision keeps
+`921,460,192` BF16 resident bytes.
 
 `/v1/chat/completions` accepts ordered text, image, and video parts.
 `/v1/responses` accepts the official `input_text` and `input_image` part shape
@@ -938,7 +942,8 @@ remote URLs and MP4 refuse. A request admits at most four attachments, 8 MiB
 per decoded attachment, and 16 MiB total decoded attachment bytes. Codec
 admission also caps each dimension at 4,096 pixels, GIF input at 32 source
 frames, and decoder allocation at 64 MiB before the stricter native
-preprocessing bounds run.
+preprocessing bounds run. The HTTP media lane uses a 120-second native vision
+deadline.
 
 The response receipt preserves original encoded attachment identity,
 preprocessing receipts, native vision runtime receipts, the decoder plan, and

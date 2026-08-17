@@ -421,7 +421,10 @@ into one generic engine claim.
   Psionic extension. Remote URLs, MP4, configured Metal media,
   resize-requiring inputs, oversized inputs, and malformed data refuse. The
   lane admits at most four attachments, 8 MiB each, and 16 MiB total decoded
-  attachment bytes. Chat and Responses preserve ordered media markers, use the
+  attachment bytes. The CPU vision loader converts admitted BF16 source
+  weights to F32 because Candle CPU matmul does not support BF16, reports
+  `1,842,920,384` actual resident tensor bytes, and enforces a 120-second HTTP
+  vision deadline. Chat and Responses preserve ordered media markers, use the
   same native vision and decoder plan for tool-enabled requests, and return
   attachment, preprocessing, vision-runtime, decoder-plan, and fallback
   receipts. Chat streaming publishes multimodal identity headers. Responses
