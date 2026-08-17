@@ -89,6 +89,98 @@
     "deterministic_replay": true,
     "receipt_digest": "22da5b9d92e6632f809d44d2cc310abcfef19e2e9cef1b73da75dedfb2c32d63"
   },
+  "checkpoint_recovery": {
+    "schema_version": "psionic.qwen38.lm_head_lora_recovery_receipt.v1",
+    "fixture_id": "qwen38-lm-head-lora-tiny-v1",
+    "checkpoint": {
+      "schema_version": "psionic.qwen38.lm_head_lora_checkpoint.v1",
+      "fixture_id": "qwen38-lm-head-lora-tiny-v1",
+      "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+      "adapter_binding_digest": "1ec068c7b3510811b41d5c00b3c0b3f027bdc2e20ddb20cabfc4a18912f63148",
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "optimizer": {
+        "learning_rate": 0.01,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "epsilon": 1e-8,
+        "weight_decay": 0.01
+      },
+      "state": {
+        "step": 1,
+        "lora_a": [
+          0.10998997,
+          -0.20997995,
+          0.05999491,
+          0.30997,
+          -0.13998501,
+          0.239975,
+          0.20998,
+          -0.089990005
+        ],
+        "lora_b": [
+          0.18998,
+          -0.089990005,
+          -0.159985,
+          0.30997002,
+          0.10999,
+          0.239975
+        ],
+        "adam_m_a": [
+          -0.00033597695,
+          0.00022398462,
+          -0.00011199231,
+          -0.00044796924,
+          -0.023998689,
+          0.015999125,
+          -0.007999563,
+          -0.03199825
+        ],
+        "adam_v_a": [
+          1.12878995e-8,
+          5.0168443e-9,
+          1.2542111e-9,
+          2.0067377e-8,
+          0.00005759294,
+          0.00002559686,
+          0.000006399215,
+          0.00010238744
+        ],
+        "adam_m_b": [
+          0.04740251,
+          -0.027955327,
+          0.019834545,
+          -0.011697297,
+          -0.06723705,
+          0.03965262
+        ],
+        "adam_v_b": [
+          0.00022469679,
+          0.00007814899,
+          0.00003934039,
+          0.000013682492,
+          0.000452076,
+          0.00015723093
+        ]
+      },
+      "state_digest": "36e7a4df58d5bd92f4c4df0c7b1b26b80a283c06e63f272ade07fc19875a7eb2",
+      "checkpoint_digest": "15f9437b91bc990e5793a8f03a18f2a63efa12aa90d387705f851798843109fc"
+    },
+    "checkpoint_bytes_sha256": "4b335ff7c8de32c7f7792647cb7744c75fcf9f2c3747692c811ecf9f4b1fd5f7",
+    "checkpoint_step": 1,
+    "resumed_step": 2,
+    "uninterrupted_state_digest": "13911e674a2621a7ddbb6f6227150abd0e0fc849d1fe13f34cb37aca4b2a2155",
+    "resumed_state_digest": "13911e674a2621a7ddbb6f6227150abd0e0fc849d1fe13f34cb37aca4b2a2155",
+    "exact_state_match": true,
+    "optimizer_state_exact_match": true,
+    "uninterrupted_second_step_loss": 1.1120116,
+    "resumed_second_step_loss": 1.1120116,
+    "second_step_loss_exact_match": true,
+    "tampered_checkpoint_refused": true,
+    "claim_boundary": "This proves exact JSON checkpoint and AdamW-state recovery for the tiny Qwen3.8 LM-head reference lane only. It is not a real-checkpoint or native-backend training recovery claim.",
+    "receipt_digest": "47dcb9ed21e5c0f7c4d707b700e006bbfe9b73eef22cd677fc36292bf2ce6465"
+  },
   "refusals": {
     "artifact_drift": {
       "schema_version": "psionic.qwen38.training_adapter_admission.v1",
@@ -353,8 +445,9 @@
   "native_backward_admitted": false,
   "adapter_artifact_written": false,
   "adapter_serving_admitted": false,
+  "tiny_reference_checkpoint_recovery_admitted": true,
   "checkpoint_recovery_admitted": false,
   "promotion_admitted": false,
-  "claim_boundary": "This report proves Qwen3.8-specific base/adapter admission and deterministic tiny-reference F32 LM-head LoRA gradients. It retains no trained adapter and makes no real-checkpoint training, native backward, serving, recovery, evaluation, or promotion claim.",
-  "report_digest": "7a0432e18f0c0ca22021e769c06b51ca5322512f83b7d1c7ef4a447ce33f7006"
+  "claim_boundary": "This report proves Qwen3.8-specific base/adapter admission, deterministic tiny-reference F32 LM-head LoRA gradients, and exact tiny-reference AdamW checkpoint recovery. It retains no trained adapter and makes no real-checkpoint training, native backward or recovery, serving, evaluation, or promotion claim.",
+  "report_digest": "1434b7db60000bd8d1ec6afa579a519ae197005fd54f92cb8c37d2ab091b5374"
 }
