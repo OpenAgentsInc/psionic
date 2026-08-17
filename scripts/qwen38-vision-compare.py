@@ -55,6 +55,14 @@ def main() -> int:
     reference_pixels = np.asarray(reference.pop("pixel_values"), dtype=np.float32)
     native_embeddings = np.asarray(native.pop("embeddings"), dtype=np.float32)
     reference_embeddings = np.asarray(reference.pop("embeddings"), dtype=np.float32)
+    media_kind = native["preprocessing"]["media_kind"]
+    if media_kind != reference["media_kind"]:
+        raise RuntimeError(f"media kind mismatch: {media_kind} != {reference['media_kind']}")
+    native_grid = native["preprocessing"]["grid_thw"]
+    reference_grid = reference["grid_thw"][0]
+    native_indices = native["preprocessing"]["sampled_frame_indices"]
+    reference_indices = reference["sampled_frame_indices"]
+    sampling_passed = native_grid == reference_grid and native_indices == reference_indices
     native_pixels = native_pixels.reshape(reference_pixels.shape)
     processor_parity = comparison(native_pixels, reference_pixels)
     output_parity = comparison(native_embeddings, reference_embeddings)
@@ -70,7 +78,11 @@ def main() -> int:
     )
     report = {
         "schema_version": "psionic.qwen38.vision_parity.v1",
-        "status": "implemented_early" if processor_passed and output_passed else "partial",
+        "status": (
+            "implemented_early"
+            if processor_passed and output_passed and sampling_passed
+            else "partial"
+        ),
         "psionic_revision": args.psionic_revision,
         "hardware": {
             "gpu_name": args.gpu_name,
@@ -82,23 +94,32 @@ def main() -> int:
         "reference": reference,
         "processor_parity": processor_parity | {"passed": processor_passed},
         "output_parity": output_parity | {"passed": output_passed},
+        "sampling_parity": {
+            "native_grid_thw": native_grid,
+            "reference_grid_thw": reference_grid,
+            "native_sampled_frame_indices": native_indices,
+            "reference_sampled_frame_indices": reference_indices,
+            "passed": sampling_passed,
+        },
         "raw_probe_sha256": {
             "native": sha256_file(args.native),
             "reference": sha256_file(args.reference),
         },
         "claim_boundary": {
-            "media": "one deterministic decoded RGB8 image",
+            "media": f"one deterministic decoded RGB8 {media_kind}",
+            "media_kind": media_kind,
             "dimensions": [256, 256],
             "resize": "not_required",
             "native_backend": "cuda",
             "reference_backend": "transformers_cuda_eager_attention",
             "text_decoder_integration": False,
             "openai_serving": False,
-            "video_encoder_parity": False,
+            "image_encoder_parity": media_kind == "image",
+            "video_encoder_parity": media_kind == "video",
         },
     }
     print(json.dumps(report, indent=2, sort_keys=True))
-    return 0 if processor_passed and output_passed else 1
+    return 0 if processor_passed and output_passed and sampling_passed else 1
 
 
 if __name__ == "__main__":

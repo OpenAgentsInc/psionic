@@ -856,9 +856,12 @@ layer-boundary timeout refusal.
 The first full CUDA comparator driver is
 `scripts/run-qwen38-vision-parity-evidence.sh`; its checker is
 `scripts/check-qwen38-vision-parity.sh`. It pins Transformers revision
-`0650ff354501cbdb7cb4138da628cc60f4e0ceed`, runs the identical 256x256
-decoded RGB8 probe, and compares both preprocessing and 64 by 5,120 pooler
-output. The retained image row is
+`0650ff354501cbdb7cb4138da628cc60f4e0ceed` and runs separate image and video
+rows. The image row uses one 256x256 decoded RGB8 frame. The video row uses
+eight 256x256 decoded RGB8 frames at 4 fps, verifies the upstream 2 fps sample
+indices `[0, 2, 5, 7]`, and verifies the temporal grid `[2, 16, 16]`. Both rows
+compare preprocessing and the complete 27-layer pooler output. The retained
+image row is
 `fixtures/qwen38/reports/qwen38_vision_parity_v1.json`, produced from Psionic
 revision `382a08fb3e1ab60f1565bbf53714ac63f2d72b48` on an idle RTX 4080 with
 driver `595.58.03`. Preprocessing is byte-identical. Encoder output has
