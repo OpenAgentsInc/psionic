@@ -1,0 +1,158 @@
+{
+  "claim_boundary": {
+    "dimensions": [
+      256,
+      256
+    ],
+    "media": "one deterministic decoded RGB8 image",
+    "native_backend": "cuda",
+    "openai_serving": false,
+    "reference_backend": "transformers_cuda_eager_attention",
+    "resize": "not_required",
+    "text_decoder_integration": false,
+    "video_encoder_parity": false
+  },
+  "hardware": {
+    "driver_version": "595.58.03",
+    "gpu_name": "NVIDIA GeForce RTX 4080",
+    "idle_before_each_process": true,
+    "idle_query": "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits"
+  },
+  "native": {
+    "preprocessing": {
+      "attachment_id": "qwen38-gradient-256",
+      "grid_thw": [
+        1,
+        16,
+        16
+      ],
+      "height": 256,
+      "limits": {
+        "maximum_attachment_bytes": 8388608,
+        "maximum_image_pixels": 262144,
+        "maximum_total_patch_count": 1024,
+        "maximum_video_frame_pixels": 65536,
+        "maximum_video_frames": 8,
+        "minimum_image_pixels": 65536,
+        "minimum_video_frames": 4,
+        "resize_policy": "refuse_when_upstream_resize_is_required",
+        "timeout_ms": 120000
+      },
+      "media_kind": "image",
+      "merged_token_count": 64,
+      "normalization_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "normalization_std": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "padded_frame_count": 2,
+      "patch_count": 256,
+      "patch_vector_size": 1536,
+      "pixel_values_dtype": "f32",
+      "pixel_values_sha256": "62608d9e895b449ba81fc5f2f57873f3bf4f01ba1777fd78eb4498bebfb9b017",
+      "processor_config_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "processor_name": "Qwen2VLImageProcessor",
+      "resize_applied": false,
+      "sampled_frame_indices": [
+        0
+      ],
+      "schema_version": "psionic.qwen38.vision_preprocessing.v1",
+      "source_bytes": 196608,
+      "source_frame_count": 1,
+      "source_mime_type": "image/raw-rgb8",
+      "source_sha256": "65cac623d555a3bacf166208ddd8b53530268d1e8e5727bbe2d32c32048c0f20",
+      "width": 256
+    },
+    "runtime": {
+      "backend": "cuda",
+      "elapsed_ms": 102,
+      "execution_engine": "psionic_candle_qwen38_vision_cuda",
+      "execution_mode": "native",
+      "expected_layer_count": 27,
+      "fallback_policy": "refuse",
+      "full_stack_resident": true,
+      "hidden_fallback_used": false,
+      "host_output_materialized": true,
+      "image_processor_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "input_bytes": 1572864,
+      "input_patch_count": 256,
+      "output_bytes": 1310720,
+      "output_sha256": "d9b5b55a20170b32d89de79892631c01ebd54ce4dc92cff8b933d452a4236b02",
+      "output_token_count": 64,
+      "output_width": 5120,
+      "resident_layer_count": 27,
+      "resident_tensor_bytes": 921460192,
+      "resident_tensor_count": 333,
+      "schema_version": "psionic.qwen38.vision_runtime.v1",
+      "source_shard_sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c",
+      "timeout_ms": 120000,
+      "video_processor_sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13"
+    }
+  },
+  "output_parity": {
+    "cosine_similarity": 0.9977859258651733,
+    "maximum_absolute_error": 11.625,
+    "normalized_rmse": 0.0667980101638391,
+    "p999_absolute_error": 0.296875,
+    "p99_absolute_error": 0.1171875,
+    "passed": true,
+    "rmse": 0.049569401890039444,
+    "shape": [
+      64,
+      5120
+    ]
+  },
+  "processor_parity": {
+    "cosine_similarity": 1.0000001192092896,
+    "maximum_absolute_error": 0.0,
+    "normalized_rmse": 0.0,
+    "p999_absolute_error": 0.0,
+    "p99_absolute_error": 0.0,
+    "passed": true,
+    "rmse": 0.0,
+    "shape": [
+      256,
+      1536
+    ]
+  },
+  "psionic_revision": "382a08fb3e1ab60f1565bbf53714ac63f2d72b48",
+  "raw_probe_sha256": {
+    "native": "f529c6aa369eb46572380183d9953f4cf0e94873b3b821e5f337d5656056924b",
+    "reference": "406e66e148b63c3e8f0ce1dac91a9c3fbe5f43461af7642e597dcb3dfe750596"
+  },
+  "reference": {
+    "elapsed_ms": 244,
+    "grid_thw": [
+      [
+        1,
+        16,
+        16
+      ]
+    ],
+    "output_sha256": "c18c379477f2e57c28715c61d6a08f3d27bfe3cfedfc57e6316c8bcae086544c",
+    "output_shape": [
+      64,
+      5120
+    ],
+    "pixel_values_sha256": "62608d9e895b449ba81fc5f2f57873f3bf4f01ba1777fd78eb4498bebfb9b017",
+    "pixel_values_shape": [
+      256,
+      1536
+    ],
+    "processor_backend": "torchvision",
+    "processor_class": "Qwen2VLImageProcessor",
+    "schema_version": "psionic.qwen38.vision_transformers_reference.v1",
+    "source_shard_sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c",
+    "torch_version": "2.11.0+cu128",
+    "transformers_revision": "0650ff354501cbdb7cb4138da628cc60f4e0ceed",
+    "transformers_source": "/tmp/transformers-qwen38-reference/src/transformers",
+    "transformers_version": "5.16.0.dev0"
+  },
+  "schema_version": "psionic.qwen38.vision_parity.v1",
+  "status": "implemented_early"
+}

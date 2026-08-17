@@ -858,11 +858,19 @@ The first full CUDA comparator driver is
 `scripts/check-qwen38-vision-parity.sh`. It pins Transformers revision
 `0650ff354501cbdb7cb4138da628cc60f4e0ceed`, runs the identical 256x256
 decoded RGB8 probe, and compares both preprocessing and 64 by 5,120 pooler
-output. This is an encoder-only milestone. R11 remains `partial` until
-retained image and video fixtures pass, vision embeddings replace the exact
-prompt pad spans in the native text decoder, and chat/responses media serving
-passes attachment, streaming, tool, bound, malformed-input, and refusal
-coverage.
+output. The retained image row is
+`fixtures/qwen38/reports/qwen38_vision_parity_v1.json`, produced from Psionic
+revision `382a08fb3e1ab60f1565bbf53714ac63f2d72b48` on an idle RTX 4080 with
+driver `595.58.03`. Preprocessing is byte-identical. Encoder output has
+normalized RMSE `0.0667980101638391`, p99 absolute error `0.1171875`, and
+cosine similarity `0.9977859258651733` against pinned Transformers CUDA eager
+attention. The one-shot elapsed fields are diagnostic and do not establish a
+performance claim.
+
+This is an encoder-only milestone. R11 remains `partial` until retained video
+fixtures pass, vision embeddings replace the exact prompt pad spans in the
+native text decoder, and chat/responses media serving passes attachment,
+streaming, tool, bound, malformed-input, and refusal coverage.
 
 Native vision remains a separate roadmap lane after text support.
 
