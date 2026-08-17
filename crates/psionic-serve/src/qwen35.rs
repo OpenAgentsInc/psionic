@@ -7385,6 +7385,13 @@ impl CudaQwen35Model {
                 }
             }
             if std::env::var_os("PSIONIC_QWEN38_DEBUG_NONFINITE").is_some() {
+                emit_qwen35_hidden_debug(
+                    position,
+                    layer_index,
+                    &layer.kind,
+                    &plan.current_hidden_buffer,
+                    self.descriptor.config.hidden_size,
+                )?;
                 let hidden = plan
                     .current_hidden_buffer
                     .read_f32_at_offset(0, self.descriptor.config.hidden_size)
