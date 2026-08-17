@@ -88,16 +88,46 @@ pub struct Qwen38MultimodalDecoderPlanReceipt {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Qwen38MultimodalDecoderPlan {
-    pub expanded_prompt: String,
-    pub token_ids: Vec<u32>,
-    pub mm_token_type_ids: Vec<u8>,
-    pub mrope_position_ids: Vec<[usize; 3]>,
-    pub mrope_position_delta: i64,
-    pub embedding_overrides: Vec<Qwen38DecoderEmbeddingOverride>,
-    pub receipt: Qwen38MultimodalDecoderPlanReceipt,
+    expanded_prompt: String,
+    token_ids: Vec<u32>,
+    mm_token_type_ids: Vec<u8>,
+    mrope_position_ids: Vec<[usize; 3]>,
+    mrope_position_delta: i64,
+    embedding_overrides: Vec<Qwen38DecoderEmbeddingOverride>,
+    receipt: Qwen38MultimodalDecoderPlanReceipt,
 }
 
 impl Qwen38MultimodalDecoderPlan {
+    #[must_use]
+    pub fn expanded_prompt(&self) -> &str {
+        self.expanded_prompt.as_str()
+    }
+
+    #[must_use]
+    pub fn token_ids(&self) -> &[u32] {
+        self.token_ids.as_slice()
+    }
+
+    #[must_use]
+    pub fn mm_token_type_ids(&self) -> &[u8] {
+        self.mm_token_type_ids.as_slice()
+    }
+
+    #[must_use]
+    pub fn mrope_position_ids(&self) -> &[[usize; 3]] {
+        self.mrope_position_ids.as_slice()
+    }
+
+    #[must_use]
+    pub fn embedding_overrides(&self) -> &[Qwen38DecoderEmbeddingOverride] {
+        self.embedding_overrides.as_slice()
+    }
+
+    #[must_use]
+    pub const fn receipt(&self) -> &Qwen38MultimodalDecoderPlanReceipt {
+        &self.receipt
+    }
+
     pub fn generated_position(
         &self,
         physical_cache_position: usize,

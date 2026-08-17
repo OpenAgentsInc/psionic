@@ -22,7 +22,8 @@ use psionic_core::QuantizationMode;
 use psionic_models::{
     DecoderModelDescriptor, GgufBlobArtifact, GgufDecoderAdapterLoader, GgufDecoderFamily,
     GgufDecoderFamilyMetadata, GgufDecoderLayerKind, GgufMetadataValue, GgufRuntimeTokenizer,
-    ModelLoadError, PagedTensorStorage, TokenId, TokenSequence, TokenizerBoundary,
+    ModelLoadError, PagedTensorStorage, Qwen38MultimodalDecoderPlan,
+    Qwen38MultimodalDecoderPlanReceipt, TokenId, TokenSequence, TokenizerBoundary,
 };
 use psionic_runtime::{
     BackendHealthTracker, CacheInvalidationTrigger, DeviceDiscovery, DeviceMemoryBudget,
@@ -1460,6 +1461,7 @@ pub struct CpuGgufQwen35TextGenerationService {
     residency_policy: psionic_runtime::ModelResidencyPolicy,
     mtp_config: Option<Qwen38MtpConfig>,
     last_mtp_report: Option<Qwen38MtpExecutionReport>,
+    last_multimodal_plan_receipt: Option<Qwen38MultimodalDecoderPlanReceipt>,
 }
 
 #[cfg(test)]
@@ -1621,6 +1623,7 @@ impl CpuGgufQwen35TextGenerationService {
             residency_policy: psionic_runtime::ModelResidencyPolicy::default(),
             mtp_config,
             last_mtp_report: None,
+            last_multimodal_plan_receipt: None,
         })
     }
 
@@ -1628,6 +1631,15 @@ impl CpuGgufQwen35TextGenerationService {
     #[must_use]
     pub fn last_qwen38_mtp_report(&self) -> Option<&Qwen38MtpExecutionReport> {
         self.last_mtp_report.as_ref()
+    }
+
+    /// Returns the admitted decoder-input plan from the most recent native
+    /// Qwen3.8 multimodal generation.
+    #[must_use]
+    pub fn last_qwen38_multimodal_plan_receipt(
+        &self,
+    ) -> Option<&Qwen38MultimodalDecoderPlanReceipt> {
+        self.last_multimodal_plan_receipt.as_ref()
     }
 
     #[cfg(test)]
@@ -2329,8 +2341,16 @@ impl CpuGgufQwen35TextGenerationService {
         &mut self,
         request: &GenerationRequest,
         deadline: Option<Qwen35CpuGenerationDeadline>,
+        multimodal_plan: Option<&Qwen38MultimodalDecoderPlan>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
         if self.mtp_config.is_some() {
+            if multimodal_plan.is_some() {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::UnsupportedStep(String::from(
+                        "qwen38 CPU multimodal generation does not support MTP speculative decoding",
+                    )),
+                ));
+            }
             return self.generate_inner_with_qwen38_mtp(request, deadline);
         }
         self.last_mtp_report = None;
@@ -2338,9 +2358,18 @@ impl CpuGgufQwen35TextGenerationService {
             deadline.check()?;
         }
         let prompt_eval_start = Instant::now();
-        let prompt_tokens = match &request.prompt {
-            GenerationInput::Text(text) => self.model.tokenizer.encode_with_defaults(text),
-            GenerationInput::Tokens(tokens) => tokens.clone(),
+        let prompt_tokens = match multimodal_plan {
+            Some(plan) => TokenSequence::new(
+                plan.token_ids()
+                    .iter()
+                    .copied()
+                    .map(TokenId)
+                    .collect::<Vec<_>>(),
+            ),
+            None => match &request.prompt {
+                GenerationInput::Text(text) => self.model.tokenizer.encode_with_defaults(text),
+                GenerationInput::Tokens(tokens) => tokens.clone(),
+            },
         };
         if prompt_tokens.is_empty() {
             return Err(ReferenceTextGenerationError::EmptyPrompt);
@@ -2356,6 +2385,13 @@ impl CpuGgufQwen35TextGenerationService {
                     == Some(self.model.tokenizer.vocabulary().bos_id()),
             ),
         )?;
+        if multimodal_plan.is_some_and(|plan| prompt_tokens.len() != plan.token_ids().len()) {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen38 CPU multimodal generation refuses context-window prompt truncation",
+                )),
+            ));
+        }
 
         let cache_capacity_tokens = qwen35_cache_capacity_tokens(
             prompt_tokens.len(),
@@ -2367,11 +2403,27 @@ impl CpuGgufQwen35TextGenerationService {
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
         let mut last_logits = Vec::new();
-        for token in prompt_tokens.as_slice() {
+        let mut embedding_overrides = multimodal_plan
+            .map(Qwen38MultimodalDecoderPlan::embedding_overrides)
+            .unwrap_or_default()
+            .iter()
+            .peekable();
+        for (token_index, token) in prompt_tokens.as_slice().iter().enumerate() {
             if let Some(deadline) = deadline {
                 deadline.check()?;
             }
-            let step = self.model.forward_token(&mut state, *token)?;
+            let embedding_override = embedding_overrides
+                .next_if(|value| value.token_index == token_index)
+                .map(|value| value.embedding.as_slice());
+            let mrope_position = multimodal_plan
+                .map(|plan| plan.mrope_position_ids()[token_index])
+                .unwrap_or([state.position; 3]);
+            let step = self.model.forward_token_with_embedding_and_mrope(
+                &mut state,
+                *token,
+                embedding_override,
+                mrope_position,
+            )?;
             if let Some(deadline) = deadline {
                 deadline.check()?;
             }
@@ -2379,6 +2431,13 @@ impl CpuGgufQwen35TextGenerationService {
             last_logits = step.logits;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+        }
+        if embedding_overrides.next().is_some() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen38 CPU multimodal decoder plan contains an out-of-range embedding override",
+                )),
+            ));
         }
 
         let prompt_eval_duration_ns = prompt_eval_start
@@ -2454,7 +2513,21 @@ impl CpuGgufQwen35TextGenerationService {
                 );
             }
 
-            let step = self.model.forward_token(&mut state, next_token)?;
+            let mrope_position = multimodal_plan
+                .map(|plan| plan.generated_position(state.position))
+                .transpose()
+                .map_err(|error| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::UnsupportedStep(
+                        error.to_string(),
+                    ))
+                })?
+                .unwrap_or([state.position; 3]);
+            let step = self.model.forward_token_with_embedding_and_mrope(
+                &mut state,
+                next_token,
+                None,
+                mrope_position,
+            )?;
             if let Some(deadline) = deadline {
                 deadline.check()?;
             }
@@ -2566,6 +2639,15 @@ impl CpuGgufQwen35TextGenerationService {
         request: &GenerationRequest,
         deadline: Option<Qwen35CpuGenerationDeadline>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        self.generate_with_deadline_and_multimodal_plan(request, deadline, None)
+    }
+
+    fn generate_with_deadline_and_multimodal_plan(
+        &mut self,
+        request: &GenerationRequest,
+        deadline: Option<Qwen35CpuGenerationDeadline>,
+        multimodal_plan: Option<&Qwen38MultimodalDecoderPlan>,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
         if request.product_id != crate::TEXT_GENERATION_PRODUCT_ID {
             return Err(ReferenceTextGenerationError::UnsupportedProduct(
                 request.product_id.clone(),
@@ -2595,11 +2677,34 @@ impl CpuGgufQwen35TextGenerationService {
                 )),
             ));
         }
+        if multimodal_plan.is_some()
+            && self.model.family_metadata.family != GgufDecoderFamily::Qwen38
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "native multimodal decoder plans require a qwen38 artifact",
+                )),
+            ));
+        }
 
         self.residency.begin_request(current_time_millis());
-        let response = self.generate_inner(request, deadline);
+        let response = self.generate_inner(request, deadline, multimodal_plan);
         self.residency.finish_request(current_time_millis());
+        self.last_multimodal_plan_receipt = response
+            .as_ref()
+            .ok()
+            .and_then(|_| multimodal_plan.map(|plan| plan.receipt().clone()));
         response
+    }
+
+    /// Runs one native Qwen3.8 generation with admitted vision embeddings and
+    /// explicit multimodal rotary positions.
+    pub fn generate_qwen38_multimodal(
+        &mut self,
+        request: &GenerationRequest,
+        plan: &Qwen38MultimodalDecoderPlan,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        self.generate_with_deadline_and_multimodal_plan(request, None, Some(plan))
     }
 
     /// Generates with a cooperative timeout checked at CPU token-step boundaries.
@@ -3719,15 +3824,42 @@ impl CpuQwen35Model {
         state: &mut CpuQwen35State,
         token: TokenId,
     ) -> Result<CpuQwen35ForwardStep, ReferenceTextGenerationError> {
+        self.forward_token_with_embedding_and_mrope(state, token, None, [state.position; 3])
+    }
+
+    fn forward_token_with_embedding_and_mrope(
+        &self,
+        state: &mut CpuQwen35State,
+        token: TokenId,
+        embedding_override: Option<&[f32]>,
+        mrope_position: [usize; 3],
+    ) -> Result<CpuQwen35ForwardStep, ReferenceTextGenerationError> {
         if token.as_u32() as usize >= self.descriptor.config.vocab_size {
             return Err(ReferenceTextGenerationError::InvalidToken {
                 token: token.as_u32(),
                 vocab_size: self.descriptor.config.vocab_size,
             });
         }
-        let mut hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
+        if embedding_override
+            .is_some_and(|embedding| embedding.len() != self.descriptor.config.hidden_size)
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(format!(
+                    "qwen38 CPU decoder embedding override width must be {}, received {}",
+                    self.descriptor.config.hidden_size,
+                    embedding_override.map_or(0, <[f32]>::len),
+                )),
+            ));
+        }
+        let mut hidden = match embedding_override {
+            Some(embedding) => embedding.to_vec(),
+            None => self.token_embedding.decode_row(token.as_u32() as usize)?,
+        };
         let mut kernel_count = 1usize;
-        let mut bytes_moved = self.token_embedding.host_residency_bytes() as u64;
+        let mut bytes_moved = embedding_override.map_or_else(
+            || self.token_embedding.host_residency_bytes() as u64,
+            |embedding| embedding.len().saturating_mul(std::mem::size_of::<f32>()) as u64,
+        );
         for (layer, layer_state) in self.layers.iter().zip(state.layers.iter_mut()) {
             hidden = layer.forward(
                 &self.family_metadata,
@@ -3735,7 +3867,7 @@ impl CpuQwen35Model {
                 self.descriptor.config.block.attention.head_count,
                 self.descriptor.config.block.attention.head_dim,
                 self.descriptor.config.block.attention.rotary_dim,
-                state.position,
+                mrope_position,
                 hidden,
                 layer_state,
             )?;
@@ -3872,7 +4004,7 @@ impl CpuQwen38MtpModel {
             model.descriptor.config.block.attention.head_dim,
             model.descriptor.config.block.attention.rotary_dim,
             attention,
-            position,
+            [position; 3],
             projected,
             &mut state.attention,
         )?;
@@ -4026,7 +4158,7 @@ impl CpuQwen35Layer {
         head_count: usize,
         head_dim: usize,
         rotary_dim: usize,
-        position: usize,
+        mrope_position: [usize; 3],
         input_hidden: Vec<f32>,
         state: &mut CpuQwen35LayerState,
     ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
@@ -4036,7 +4168,7 @@ impl CpuQwen35Layer {
                     family_metadata,
                     hidden_size,
                     hybrid,
-                    position,
+                    mrope_position[0],
                     input_hidden,
                     hybrid_state,
                 ),
@@ -4050,7 +4182,7 @@ impl CpuQwen35Layer {
                 head_dim,
                 rotary_dim,
                 full_attention,
-                position,
+                mrope_position,
                 input_hidden,
                 full_attention_state,
             ),
@@ -4360,7 +4492,7 @@ impl CpuQwen35Layer {
         head_dim: usize,
         rotary_dim: usize,
         full_attention: &CpuQwen35FullAttentionLayer,
-        position: usize,
+        mrope_position: [usize; 3],
         input_hidden: Vec<f32>,
         state: &mut CpuQwen35FullAttentionState,
     ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
@@ -4422,20 +4554,20 @@ impl CpuQwen35Layer {
             epsilon,
         );
         let attention_scale = qwen35_attention_scale(family_metadata, head_dim);
-        apply_rope_neox(
+        apply_rope_neox_mrope(
             query.as_mut_slice(),
             head_count,
             head_dim,
             rotary_dim,
-            position,
+            mrope_position,
             family_metadata,
         );
-        apply_rope_neox(
+        apply_rope_neox_mrope(
             key.as_mut_slice(),
             kv_head_count,
             head_dim,
             rotary_dim,
-            position,
+            mrope_position,
             family_metadata,
         );
         let attention = attend_full_attention(
@@ -15421,12 +15553,35 @@ fn apply_rope_neox(
     position: usize,
     metadata: &GgufDecoderFamilyMetadata,
 ) {
+    apply_rope_neox_mrope(
+        values,
+        head_count,
+        head_dim,
+        rotary_dim,
+        [position; 3],
+        metadata,
+    );
+}
+
+fn apply_rope_neox_mrope(
+    values: &mut [f32],
+    head_count: usize,
+    head_dim: usize,
+    rotary_dim: usize,
+    position: [usize; 3],
+    metadata: &GgufDecoderFamilyMetadata,
+) {
     let rotary_dim = rotary_dim.min(head_dim).max(2);
     let (freq_scale, ext_factor, corr_dims, theta_scale) =
         qwen35_rope_runtime_parameters(rotary_dim, metadata);
     let mrope_sections = qwen35_mrope_sections(metadata);
     let is_imrope = qwen35_mrope_interleaved(metadata);
-    let position_ids = [position as f32, position as f32, position as f32, 0.0_f32];
+    let position_ids = [
+        position[0] as f32,
+        position[1] as f32,
+        position[2] as f32,
+        0.0_f32,
+    ];
     for head_index in 0..head_count {
         let head_base = head_index.saturating_mul(head_dim);
         for i0 in (0..rotary_dim).step_by(2) {
@@ -15440,7 +15595,7 @@ fn apply_rope_neox(
                 qwen35_mrope_theta_base(pair, sections, is_imrope, position_ids)
                     * theta_scale.powf(pair as f32)
             } else {
-                position as f32 * theta_scale.powf(pair as f32)
+                position[0] as f32 * theta_scale.powf(pair as f32)
             };
             let (cos_theta, sin_theta) =
                 rope_yarn(theta_base, freq_scale, corr_dims, i0, ext_factor, 1.0);
@@ -15527,7 +15682,7 @@ fn rope_yarn_ramp(low: f32, high: f32, i0: usize) -> f32 {
 mod tests {
     use super::{
         QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES, Qwen38MetalProjectionRow,
-        qwen38_cuda_preflight, qwen38_cuda_unsupported_quantization_modes,
+        qwen35_mrope_theta_base, qwen38_cuda_preflight, qwen38_cuda_unsupported_quantization_modes,
         qwen38_metal_projection_preflight, restore_qwen38_rejected_draft,
     };
     use psionic_backend_cuda::CudaDeviceMemoryInfo;
@@ -15665,5 +15820,17 @@ mod tests {
         let (partial_state, accepted, rollbacks, restored) = run_script(&[7, 80, 9], &[7, 8, 9]);
         assert_eq!((accepted, rollbacks, restored), (2, 1, true));
         assert_eq!(partial_state, vec![100, 7, 101, 102, 9]);
+    }
+
+    #[test]
+    fn qwen38_interleaved_mrope_selects_temporal_height_and_width_positions() {
+        let positions = [2.0, 3.0, 4.0, 0.0];
+        let sections = [11, 11, 10, 0];
+        assert_eq!(qwen35_mrope_theta_base(0, sections, true, positions), 2.0);
+        assert_eq!(qwen35_mrope_theta_base(1, sections, true, positions), 3.0);
+        assert_eq!(qwen35_mrope_theta_base(2, sections, true, positions), 4.0);
+        assert_eq!(qwen35_mrope_theta_base(29, sections, true, positions), 4.0);
+        assert_eq!(qwen35_mrope_theta_base(30, sections, true, positions), 2.0);
+        assert_eq!(qwen35_mrope_theta_base(31, sections, true, positions), 3.0);
     }
 }

@@ -396,10 +396,13 @@ into one generic engine claim.
   model layer also has an early decoder-input plan that validates those
   receipts, expands exact image and timestamped video pad spans, binds each
   5,120-wide encoder row to one pad token, and computes Qwen3.5-compatible
-  three-axis MRoPE positions and the generated-token position delta.
-  Decoder backend injection, native media serving, and end-to-end image/video
-  generation remain absent, so prompt markers are still refused as
-  understanding on the text-only lane.
+  three-axis MRoPE positions and the generated-token position delta. The native
+  CPU Qwen3.8 decoder has an explicit multimodal generation entry point that
+  consumes this plan, replaces token embeddings during prefill, applies exact
+  per-token MRoPE coordinates in full-attention layers, and applies the delta
+  during decode. CUDA/Metal decoder consumption, native media serving, and
+  retained end-to-end image/video generation evidence remain absent, so HTTP
+  prompt markers are still refused as understanding on the text-only lane.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`

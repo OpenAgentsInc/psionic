@@ -882,9 +882,20 @@ the Qwen3.5 three-axis MRoPE positions plus generated-token position delta.
 Malformed dimensions, media ordering, token counts, output widths, runtime
 fallbacks, and output digests refuse before decoder execution.
 
-R11 remains `partial` until the native decoder backends consume that plan and
-chat/responses media serving passes attachment, streaming, tool, bound,
-malformed-input, and refusal coverage.
+The native CPU decoder now consumes the plan through
+`generate_qwen38_multimodal`. During prefill it replaces each exact pad-token
+embedding with the admitted 5,120-wide encoder row and passes the planned
+three-axis coordinate through every full-attention RoPE application. Recurrent
+layers preserve their position-independent state transition. Generated tokens
+use the physical KV-cache position plus the retained MRoPE delta. Text-only
+calls preserve scalar-equivalent `[position, position, position]` behavior.
+The CPU lane refuses context-window prompt truncation and MTP speculative
+decode for multimodal calls because either would invalidate the admitted plan.
+The service retains the successful plan receipt for inspection.
+
+R11 remains `partial` until CUDA and Metal consume the plan and chat/responses
+media serving passes attachment, streaming, tool, bound, malformed-input, and
+refusal coverage with retained end-to-end generation evidence.
 
 Native vision remains a separate roadmap lane after text support.
 
