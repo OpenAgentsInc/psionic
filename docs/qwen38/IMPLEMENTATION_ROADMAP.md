@@ -52,7 +52,7 @@ The first claim excludes:
 - full BF16 CUDA residency on the local 16 GiB RTX 4080
 - Qwen3.8 training, LoRA serving, DPO, GRPO, or adapter promotion
 - automatic compatibility with every community GGUF conversion
-- MTP speculative decoding or recurrent-state rollback
+- MTP acceleration, CUDA MTP, or multi-token draft batches
 - native Metal execution or performance claims
 - an Ollama or llama.cpp subprocess presented as Psionic execution
 
@@ -93,7 +93,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R7 | `implemented` | Native CUDA token generation | First local accelerated lane |
 | R8 | `implemented_early` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `implemented` | Comparator and correctness-first release gate | Retained `implemented_early` claim |
-| R9A | `planned` | Optional MTP speculative decoding and rollback | Separate acceleration claim |
+| R9A | `implemented_early` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
 | R10 | `planned` | Native Metal generation | Separate Apple backend claim |
 | R11 | `planned` | Native vision lane | Separate multimodal claim |
 | R12 | `planned` | Training and adapter lane | Separate training claim |
@@ -726,6 +726,33 @@ be regenerated.
 MTP is not required for the first Qwen3.8 text claim. Add it only after the
 base trunk is stable.
 
+Status: `implemented_early` on 2026-08-17. The native CPU service exposes an
+explicit `from_gguf_path_with_qwen38_mtp` constructor. The default constructor
+still excludes the MTP tail and preserves the R6/R9 output path. The opt-in
+constructor requires one declared NextN block and loads its 15 `blk.64.*`
+tensors, while continuing to share the token embedding and LM head exactly as
+the selected artifact declares.
+
+The current implementation supports greedy decode with one draft per target
+verification cycle. It passes the normalized target hidden row from the prior
+target step together with the next-token embedding in llama.cpp order, and it
+uses a separate dense-attention KV state for the MTP block. Target verification
+clones the complete recurrent and full-attention state, advances through the
+accepted token and proposed token, restores the snapshot after rejection, and
+replays only the accepted prefix. Replay state, logits, and final hidden rows
+must match before `restored_state_parity` remains true. An accepted draft also
+runs one MTP alignment step from the verified target hidden row so the separate
+MTP KV positions remain contiguous across later draft cycles.
+
+`Qwen38MtpExecutionReport` uses schema
+`psionic.qwen38.mtp_execution.v1`. It records draft, acceptance, rejection,
+target-forward, replay, rollback, MTP-weight, MTP-KV, rollback-snapshot,
+latency, and throughput facts. The producer and checker are
+`scripts/run-qwen38-cpu-mtp-evidence.sh` and
+`scripts/check-qwen38-cpu-mtp-evidence.sh`. Token-at-a-time target verification
+is a correctness implementation. It does not claim acceleration. CUDA MTP,
+sampling, structured output, and draft batches wider than one remain refused.
+
 Required work:
 
 - conditionally load the one appended NextN block
@@ -834,7 +861,7 @@ tokens, memory metrics, and the Psionic commit that produced the winning row.
 | Structured output | required | no | required | required | required or refused | planned or refused |
 | Media | marker/refusal | processor facts | marker/refusal | refused | refused | refused |
 | Performance | no | no | required | informational | retained | follow-on retained |
-| MTP and rollback | synthetic follow-on | bounded source | optional follow-on | planned | planned | planned |
+| MTP and rollback | accept/reject/partial plus tiny graph | bounded source | optional follow-on | implemented_early CPU | planned | planned |
 
 Synthetic fixtures cover deterministic failures and small numerics. They do
 not replace real-artifact tests. Full-model tests should use environment-gated

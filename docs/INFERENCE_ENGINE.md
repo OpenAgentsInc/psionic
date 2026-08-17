@@ -332,7 +332,7 @@ into one generic engine claim.
   controls, prompt-cache identity, and raw-logit posture. Native Qwen3.8 XML
   tools cover all tool-choice modes, ordered parallel calls, and streamed tool
   arguments. Structured output remains inside the proven runtime envelope.
-  Metal, media, adapters, session reuse, and MTP speculative decoding remain
+  Metal, media, adapters, session reuse, and generic-server MTP remain
   unsupported and are published or refused explicitly. The internal CPU service now has a
   typed cooperative generation timeout checked at token-step boundaries with
   stable `timed_out` and HTTP `504` diagnostics. R6 is `implemented` for the
@@ -351,8 +351,22 @@ into one generic engine claim.
   prompt digests byte-for-byte. The bundle records zero CUDA fallback, graph,
   cache, allocator, latency, and throughput observations while publishing no
   performance claim. Qwen3.8 remains `partial` overall because Metal,
-  multimodal execution, training and adapters, optional MTP, long-context
+  multimodal execution, training and adapters, MTP acceleration, long-context
   widening, and the competitive performance milestone are not complete. The
+  optional R9A CPU lane is `implemented_early` behind an explicit constructor.
+  It conditionally loads the appended 15-tensor NextN block, shares the base
+  embedding and LM head, keeps a separate dense-attention MTP KV cache, and
+  aligns the prior target final-hidden row with the accepted next-token
+  embedding. Greedy one-token drafts are target-verified against cloned hybrid
+  state. Rejection restores the full target snapshot and replays the accepted
+  prefix, with exact state, logit, and hidden-row parity recorded in
+  `psionic.qwen38.mtp_execution.v1`. Accepted drafts run an MTP alignment step
+  from the verified target hidden row so later MTP KV positions stay
+  contiguous. Added MTP weights, MTP KV, rollback
+  snapshots, draft acceptance, rollback activity, latency, and throughput are
+  explicit. This token-at-a-time CPU path is correctness evidence and makes no
+  acceleration claim. The default CPU and generic-serving paths still skip MTP.
+  The
   retained R4 and R5
   reports themselves still do not execute full-width
   attention or MLPs, materialize full-vocabulary logits, generate tokens,

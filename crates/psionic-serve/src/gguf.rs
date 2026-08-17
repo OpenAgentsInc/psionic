@@ -17225,7 +17225,7 @@ mod tests {
         CudaGgufQwen35TextGenerationService, GenerationLoadState, GenerationModelHandle,
         GenerationOptions, GenerationProvenance, GenerationRequest, GenerationResponse,
         GenerationStreamEvent, GenerationStreamStatus, InMemoryKvCache, PrefixCacheControl,
-        PrefixCacheMode, Qwen35CudaDecodeOutputMode, ReferenceTextGenerationError,
+        PrefixCacheMode, Qwen35CudaDecodeOutputMode, Qwen38MtpConfig, ReferenceTextGenerationError,
         StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor,
     };
     use psionic_adapters::{
@@ -18105,6 +18105,72 @@ mod tests {
                 .diagnostic
                 .and_then(|diagnostic| diagnostic.backend),
             Some(String::from("cpu"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_cpu_mtp_loads_separate_state_and_preserves_greedy_output()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen38_mtp.gguf");
+        write_test_gguf(
+            &path,
+            qwen38_decoder_metadata("tiny psionic qwen38 mtp").as_slice(),
+            qwen38_decoder_tensors().as_slice(),
+        )?;
+
+        let mut baseline = CpuGgufQwen35TextGenerationService::from_gguf_path(&path)?;
+        let descriptor = baseline.model_descriptor().clone();
+        let request = GenerationRequest::new_text(
+            "qwen38-mtp-output-parity",
+            descriptor,
+            None,
+            "hello",
+            GenerationOptions::greedy(4),
+        );
+        let baseline_response = baseline.generate(&request)?;
+        assert!(baseline.last_qwen38_mtp_report().is_none());
+
+        let mut mtp = CpuGgufQwen35TextGenerationService::from_gguf_path_with_qwen38_mtp(
+            &path,
+            Qwen38MtpConfig::single_token(),
+        )?;
+        let mtp_response = mtp.generate(&request)?;
+        let report = mtp
+            .last_qwen38_mtp_report()
+            .expect("opt-in generation must retain MTP accounting");
+        let support = mtp.runtime_support();
+
+        assert_eq!(mtp_response.output, baseline_response.output);
+        assert_eq!(report.draft_count, 2);
+        assert_eq!(report.accepted_count, 2);
+        assert_eq!(report.rejected_count, 0);
+        assert_eq!(report.acceptance_rate, 1.0);
+        assert_eq!(report.mtp_forward_count, 4);
+        assert_eq!(report.mtp_alignment_forward_count, 2);
+        assert_eq!(report.rollback_count, 0);
+        assert_eq!(report.target_replay_count, 0);
+        assert!(report.restored_state_parity);
+        assert!(report.mtp_weight_residency_bytes > 0);
+        assert!(report.mtp_kv_cache_peak_bytes > 0);
+        assert!(report.rollback_snapshot_peak_bytes > 0);
+        assert_eq!(
+            report.added_peak_residency_bytes,
+            report
+                .mtp_weight_residency_bytes
+                .saturating_add(report.mtp_kv_cache_peak_bytes)
+                .saturating_add(report.rollback_snapshot_peak_bytes)
+        );
+        assert!(
+            !support
+                .unsupported_features
+                .contains(&String::from("mtp_speculative_decoding_skipped"))
+        );
+        assert!(
+            support
+                .unsupported_features
+                .contains(&String::from("mtp_non_greedy_decode"))
         );
         Ok(())
     }
@@ -19732,6 +19798,7 @@ mod tests {
             dense_tensor("token_embd.weight", vec![10, 32], {
                 let mut values = vec![0.0; 10 * 32];
                 values[6 * 32] = 2.0;
+                values[7 * 32] = 2.0;
                 values
             }),
             dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
@@ -19847,6 +19914,29 @@ mod tests {
                 ));
             }
         }
+        let mut eh_projection = vec![0.0; 32 * 64];
+        eh_projection[32] = 1.0;
+        tensors.extend([
+            dense_tensor("blk.4.attn_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.4.attn_q.weight", vec![64, 32], vec![0.0; 64 * 32]),
+            dense_tensor("blk.4.attn_k.weight", vec![16, 32], vec![0.0; 16 * 32]),
+            dense_tensor("blk.4.attn_v.weight", vec![16, 32], vec![0.0; 16 * 32]),
+            dense_tensor("blk.4.attn_output.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.4.attn_q_norm.weight", vec![8], vec![1.0; 8]),
+            dense_tensor("blk.4.attn_k_norm.weight", vec![8], vec![1.0; 8]),
+            dense_tensor("blk.4.ffn_gate.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.4.ffn_up.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.4.ffn_down.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.4.post_attention_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.4.nextn.eh_proj.weight", vec![32, 64], eh_projection),
+            dense_tensor("blk.4.nextn.enorm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.4.nextn.hnorm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor(
+                "blk.4.nextn.shared_head_norm.weight",
+                vec![32],
+                vec![1.0; 32],
+            ),
+        ]);
         tensors
     }
 

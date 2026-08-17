@@ -36,7 +36,7 @@ const QWEN38_CUDA_CONTEXT_LIMIT_TOKENS: usize = 4096;
 const QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES: u64 = 1_834_614_784;
 
 use crate::{
-    ContinuousBatchGenerationResult, CudaGraphReplayMetrics, CudaGraphReplayMode,
+    ContinuousBatchGenerationResult, CudaGraphReplayMetrics, CudaGraphReplayMode, DecodeStrategy,
     GenerationEventStream, GenerationInput, GenerationMetrics, GenerationOptions,
     GenerationProvenance, GenerationRequest, GenerationResponse, GenerationStreamChunk,
     GenerationStreamEvent, GenerationStreamStatus, GenerationStreamTerminal,
@@ -49,6 +49,9 @@ use crate::{
     current_time_millis, default_generation_streaming_policy,
     select_psion_rvllm_fa3_decode_attention_backend,
 };
+
+/// Stable schema for one opt-in Qwen3.8 MTP execution report.
+pub const QWEN38_MTP_EXECUTION_REPORT_SCHEMA_VERSION: &str = "psionic.qwen38.mtp_execution.v1";
 
 pub struct CudaGgufQwen35TextGenerationService {
     backend: CudaBackend,
@@ -1331,6 +1334,81 @@ impl CudaGgufQwen35TextGenerationService {
     }
 }
 
+/// Bounded configuration for the optional Qwen3.8 NextN draft head.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Qwen38MtpConfig {
+    /// Maximum draft tokens verified in one target cycle.
+    pub max_draft_tokens_per_cycle: usize,
+}
+
+impl Qwen38MtpConfig {
+    /// Enables the current one-token-per-cycle correctness lane.
+    #[must_use]
+    pub const fn single_token() -> Self {
+        Self {
+            max_draft_tokens_per_cycle: 1,
+        }
+    }
+}
+
+/// Machine-readable accounting for one optional Qwen3.8 MTP generation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38MtpExecutionReport {
+    pub schema_version: String,
+    pub backend: String,
+    pub enabled: bool,
+    pub max_draft_tokens_per_cycle: usize,
+    pub draft_count: usize,
+    pub accepted_count: usize,
+    pub rejected_count: usize,
+    pub acceptance_rate: f64,
+    pub mtp_forward_count: usize,
+    pub mtp_alignment_forward_count: usize,
+    pub target_forward_count: usize,
+    pub target_replay_count: usize,
+    pub rollback_count: usize,
+    pub restored_state_parity: bool,
+    pub mtp_weight_residency_bytes: u64,
+    pub mtp_kv_cache_peak_bytes: u64,
+    pub rollback_snapshot_peak_bytes: u64,
+    pub added_peak_residency_bytes: u64,
+    pub decode_duration_ns: u64,
+    pub generated_token_count: usize,
+    pub generated_tokens_per_second: f64,
+    pub performance_claim: String,
+}
+
+#[derive(Clone, Debug, Default)]
+struct Qwen38MtpExecutionLedger {
+    draft_count: usize,
+    accepted_count: usize,
+    mtp_forward_count: usize,
+    mtp_alignment_forward_count: usize,
+    target_forward_count: usize,
+    target_replay_count: usize,
+    rollback_count: usize,
+    restored_state_parity: bool,
+    mtp_kv_cache_peak_bytes: u64,
+    rollback_snapshot_peak_bytes: u64,
+}
+
+fn restore_qwen38_rejected_draft<S, O, E>(
+    state: &mut S,
+    snapshot: S,
+    verified_prefix_state: &S,
+    verified_prefix_output: &O,
+    replay_prefix: impl FnOnce(&mut S) -> Result<O, E>,
+) -> Result<(O, bool), E>
+where
+    S: PartialEq,
+    O: PartialEq,
+{
+    *state = snapshot;
+    let replayed = replay_prefix(state)?;
+    let parity = state == verified_prefix_state && &replayed == verified_prefix_output;
+    Ok((replayed, parity))
+}
+
 #[derive(Clone, Debug)]
 pub struct CpuGgufQwen35TextGenerationService {
     backend: CpuBackend,
@@ -1340,6 +1418,8 @@ pub struct CpuGgufQwen35TextGenerationService {
     residency: LoadedModelResidency,
     memory_plan: psionic_runtime::ModelMemoryPlan,
     residency_policy: psionic_runtime::ModelResidencyPolicy,
+    mtp_config: Option<Qwen38MtpConfig>,
+    last_mtp_report: Option<Qwen38MtpExecutionReport>,
 }
 
 #[cfg(test)]
@@ -1460,8 +1540,31 @@ fn duration_millis_saturating(duration: Duration) -> u64 {
 
 impl CpuGgufQwen35TextGenerationService {
     pub fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
+        Self::from_gguf_path_with_optional_qwen38_mtp(path, None)
+    }
+
+    /// Loads the appended Qwen3.8 NextN block for bounded CPU speculative decode.
+    pub fn from_gguf_path_with_qwen38_mtp(
+        path: impl AsRef<Path>,
+        config: Qwen38MtpConfig,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        if config.max_draft_tokens_per_cycle != 1 {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(format!(
+                    "qwen38 CPU MTP currently requires max_draft_tokens_per_cycle = 1, received {}",
+                    config.max_draft_tokens_per_cycle,
+                )),
+            ));
+        }
+        Self::from_gguf_path_with_optional_qwen38_mtp(path, Some(config))
+    }
+
+    fn from_gguf_path_with_optional_qwen38_mtp(
+        path: impl AsRef<Path>,
+        mtp_config: Option<Qwen38MtpConfig>,
+    ) -> Result<Self, ReferenceTextGenerationError> {
         let backend = CpuBackend::new();
-        let model = Arc::new(CpuQwen35Model::from_gguf_path(path)?);
+        let model = Arc::new(CpuQwen35Model::from_gguf_path(path, mtp_config.is_some())?);
         let now_millis = current_time_millis();
         let mut backend_health = BackendHealthTracker::default();
         backend_health.observe("cpu", backend.health(), now_millis);
@@ -1476,7 +1579,15 @@ impl CpuGgufQwen35TextGenerationService {
             ),
             memory_plan: model.memory_plan.clone(),
             residency_policy: psionic_runtime::ModelResidencyPolicy::default(),
+            mtp_config,
+            last_mtp_report: None,
         })
+    }
+
+    /// Returns the MTP accounting from the most recent opt-in generation.
+    #[must_use]
+    pub fn last_qwen38_mtp_report(&self) -> Option<&Qwen38MtpExecutionReport> {
+        self.last_mtp_report.as_ref()
     }
 
     #[cfg(test)]
@@ -1501,11 +1612,18 @@ impl CpuGgufQwen35TextGenerationService {
 
     #[must_use]
     pub fn runtime_support(&self) -> crate::GgufDecoderRuntimeSupport {
+        let mut unsupported_features =
+            qwen35_unsupported_features(&self.model.family_metadata, false);
+        if self.model.mtp.is_some() {
+            unsupported_features.retain(|feature| feature != "mtp_speculative_decoding_skipped");
+            unsupported_features.push(String::from("mtp_non_greedy_decode"));
+            unsupported_features.push(String::from("mtp_structured_output"));
+        }
         crate::GgufDecoderRuntimeSupport {
             family: self.model.family_metadata.family,
             supported_backends: vec![String::from("cpu")],
             unsupported_backends: vec![String::from("cuda"), String::from("metal")],
-            unsupported_features: qwen35_unsupported_features(&self.model.family_metadata, false),
+            unsupported_features,
             quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
             adapter_runtime: crate::DecoderAdapterRuntimeSupport {
                 support_level: String::from("unsupported"),
@@ -1759,11 +1877,423 @@ impl CpuGgufQwen35TextGenerationService {
         ])
     }
 
+    fn generate_inner_with_qwen38_mtp(
+        &mut self,
+        request: &GenerationRequest,
+        deadline: Option<Qwen35CpuGenerationDeadline>,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        if request.options.decode_strategy != DecodeStrategy::Greedy {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen38 CPU MTP currently supports greedy decode only",
+                )),
+            ));
+        }
+        if request.options.structured_output.is_some() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen38 CPU MTP does not support structured-output sampling",
+                )),
+            ));
+        }
+        let config = self.mtp_config.ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::UnsupportedStep(
+                String::from("qwen38 CPU MTP generation requires an opt-in MTP configuration"),
+            ))
+        })?;
+        let model = Arc::clone(&self.model);
+        let mtp = model.mtp.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::UnsupportedStep(
+                String::from("qwen38 CPU MTP generation requires loaded NextN weights"),
+            ))
+        })?;
+        if let Some(deadline) = deadline {
+            deadline.check()?;
+        }
+
+        let prompt_eval_start = Instant::now();
+        let prompt_tokens = match &request.prompt {
+            GenerationInput::Text(text) => model.tokenizer.encode_with_defaults(text),
+            GenerationInput::Tokens(tokens) => tokens.clone(),
+        };
+        if prompt_tokens.is_empty() {
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+        let (prompt_tokens, context_window) = psionic_models::apply_context_window(
+            &prompt_tokens,
+            model.descriptor.config.max_context,
+            0,
+            request.options.max_output_tokens,
+            request.options.context_overflow_policy,
+            usize::from(
+                prompt_tokens.as_slice().first().copied()
+                    == Some(model.tokenizer.vocabulary().bos_id()),
+            ),
+        )?;
+        let cache_capacity_tokens = qwen35_cache_capacity_tokens(
+            prompt_tokens.len(),
+            request.options.max_output_tokens,
+            model.descriptor.config.max_context,
+        );
+        let mut state = model.initial_state(cache_capacity_tokens);
+        let mut mtp_state = mtp.initial_state(cache_capacity_tokens);
+        let mut history = crate::InMemoryKvCache::new(model.descriptor.config.max_context, 0);
+        let mut kernel_count = 0usize;
+        let mut bytes_moved = 0u64;
+        let mut last_logits = Vec::new();
+        let mut last_hidden = Vec::new();
+        for token in prompt_tokens.as_slice() {
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
+            let step = model.forward_token(&mut state, *token)?;
+            history.append(*token, Vec::new(), Vec::new())?;
+            last_logits = step.logits;
+            last_hidden = step.final_hidden;
+            kernel_count = kernel_count.saturating_add(step.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+        }
+
+        let prompt_eval_duration_ns = prompt_eval_start
+            .elapsed()
+            .as_nanos()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        let decode_start = Instant::now();
+        let mut sampler = crate::GenerationSampler::new(&request.options)?;
+        let structured_output_report = sampler.structured_output_report();
+        let mut generated_tokens = Vec::new();
+        let mut generated_text_terminated = None;
+        let mut first_token_emitted_at = None;
+        let mut last_token_emitted_at = None;
+        let mut ledger = Qwen38MtpExecutionLedger {
+            restored_state_parity: true,
+            ..Qwen38MtpExecutionLedger::default()
+        };
+
+        let (termination, termination_detail) = 'decode: loop {
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
+            if generated_tokens.len() >= request.options.max_output_tokens {
+                break (
+                    TerminationReason::MaxOutputTokens,
+                    Some(GenerationTerminationDetail::max_output_tokens()),
+                );
+            }
+            if prompt_tokens.len().saturating_add(generated_tokens.len())
+                >= model.descriptor.config.max_context
+            {
+                break (
+                    TerminationReason::ContextLimit,
+                    Some(GenerationTerminationDetail::context_limit()),
+                );
+            }
+
+            let next_token = match sampler.select_next_token(
+                &model.tokenizer,
+                last_logits.as_slice(),
+                &history,
+                generated_tokens.as_slice(),
+            )? {
+                crate::GenerationSelection::Token(token) => token,
+                crate::GenerationSelection::Terminate => {
+                    break (
+                        TerminationReason::EndOfSequence,
+                        Some(GenerationTerminationDetail::end_of_sequence_token()),
+                    );
+                }
+            };
+            if model.tokenizer.is_end_of_sequence(next_token) {
+                break (
+                    TerminationReason::EndOfSequence,
+                    Some(GenerationTerminationDetail::end_of_sequence_token()),
+                );
+            }
+            if first_token_emitted_at.is_none() {
+                first_token_emitted_at = Some(decode_start.elapsed());
+            }
+            last_token_emitted_at = Some(decode_start.elapsed());
+            generated_tokens.push(next_token);
+            if let Some(stop_hit) = crate::truncate_generated_text_with_match(
+                &model.tokenizer,
+                &mut generated_tokens,
+                &request.options.stop_sequences,
+            ) {
+                generated_text_terminated = Some(TerminationReason::EndOfSequence);
+                break (
+                    TerminationReason::EndOfSequence,
+                    Some(GenerationTerminationDetail::stop_sequence(
+                        stop_hit.matched_stop_sequence,
+                    )),
+                );
+            }
+            history.append(next_token, Vec::new(), Vec::new())?;
+
+            let draft_room = generated_tokens.len() < request.options.max_output_tokens
+                && prompt_tokens.len().saturating_add(generated_tokens.len())
+                    < model.descriptor.config.max_context;
+            if !draft_room {
+                let step = model.forward_token(&mut state, next_token)?;
+                ledger.target_forward_count = ledger.target_forward_count.saturating_add(1);
+                last_logits = step.logits;
+                last_hidden = step.final_hidden;
+                kernel_count = kernel_count.saturating_add(step.kernel_count);
+                bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+                continue;
+            }
+
+            let target_snapshot = state.clone();
+            ledger.rollback_snapshot_peak_bytes = ledger
+                .rollback_snapshot_peak_bytes
+                .max(target_snapshot.allocated_bytes());
+            let mtp_step = mtp.forward_draft(
+                &model,
+                &mut mtp_state,
+                last_hidden.as_slice(),
+                next_token,
+                state.position,
+            )?;
+            ledger.draft_count = ledger.draft_count.saturating_add(1);
+            ledger.mtp_forward_count = ledger.mtp_forward_count.saturating_add(1);
+            ledger.mtp_kv_cache_peak_bytes = ledger
+                .mtp_kv_cache_peak_bytes
+                .max(mtp_state.allocated_bytes());
+            kernel_count = kernel_count.saturating_add(mtp_step.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(mtp_step.bytes_moved);
+            let draft_token = match sampler.select_next_token(
+                &model.tokenizer,
+                mtp_step.logits.as_slice(),
+                &history,
+                generated_tokens.as_slice(),
+            )? {
+                crate::GenerationSelection::Token(token) => token,
+                crate::GenerationSelection::Terminate => {
+                    let step = model.forward_token(&mut state, next_token)?;
+                    ledger.target_forward_count = ledger.target_forward_count.saturating_add(1);
+                    last_logits = step.logits;
+                    last_hidden = step.final_hidden;
+                    kernel_count = kernel_count.saturating_add(step.kernel_count);
+                    bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+                    continue;
+                }
+            };
+
+            let verified_prefix_step = model.forward_token(&mut state, next_token)?;
+            ledger.target_forward_count = ledger.target_forward_count.saturating_add(1);
+            kernel_count = kernel_count.saturating_add(verified_prefix_step.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(verified_prefix_step.bytes_moved);
+            let verified_prefix_state = state.clone();
+            let verifier_token = match sampler.select_next_token(
+                &model.tokenizer,
+                verified_prefix_step.logits.as_slice(),
+                &history,
+                generated_tokens.as_slice(),
+            )? {
+                crate::GenerationSelection::Token(token) => Some(token),
+                crate::GenerationSelection::Terminate => None,
+            };
+            let speculative_step = model.forward_token(&mut state, draft_token)?;
+            ledger.target_forward_count = ledger.target_forward_count.saturating_add(1);
+            kernel_count = kernel_count.saturating_add(speculative_step.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(speculative_step.bytes_moved);
+
+            if verifier_token == Some(draft_token) {
+                ledger.accepted_count = ledger.accepted_count.saturating_add(1);
+                let alignment_step = mtp.forward_draft(
+                    &model,
+                    &mut mtp_state,
+                    verified_prefix_step.final_hidden.as_slice(),
+                    draft_token,
+                    verified_prefix_state.position,
+                )?;
+                ledger.mtp_forward_count = ledger.mtp_forward_count.saturating_add(1);
+                ledger.mtp_alignment_forward_count =
+                    ledger.mtp_alignment_forward_count.saturating_add(1);
+                ledger.mtp_kv_cache_peak_bytes = ledger
+                    .mtp_kv_cache_peak_bytes
+                    .max(mtp_state.allocated_bytes());
+                kernel_count = kernel_count.saturating_add(alignment_step.kernel_count);
+                bytes_moved = bytes_moved.saturating_add(alignment_step.bytes_moved);
+                last_logits = speculative_step.logits;
+                last_hidden = speculative_step.final_hidden;
+                if model.tokenizer.is_end_of_sequence(draft_token) {
+                    break 'decode (
+                        TerminationReason::EndOfSequence,
+                        Some(GenerationTerminationDetail::end_of_sequence_token()),
+                    );
+                }
+                last_token_emitted_at = Some(decode_start.elapsed());
+                generated_tokens.push(draft_token);
+                history.append(draft_token, Vec::new(), Vec::new())?;
+                if let Some(stop_hit) = crate::truncate_generated_text_with_match(
+                    &model.tokenizer,
+                    &mut generated_tokens,
+                    &request.options.stop_sequences,
+                ) {
+                    generated_text_terminated = Some(TerminationReason::EndOfSequence);
+                    break 'decode (
+                        TerminationReason::EndOfSequence,
+                        Some(GenerationTerminationDetail::stop_sequence(
+                            stop_hit.matched_stop_sequence,
+                        )),
+                    );
+                }
+            } else {
+                ledger.rollback_count = ledger.rollback_count.saturating_add(1);
+                let (replay_step, restored_state_parity) = restore_qwen38_rejected_draft(
+                    &mut state,
+                    target_snapshot,
+                    &verified_prefix_state,
+                    &verified_prefix_step,
+                    |state| model.forward_token(state, next_token),
+                )?;
+                ledger.target_forward_count = ledger.target_forward_count.saturating_add(1);
+                ledger.target_replay_count = ledger.target_replay_count.saturating_add(1);
+                ledger.restored_state_parity &= restored_state_parity;
+                kernel_count = kernel_count.saturating_add(replay_step.kernel_count);
+                bytes_moved = bytes_moved.saturating_add(replay_step.bytes_moved);
+                last_logits = replay_step.logits;
+                last_hidden = replay_step.final_hidden;
+            }
+        };
+
+        let decode_duration = decode_start.elapsed();
+        let generated = TokenSequence::new(generated_tokens);
+        let text = model.tokenizer.decode(generated.as_slice());
+        let metrics = GenerationMetrics {
+            total_duration_ns: Some(
+                prompt_eval_start
+                    .elapsed()
+                    .as_nanos()
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+            ),
+            load_duration_ns: Some(model.load_duration_ns),
+            prompt_eval_count: Some(prompt_tokens.len()),
+            prompt_eval_duration_ns: Some(prompt_eval_duration_ns),
+            context_window: Some(context_window),
+            eval_count: Some(generated.len()),
+            eval_duration_ns: Some(decode_duration.as_nanos().try_into().unwrap_or(u64::MAX)),
+            time_to_first_token_ns: first_token_emitted_at
+                .map(|duration| duration.as_nanos().try_into().unwrap_or(u64::MAX)),
+            inter_token_latency_ns: average_inter_token_latency_ns(
+                first_token_emitted_at,
+                last_token_emitted_at,
+                generated.len(),
+            ),
+            kv_cache: None,
+            kv_residency: None,
+            kv_cache_encoding: None,
+            prefix_tokens_reused: None,
+            termination_detail,
+            gemma4_metal_decode: None,
+            qwen35_cuda_decode: None,
+            gpt_oss_perf: None,
+        };
+        let provenance = GenerationProvenance {
+            served_artifact: crate::served_artifact_identity_for_decoder_backend(
+                &model.descriptor,
+                "cpu",
+                &[],
+            ),
+            adapter_serving: None,
+            served_revision: None,
+            execution_plan_digest: model.plan_digest.clone(),
+            cluster_execution: None,
+            load_state: crate::GenerationLoadState::Warm,
+            isolation_policy: psionic_runtime::LocalServingIsolationPolicy::in_process_runtime(),
+            streaming_policy: None,
+            memory_plan: Some(self.memory_plan.clone()),
+            residency_policy: Some(self.residency_policy.clone()),
+            residency_snapshot: Some(self.residency_snapshot()),
+            kv_cache_policy: None,
+            kv_cache_encoding_policy: None,
+            kv_ownership: None,
+            prefix_cache_control: Some(request.prefix_cache_control.clone()),
+            prefix_cache_state: None,
+            prefix_cache_refusal_reason: None,
+            prefix_cache_policy: None,
+            prefix_cache_identity: None,
+            compile_path: None,
+            delivery_proof: Some(psionic_runtime::ExecutionDeliveryProof {
+                execution_plan_digest: model.plan_digest.clone(),
+                kernel_count,
+                bytes_moved,
+                plan_cache_hits: 0,
+                plan_cache_misses: 0,
+                kv_growth: None,
+                prefill_decode_handoff: None,
+                kv_residency: None,
+            }),
+            cache_observations: Vec::new(),
+            scheduler: None,
+            structured_output: structured_output_report,
+            psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
+        };
+        let response = GenerationResponse::new(
+            request,
+            None,
+            generated,
+            text,
+            prompt_tokens.len(),
+            0,
+            generated_text_terminated.unwrap_or(termination),
+        )
+        .with_metrics_and_provenance(metrics, provenance);
+        let rejected_count = ledger.draft_count.saturating_sub(ledger.accepted_count);
+        let acceptance_rate = if ledger.draft_count == 0 {
+            0.0
+        } else {
+            ledger.accepted_count as f64 / ledger.draft_count as f64
+        };
+        let decode_duration_ns = decode_duration.as_nanos().try_into().unwrap_or(u64::MAX);
+        let generated_tokens_per_second = if decode_duration.as_secs_f64() == 0.0 {
+            0.0
+        } else {
+            response.output.tokens.len() as f64 / decode_duration.as_secs_f64()
+        };
+        let added_peak_residency_bytes = mtp
+            .weight_residency_bytes
+            .saturating_add(ledger.mtp_kv_cache_peak_bytes)
+            .saturating_add(ledger.rollback_snapshot_peak_bytes);
+        self.last_mtp_report = Some(Qwen38MtpExecutionReport {
+            schema_version: String::from(QWEN38_MTP_EXECUTION_REPORT_SCHEMA_VERSION),
+            backend: String::from("cpu"),
+            enabled: true,
+            max_draft_tokens_per_cycle: config.max_draft_tokens_per_cycle,
+            draft_count: ledger.draft_count,
+            accepted_count: ledger.accepted_count,
+            rejected_count,
+            acceptance_rate,
+            mtp_forward_count: ledger.mtp_forward_count,
+            mtp_alignment_forward_count: ledger.mtp_alignment_forward_count,
+            target_forward_count: ledger.target_forward_count,
+            target_replay_count: ledger.target_replay_count,
+            rollback_count: ledger.rollback_count,
+            restored_state_parity: ledger.restored_state_parity,
+            mtp_weight_residency_bytes: mtp.weight_residency_bytes,
+            mtp_kv_cache_peak_bytes: ledger.mtp_kv_cache_peak_bytes,
+            rollback_snapshot_peak_bytes: ledger.rollback_snapshot_peak_bytes,
+            added_peak_residency_bytes,
+            decode_duration_ns,
+            generated_token_count: response.output.tokens.len(),
+            generated_tokens_per_second,
+            performance_claim: String::from("correctness_only_no_acceleration_claim"),
+        });
+        Ok(response)
+    }
+
     fn generate_inner(
         &mut self,
         request: &GenerationRequest,
         deadline: Option<Qwen35CpuGenerationDeadline>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        if self.mtp_config.is_some() {
+            return self.generate_inner_with_qwen38_mtp(request, deadline);
+        }
+        self.last_mtp_report = None;
         if let Some(deadline) = deadline {
             deadline.check()?;
         }
@@ -2843,13 +3373,17 @@ struct CpuQwen35Model {
     output_norm: Vec<f32>,
     output: HostMatrix,
     layers: Vec<CpuQwen35Layer>,
+    mtp: Option<CpuQwen38MtpModel>,
     plan_digest: String,
     load_duration_ns: u64,
     memory_plan: psionic_runtime::ModelMemoryPlan,
 }
 
 impl CpuQwen35Model {
-    fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
+    fn from_gguf_path(
+        path: impl AsRef<Path>,
+        enable_qwen38_mtp: bool,
+    ) -> Result<Self, ReferenceTextGenerationError> {
         let load_start = Instant::now();
         let artifact = GgufBlobArtifact::open_path(&path, gguf_local_blob_open_options())?;
         let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
@@ -2883,6 +3417,41 @@ impl CpuQwen35Model {
             .collect::<Result<Vec<_>, _>>()?;
         let output_norm =
             load_dense_vector(&artifact, adapter.tensor_layout().output_norm.as_str())?;
+        let mtp = if enable_qwen38_mtp {
+            if adapter.family_metadata().family != GgufDecoderFamily::Qwen38 {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: String::from(
+                        "optional Qwen3.8 MTP execution requires a qualified qwen38 artifact",
+                    ),
+                }
+                .into());
+            }
+            let nextn_layers =
+                family_fact_usize(adapter.family_metadata(), "qwen35.nextn_predict_layers")?;
+            if nextn_layers != 1 {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "optional Qwen3.8 MTP execution requires exactly one NextN block, found {nextn_layers}",
+                    ),
+                }
+                .into());
+            }
+            Some(CpuQwen38MtpModel::load(
+                &artifact,
+                adapter.tensor_layout().layers.len(),
+                adapter.tensor_layout().layers.last().ok_or_else(|| {
+                    ModelLoadError::ArtifactFormat {
+                        format: String::from("gguf"),
+                        message: String::from("qwen38 MTP loading requires a trunk layer template"),
+                    }
+                })?,
+                adapter.family_metadata(),
+            )?)
+        } else {
+            None
+        };
         let weights_bytes = std::fs::metadata(path.as_ref())
             .map(|metadata| metadata.len())
             .unwrap_or_default();
@@ -2894,7 +3463,12 @@ impl CpuQwen35Model {
             output_norm,
             output,
             layers,
-            plan_digest: digest_qwen35_cpu_plan(adapter.descriptor(), adapter.family_metadata()),
+            mtp,
+            plan_digest: if enable_qwen38_mtp {
+                digest_qwen38_mtp_cpu_plan(adapter.descriptor(), adapter.family_metadata())
+            } else {
+                digest_qwen35_cpu_plan(adapter.descriptor(), adapter.family_metadata())
+            },
             load_duration_ns: load_start
                 .elapsed()
                 .as_nanos()
@@ -2956,6 +3530,7 @@ impl CpuQwen35Model {
         state.position = state.position.saturating_add(1);
         Ok(CpuQwen35ForwardStep {
             logits,
+            final_hidden,
             kernel_count: kernel_count.saturating_add(1),
             bytes_moved,
         })
@@ -2963,16 +3538,178 @@ impl CpuQwen35Model {
 }
 
 #[derive(Clone, Debug)]
+struct CpuQwen38MtpModel {
+    embedding_hidden_projection: HostMatrix,
+    embedding_norm: Vec<f32>,
+    target_hidden_norm: Vec<f32>,
+    shared_head_norm: Vec<f32>,
+    layer: CpuQwen35Layer,
+    weight_residency_bytes: u64,
+}
+
+impl CpuQwen38MtpModel {
+    fn load(
+        artifact: &GgufBlobArtifact,
+        layer_index: usize,
+        trunk_template: &psionic_models::GgufDecoderLayerTensorLayout,
+        metadata: &GgufDecoderFamilyMetadata,
+    ) -> Result<Self, ModelLoadError> {
+        let prefix = format!("blk.{layer_index}");
+        let mut layout = trunk_template.clone();
+        layout.layer_index = layer_index;
+        layout.layer_kind = GgufDecoderLayerKind::Qwen35FullAttention;
+        layout.attention_norm = format!("{prefix}.attn_norm.weight");
+        layout.attention_query_weight = Some(format!("{prefix}.attn_q.weight"));
+        layout.attention_query_norm = Some(format!("{prefix}.attn_q_norm.weight"));
+        layout.attention_key_weight = Some(format!("{prefix}.attn_k.weight"));
+        layout.attention_key_norm = Some(format!("{prefix}.attn_k_norm.weight"));
+        layout.attention_value_weight = Some(format!("{prefix}.attn_v.weight"));
+        layout.attention_output_weight = Some(format!("{prefix}.attn_output.weight"));
+        layout.attention_post_norm = Some(format!("{prefix}.post_attention_norm.weight"));
+        layout.feed_forward_gate_weight = Some(format!("{prefix}.ffn_gate.weight"));
+        layout.feed_forward_down_weight = Some(format!("{prefix}.ffn_down.weight"));
+        layout.feed_forward_up_weight = Some(format!("{prefix}.ffn_up.weight"));
+
+        let embedding_hidden_projection =
+            HostMatrix::load(artifact, format!("{prefix}.nextn.eh_proj.weight").as_str())?;
+        let embedding_norm =
+            load_dense_vector(artifact, format!("{prefix}.nextn.enorm.weight").as_str())?;
+        let target_hidden_norm =
+            load_dense_vector(artifact, format!("{prefix}.nextn.hnorm.weight").as_str())?;
+        let shared_head_norm = load_dense_vector(
+            artifact,
+            format!("{prefix}.nextn.shared_head_norm.weight").as_str(),
+        )?;
+        let layer = CpuQwen35Layer::load(artifact, &layout, metadata)?;
+        let weight_residency_bytes = embedding_hidden_projection
+            .host_residency_bytes()
+            .saturating_add(vec_f32_bytes(embedding_norm.as_slice()))
+            .saturating_add(vec_f32_bytes(target_hidden_norm.as_slice()))
+            .saturating_add(vec_f32_bytes(shared_head_norm.as_slice()))
+            .saturating_add(layer.host_residency_bytes())
+            as u64;
+        Ok(Self {
+            embedding_hidden_projection,
+            embedding_norm,
+            target_hidden_norm,
+            shared_head_norm,
+            layer,
+            weight_residency_bytes,
+        })
+    }
+
+    fn initial_state(&self, cache_capacity_tokens: usize) -> CpuQwen38MtpState {
+        let CpuQwen35LayerKind::FullAttention(attention) = &self.layer.kind else {
+            unreachable!("qwen38 MTP loader always constructs a full-attention layer")
+        };
+        CpuQwen38MtpState {
+            attention: CpuQwen35FullAttentionState::new(cache_capacity_tokens, attention.kv_width),
+        }
+    }
+
+    fn forward_draft(
+        &self,
+        model: &CpuQwen35Model,
+        state: &mut CpuQwen38MtpState,
+        target_hidden: &[f32],
+        next_token: TokenId,
+        position: usize,
+    ) -> Result<CpuQwen35ForwardStep, ReferenceTextGenerationError> {
+        let epsilon = model.family_metadata.rms_norm_epsilon;
+        let token_embedding = model
+            .token_embedding
+            .decode_row(next_token.as_u32() as usize)?;
+        let normalized_embedding = rms_norm(
+            token_embedding.as_slice(),
+            self.embedding_norm.as_slice(),
+            epsilon,
+        );
+        let normalized_hidden =
+            rms_norm(target_hidden, self.target_hidden_norm.as_slice(), epsilon);
+        let mut concatenated = Vec::with_capacity(
+            normalized_embedding
+                .len()
+                .saturating_add(normalized_hidden.len()),
+        );
+        concatenated.extend_from_slice(normalized_embedding.as_slice());
+        concatenated.extend_from_slice(normalized_hidden.as_slice());
+        let projected = self
+            .embedding_hidden_projection
+            .matvec(concatenated.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let CpuQwen35LayerKind::FullAttention(attention) = &self.layer.kind else {
+            unreachable!("qwen38 MTP loader always constructs a full-attention layer")
+        };
+        let hidden = self.layer.forward_full_attention(
+            &model.family_metadata,
+            model.descriptor.config.hidden_size,
+            model.descriptor.config.block.attention.head_count,
+            model.descriptor.config.block.attention.head_dim,
+            model.descriptor.config.block.attention.rotary_dim,
+            attention,
+            position,
+            projected,
+            &mut state.attention,
+        )?;
+        let final_hidden = rms_norm(hidden.as_slice(), self.shared_head_norm.as_slice(), epsilon);
+        let logits = model
+            .output
+            .matvec(final_hidden.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let bytes_moved = self
+            .weight_residency_bytes
+            .saturating_add(model.token_embedding.host_residency_bytes() as u64)
+            .saturating_add(model.output.host_residency_bytes() as u64);
+        Ok(CpuQwen35ForwardStep {
+            logits,
+            final_hidden,
+            kernel_count: 8,
+            bytes_moved,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CpuQwen38MtpState {
+    attention: CpuQwen35FullAttentionState,
+}
+
+impl CpuQwen38MtpState {
+    fn allocated_bytes(&self) -> u64 {
+        self.attention.allocated_bytes()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct CpuQwen35ForwardStep {
     logits: Vec<f32>,
+    final_hidden: Vec<f32>,
     kernel_count: usize,
     bytes_moved: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct CpuQwen35State {
     position: usize,
     layers: Vec<CpuQwen35LayerState>,
+}
+
+impl CpuQwen35State {
+    fn allocated_bytes(&self) -> u64 {
+        let layer_storage = self
+            .layers
+            .capacity()
+            .saturating_mul(std::mem::size_of::<CpuQwen35LayerState>());
+        let state_storage = self
+            .layers
+            .iter()
+            .map(|layer| match layer {
+                CpuQwen35LayerState::Hybrid(state) => state.allocated_bytes(),
+                CpuQwen35LayerState::FullAttention(state) => state.allocated_bytes(),
+            })
+            .fold(0u64, u64::saturating_add);
+        (layer_storage as u64).saturating_add(state_storage)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3535,7 +4272,7 @@ enum CpuQwen35LayerKind {
     FullAttention(CpuQwen35FullAttentionLayer),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum CpuQwen35LayerState {
     Hybrid(CpuQwen35HybridState),
     FullAttention(CpuQwen35FullAttentionState),
@@ -3628,7 +4365,7 @@ impl CpuQwen35HybridLayer {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct CpuQwen35HybridState {
     conv_state: Vec<f32>,
     delta_state: Vec<f32>,
@@ -3640,6 +4377,13 @@ impl CpuQwen35HybridState {
             conv_state: vec![0.0; conv_len],
             delta_state: vec![0.0; delta_len],
         }
+    }
+
+    fn allocated_bytes(&self) -> u64 {
+        self.conv_state
+            .capacity()
+            .saturating_add(self.delta_state.capacity())
+            .saturating_mul(std::mem::size_of::<f32>()) as u64
     }
 }
 
@@ -3690,7 +4434,7 @@ impl CpuQwen35FullAttentionLayer {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct CpuQwen35FullAttentionState {
     entries: Vec<Qwen35FullAttentionEntry>,
 }
@@ -3700,6 +4444,28 @@ impl CpuQwen35FullAttentionState {
         Self {
             entries: Vec::with_capacity(cache_capacity_tokens),
         }
+    }
+
+    fn allocated_bytes(&self) -> u64 {
+        let entry_storage =
+            self.entries
+                .capacity()
+                .saturating_mul(std::mem::size_of::<Qwen35FullAttentionEntry>()) as u64;
+        self.entries.iter().fold(entry_storage, |bytes, entry| {
+            bytes
+                .saturating_add(
+                    entry
+                        .key
+                        .capacity()
+                        .saturating_mul(std::mem::size_of::<f32>()) as u64,
+                )
+                .saturating_add(
+                    entry
+                        .value
+                        .capacity()
+                        .saturating_mul(std::mem::size_of::<f32>()) as u64,
+                )
+        })
     }
 }
 
@@ -10927,7 +11693,7 @@ impl Qwen35FullAttentionState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Qwen35FullAttentionEntry {
     key: Vec<f32>,
     value: Vec<f32>,
@@ -13621,6 +14387,16 @@ fn digest_qwen35_cpu_plan(
     hex::encode(hasher.finalize())
 }
 
+fn digest_qwen38_mtp_cpu_plan(
+    descriptor: &DecoderModelDescriptor,
+    metadata: &GgufDecoderFamilyMetadata,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(digest_qwen35_cpu_plan(descriptor, metadata).as_bytes());
+    hasher.update(b"|qwen38-mtp-single-token-cpu|v1");
+    hex::encode(hasher.finalize())
+}
+
 fn digest_qwen35_metal_plan(
     descriptor: &DecoderModelDescriptor,
     metadata: &GgufDecoderFamilyMetadata,
@@ -14390,7 +15166,7 @@ fn rope_yarn_ramp(low: f32, high: f32, i0: usize) -> f32 {
 mod tests {
     use super::{
         QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES, qwen38_cuda_preflight,
-        qwen38_cuda_unsupported_quantization_modes,
+        qwen38_cuda_unsupported_quantization_modes, restore_qwen38_rejected_draft,
     };
     use psionic_backend_cuda::CudaDeviceMemoryInfo;
     use psionic_core::QuantizationMode;
@@ -14440,5 +15216,55 @@ mod tests {
             ]),
             vec![QuantizationMode::GgmlQ4_0, QuantizationMode::Int8Symmetric,]
         );
+    }
+
+    #[test]
+    fn qwen38_mtp_rollback_handles_accept_all_reject_all_and_partial_rejection() {
+        fn run_script(drafts: &[u32], verifier_tokens: &[u32]) -> (Vec<u32>, usize, usize, bool) {
+            let mut state = Vec::new();
+            let mut accepted = 0usize;
+            let mut rollbacks = 0usize;
+            let mut restored = true;
+            for (index, (&draft, &verifier)) in
+                drafts.iter().zip(verifier_tokens.iter()).enumerate()
+            {
+                let accepted_prefix = 100 + index as u32;
+                let snapshot = state.clone();
+                state.push(accepted_prefix);
+                let verified_prefix_state = state.clone();
+                let verified_output = verifier;
+                state.push(draft);
+                if draft == verifier {
+                    accepted += 1;
+                    continue;
+                }
+                rollbacks += 1;
+                let (_, parity) = restore_qwen38_rejected_draft(
+                    &mut state,
+                    snapshot,
+                    &verified_prefix_state,
+                    &verified_output,
+                    |state| {
+                        state.push(accepted_prefix);
+                        Ok::<u32, ()>(verifier)
+                    },
+                )
+                .expect("scripted replay");
+                restored &= parity;
+            }
+            (state, accepted, rollbacks, restored)
+        }
+
+        let (accept_state, accepted, rollbacks, restored) = run_script(&[7, 8, 9], &[7, 8, 9]);
+        assert_eq!((accepted, rollbacks, restored), (3, 0, true));
+        assert_eq!(accept_state.len(), 6);
+
+        let (reject_state, accepted, rollbacks, restored) = run_script(&[70, 80, 90], &[7, 8, 9]);
+        assert_eq!((accepted, rollbacks, restored), (0, 3, true));
+        assert_eq!(reject_state, vec![100, 101, 102]);
+
+        let (partial_state, accepted, rollbacks, restored) = run_script(&[7, 80, 9], &[7, 8, 9]);
+        assert_eq!((accepted, rollbacks, restored), (2, 1, true));
+        assert_eq!(partial_state, vec![100, 7, 101, 102, 9]);
     }
 }
