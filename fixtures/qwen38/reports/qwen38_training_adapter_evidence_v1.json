@@ -1,0 +1,360 @@
+{
+  "schema_version": "psionic.qwen38.training_adapter_evidence.v1",
+  "phase": "R12",
+  "status": "implemented_early",
+  "base_identity": {
+    "schema_version": "psionic.qwen38.training_base_identity.v1",
+    "model_id": "Qwen/Qwen3.8-27B",
+    "served_model_id": "qwen3.8-27b",
+    "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+    "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+  },
+  "admitted_plan": {
+    "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+    "request_id": "qwen38-lm-head-reference-001",
+    "status": "admitted",
+    "base_identity": {
+      "schema_version": "psionic.qwen38.training_base_identity.v1",
+      "model_id": "Qwen/Qwen3.8-27B",
+      "served_model_id": "qwen3.8-27b",
+      "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+      "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+      "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+    },
+    "adapter_binding": {
+      "schema_version": "psionic.qwen38.adapter_identity_binding.v1",
+      "adapter_id": "qwen38-lm-head-reference-001",
+      "adapter_revision": "reference-step-001",
+      "base_model_id": "Qwen/Qwen3.8-27B",
+      "base_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+      "target_modules": [
+        "lm_head.weight"
+      ],
+      "binding_digest": "1ec068c7b3510811b41d5c00b3c0b3f027bdc2e20ddb20cabfc4a18912f63148"
+    },
+    "execution_mode": "tiny_reference_cpu",
+    "exact_backward_contract": "qwen38_lm_head_lora_f32_reference_backward_v1",
+    "deferred_target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj",
+      "linear_attn.in_proj_qkv",
+      "linear_attn.in_proj_z",
+      "linear_attn.in_proj_a",
+      "linear_attn.in_proj_b",
+      "linear_attn.out_proj",
+      "visual.merger.linear_fc2"
+    ],
+    "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+    "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+    "seed": 38,
+    "cpu_budget": {
+      "kind": "bounded_single_core"
+    },
+    "claim_boundary": "This admits deterministic tiny-reference CPU math for an F32 Qwen3.8 LM-head LoRA adapter. It does not admit real-checkpoint training, native CPU/CUDA/Metal backward execution, decoder-layer or vision targets, adapter serving, checkpoint recovery, evaluation gains, or promotion.",
+    "plan_digest": "8f15b7bb7a985c50b1f38133fec629ac19b5194a051949300d9f384aa90d1267"
+  },
+  "backward_receipt": {
+    "schema_version": "psionic.qwen38.lm_head_lora_backward_receipt.v1",
+    "fixture_id": "qwen38-lm-head-lora-tiny-v1",
+    "contract": "qwen38_lm_head_lora_f32_reference_backward_v1",
+    "hidden_size": 4,
+    "vocabulary_size": 3,
+    "lora_rank": 2,
+    "lora_alpha": 4.0,
+    "target_token_id": 2,
+    "learning_rate": 0.05,
+    "initial_loss": 1.1699275,
+    "updated_loss": 1.1141841,
+    "loss_improved": true,
+    "initial_logits_sha256": "bd86f2c092cff9b2429ba1326cca150e6aa12bb403e35d5732260f5b5eb14d02",
+    "updated_logits_sha256": "bc83ab9d1ad7bb3acb02414b0ae0563bf7e53dfcc5ebec2f578c89307b5f1d96",
+    "lora_a_gradient_sha256": "63e8122bc4ae0dacbe47693ad6976586316a65a27dc0e24f17c25799d5e58a84",
+    "lora_b_gradient_sha256": "7d1a443d54d2aa7a87bb65df03310292edb8e36aa0baf7ef1c163942db9b3d4b",
+    "updated_lora_a_sha256": "b1d23db3a7a39c9e6741f03d2ad34002d42198a2aefa49d972ecd147c81557de",
+    "updated_lora_b_sha256": "482c34590091af8b7059f4f24eb900c501ecbd655b716ed5d3191e290d7d8e27",
+    "finite_difference_epsilon": 0.001,
+    "gradient_max_abs_error": 0.00006894767,
+    "gradient_tolerance": 0.0002,
+    "gradient_check_passed": true,
+    "base_weights_frozen": true,
+    "deterministic_replay": true,
+    "receipt_digest": "22da5b9d92e6632f809d44d2cc310abcfef19e2e9cef1b73da75dedfb2c32d63"
+  },
+  "refusals": {
+    "artifact_drift": {
+      "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+      "request_id": "qwen38-lm-head-reference-001",
+      "status": "refused",
+      "refusal": {
+        "code": "base_artifact_identity_mismatch",
+        "detail": "Qwen3.8 training base artifact identity digest does not match canonical facts"
+      },
+      "base_identity": {
+        "schema_version": "psionic.qwen38.training_base_identity.v1",
+        "model_id": "Qwen/Qwen3.8-27B",
+        "served_model_id": "qwen3.8-27b",
+        "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+        "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+      },
+      "execution_mode": "tiny_reference_cpu",
+      "exact_backward_contract": null,
+      "deferred_target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_attn.in_proj_qkv",
+        "linear_attn.in_proj_z",
+        "linear_attn.in_proj_a",
+        "linear_attn.in_proj_b",
+        "linear_attn.out_proj",
+        "visual.merger.linear_fc2"
+      ],
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "cpu_budget": {
+        "kind": "bounded_single_core"
+      },
+      "claim_boundary": "The request was refused before training. No adapter, checkpoint, evaluation, serving binding, or promotion claim was produced.",
+      "plan_digest": "e363127c472b0bba48f625153d7aa1a6b8876d818a8f589d8f30b9baa746bb79"
+    },
+    "decoder_target": {
+      "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+      "request_id": "qwen38-lm-head-reference-001",
+      "status": "refused",
+      "refusal": {
+        "code": "unsupported_target",
+        "detail": "only `lm_head.weight` has an exact Qwen3.8 reference backward contract; requested [\"q_proj\"]"
+      },
+      "base_identity": {
+        "schema_version": "psionic.qwen38.training_base_identity.v1",
+        "model_id": "Qwen/Qwen3.8-27B",
+        "served_model_id": "qwen3.8-27b",
+        "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+        "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+      },
+      "execution_mode": "tiny_reference_cpu",
+      "exact_backward_contract": null,
+      "deferred_target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_attn.in_proj_qkv",
+        "linear_attn.in_proj_z",
+        "linear_attn.in_proj_a",
+        "linear_attn.in_proj_b",
+        "linear_attn.out_proj",
+        "visual.merger.linear_fc2"
+      ],
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "cpu_budget": {
+        "kind": "bounded_single_core"
+      },
+      "claim_boundary": "The request was refused before training. No adapter, checkpoint, evaluation, serving binding, or promotion claim was produced.",
+      "plan_digest": "8ba81509f48c460d5dc8922ffc284e4d9ade7cdf5fa94d78e60797fa8163c53a"
+    },
+    "inherited_adapter": {
+      "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+      "request_id": "qwen38-lm-head-reference-001",
+      "status": "refused",
+      "refusal": {
+        "code": "inherited_adapter_identity",
+        "detail": "Qwen3.5/Qwen3.6 adapter ids cannot be relabeled as Qwen3.8 adapters"
+      },
+      "base_identity": {
+        "schema_version": "psionic.qwen38.training_base_identity.v1",
+        "model_id": "Qwen/Qwen3.8-27B",
+        "served_model_id": "qwen3.8-27b",
+        "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+        "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+      },
+      "execution_mode": "tiny_reference_cpu",
+      "exact_backward_contract": null,
+      "deferred_target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_attn.in_proj_qkv",
+        "linear_attn.in_proj_z",
+        "linear_attn.in_proj_a",
+        "linear_attn.in_proj_b",
+        "linear_attn.out_proj",
+        "visual.merger.linear_fc2"
+      ],
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "cpu_budget": {
+        "kind": "bounded_single_core"
+      },
+      "claim_boundary": "The request was refused before training. No adapter, checkpoint, evaluation, serving binding, or promotion claim was produced.",
+      "plan_digest": "dd60287b0868709d03cbc60af146c2a80a0ff1bc33b035c9e61c87cabd540bf3"
+    },
+    "inherited_model": {
+      "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+      "request_id": "qwen38-lm-head-reference-001",
+      "status": "refused",
+      "refusal": {
+        "code": "unsupported_model",
+        "detail": "Qwen3.8 training requires exact model id `Qwen/Qwen3.8-27B`; `Qwen/Qwen3.6-27B` is not inherited or normalized"
+      },
+      "base_identity": {
+        "schema_version": "psionic.qwen38.training_base_identity.v1",
+        "model_id": "Qwen/Qwen3.8-27B",
+        "served_model_id": "qwen3.8-27b",
+        "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+        "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+      },
+      "execution_mode": "tiny_reference_cpu",
+      "exact_backward_contract": null,
+      "deferred_target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_attn.in_proj_qkv",
+        "linear_attn.in_proj_z",
+        "linear_attn.in_proj_a",
+        "linear_attn.in_proj_b",
+        "linear_attn.out_proj",
+        "visual.merger.linear_fc2"
+      ],
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "cpu_budget": {
+        "kind": "bounded_single_core"
+      },
+      "claim_boundary": "The request was refused before training. No adapter, checkpoint, evaluation, serving binding, or promotion claim was produced.",
+      "plan_digest": "b9acf42425089142ed20bbb25584afa5a59bf11a52d8bf9f4843a82f42f81e9d"
+    },
+    "missing_lineage": {
+      "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+      "request_id": "qwen38-lm-head-reference-001",
+      "status": "refused",
+      "refusal": {
+        "code": "missing_lineage",
+        "detail": "corpus and evaluation manifests require lowercase sha256 digests"
+      },
+      "base_identity": {
+        "schema_version": "psionic.qwen38.training_base_identity.v1",
+        "model_id": "Qwen/Qwen3.8-27B",
+        "served_model_id": "qwen3.8-27b",
+        "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+        "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+      },
+      "execution_mode": "tiny_reference_cpu",
+      "exact_backward_contract": null,
+      "deferred_target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_attn.in_proj_qkv",
+        "linear_attn.in_proj_z",
+        "linear_attn.in_proj_a",
+        "linear_attn.in_proj_b",
+        "linear_attn.out_proj",
+        "visual.merger.linear_fc2"
+      ],
+      "corpus_manifest_sha256": "missing",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "cpu_budget": {
+        "kind": "bounded_single_core"
+      },
+      "claim_boundary": "The request was refused before training. No adapter, checkpoint, evaluation, serving binding, or promotion claim was produced.",
+      "plan_digest": "685f7bcc799495b1b4af8ef1638bd4615e464c7070e7646138cff8950f5f6e0b"
+    },
+    "native_cuda": {
+      "schema_version": "psionic.qwen38.training_adapter_admission.v1",
+      "request_id": "qwen38-lm-head-reference-001",
+      "status": "refused",
+      "refusal": {
+        "code": "unsupported_execution_mode",
+        "detail": "native CPU, CUDA, and Metal Qwen3.8 backward execution is not implemented"
+      },
+      "base_identity": {
+        "schema_version": "psionic.qwen38.training_base_identity.v1",
+        "model_id": "Qwen/Qwen3.8-27B",
+        "served_model_id": "qwen3.8-27b",
+        "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "artifact_facts_sha256": "03d7a022f38e161e4281fcfe4ed6a1bc354fd910ba70457a3ff1c2213f999de6",
+        "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+        "base_artifact_identity_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9"
+      },
+      "execution_mode": "native_cuda",
+      "exact_backward_contract": null,
+      "deferred_target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_attn.in_proj_qkv",
+        "linear_attn.in_proj_z",
+        "linear_attn.in_proj_a",
+        "linear_attn.in_proj_b",
+        "linear_attn.out_proj",
+        "visual.merger.linear_fc2"
+      ],
+      "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+      "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+      "seed": 38,
+      "cpu_budget": {
+        "kind": "bounded_single_core"
+      },
+      "claim_boundary": "The request was refused before training. No adapter, checkpoint, evaluation, serving binding, or promotion claim was produced.",
+      "plan_digest": "31f32da3840003a01301f1eaa72eba5ecc46f80339fe6d3656d48f12c617735a"
+    }
+  },
+  "real_checkpoint_training_admitted": false,
+  "native_backward_admitted": false,
+  "adapter_artifact_written": false,
+  "adapter_serving_admitted": false,
+  "checkpoint_recovery_admitted": false,
+  "promotion_admitted": false,
+  "claim_boundary": "This report proves Qwen3.8-specific base/adapter admission and deterministic tiny-reference F32 LM-head LoRA gradients. It retains no trained adapter and makes no real-checkpoint training, native backward, serving, recovery, evaluation, or promotion claim.",
+  "report_digest": "7a0432e18f0c0ca22021e769c06b51ca5322512f83b7d1c7ef4a447ce33f7006"
+}
