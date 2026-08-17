@@ -6014,18 +6014,48 @@ fn encode_qwen35_hybrid_qkv_post_conv(
     state_size: usize,
     v_offset: usize,
     v_size: usize,
-    _q_scale_device: &CudaBuffer,
-    _k_scale_device: &CudaBuffer,
-    _q_buffer: &CudaBuffer,
-    _k_buffer: &CudaBuffer,
+    q_scale_device: &CudaBuffer,
+    k_scale_device: &CudaBuffer,
+    q_buffer: &CudaBuffer,
+    k_buffer: &CudaBuffer,
     qkv_norm_buffer: &CudaBuffer,
 ) -> Result<(), ReferenceTextGenerationError> {
     let q_size = group_count.saturating_mul(state_size);
     let k_size = q_size;
+    if qwen35_fused_qkv_rms_norm_enabled() {
+        submission.pack_qwen35_hybrid_qkv_rms_norm_f32(
+            conv_buffer,
+            0,
+            q_size,
+            v_offset,
+            group_count,
+            state_size,
+            v_size,
+            q_scale_device,
+            k_scale_device,
+            1e-6,
+            qkv_norm_buffer,
+            0,
+            q_size,
+            v_offset,
+        )?;
+        return Ok(());
+    }
+
     let q_bytes = q_size.saturating_mul(std::mem::size_of::<f32>());
     let k_bytes = k_size.saturating_mul(std::mem::size_of::<f32>());
-    submission.copy_buffer_region(conv_buffer, 0, qkv_norm_buffer, 0, q_bytes)?;
-    submission.copy_buffer_region(conv_buffer, q_bytes, qkv_norm_buffer, q_bytes, k_bytes)?;
+    submission.rms_norm_region(conv_buffer, 0, q_scale_device, q_buffer, 0, q_size, 1e-6)?;
+    submission.rms_norm_region(
+        conv_buffer,
+        q_size,
+        k_scale_device,
+        k_buffer,
+        0,
+        k_size,
+        1e-6,
+    )?;
+    submission.copy_buffer_region(q_buffer, 0, qkv_norm_buffer, 0, q_bytes)?;
+    submission.copy_buffer_region(k_buffer, 0, qkv_norm_buffer, q_bytes, k_bytes)?;
     submission.copy_buffer_region(
         conv_buffer,
         v_offset.saturating_mul(std::mem::size_of::<f32>()),
@@ -11216,7 +11246,6 @@ impl Qwen35Layer {
         let z_offset = qkv_rows;
         let alpha_offset = z_offset.saturating_add(z_rows);
         let beta_offset = alpha_offset.saturating_add(alpha_rows);
-        let v_bytes = v_size.saturating_mul(std::mem::size_of::<f32>());
 
         let mut submission = backend
             .begin_submission()
@@ -11304,26 +11333,18 @@ impl Qwen35Layer {
             &plan.decay_buffer,
             &plan.beta_buffer,
         )?;
-        submission.copy_buffer_region(
+        encode_qwen35_hybrid_qkv_post_conv(
+            &mut submission,
             &plan.conv_buffer,
-            0,
+            hybrid.group_count,
+            hybrid.state_size,
+            v_offset,
+            v_size,
+            &hybrid.q_scale_device,
+            &hybrid.k_scale_device,
+            &plan.q_buffer,
+            &plan.k_buffer,
             &plan.qkv_norm_buffer,
-            0,
-            q_size.saturating_mul(std::mem::size_of::<f32>()),
-        )?;
-        submission.copy_buffer_region(
-            &plan.conv_buffer,
-            q_size.saturating_mul(std::mem::size_of::<f32>()),
-            &plan.qkv_norm_buffer,
-            q_size.saturating_mul(std::mem::size_of::<f32>()),
-            k_size.saturating_mul(std::mem::size_of::<f32>()),
-        )?;
-        submission.copy_buffer_region(
-            &plan.conv_buffer,
-            v_offset.saturating_mul(std::mem::size_of::<f32>()),
-            &plan.qkv_norm_buffer,
-            v_offset.saturating_mul(std::mem::size_of::<f32>()),
-            v_bytes,
         )?;
         submission.gated_delta_step_f32(
             &plan.qkv_norm_buffer,
@@ -12011,7 +12032,7 @@ impl Qwen35Layer {
                 q,
                 k,
                 v,
-                gate_preexp[value_head_index],
+                decay[value_head_index],
                 beta_sigmoid[value_head_index],
                 state_slice,
                 norm_q.as_mut_slice(),

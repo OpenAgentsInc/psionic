@@ -403,11 +403,14 @@ into one generic engine claim.
   the delta during decode. The CUDA lane uploads admitted embeddings directly
   into the resident hidden buffer and uses a fused three-axis MRoPE plus F16-KV
   attention kernel. It keeps the captured scalar text graph unchanged and
-  uses uncaptured native submissions for multimodal positions. Both runtimes
-  bypass token-only prefix reuse, refuse prompt truncation, and retain the
-  successful plan receipt. Metal decoder consumption, native media serving,
-  and retained end-to-end image/video generation evidence remain absent, so
-  HTTP prompt markers are still refused as understanding on the text-only lane.
+  uses uncaptured native submissions for multimodal positions. The uncaptured
+  hybrid path shares the fused per-head Q/K normalization used by captured text
+  graphs; raw post-convolution Q/K values never enter the recurrent delta-state
+  update. Both runtimes bypass token-only prefix reuse, refuse prompt
+  truncation, and retain the successful plan receipt. Metal decoder
+  consumption, native media serving, and retained end-to-end image/video
+  generation evidence remain absent, so HTTP prompt markers are still refused
+  as understanding on the text-only lane.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`
