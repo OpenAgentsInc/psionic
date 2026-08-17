@@ -826,6 +826,44 @@ Metal evidence does not inherit CUDA parity or performance results.
 
 ## R11: Native Vision
 
+Status: `partial`. Psionic now has a separately admitted native vision source
+artifact over the official first BF16 shard. Admission binds shard byte length
+`3,966,730,552`, SHA-256
+`ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c`,
+all 333 `model.visual` tensors, `921,460,192` tensor bytes, and both processor
+config digests. The loader reads only the vision prefix and reports the 59
+non-vision tensors that share the source shard; no extracted or hidden mirror
+artifact is required.
+
+The bounded processor accepts decoded RGB8 media only when upstream smart
+resize would preserve the dimensions. Image dimensions must be divisible by
+32 and contain 65,536 through 262,144 pixels. The first video policy samples
+at 2 fps, admits four through eight sampled frames, requires at most 65,536
+pixels per frame, repeats the final frame for an odd temporal count, and caps
+the combined patch count at 1,024. Inputs requiring resize refuse instead of
+using a non-equivalent resampler. Receipts bind attachment bytes, frame
+indices, dimensions, `grid_thw`, processor config, normalization, patch order,
+limits, timeout, and the exact preprocessed tensor digest.
+
+The native Candle-backed encoder executes patch projection, learned position
+interpolation, rotary attention, all 27 vision blocks, spatial merge, and the
+5,120-wide output projection on CPU or the feature-gated CUDA backend. Runtime
+receipts publish all 333 resident tensors and 27 resident layers, backend,
+engine, timeout, output identity, host materialization, `fallback_policy =
+refuse`, and no hidden fallback. Tiny tests cover the complete graph and
+layer-boundary timeout refusal.
+
+The first full CUDA comparator driver is
+`scripts/run-qwen38-vision-parity-evidence.sh`; its checker is
+`scripts/check-qwen38-vision-parity.sh`. It pins Transformers revision
+`0650ff354501cbdb7cb4138da628cc60f4e0ceed`, runs the identical 256x256
+decoded RGB8 probe, and compares both preprocessing and 64 by 5,120 pooler
+output. This is an encoder-only milestone. R11 remains `partial` until
+retained image and video fixtures pass, vision embeddings replace the exact
+prompt pad spans in the native text decoder, and chat/responses media serving
+passes attachment, streaming, tool, bound, malformed-input, and refusal
+coverage.
+
 Native vision remains a separate roadmap lane after text support.
 
 It requires:

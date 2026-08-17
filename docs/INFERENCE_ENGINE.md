@@ -385,6 +385,16 @@ into one generic engine claim.
   serve requests, compute gradients, or execute media inputs.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
+- The independent `qwen38` native vision lane is `partial`. Current `main`
+  separately admits the official 333-tensor, `921,460,192`-byte BF16 vision
+  stack from the pinned first safetensors shard and executes exact no-resize
+  RGB8 preprocessing plus the 27-layer encoder and 5,120-wide merger on CPU
+  or feature-gated CUDA. Runtime receipts publish full-stack residency,
+  timeout checks, attachment and processor identity, output identity, and a
+  refuse fallback policy. The first pinned Transformers comparator covers one
+  256x256 image probe. Vision-to-text embedding injection, native media serving,
+  retained video parity, and end-to-end image/video generation remain absent,
+  so prompt markers are still refused as understanding on the text-only lane.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`

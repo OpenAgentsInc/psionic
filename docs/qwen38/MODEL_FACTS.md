@@ -1,7 +1,8 @@
 # Qwen3.8-27B Model Facts
 
-> Status: checkpoint facts and header admission are `implemented`; execution is
-> `planned`. Facts were read from the official Hugging Face repository at
+> Status: checkpoint facts and header admission are `implemented`; text
+> execution is `implemented_early`, and native vision execution is `partial`.
+> Facts were read from the official Hugging Face repository at
 > revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` on 2026-08-14.
 
 ## Artifact Identity

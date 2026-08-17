@@ -1,7 +1,8 @@
 # Qwen3.8-27B Upstream Artifact Index
 
-> Status: `planned`. This index describes the 32 files verified at upstream
-> revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` on 2026-08-14.
+> Status: `implemented`. This index describes the 32 files verified at upstream
+> revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` on 2026-08-14. Native
+> vision execution remains `partial`.
 
 The local artifact root is `target/models/qwen/Qwen3.8-27B`. Links below point
 to the pinned Hugging Face revision so they remain stable if upstream `main`
