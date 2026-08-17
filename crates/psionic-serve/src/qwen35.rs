@@ -7384,6 +7384,24 @@ impl CudaQwen35Model {
                     ));
                 }
             }
+            if std::env::var_os("PSIONIC_QWEN38_DEBUG_NONFINITE").is_some() {
+                let hidden = plan
+                    .current_hidden_buffer
+                    .read_f32_at_offset(0, self.descriptor.config.hidden_size)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                if let Some((hidden_index, value)) = hidden
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .find(|(_, value)| !value.is_finite())
+                {
+                    return Err(ReferenceTextGenerationError::Runtime(
+                        crate::RuntimeError::Backend(format!(
+                            "qwen38 CUDA hidden state became non-finite after layer {layer_index} at physical position {position}, MRoPE position {mrope_position:?}, hidden index {hidden_index}, value {value}"
+                        )),
+                    ));
+                }
+            }
         }
 
         let current_hidden_buffer = plan.current_hidden_buffer.clone();
