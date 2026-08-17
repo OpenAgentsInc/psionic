@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }],
-            "tool_choice": "none",
+            "tool_choice": "auto",
             "temperature": 0.0,
             "max_tokens": 2,
             "psionic_enable_thinking": false
