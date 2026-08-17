@@ -342,8 +342,18 @@ into one generic engine claim.
   pinned llama.cpp revision. All 28 comparisons pass, with maximum normalized
   RMSE `0.010121032189794241` and minimum cosine similarity
   `0.9999686621232524`; the transposed delta state matches directly without a
-  layout transform. Qwen3.8 remains `partial` overall because the R9 release
-  gate and later milestones are not complete. The retained R4 and R5
+  layout transform. R9 now retains the clean-checkout
+  `psionic.qwen38.release_gate.v1` bundle. Its seven gates cover artifact and
+  prompt fixtures, Qwen3.6 regressions, native generation and state reset,
+  generic serving and tool replay, structured-output boundaries, the pinned
+  CPU comparator, and fallback-free CUDA publication. Explicit `low`,
+  `medium`, and `xhigh` llama.cpp `/apply-template` requests match the Psionic
+  prompt digests byte-for-byte. The bundle records zero CUDA fallback, graph,
+  cache, allocator, latency, and throughput observations while publishing no
+  performance claim. Qwen3.8 remains `partial` overall because Metal,
+  multimodal execution, training and adapters, optional MTP, long-context
+  widening, and the competitive performance milestone are not complete. The
+  retained R4 and R5
   reports themselves still do not execute full-width
   attention or MLPs, materialize full-vocabulary logits, generate tokens,
   serve requests, compute gradients, or execute media inputs.

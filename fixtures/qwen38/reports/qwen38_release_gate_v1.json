@@ -1,0 +1,252 @@
+{
+  "schema_version": "psionic.qwen38.release_gate.v1",
+  "report_kind": "qwen38_release_gate",
+  "issue": 1151,
+  "generated_at": "2026-08-17T17:16:50Z",
+  "generated_from_clean_checkout": true,
+  "status": "passed",
+  "psionic": {
+    "revision": "99283e19af6e851b79ac01480ec590c5e4d4764e",
+    "branch": "main",
+    "upstream": "origin/main",
+    "commit_timestamp": "2026-08-17T12:15:16-05:00",
+    "dirty": false
+  },
+  "model": {
+    "product_family": "qwen38",
+    "official_model_id": "Qwen/Qwen3.8-27B",
+    "served_model_id": "qwen3.8-27b",
+    "upstream_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "config_sha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+    "template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+    "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"
+  },
+  "artifact": {
+    "filename": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+    "local_path": "/home/christopherdavid/code/psionic/target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf",
+    "byte_length": 13441059904,
+    "sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2"
+  },
+  "runtime": {
+    "implementation": "native_psionic",
+    "backends": [
+      "cpu",
+      "cuda"
+    ],
+    "context_tokens": 4096,
+    "host_fallback_enabled": false,
+    "raw_logits_observable": true,
+    "generic_server_status": "implemented_early",
+    "graph_cache_namespace": "qwen38-cuda-graph-cache|v1",
+    "execution_plan_namespace": "qwen38-native-cuda|v1"
+  },
+  "prompt_contract": {
+    "prompt_text": "Hello",
+    "prompt_token_ids": [
+      9419
+    ],
+    "expected_greedy_output_token_ids": [
+      11,
+      353
+    ],
+    "expected_seeded_sample_output_token_ids": [
+      11,
+      271
+    ],
+    "sample_settings": {
+      "seed": 42,
+      "temperature": 0.8,
+      "top_k": 40,
+      "top_p": 0.9
+    }
+  },
+  "correctness": {
+    "direct_native_generation": "passed",
+    "generic_server_generation": "passed",
+    "tool_loop_replay": "passed",
+    "structured_output_acceptance_and_refusal": "passed",
+    "repeated_request_state_reset": "passed"
+  },
+  "comparator": {
+    "implementation": "ggml-org/llama.cpp",
+    "revision": "9b05354ec6fb58b4e665e9a39ebc40285c015638",
+    "binary_version": "version: 0.1.0-dev (build 10433, commit 9b05354ec)\nbuilt with GNU 14.3.1 for Linux x86_64",
+    "backend": "cpu",
+    "generation_intermediate_comparisons": 28,
+    "generation_intermediate_all_passed": true,
+    "template": {
+      "endpoint": "/apply-template",
+      "request_argument": "chat_template_kwargs",
+      "cases": [
+        {
+          "case_id": "reasoning_low",
+          "reasoning_effort": "low",
+          "expected_rendered_sha256": "64012fe752f5f00303b06929686ce5d4fc8558a42e1d70275d2d4bb920da94a0",
+          "actual_rendered_sha256": "64012fe752f5f00303b06929686ce5d4fc8558a42e1d70275d2d4bb920da94a0",
+          "rendered_bytes": 229,
+          "latency_ms": 4.656000000000001,
+          "passed": true
+        },
+        {
+          "case_id": "reasoning_medium",
+          "reasoning_effort": "medium",
+          "expected_rendered_sha256": "bcff7d22d26a515874d02d760f5e74dfd8a8ce843e7ed891465246371b3c7821",
+          "actual_rendered_sha256": "bcff7d22d26a515874d02d760f5e74dfd8a8ce843e7ed891465246371b3c7821",
+          "rendered_bytes": 63,
+          "latency_ms": 3.7279999999999998,
+          "passed": true
+        },
+        {
+          "case_id": "reasoning_xhigh",
+          "reasoning_effort": "xhigh",
+          "expected_rendered_sha256": "66b3bad518270f743db4ad4efb0bcc03d7f0bc13d8c8ee8f287e433ddc110e30",
+          "actual_rendered_sha256": "66b3bad518270f743db4ad4efb0bcc03d7f0bc13d8c8ee8f287e433ddc110e30",
+          "rendered_bytes": 300,
+          "latency_ms": 1.15,
+          "passed": true
+        }
+      ],
+      "all_passed": true
+    }
+  },
+  "cuda_publication": {
+    "host_fallback_invocations": 0,
+    "graph_hits": 2,
+    "graph_shape_drifts": 0,
+    "graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+    "allocator_peak_resident_device_bytes": 13390641048,
+    "allocator_resident_device_bytes_after_measurements": 13296621464,
+    "preflight_required_device_bytes": 15275674688,
+    "device_free_bytes_at_preflight": 15808397312,
+    "context_tokens": 4096
+  },
+  "performance": {
+    "claim_status": "not_published",
+    "release_bar": "correctness_and_truthful_runtime_publication",
+    "observations": {
+      "cuda_greedy_mean_decode_tok_s": 10.995421174982495,
+      "cuda_sample_mean_decode_tok_s": 10.874144370111445,
+      "template_latency_ms_low": 4.656000000000001,
+      "template_latency_ms_medium": 3.7279999999999998,
+      "template_latency_ms_xhigh": 1.15
+    }
+  },
+  "refusals": {
+    "validated_refusal_case_count": 5,
+    "capabilities": [
+      {
+        "feature": "adapters",
+        "status": "refused"
+      },
+      {
+        "feature": "media_execution",
+        "status": "refused"
+      },
+      {
+        "feature": "metal_backend",
+        "status": "refused"
+      },
+      {
+        "feature": "mtp_speculative_decoding",
+        "status": "planned"
+      },
+      {
+        "feature": "session_reuse",
+        "status": "refused"
+      },
+      {
+        "feature": "training",
+        "status": "planned"
+      },
+      {
+        "feature": "yarn_context_extension",
+        "status": "planned"
+      }
+    ]
+  },
+  "validation": {
+    "gates": [
+      {
+        "gate_id": "artifact_contract",
+        "command": "cargo test -p psionic-models qwen38_artifact -- --test-threads=1",
+        "duration_ms": 159,
+        "passed": true
+      },
+      {
+        "gate_id": "prompt_contract",
+        "command": "cargo test -p psionic-models qwen38_prompt -- --test-threads=1",
+        "duration_ms": 156,
+        "passed": true
+      },
+      {
+        "gate_id": "qwen36_regression",
+        "command": "cargo test -p psionic-models qwen36 -- --test-threads=1",
+        "duration_ms": 160,
+        "passed": true
+      },
+      {
+        "gate_id": "direct_native_generation",
+        "command": "cargo test -p psionic-serve --lib qwen38_cpu_generation_skips_mtp_and_resets_request_state -- --test-threads=1",
+        "duration_ms": 45220,
+        "passed": true
+      },
+      {
+        "gate_id": "openai_serving",
+        "command": "cargo test -p psionic-serve --lib qwen38_openai -- --test-threads=1",
+        "duration_ms": 286,
+        "passed": true
+      },
+      {
+        "gate_id": "cpu_recurrent_comparator",
+        "command": "scripts/check-qwen38-cpu-intermediate-parity.sh",
+        "duration_ms": 11,
+        "passed": true
+      },
+      {
+        "gate_id": "cuda_publication",
+        "command": "scripts/check-qwen38-cuda-generation.sh",
+        "duration_ms": 27,
+        "passed": true
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "evidence_id": "artifact_facts",
+      "path": "fixtures/qwen38/qwen38_27b_artifact_facts_v1.json",
+      "schema_version": "psionic.qwen38.artifact_facts.v1",
+      "sha256": "389c6e91070de6fa1a574cb3fc92035b5316da6fe6e4bc1c2ab84c2698375a3c"
+    },
+    {
+      "evidence_id": "prompt_tokenizer_golden",
+      "path": "fixtures/qwen38/qwen38_prompt_tokenizer_golden_v1.json",
+      "schema_version": "psionic.qwen38.prompt_tokenizer_golden.v1",
+      "sha256": "8432379c78e19d1891bb36112ff043e0d3b7b515a79ea7216fb0af56941b7b34"
+    },
+    {
+      "evidence_id": "release_template_cases",
+      "path": "fixtures/qwen38/qwen38_release_template_cases_v1.json",
+      "schema_version": "psionic.qwen38.release_template_cases.v1",
+      "sha256": "9cda0511b7cb827fc6330c98a94bd5a319573aeae3ea78f1705e8a32cc54e1c5"
+    },
+    {
+      "evidence_id": "cpu_recurrent_parity",
+      "path": "fixtures/qwen38/reports/qwen38_cpu_recurrent_intermediate_parity_v1.json",
+      "schema_version": "psionic_qwen38_cpu_recurrent_intermediate_parity_v1",
+      "sha256": "ff8ee7da467b858d1c04e662c65032a6b561d25287e6910e81dc75f807ef949f"
+    },
+    {
+      "evidence_id": "cuda_greedy_generation",
+      "path": "fixtures/qwen38/reports/qwen38_cuda_greedy_generation_v1.json",
+      "schema_version": 7,
+      "sha256": "ea768749356abbcf8e4ebc2ae9c557ae0e6ed285c96584dcd2e471180e96acdb"
+    },
+    {
+      "evidence_id": "cuda_bounded_sample_generation",
+      "path": "fixtures/qwen38/reports/qwen38_cuda_bounded_sample_generation_v1.json",
+      "schema_version": 7,
+      "sha256": "3d56a53c70833b46c6bfa6615a9216f15f7dcd02109034f059c692b26c99e7f4"
+    }
+  ],
+  "all_passed": true
+}

@@ -5,8 +5,9 @@
 > admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
 > `implemented`; R6 native CPU generation is also `implemented` for the
 > internal CPU lane. R7 native CUDA generation is `implemented`. R8
-> OpenAI-compatible CPU/CUDA serving is `implemented_early`; R9 and later
-> release milestones remain `planned`.
+> OpenAI-compatible CPU/CUDA serving is `implemented_early`; R9 comparator and
+> release gating is `implemented`. Later backend, multimodal, training, and
+> performance milestones remain `planned`.
 
 ## Goal
 
@@ -90,8 +91,8 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R5 | `implemented` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `implemented` | Native CPU token generation | Internal executable text lane with retained parity |
 | R7 | `implemented` | Native CUDA token generation | First local accelerated lane |
-| R8 | `planned` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
-| R9 | `planned` | Comparator, performance, and release gate | Retained `implemented_early` claim |
+| R8 | `implemented_early` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
+| R9 | `implemented` | Comparator and correctness-first release gate | Retained `implemented_early` claim |
 | R9A | `planned` | Optional MTP speculative decoding and rollback | Separate acceleration claim |
 | R10 | `planned` | Native Metal generation | Separate Apple backend claim |
 | R11 | `planned` | Native vision lane | Separate multimodal claim |
@@ -652,6 +653,10 @@ checker and comparator gate.
 
 ## R9: Comparator And Release Gate
 
+Status: `implemented` on 2026-08-17. The retained report is
+`fixtures/qwen38/reports/qwen38_release_gate_v1.json` and binds clean Psionic
+revision `99283e19af6e851b79ac01480ec590c5e4d4764e`.
+
 Add a release checker modeled on the existing Qwen3.5 pilot without reusing
 Qwen3.5 names or claims.
 
@@ -668,6 +673,19 @@ match the pinned revision. The checker replays the portable test matrix and
 validates the retained CPU, CUDA, fixture, source-revision, and comparator
 digests. The generated report remains incomplete evidence until it is reviewed
 and committed.
+
+The retained run passes seven gates: artifact contract, prompt contract,
+Qwen3.6 regressions, direct native generation and state reset, generic OpenAI
+serving, the CPU recurrent comparator, and CUDA publication. The pinned
+llama.cpp `/apply-template` endpoint matches Psionic byte-for-byte for explicit
+`low`, `medium`, and `xhigh` `chat_template_kwargs`. Its 28 retained recurrent
+intermediate comparisons also pass. CUDA publication records zero host
+fallback, two graph hits, zero graph-shape drift, and a
+`13,390,641,048`-byte allocator peak inside the preflight envelope.
+
+The bundle retains the measured CUDA decode observations from R7 and the live
+template-request latencies, but marks the performance claim as
+`not_published`. R13 owns the bounded competitive performance claim.
 
 The gate should run:
 

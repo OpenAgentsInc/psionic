@@ -1,8 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
-> Status: `partial` on 2026-08-17. R1-R7 are implemented, and R8
-> OpenAI-compatible CPU/CUDA serving is `implemented_early`. Later release,
-> backend, multimodal, training, and performance milestones remain open.
+> Status: `partial` on 2026-08-17. R1-R7 and R9 are implemented, and R8
+> OpenAI-compatible CPU/CUDA serving is `implemented_early`. Later backend,
+> multimodal, training, and performance milestones remain open.
 
 ## Compatibility Result
 
@@ -222,6 +222,17 @@ posture. Native XML tool calls support `none`, `auto`, `required`, named,
 ordered parallel, and streamed-delta behavior. Structured output remains
 bounded by the existing proven runtime envelope.
 
+R9 consolidates that lane into
+`fixtures/qwen38/reports/qwen38_release_gate_v1.json`. The report binds a clean
+Psionic revision, the exact model and artifact digests, Qwen3.6 regressions,
+Qwen3.8 artifact and prompt tests, native generation and state reset, generic
+serving, tool replay, structured-output acceptance and refusal, the pinned
+llama.cpp recurrent comparator, explicit-effort template parity, and
+fallback-free CUDA publication. The release bar is correctness and truthful
+runtime publication. The retained latency and throughput values remain
+observations rather than a performance claim.
+
 Metal, image/video execution, adapters, session reuse, and MTP speculative
 decoding still refuse Qwen3.8. The serving lane publishes those limits
-explicitly. R9 owns the consolidated comparator and release gate.
+explicitly. YaRN extension, training, and the R13 competitive speed claim also
+remain planned.

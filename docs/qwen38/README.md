@@ -5,8 +5,9 @@
 > checkpoint admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
 > `implemented`. R6 native CPU generation is `implemented` for the internal
 > execution lane. R7 native CUDA generation is `implemented`. R8
-> OpenAI-compatible CPU/CUDA serving is `implemented_early`. Training, Metal,
-> native multimodal execution, and later release gates remain outside the
+> OpenAI-compatible CPU/CUDA serving is `implemented_early`, and R9 comparator
+> and release gating is `implemented`. Training, Metal, native multimodal
+> execution, optional MTP, and competitive performance remain outside the
 > current claim.
 
 This directory tracks the work required to add honest Qwen3.8 support to
@@ -201,8 +202,18 @@ preserved-thinking replay, native Qwen3.8 XML tool calls, all tool-choice
 modes, ordered parallel calls, streamed tool arguments, and structured output
 inside the existing proven runtime envelope. It refuses image/video input and
 publishes adapters and session reuse as unsupported. Metal remains refused
-until R10. The R8 serving lane is `implemented_early`; R9 still owns the
-consolidated comparator and release gate.
+until R10. The R8 serving lane is `implemented_early`.
+
+R9 adds the clean-checkout release producer and checker, the dedicated
+`psionic.qwen38.release_gate.v1` report, and the Qwen3.8-only explicit-effort
+template fixture. The retained report at
+`fixtures/qwen38/reports/qwen38_release_gate_v1.json` binds Psionic revision
+`99283e19af6e851b79ac01480ec590c5e4d4764e`, the exact artifact and model
+digests, all seven release gates, 28 passing pinned llama.cpp recurrent
+comparisons, and byte-identical llama.cpp `/apply-template` results for
+`low`, `medium`, and `xhigh`. It retains zero-fallback CUDA allocation,
+graph, cache, and throughput observations without publishing a performance
+claim.
 
 ## Primary Source
 
