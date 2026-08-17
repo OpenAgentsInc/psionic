@@ -44,8 +44,8 @@ use psionic_models::{
     PromptMessageRole, PromptReasoningEffort, PromptRenderOptions, QWEN38_TEMPLATE_ID,
     QWEN38_TEMPLATE_SHA256, QWEN38_TOKENIZER_SHA256, Qwen35MultimodalProjectionConfig,
     Qwen38PromptContent, Qwen38PromptMessage, Qwen38PromptOptions, Qwen38PromptReceipt,
-    Qwen38PromptRole, Qwen38ToolDefinition, Qwen38ToolFunctionDefinition, ReasoningParser,
-    parse_gpt_oss_harmony_text, parse_reasoning_response_text_for_decoder_family,
+    Qwen38PromptRole, Qwen38RenderedPrompt, Qwen38ToolDefinition, Qwen38ToolFunctionDefinition,
+    ReasoningParser, parse_gpt_oss_harmony_text, parse_reasoning_response_text_for_decoder_family,
     reasoning_parser_for_decoder_family, render_gpt_oss_harmony_prompt, render_qwen38_prompt,
 };
 use psionic_net::{
@@ -99,9 +99,15 @@ use crate::{
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
+mod qwen38_media;
 mod tassadar_post_article_router_plugin_tool_loop_pilot;
 
 pub use tassadar_post_article_router_plugin_tool_loop_pilot::*;
+
+use self::qwen38_media::{
+    Qwen38OpenAiMediaKind, Qwen38OpenAiMultimodalReceipt, Qwen38OpenAiMultimodalRuntime,
+    Qwen38PreparedMediaInput, prepare_qwen38_openai_media,
+};
 
 const DEFAULT_MAX_TOKENS: usize = 256;
 const HARMONY_RETURN_STOP: &str = "<|return|>";
@@ -987,6 +993,7 @@ impl OpenAiCompatBackend {
 #[derive(Clone, Debug)]
 pub struct OpenAiCompatConfig {
     pub model_paths: Vec<PathBuf>,
+    pub qwen38_vision_model_dir: Option<PathBuf>,
     pub host: String,
     pub port: u16,
     pub backend: OpenAiCompatBackend,
@@ -1000,6 +1007,7 @@ impl OpenAiCompatConfig {
     pub fn new(model_path: impl Into<PathBuf>) -> Self {
         Self {
             model_paths: vec![model_path.into()],
+            qwen38_vision_model_dir: None,
             host: String::from("127.0.0.1"),
             port: 8080,
             backend: OpenAiCompatBackend::Cpu,
@@ -2012,6 +2020,7 @@ enum OpenAiCompatRuntimeKind {
 struct OpenAiCompatModelLoadPlan {
     path: PathBuf,
     runtime_kind: OpenAiCompatRuntimeKind,
+    qwen38_vision_model_dir: Option<PathBuf>,
     sparse_cluster_schedule: Option<SparseExpertClusterSchedule>,
     distributed_peer: Option<DistributedGemma4PeerConfig>,
 }
@@ -2053,6 +2062,26 @@ struct OpenAiCompatLoadedDecoderModel {
 enum OpenAiCompatMultimodalLane {
     PromptProjection(Qwen35MultimodalProjectionConfig),
     ProcessorOwned(ProcessorOwnedMultimodalLane),
+    Qwen38Native(Qwen38NativeMultimodalLane),
+}
+
+#[derive(Clone)]
+struct Qwen38NativeMultimodalLane {
+    vision_backend: &'static str,
+    supported_media: &'static [&'static str],
+}
+
+impl Qwen38NativeMultimodalLane {
+    const fn cpu_vision() -> Self {
+        Self {
+            vision_backend: "cpu",
+            supported_media: &["image", "video"],
+        }
+    }
+
+    fn supported_media(&self) -> Vec<&'static str> {
+        self.supported_media.to_vec()
+    }
 }
 
 #[derive(Clone)]
@@ -2292,6 +2321,7 @@ impl OpenAiCompatLoadedModel {
             .map(|lane| match lane {
                 OpenAiCompatMultimodalLane::PromptProjection(_) => "prompt_projection_only",
                 OpenAiCompatMultimodalLane::ProcessorOwned(_) => "processor_owned",
+                OpenAiCompatMultimodalLane::Qwen38Native(_) => "native_vision",
             })
     }
 
@@ -2301,6 +2331,7 @@ impl OpenAiCompatLoadedModel {
             .map(|lane| match lane {
                 OpenAiCompatMultimodalLane::PromptProjection(_) => vec!["image", "video"],
                 OpenAiCompatMultimodalLane::ProcessorOwned(lane) => lane.supported_media(),
+                OpenAiCompatMultimodalLane::Qwen38Native(lane) => lane.supported_media(),
             })
     }
 
@@ -2309,7 +2340,8 @@ impl OpenAiCompatLoadedModel {
             .and_then(|model| model.multimodal_lane.as_ref())
             .and_then(|lane| match lane {
                 OpenAiCompatMultimodalLane::PromptProjection(config) => Some(config.clone()),
-                OpenAiCompatMultimodalLane::ProcessorOwned(_) => None,
+                OpenAiCompatMultimodalLane::ProcessorOwned(_)
+                | OpenAiCompatMultimodalLane::Qwen38Native(_) => None,
             })
     }
 
@@ -3381,6 +3413,13 @@ enum OpenAiCompatWorkerCommand {
         request: GenerationRequest,
         reply: oneshot::Sender<Result<crate::GenerationResponse, ReferenceTextGenerationError>>,
     },
+    Qwen38MultimodalGenerate {
+        model_key: String,
+        request: GenerationRequest,
+        prompt: Qwen38RenderedPrompt,
+        media: Vec<Qwen38PreparedMediaInput>,
+        reply: oneshot::Sender<Result<Qwen38OpenAiGenerationResult, ReferenceTextGenerationError>>,
+    },
     Embed {
         model_key: String,
         request: EmbeddingRequest,
@@ -3398,6 +3437,11 @@ enum OpenAiCompatWorkerCommand {
         request: DistributedGemma4RemoteResetRequest,
         reply: oneshot::Sender<Result<(), ReferenceTextGenerationError>>,
     },
+}
+
+struct Qwen38OpenAiGenerationResult {
+    response: crate::GenerationResponse,
+    multimodal: Qwen38OpenAiMultimodalReceipt,
 }
 
 impl BootstrapProxyState {
@@ -3632,6 +3676,7 @@ impl OpenAiCompatServer {
         let mut routed_models = Vec::new();
         let mut default_model_key = None;
         let mut load_plans = Vec::new();
+        let mut qwen38_multimodal_configured = false;
         let mut sparse_shard_artifact_cache = SparseShardArtifactCache::default();
         let bootstrap_mode = BootstrapProxyMode::from_env()?;
 
@@ -3673,6 +3718,21 @@ impl OpenAiCompatServer {
                 admitted_schedule.as_ref(),
                 config.backend,
             )?;
+            if let Some(vision_model_dir) = config.qwen38_vision_model_dir.as_ref()
+                && let Some(decoder) = loaded_model.decoder_mut()
+                && matches!(decoder.family, GgufDecoderFamily::Qwen38)
+            {
+                if matches!(config.backend, OpenAiCompatBackend::Metal) {
+                    return Err(OpenAiCompatServerError::Config(String::from(
+                        "Qwen3.8 OpenAI media serving is not implemented on the Metal decoder lane; omit `--qwen38-vision-model-dir` or use the CPU/CUDA decoder backend",
+                    )));
+                }
+                decoder.multimodal_lane = Some(OpenAiCompatMultimodalLane::Qwen38Native(
+                    Qwen38NativeMultimodalLane::cpu_vision(),
+                ));
+                load_plan.qwen38_vision_model_dir = Some(vision_model_dir.clone());
+                qwen38_multimodal_configured = true;
+            }
             maybe_materialize_admitted_sparse_shards(
                 &mut loaded_model,
                 &load_plan,
@@ -3696,6 +3756,11 @@ impl OpenAiCompatServer {
                 default_model_key = Some(loaded_model.model_key.clone());
             }
             load_plans.push(load_plan);
+        }
+        if config.qwen38_vision_model_dir.is_some() && !qwen38_multimodal_configured {
+            return Err(OpenAiCompatServerError::Config(String::from(
+                "`qwen38_vision_model_dir` requires at least one loaded Qwen3.8 decoder artifact",
+            )));
         }
 
         let default_model_key = default_model_key.expect("validated non-empty model list");
@@ -3878,6 +3943,7 @@ impl OpenAiCompatWorker {
             .name(String::from("psionic-openai-worker"))
             .spawn(move || {
                 let mut generation_services = BTreeMap::new();
+                let mut qwen38_multimodal_runtimes = BTreeMap::new();
                 let mut embeddings_services = BTreeMap::new();
                 for load_plan in &load_plans {
                     match load_plan.runtime_kind {
@@ -3887,9 +3953,25 @@ impl OpenAiCompatWorker {
                                     let model_key =
                                         service.model_descriptor().model.model_id.clone();
                                     generation_services.insert(
-                                        model_key,
+                                        model_key.clone(),
                                         OpenAiCompatGenerationService::Cpu(service),
                                     );
+                                    if let Some(model_dir) =
+                                        load_plan.qwen38_vision_model_dir.as_deref()
+                                    {
+                                        match Qwen38OpenAiMultimodalRuntime::from_official_model_dir(
+                                            model_dir,
+                                        ) {
+                                            Ok(runtime) => {
+                                                qwen38_multimodal_runtimes
+                                                    .insert(model_key, runtime);
+                                            }
+                                            Err(error) => {
+                                                let _ = ready_tx.send(Err::<(), String>(error));
+                                                return;
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(error) => {
                                     let _ = ready_tx.send(Err::<(), String>(error.to_string()));
@@ -3993,9 +4075,25 @@ impl OpenAiCompatWorker {
                                     let model_key =
                                         service.model_descriptor().model.model_id.clone();
                                     generation_services.insert(
-                                        model_key,
+                                        model_key.clone(),
                                         OpenAiCompatGenerationService::Qwen35Cuda(service),
                                     );
+                                    if let Some(model_dir) =
+                                        load_plan.qwen38_vision_model_dir.as_deref()
+                                    {
+                                        match Qwen38OpenAiMultimodalRuntime::from_official_model_dir(
+                                            model_dir,
+                                        ) {
+                                            Ok(runtime) => {
+                                                qwen38_multimodal_runtimes
+                                                    .insert(model_key, runtime);
+                                            }
+                                            Err(error) => {
+                                                let _ = ready_tx.send(Err::<(), String>(error));
+                                                return;
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(error) => {
                                     let _ = ready_tx.send(Err::<(), String>(error.to_string()));
@@ -4049,6 +4147,48 @@ impl OpenAiCompatWorker {
                         break;
                     };
                     match command {
+                        OpenAiCompatWorkerCommand::Qwen38MultimodalGenerate {
+                            model_key,
+                            request,
+                            prompt,
+                            media,
+                            reply,
+                        } => {
+                            let result = (|| {
+                                let runtime = qwen38_multimodal_runtimes
+                                    .get(model_key.as_str())
+                                    .ok_or_else(|| {
+                                        qwen38_multimodal_generation_error(format!(
+                                            "model `{model_key}` does not have an admitted Qwen3.8 vision runtime"
+                                        ))
+                                    })?;
+                                let (plan, multimodal) = runtime
+                                    .build_plan(&prompt, media.as_slice())
+                                    .map_err(qwen38_multimodal_generation_error)?;
+                                let service = generation_services
+                                    .get_mut(model_key.as_str())
+                                    .ok_or_else(|| {
+                                        ReferenceTextGenerationError::UnsupportedModel(
+                                            model_key.clone(),
+                                        )
+                                    })?;
+                                let response = match service {
+                                    OpenAiCompatGenerationService::Cpu(service) => service
+                                        .generate_qwen38_multimodal(&request, &plan),
+                                    OpenAiCompatGenerationService::Qwen35Cuda(service) => service
+                                        .generate_qwen38_multimodal(&request, &plan),
+                                    _ => Err(qwen38_multimodal_generation_error(format!(
+                                        "model `{model_key}` does not support native Qwen3.8 multimodal generation"
+                                    ))),
+                                }?;
+                                Ok(Qwen38OpenAiGenerationResult {
+                                    response,
+                                    multimodal,
+                                })
+                            })();
+                            let _ = reply.send(result);
+                            continue;
+                        }
                         OpenAiCompatWorkerCommand::Gemma4PipelineStep {
                             model_key,
                             request,
@@ -4109,6 +4249,9 @@ impl OpenAiCompatWorker {
 
                     let Some(model_key) = pending_commands.front().map(|command| match command {
                         OpenAiCompatWorkerCommand::Generate { model_key, .. } => model_key.clone(),
+                        OpenAiCompatWorkerCommand::Qwen38MultimodalGenerate {
+                            model_key, ..
+                        } => model_key.clone(),
                         OpenAiCompatWorkerCommand::Embed { model_key, .. } => model_key.clone(),
                         OpenAiCompatWorkerCommand::Gemma4PipelineStep { model_key, .. } => {
                             model_key.clone()
@@ -4241,6 +4384,34 @@ impl OpenAiCompatWorker {
         })?
     }
 
+    async fn generate_qwen38_multimodal(
+        &self,
+        model_key: String,
+        request: GenerationRequest,
+        prompt: Qwen38RenderedPrompt,
+        media: Vec<Qwen38PreparedMediaInput>,
+    ) -> Result<Qwen38OpenAiGenerationResult, ReferenceTextGenerationError> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        self.sender
+            .send(OpenAiCompatWorkerCommand::Qwen38MultimodalGenerate {
+                model_key,
+                request,
+                prompt,
+                media,
+                reply: reply_tx,
+            })
+            .map_err(|_| {
+                qwen38_multimodal_generation_error(String::from(
+                    "generic OpenAI worker is no longer available",
+                ))
+            })?;
+        reply_rx.await.map_err(|_| {
+            qwen38_multimodal_generation_error(String::from(
+                "generic OpenAI worker dropped the Qwen3.8 multimodal response channel",
+            ))
+        })?
+    }
+
     async fn embed(
         &self,
         model_key: String,
@@ -4312,6 +4483,10 @@ impl OpenAiCompatWorker {
             ))
         })?
     }
+}
+
+fn qwen38_multimodal_generation_error(detail: String) -> ReferenceTextGenerationError {
+    ReferenceTextGenerationError::Runtime(psionic_runtime::RuntimeError::Backend(detail))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -4838,14 +5013,20 @@ struct Qwen38OpenAiCapability {
     prefix_cache: &'static str,
     supported_sampling_controls: Vec<&'static str>,
     unsupported_sampling_controls: Vec<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vision_backend: Option<&'static str>,
     image_input: &'static str,
     video_input: &'static str,
 }
 
 fn qwen38_openai_capability(model: &OpenAiCompatLoadedModel) -> Option<Qwen38OpenAiCapability> {
-    model
+    let decoder = model
         .decoder()
         .filter(|decoder| matches!(decoder.family, GgufDecoderFamily::Qwen38))?;
+    let native_vision = match decoder.multimodal_lane.as_ref() {
+        Some(OpenAiCompatMultimodalLane::Qwen38Native(lane)) => Some(lane),
+        _ => None,
+    };
     Some(Qwen38OpenAiCapability {
         prompt_template_id: QWEN38_TEMPLATE_ID,
         prompt_template_sha256: QWEN38_TEMPLATE_SHA256,
@@ -4881,8 +5062,17 @@ fn qwen38_openai_capability(model: &OpenAiCompatLoadedModel) -> Option<Qwen38Ope
             "seed",
         ],
         unsupported_sampling_controls: vec!["logit_bias", "n", "best_of"],
-        image_input: "refuse_text_only_lane",
-        video_input: "refuse_text_only_lane",
+        vision_backend: native_vision.map(|lane| lane.vision_backend),
+        image_input: if native_vision.is_some() {
+            "native_bounded_base64_data_url"
+        } else {
+            "refuse_text_only_lane"
+        },
+        video_input: if native_vision.is_some() {
+            "native_bounded_animated_gif_data_url"
+        } else {
+            "refuse_text_only_lane"
+        },
     })
 }
 
@@ -5462,8 +5652,10 @@ fn chat_message_text_parts(content: &ChatCompletionMessageContent) -> Vec<&str> 
         ChatCompletionMessageContent::Parts(parts) => parts
             .iter()
             .filter_map(|part| match part {
-                ChatCompletionContentPart::Text { text } => Some(text.as_str()),
+                ChatCompletionContentPart::Text { text }
+                | ChatCompletionContentPart::InputText { text } => Some(text.as_str()),
                 ChatCompletionContentPart::ImageUrl { .. }
+                | ChatCompletionContentPart::InputImage { .. }
                 | ChatCompletionContentPart::InputAudio { .. }
                 | ChatCompletionContentPart::VideoUrl { .. } => None,
             })
@@ -6712,7 +6904,9 @@ enum ChatCompletionMessageContent {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ChatCompletionContentPart {
     Text { text: String },
+    InputText { text: String },
     ImageUrl { image_url: ChatCompletionMediaUrl },
+    InputImage { image_url: String },
     InputAudio { input_audio: ChatCompletionMediaUrl },
     VideoUrl { video_url: ChatCompletionMediaUrl },
 }
@@ -8660,6 +8854,7 @@ async fn handle_generic_chat_completions(
             model.audio_lane.as_ref(),
         )?;
     }
+    let qwen38_media = prepare_qwen38_openai_media_inputs(&request.messages, model)?;
     let prompt_messages = apply_tool_contract_to_prompt_messages(
         chat_messages_to_prompt_messages_for_decoder(&request.messages, model)?,
         tool_contract.as_ref(),
@@ -8672,6 +8867,7 @@ async fn handle_generic_chat_completions(
         tool_contract.as_ref(),
     )?;
     let qwen38_prompt_receipt = rendered.qwen38_receipt.clone();
+    let qwen38_rendered_prompt = rendered.qwen38_rendered.clone();
     let request_id = next_generic_request_id(&state, "psionic-chatcmpl");
     let response_model_name = request
         .model
@@ -8704,12 +8900,38 @@ async fn handle_generic_chat_completions(
     }
     .with_prefix_cache_control(request.psionic_prefix_cache.clone().unwrap_or_default());
 
-    let response = worker_for_route(state.as_ref(), &route.selection)?
-        .generate(route.selection.model_key.clone(), generation_request)
-        .await
-        .map_err(|error| {
-            OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+    let worker = worker_for_route(state.as_ref(), &route.selection)?;
+    let (response, qwen38_multimodal_receipt) = if qwen38_media.is_empty() {
+        (
+            worker
+                .generate(route.selection.model_key.clone(), generation_request)
+                .await
+                .map_err(|error| {
+                    OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(
+                        error,
+                    ))
+                })?,
+            None,
+        )
+    } else {
+        let prompt = qwen38_rendered_prompt.ok_or_else(|| {
+            OpenAiCompatHttpError::Internal(String::from(
+                "Qwen3.8 media request is missing its structured rendered prompt",
+            ))
         })?;
+        let generated = worker
+            .generate_qwen38_multimodal(
+                route.selection.model_key.clone(),
+                generation_request,
+                prompt,
+                qwen38_media,
+            )
+            .await
+            .map_err(|error| {
+                OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+            })?;
+        (generated.response, Some(generated.multimodal))
+    };
     let route_execution = route_execution_status_for_local_route(&route.selection);
     state.record_route_execution(route_execution.clone());
     let parsed_reasoning = if reasoning_parser_for_decoder_family(model.family).is_some() {
@@ -8796,6 +9018,7 @@ async fn handle_generic_chat_completions(
         loaded_model,
         qwen38_prompt_receipt.as_ref(),
         &response.metrics,
+        qwen38_multimodal_receipt,
     );
     if request.stream {
         let terminal_chunk = completion_terminal_chunk(
@@ -9083,6 +9306,15 @@ async fn handle_generic_responses(
             "stateful `/v1/responses` continuation cannot change `instructions`; omit it or repeat the original value exactly",
         )));
     }
+    if matches!(
+        model.multimodal_lane.as_ref(),
+        Some(OpenAiCompatMultimodalLane::Qwen38Native(_))
+    ) && qwen38_prompt_history_contains_media(response_state_context.prompt_history.as_slice())
+    {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "stateful Qwen3.8 `/v1/responses` continuation cannot replay retained binary media yet; submit the media again in a new response request",
+        )));
+    }
     let reasoning_request =
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
     let qwen38_prompt_options = qwen38_prompt_options_for_request(
@@ -9091,12 +9323,15 @@ async fn handle_generic_responses(
         request.psionic_enable_thinking,
         request.psionic_preserve_thinking,
     )?;
-    let appended_prompt_messages = response_input_to_prompt_messages_with_options(
+    let response_input_messages = response_input_chat_messages(
         &request,
-        model,
         response_state_context.prompt_history.is_empty(),
         false,
-    )?;
+    );
+    let qwen38_media =
+        prepare_qwen38_openai_media_inputs(response_input_messages.as_slice(), model)?;
+    let appended_prompt_messages =
+        chat_messages_to_prompt_messages_for_decoder(response_input_messages.as_slice(), model)?;
     let mut prompt_history = response_state_context.prompt_history.clone();
     prompt_history.extend(appended_prompt_messages.clone());
     let prompt_messages = apply_tool_contract_to_prompt_messages(
@@ -9111,6 +9346,7 @@ async fn handle_generic_responses(
         tool_contract.as_ref(),
     )?;
     let qwen38_prompt_receipt = rendered.qwen38_receipt.clone();
+    let qwen38_rendered_prompt = rendered.qwen38_rendered.clone();
     let request_id = next_generic_request_id(&state, "psionic-resp");
     let response_model_name = request
         .model
@@ -9142,12 +9378,38 @@ async fn handle_generic_responses(
     }
     .with_prefix_cache_control(request.psionic_prefix_cache.clone().unwrap_or_default());
 
-    let response = worker_for_route(state.as_ref(), &route.selection)?
-        .generate(route.selection.model_key.clone(), generation_request)
-        .await
-        .map_err(|error| {
-            OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+    let worker = worker_for_route(state.as_ref(), &route.selection)?;
+    let (response, qwen38_multimodal_receipt) = if qwen38_media.is_empty() {
+        (
+            worker
+                .generate(route.selection.model_key.clone(), generation_request)
+                .await
+                .map_err(|error| {
+                    OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(
+                        error,
+                    ))
+                })?,
+            None,
+        )
+    } else {
+        let prompt = qwen38_rendered_prompt.ok_or_else(|| {
+            OpenAiCompatHttpError::Internal(String::from(
+                "Qwen3.8 media request is missing its structured rendered prompt",
+            ))
         })?;
+        let generated = worker
+            .generate_qwen38_multimodal(
+                route.selection.model_key.clone(),
+                generation_request,
+                prompt,
+                qwen38_media,
+            )
+            .await
+            .map_err(|error| {
+                OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+            })?;
+        (generated.response, Some(generated.multimodal))
+    };
     let route_execution = route_execution_status_for_local_route(&route.selection);
     state.record_route_execution(route_execution.clone());
     let parsed_reasoning = if reasoning_parser_for_decoder_family(model.family).is_some() {
@@ -9235,6 +9497,7 @@ async fn handle_generic_responses(
         loaded_model,
         qwen38_prompt_receipt.as_ref(),
         &response.metrics,
+        qwen38_multimodal_receipt,
     );
     let assistant_history = assistant_history_from_response(
         model.family,
@@ -9763,7 +10026,7 @@ struct ResponsesResponse {
     psionic_qwen38: Option<Qwen38OpenAiReceipt>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 struct Qwen38OpenAiReceipt {
     schema_version: &'static str,
     model_key: String,
@@ -9774,6 +10037,8 @@ struct Qwen38OpenAiReceipt {
     execution_engine: &'static str,
     prompt: Qwen38PromptReceipt,
     #[serde(skip_serializing_if = "Option::is_none")]
+    multimodal: Option<Qwen38OpenAiMultimodalReceipt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     raw_logits_materialized: Option<bool>,
 }
 
@@ -9781,6 +10046,7 @@ fn qwen38_openai_receipt(
     model: &OpenAiCompatLoadedModel,
     prompt: Option<&Qwen38PromptReceipt>,
     metrics: &GenerationMetrics,
+    multimodal: Option<Qwen38OpenAiMultimodalReceipt>,
 ) -> Option<Qwen38OpenAiReceipt> {
     model
         .decoder()
@@ -9794,6 +10060,7 @@ fn qwen38_openai_receipt(
         execution_mode: model.execution_mode_label(),
         execution_engine: model.execution_engine_label(),
         prompt: prompt?.clone(),
+        multimodal,
         raw_logits_materialized: metrics
             .qwen35_cuda_decode
             .as_ref()
@@ -10294,6 +10561,35 @@ fn insert_loaded_model_identity_headers(
             }),
         );
     }
+    if let Some(multimodal) = receipt.multimodal.as_ref() {
+        insert_usize_header(
+            headers,
+            "x-psionic-qwen38-media-attachments",
+            multimodal.attachment_count(),
+        );
+        for (name, value) in [
+            (
+                "x-psionic-qwen38-vision-backend",
+                multimodal.vision_backend().to_string(),
+            ),
+            (
+                "x-psionic-qwen38-attachment-sha256",
+                multimodal.attachment_sha256_csv(),
+            ),
+            (
+                "x-psionic-qwen38-multimodal-token-sha256",
+                multimodal.decoder_plan().token_ids_sha256.clone(),
+            ),
+            (
+                "x-psionic-qwen38-expanded-prompt-sha256",
+                multimodal.decoder_plan().expanded_prompt_sha256.clone(),
+            ),
+        ] {
+            if let Ok(value) = HeaderValue::from_str(value.as_str()) {
+                headers.insert(HeaderName::from_static(name), value);
+            }
+        }
+    }
 }
 
 fn insert_generic_execution_headers(
@@ -10539,6 +10835,7 @@ struct GenericRenderedPrompt {
     text: String,
     stop_sequences: Vec<String>,
     qwen38_receipt: Option<Qwen38PromptReceipt>,
+    qwen38_rendered: Option<Qwen38RenderedPrompt>,
 }
 
 struct ResolvedGenericRoute<'a> {
@@ -11056,6 +11353,7 @@ fn load_generic_decoder_model(
         OpenAiCompatModelLoadPlan {
             path: model_path.to_path_buf(),
             runtime_kind,
+            qwen38_vision_model_dir: None,
             sparse_cluster_schedule: None,
             distributed_peer: distributed_front,
         },
@@ -11117,6 +11415,7 @@ fn load_generic_embeddings_model(
         OpenAiCompatModelLoadPlan {
             path: model_path.to_path_buf(),
             runtime_kind: OpenAiCompatRuntimeKind::SafetensorsEmbeddings,
+            qwen38_vision_model_dir: None,
             sparse_cluster_schedule: None,
             distributed_peer: None,
         },
@@ -11403,6 +11702,7 @@ fn render_prompt_for_model_with_request(
                 String::from(HARMONY_CALL_STOP),
             ],
             qwen38_receipt: None,
+            qwen38_rendered: None,
         });
     }
     let renderer = decoder.prompt_renderer.as_ref().ok_or_else(|| {
@@ -11427,9 +11727,10 @@ fn render_prompt_for_model_with_request(
             })?;
         return Ok(GenericRenderedPrompt {
             input,
-            text: rendered.text,
+            text: rendered.text.clone(),
             stop_sequences: Vec::new(),
-            qwen38_receipt: Some(rendered.receipt),
+            qwen38_receipt: Some(rendered.receipt.clone()),
+            qwen38_rendered: Some(rendered),
         });
     }
     let rendered = match renderer.render_with_options(None, messages, true, &decoder.prompt_options)
@@ -11446,6 +11747,7 @@ fn render_prompt_for_model_with_request(
                 text,
                 stop_sequences: Vec::new(),
                 qwen38_receipt: None,
+                qwen38_rendered: None,
             });
         }
         Err(error) => return Err(error.into()),
@@ -11464,6 +11766,7 @@ fn render_prompt_for_model_with_request(
         text: rendered.text,
         stop_sequences: rendered.stop_sequences,
         qwen38_receipt: None,
+        qwen38_rendered: None,
     })
 }
 
@@ -11808,12 +12111,22 @@ fn apply_sampling_controls(
     options.seed = seed;
 }
 
+#[cfg(test)]
 fn response_input_to_prompt_messages_with_options(
     request: &ResponsesRequest,
     model: &OpenAiCompatLoadedDecoderModel,
     include_instructions: bool,
     allow_empty_input: bool,
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
+    let messages = response_input_chat_messages(request, include_instructions, allow_empty_input);
+    chat_messages_to_prompt_messages_for_decoder(messages.as_slice(), model)
+}
+
+fn response_input_chat_messages(
+    request: &ResponsesRequest,
+    include_instructions: bool,
+    allow_empty_input: bool,
+) -> Vec<ChatCompletionMessage> {
     let mut messages = Vec::new();
     if include_instructions && let Some(instructions) = request.instructions.as_ref() {
         messages.push(ChatCompletionMessage::text(
@@ -11835,7 +12148,7 @@ fn response_input_to_prompt_messages_with_options(
             }
         }
     }
-    chat_messages_to_prompt_messages_for_decoder(messages.as_slice(), model)
+    messages
 }
 
 fn assistant_history_from_response(
@@ -12153,18 +12466,29 @@ fn chat_message_content_to_text(
             if let Some(OpenAiCompatMultimodalLane::PromptProjection(config)) = multimodal_lane {
                 return project_qwen35_multimodal_content(parts.as_slice(), role, config);
             }
+            if matches!(
+                multimodal_lane,
+                Some(OpenAiCompatMultimodalLane::Qwen38Native(_))
+            ) {
+                return project_qwen38_native_multimodal_content(parts.as_slice(), role);
+            }
             let mut text = String::new();
             for part in parts {
                 match part {
-                    ChatCompletionContentPart::Text { text: part_text } => {
+                    ChatCompletionContentPart::Text { text: part_text }
+                    | ChatCompletionContentPart::InputText { text: part_text } => {
                         text.push_str(part_text);
                     }
                     ChatCompletionContentPart::ImageUrl { .. }
+                    | ChatCompletionContentPart::InputImage { .. }
                     | ChatCompletionContentPart::VideoUrl { .. } => {
                         return Err(match multimodal_lane {
                             Some(OpenAiCompatMultimodalLane::ProcessorOwned(lane)) => {
                                 processor_owned_multimodal_content_error(family, lane)
                             }
+                            Some(OpenAiCompatMultimodalLane::Qwen38Native(_)) => unreachable!(
+                                "Qwen3.8 native media parts are projected before this match"
+                            ),
                             _ => unsupported_multimodal_content_error(family),
                         });
                     }
@@ -12191,10 +12515,12 @@ fn project_qwen35_multimodal_content(
     let mut text = String::new();
     for part in parts {
         match part {
-            ChatCompletionContentPart::Text { text: part_text } => {
+            ChatCompletionContentPart::Text { text: part_text }
+            | ChatCompletionContentPart::InputText { text: part_text } => {
                 text.push_str(part_text);
             }
             ChatCompletionContentPart::ImageUrl { .. }
+            | ChatCompletionContentPart::InputImage { .. }
             | ChatCompletionContentPart::VideoUrl { .. }
                 if matches!(role, PromptMessageRole::System) =>
             {
@@ -12207,7 +12533,8 @@ fn project_qwen35_multimodal_content(
                     "qwen35 multimodal projection supports image and video parts only",
                 )));
             }
-            ChatCompletionContentPart::ImageUrl { .. } => {
+            ChatCompletionContentPart::ImageUrl { .. }
+            | ChatCompletionContentPart::InputImage { .. } => {
                 text.push_str(config.image_marker());
             }
             ChatCompletionContentPart::VideoUrl { .. } => {
@@ -12216,6 +12543,87 @@ fn project_qwen35_multimodal_content(
         }
     }
     Ok(text)
+}
+
+fn project_qwen38_native_multimodal_content(
+    parts: &[ChatCompletionContentPart],
+    role: PromptMessageRole,
+) -> Result<String, OpenAiCompatHttpError> {
+    let mut text = String::new();
+    for part in parts {
+        match part {
+            ChatCompletionContentPart::Text { text: part_text }
+            | ChatCompletionContentPart::InputText { text: part_text } => {
+                text.push_str(part_text);
+            }
+            ChatCompletionContentPart::ImageUrl { .. }
+            | ChatCompletionContentPart::InputImage { .. }
+            | ChatCompletionContentPart::VideoUrl { .. }
+                if matches!(role, PromptMessageRole::System) =>
+            {
+                return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                    "Qwen3.8 system messages cannot contain image or video parts",
+                )));
+            }
+            ChatCompletionContentPart::InputAudio { .. } => {
+                return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                    "Qwen3.8 native multimodal serving supports image and video parts only",
+                )));
+            }
+            ChatCompletionContentPart::ImageUrl { .. }
+            | ChatCompletionContentPart::InputImage { .. } => {
+                text.push_str("<|vision_start|><|image_pad|><|vision_end|>");
+            }
+            ChatCompletionContentPart::VideoUrl { .. } => {
+                text.push_str("<|vision_start|><|video_pad|><|vision_end|>");
+            }
+        }
+    }
+    Ok(text)
+}
+
+fn prepare_qwen38_openai_media_inputs(
+    messages: &[ChatCompletionMessage],
+    model: &OpenAiCompatLoadedDecoderModel,
+) -> Result<Vec<Qwen38PreparedMediaInput>, OpenAiCompatHttpError> {
+    if !matches!(
+        model.multimodal_lane,
+        Some(OpenAiCompatMultimodalLane::Qwen38Native(_))
+    ) {
+        return Ok(Vec::new());
+    }
+    let mut prepared = Vec::new();
+    for message in messages {
+        let ChatCompletionMessageContent::Parts(parts) = &message.content else {
+            continue;
+        };
+        for part in parts {
+            let (kind, url) = match part {
+                ChatCompletionContentPart::ImageUrl { image_url } => {
+                    (Qwen38OpenAiMediaKind::Image, image_url.url.as_str())
+                }
+                ChatCompletionContentPart::InputImage { image_url } => {
+                    (Qwen38OpenAiMediaKind::Image, image_url.as_str())
+                }
+                ChatCompletionContentPart::VideoUrl { video_url } => {
+                    (Qwen38OpenAiMediaKind::Video, video_url.url.as_str())
+                }
+                ChatCompletionContentPart::Text { .. }
+                | ChatCompletionContentPart::InputText { .. }
+                | ChatCompletionContentPart::InputAudio { .. } => continue,
+            };
+            let input = prepare_qwen38_openai_media(kind, url, prepared.as_slice())
+                .map_err(OpenAiCompatHttpError::BadRequest)?;
+            prepared.push(input);
+        }
+    }
+    Ok(prepared)
+}
+
+fn qwen38_prompt_history_contains_media(prompt_history: &[PromptMessage]) -> bool {
+    prompt_history.iter().any(|message| {
+        message.content.contains("<|image_pad|>") || message.content.contains("<|video_pad|>")
+    })
 }
 
 fn unsupported_multimodal_content_error(family: GgufDecoderFamily) -> OpenAiCompatHttpError {
@@ -12471,6 +12879,86 @@ mod tests {
         assert_eq!(prompt[0].content, "first instruction");
         assert_eq!(prompt[1].role, PromptMessageRole::User);
         assert_eq!(prompt[1].content, "hello");
+    }
+
+    #[test]
+    fn qwen38_native_media_projection_preserves_part_order_and_refuses_system_media() {
+        let parts = vec![
+            ChatCompletionContentPart::InputText {
+                text: String::from("compare "),
+            },
+            ChatCompletionContentPart::InputImage {
+                image_url: String::from("data:image/png;base64,AA=="),
+            },
+            ChatCompletionContentPart::Text {
+                text: String::from(" with "),
+            },
+            ChatCompletionContentPart::VideoUrl {
+                video_url: super::ChatCompletionMediaUrl {
+                    url: String::from("data:image/gif;base64,AA=="),
+                },
+            },
+        ];
+
+        let projected = super::project_qwen38_native_multimodal_content(
+            parts.as_slice(),
+            PromptMessageRole::User,
+        )
+        .expect("project native media markers");
+        assert_eq!(
+            projected,
+            "compare <|vision_start|><|image_pad|><|vision_end|> with <|vision_start|><|video_pad|><|vision_end|>"
+        );
+
+        let error = super::project_qwen38_native_multimodal_content(
+            parts.as_slice(),
+            PromptMessageRole::System,
+        )
+        .expect_err("system media should refuse");
+        assert!(error.to_string().contains("system messages cannot contain"));
+    }
+
+    #[test]
+    fn responses_input_accepts_official_input_text_and_input_image_parts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let request = serde_json::from_value::<ResponsesRequest>(serde_json::json!({
+            "model": "qwen38:27b",
+            "input": [{
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "describe"},
+                    {"type": "input_image", "image_url": "data:image/png;base64,AA=="}
+                ]
+            }]
+        }))?;
+        let ResponsesInput::Messages(messages) = request.input else {
+            panic!("expected Responses message input");
+        };
+        let ChatCompletionMessageContent::Parts(parts) = &messages[0].content else {
+            panic!("expected Responses content parts");
+        };
+        assert!(matches!(
+            parts.as_slice(),
+            [
+                ChatCompletionContentPart::InputText { .. },
+                ChatCompletionContentPart::InputImage { .. }
+            ]
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_response_history_detects_unreplayable_media_markers() {
+        assert!(super::qwen38_prompt_history_contains_media(&[
+            PromptMessage::new(
+                PromptMessageRole::User,
+                "inspect <|vision_start|><|image_pad|><|vision_end|>",
+            ),
+        ]));
+        assert!(!super::qwen38_prompt_history_contains_media(&[
+            PromptMessage::new(PromptMessageRole::User, "text only"),
+        ]));
     }
 
     #[test]

@@ -922,9 +922,36 @@ CUDA vision and decoder execution, device argmax with 16 bytes of readback,
 `fallback_policy = refuse`, and no hidden fallback. Elapsed fields are
 diagnostic and do not establish a performance claim.
 
-R11 remains `partial` until Metal consumes the plan and chat/responses media
-serving passes attachment, streaming, tool, bound, malformed-input, and refusal
-coverage with retained end-to-end generation evidence.
+The generic OpenAI-compatible server now has an early native Qwen3.8 media
+lane behind `--qwen38-vision-model-dir <official-model-dir>`. The lane loads
+the official tokenizer and native vision stack on CPU, then sends the strict
+decoder-input plan to the admitted CPU or CUDA decoder. Keeping vision on CPU
+prevents its full-model residency from overlapping the CUDA decoder weights.
+Metal configuration refuses because Metal decoder consumption is not
+implemented.
+
+`/v1/chat/completions` accepts ordered text, image, and video parts.
+`/v1/responses` accepts the official `input_text` and `input_image` part shape
+plus Psionic's bounded `video_url` extension. Images are base64 data URLs with
+PNG, JPEG, or WebP payloads. Videos are base64 animated GIF data URLs only;
+remote URLs and MP4 refuse. A request admits at most four attachments, 8 MiB
+per decoded attachment, and 16 MiB total decoded attachment bytes. Codec
+admission also caps each dimension at 4,096 pixels, GIF input at 32 source
+frames, and decoder allocation at 64 MiB before the stricter native
+preprocessing bounds run.
+
+The response receipt preserves original encoded attachment identity,
+preprocessing receipts, native vision runtime receipts, the decoder plan, and
+hidden-fallback truth. Chat streaming carries attachment count, vision backend,
+attachment digests, multimodal token identity, and expanded-prompt identity in
+headers. Tools use the same ordered media prompt. A stored Responses turn that
+contains media refuses continuation because binary attachment state is not yet
+retained for replay. A server without the explicit vision directory continues
+to publish and enforce the text-only media refusal.
+
+R11 remains `partial` until Metal consumes the plan and retained end-to-end
+OpenAI server evidence covers image, video, streaming, tools, bounds,
+malformed input, and refusal behavior.
 
 Native vision remains a separate roadmap lane after text support.
 
@@ -939,8 +966,8 @@ It requires:
 - native output parity against an upstream-supported runtime
 - bounded image/video size, frame count, timeout, and memory admission
 
-Until R11 lands, prompt marker projection must not be described as image or
-video understanding.
+Prompt marker projection without an admitted native vision runtime and decoder
+plan must not be described as image or video understanding.
 
 ## R12: Training And Adapters
 

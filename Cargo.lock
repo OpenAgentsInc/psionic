@@ -5399,6 +5399,7 @@ dependencies = [
  "hex",
  "hyper",
  "hyper-util",
+ "image",
  "psionic-adapters",
  "psionic-backend-cpu",
  "psionic-backend-cuda",

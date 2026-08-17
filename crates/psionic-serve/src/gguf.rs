@@ -27,8 +27,8 @@ use psionic_core::{QuantizationMode, Shape};
 use psionic_models::{
     DecoderModelDescriptor, GgufBlobArtifact, GgufDecoderAdapterLoader, GgufDecoderFamily,
     GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GgufMetadataValue,
-    GgufRuntimeTokenizer, ModelLoadError, PagedTensorStorage, TokenId, TokenSequence,
-    TokenizerBoundary,
+    GgufRuntimeTokenizer, ModelLoadError, PagedTensorStorage, Qwen38MultimodalDecoderPlan, TokenId,
+    TokenSequence, TokenizerBoundary,
 };
 use psionic_runtime::DeviceDiscovery;
 use psionic_train::{
@@ -359,6 +359,23 @@ impl CpuGgufTextGenerationService {
             CpuGgufServiceKind::GptOss(service) => service.generate_continuous_batch(requests),
             CpuGgufServiceKind::Dense(service) => service.generate_continuous_batch(requests),
             CpuGgufServiceKind::Qwen35(service) => service.generate_continuous_batch(requests),
+        }
+    }
+
+    pub fn generate_qwen38_multimodal(
+        &mut self,
+        request: &GenerationRequest,
+        plan: &Qwen38MultimodalDecoderPlan,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        match &mut self.inner {
+            CpuGgufServiceKind::Qwen35(service) => {
+                service.generate_qwen38_multimodal(request, plan)
+            }
+            CpuGgufServiceKind::GptOss(_) | CpuGgufServiceKind::Dense(_) => Err(
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::UnsupportedStep(
+                    String::from("native Qwen3.8 multimodal generation requires a Qwen3.8 decoder"),
+                )),
+            ),
         }
     }
 

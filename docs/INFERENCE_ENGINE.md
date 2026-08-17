@@ -335,9 +335,11 @@ into one generic engine claim.
   The Qwen3.8 Metal runtime is now `partial`: strict native-projection
   admission, bounded residency accounting, Qwen3.8 plan identity, and generic
   Metal/native/refuse publication are implemented, while retained full-model
-  Apple parity and throughput evidence is still pending. Media, adapters,
-  session reuse, and generic-server MTP remain unsupported and are published
-  or refused explicitly. The internal CPU service now has a
+  Apple parity and throughput evidence is still pending. Native bounded media
+  serving is implemented early on the CPU and CUDA decoder lanes behind an
+  explicit official vision-model directory; Metal media, adapters, session
+  reuse, and generic-server MTP remain unsupported and are published or
+  refused explicitly. The internal CPU service now has a
   typed cooperative generation timeout checked at token-step boundaries with
   stable `timed_out` and HTTP `504` diagnostics. R6 is `implemented` for the
   internal CPU lane.
@@ -355,9 +357,9 @@ into one generic engine claim.
   prompt digests byte-for-byte. The bundle records zero CUDA fallback, graph,
   cache, allocator, latency, and throughput observations while publishing no
   performance claim. Qwen3.8 remains `partial` overall because retained
-  full-model Apple Metal evidence, multimodal execution, training and adapters,
-  MTP acceleration, long-context widening, and the competitive performance
-  milestone are not complete. The
+  full-model Apple Metal evidence, Metal multimodal execution, retained HTTP
+  media evidence, training and adapters, MTP acceleration, long-context
+  widening, and the competitive performance milestone are not complete. The
   optional R9A CPU lane is `implemented` behind an explicit constructor.
   It conditionally loads the appended 15-tensor NextN block, shares the base
   embedding and LM head, keeps a separate dense-attention MTP KV cache, and
@@ -408,12 +410,27 @@ into one generic engine claim.
   graphs; raw post-convolution Q/K values never enter the recurrent delta-state
   update. Both runtimes bypass token-only prefix reuse, refuse prompt
   truncation, and retain the successful plan receipt. Metal decoder
-  consumption and native media serving remain absent, so HTTP prompt markers
-  are still refused as understanding on the text-only lane. Retained CUDA
+  consumption remains absent. Retained CUDA
   image/video generation evidence binds both source artifacts and both encoder
   parity reports. It records 64 image tokens producing `The image` and 128
   video tokens producing `The video`, with device argmax, a refuse fallback
-  policy, and no hidden fallback. The timings are diagnostic only.
+  policy, and no hidden fallback. The timings are diagnostic only. The generic
+  OpenAI-compatible server now exposes this plan on CPU and CUDA when started
+  with `--qwen38-vision-model-dir`. Images accept bounded base64 PNG, JPEG, or
+  WebP data URLs. Videos accept bounded base64 animated GIF data URLs as a
+  Psionic extension. Remote URLs, MP4, configured Metal media,
+  resize-requiring inputs, oversized inputs, and malformed data refuse. The
+  lane admits at most four attachments, 8 MiB each, and 16 MiB total decoded
+  attachment bytes. Chat and Responses preserve ordered media markers, use the
+  same native vision and decoder plan for tool-enabled requests, and return
+  attachment, preprocessing, vision-runtime, decoder-plan, and fallback
+  receipts. Chat streaming publishes multimodal identity headers. Responses
+  accepts the official `input_text` and `input_image` shapes; a stored media
+  turn refuses stateful continuation because binary attachments are not
+  retained for replay. The server still publishes and enforces text-only
+  refusal when the vision directory is omitted. Retained end-to-end HTTP
+  evidence and Metal decoder consumption remain pending, so R11 stays
+  `partial`.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`

@@ -72,6 +72,7 @@ where
     let mut host = String::from("127.0.0.1");
     let mut port = 8080_u16;
     let mut backend = OpenAiCompatBackend::Cpu;
+    let mut qwen38_vision_model_dir = None;
     let mut reasoning_budget = 0_u8;
     let mut mesh_coordination_enabled = true;
 
@@ -102,6 +103,9 @@ where
                         ));
                     }
                 };
+            }
+            "--qwen38-vision-model-dir" => {
+                qwen38_vision_model_dir = Some(next_value(&mut args, argument.as_str())?.into());
             }
             "--reasoning-budget" => {
                 reasoning_budget = next_value(&mut args, argument.as_str())?
@@ -140,6 +144,7 @@ where
     config.host = host;
     config.port = port;
     config.backend = backend;
+    config.qwen38_vision_model_dir = qwen38_vision_model_dir;
     config.reasoning_budget = reasoning_budget;
     config.mesh_coordination_enabled = mesh_coordination_enabled;
     Ok(config)
@@ -152,7 +157,7 @@ fn next_value(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<Str
 
 fn usage() -> String {
     String::from(
-        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda|metal] [--host <ip>] [--port <port>] [--reasoning-budget <n>] [--mesh-coordination enabled|disabled]",
+        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda|metal] [--qwen38-vision-model-dir <official-model-dir>] [--host <ip>] [--port <port>] [--reasoning-budget <n>] [--mesh-coordination enabled|disabled]",
     )
 }
 
@@ -177,6 +182,25 @@ mod tests {
             .expect("cuda backend should parse");
 
         assert!(matches!(config.backend, OpenAiCompatBackend::Cuda));
+    }
+
+    #[test]
+    fn parse_args_accepts_qwen38_vision_model_dir() {
+        let config = parse_args_from([
+            "-m",
+            "/tmp/model.gguf",
+            "--qwen38-vision-model-dir",
+            "/tmp/Qwen3.8-27B",
+        ])
+        .expect("Qwen3.8 vision model directory should parse");
+
+        assert_eq!(
+            config
+                .qwen38_vision_model_dir
+                .as_deref()
+                .map(|path| path.to_string_lossy().into_owned()),
+            Some(String::from("/tmp/Qwen3.8-27B"))
+        );
     }
 
     #[test]
