@@ -64,6 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Qwen38VisionRuntimeBackend::Cuda { device_ordinal: 0 },
     )?;
     let vision_output = vision_runtime.encode(&preprocessing)?;
+    let vision_runtime_receipt = vision_output.receipt.clone();
     let vision_duration_ns = duration_ns(vision_started.elapsed());
     drop(vision_runtime);
 
@@ -114,6 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if retained_receipt != plan.receipt() {
         return Err("CUDA service retained a different multimodal plan receipt".into());
     }
+    let decoder = service.model_descriptor();
 
     println!(
         "{}",
@@ -122,8 +124,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             "media_kind": media_kind,
             "official_model_dir": official_model_dir,
             "decoder_gguf": gguf_path,
-            "decoder_model": service.model_descriptor(),
-            "vision_receipt": plan.receipt().vision_runtime_output_sha256,
+            "decoder_model": {
+                "model": &decoder.model,
+                "config": &decoder.config,
+                "tokenizer_family": &decoder.tokenizer_family,
+                "weights_digest": &decoder.weights.digest,
+                "artifact_identity": &decoder.artifact_identity,
+            },
+            "decoder_runtime": service.cuda_runtime_contract(),
+            "vision_runtime": vision_runtime_receipt,
             "multimodal_plan_receipt": retained_receipt,
             "output_token_ids": response.output.tokens.as_slice().iter().map(|token| token.as_u32()).collect::<Vec<_>>(),
             "output_text": response.output.text,
