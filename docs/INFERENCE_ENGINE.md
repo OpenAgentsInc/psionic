@@ -307,8 +307,8 @@ into one generic engine claim.
   pinned llama.cpp revision `9b05354ec6fb58b4e665e9a39ebc40285c015638`.
   Tiny-fixture evidence covers recurrent/full-attention state allocation,
   MTP-tail exclusion, deterministic reset, context and memory refusal, and
-  cancellation. The generic OpenAI server still refuses Qwen3.8 until R8, and
-  R7 adds an internal native CUDA lane over the same graph. The selected
+  cancellation. The generic OpenAI server still refuses Qwen3.8 until R8. R7
+  adds an internal native CUDA lane over the same graph. The selected
   Dynamic V3 weights remain compressed on device, including native `Q3_K`
   token-embedding lookup and mixed-quantized full-attention Q/K/V parts. The
   lane uses Qwen3.8-specific execution-plan and graph-cache namespaces, caps
@@ -320,18 +320,23 @@ into one generic engine claim.
   quantization are checked before the first upload. Tiny-fixture CPU/CUDA
   logits and token parity, greedy and bounded sampling, graph replay, raw-
   logit observability, state reset, context refusal, and preflight refusal pass.
-  R7 remains `partial` pending retained full-model evidence from an idle RTX
-  4080. Metal, media, adapters, session reuse, and MTP speculative decoding
-  remain unsupported. The internal CPU service now has a typed cooperative
-  generation timeout checked at token-step boundaries with stable `timed_out`
-  and HTTP `504` diagnostics. R6 is `implemented` for the internal CPU lane.
+  R7 is `implemented`. Retained greedy and bounded-sampling rows on an idle
+  RTX 4080 bind exact prompt token `[9419]`, deterministic output IDs, zero
+  host fallback, graph replay without shape drift, mean decode throughput of
+  `10.995421174982495` and `10.874144370111445` tokens/s, and a measured
+  `13,390,641,048` byte Psionic CUDA allocator high-water mark inside the
+  preflight envelope. Metal, media, adapters, session reuse, and MTP
+  speculative decoding remain unsupported. The internal CPU service now has a
+  typed cooperative generation timeout checked at token-step boundaries with
+  stable `timed_out` and HTTP `504` diagnostics. R6 is `implemented` for the
+  internal CPU lane.
   Its retained real-artifact report compares 14 layer-zero recurrent
   boundaries across two-token prefill and retained-state decode against the
   pinned llama.cpp revision. All 28 comparisons pass, with maximum normalized
   RMSE `0.010121032189794241` and minimum cosine similarity
   `0.9999686621232524`; the transposed delta state matches directly without a
-  layout transform. Qwen3.8 remains `partial` overall because the accelerated
-  and public-serving milestones are not complete. The retained R4 and R5
+  layout transform. Qwen3.8 remains `partial` overall because public serving
+  and later milestones are not complete. The retained R4 and R5
   reports themselves still do not execute full-width
   attention or MLPs, materialize full-vocabulary logits, generate tokens,
   serve requests, compute gradients, or execute media inputs.

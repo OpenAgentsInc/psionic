@@ -1,10 +1,11 @@
 # Qwen3.8 Implementation Roadmap
 
-> Status: `partial` on 2026-08-14. Upstream research, artifact acquisition, and
+> Status: `partial` on 2026-08-17. Upstream research, artifact acquisition, and
 > R1 product/artifact identity, R2 prompt/tokenizer contracts, R3 checkpoint
 > admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
 > `implemented`; R6 native CPU generation is also `implemented` for the
-> internal CPU lane. R7 and later publication milestones remain `planned`.
+> internal CPU lane. R7 native CUDA generation is `implemented`. R8 and later
+> publication milestones remain `planned`.
 
 ## Goal
 
@@ -87,7 +88,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R4 | `implemented` | Real BF16 bounded execution evidence | Bounded evidence, not generation |
 | R5 | `implemented` | Converter-bound GGUF, exact type support, and memory admission | Artifact admitted, not served |
 | R6 | `implemented` | Native CPU token generation | Internal executable text lane with retained parity |
-| R7 | `partial` | Native CUDA token generation | First local accelerated lane |
+| R7 | `implemented` | Native CUDA token generation | First local accelerated lane |
 | R8 | `planned` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `planned` | Comparator, performance, and release gate | Retained `implemented_early` claim |
 | R9A | `planned` | Optional MTP speculative decoding and rollback | Separate acceleration claim |
@@ -520,11 +521,10 @@ first accelerated support claim.
 
 ## R7: Native CUDA Generation
 
-Status: `partial`. The shared native CUDA graph now admits Qwen3.8, preserves
-Qwen3.8-specific execution-plan and graph-cache namespaces, and passes the
-portable tiny-fixture acceptance suite. The required retained full-model rows
-remain pending an idle RTX 4080 run, so R7 is not yet
-`implemented`.
+Status: `implemented` on 2026-08-17. The shared native CUDA graph admits
+Qwen3.8, preserves Qwen3.8-specific execution-plan and graph-cache namespaces,
+passes the portable tiny-fixture acceptance suite, and has retained
+production-artifact greedy and bounded-sampling rows from an idle RTX 4080.
 
 The current implementation keeps the selected Dynamic V3 tensor storage on
 CUDA without dense F16 mirrors. The `Q3_K` token embedding uses native
@@ -543,6 +543,19 @@ scratch, dense-mirror, raw-logit, and fallback truth. The admitted context is
 device bytes, including retained pool buffers, so retained runs report a
 measured allocation high-water mark in addition to the planned envelope. No
 8,192-token claim follows from the current implementation.
+
+The retained reports are
+`fixtures/qwen38/reports/qwen38_cuda_greedy_generation_v1.json` and
+`fixtures/qwen38/reports/qwen38_cuda_bounded_sample_generation_v1.json`. Both
+bind the exact pretokenized prompt `[9419]`, the selected artifact byte length
+and SHA-256, the idle check, and NVIDIA GeForce RTX 4080 GPU identity. Greedy
+decode produced `[11, 353]` on both repeats at mean `10.995421174982495`
+tokens/s. Seeded bounded sampling produced `[11, 271]` on both repeats at mean
+`10.874144370111445` tokens/s. Both rows recorded zero host fallback, no raw
+logits, graph hits with no shape drift, and the Qwen3.8 graph-cache identity.
+The measured Psionic allocator high-water mark was `13,390,641,048` bytes,
+below the `15,275,674,688` byte preflight requirement and within the
+`15,808,397,312` bytes free at admission.
 
 Reuse the existing Qwen3.5 CUDA kernels and execution plans only after CPU
 parity proves the shared architecture boundary. Add Qwen3.8-specific plan and

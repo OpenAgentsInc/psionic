@@ -1,0 +1,303 @@
+{
+  "schema_version": 7,
+  "report_kind": "qwen38_cuda_generation_evidence",
+  "run_status": "ok",
+  "refusal_reason": null,
+  "benchmark_class": "direct_engine",
+  "generated_at_unix_s": 1786983650,
+  "backend": "psionic",
+  "model_path": "/home/christopherdavid/code/psionic/target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf",
+  "ollama_model": null,
+  "ollama_base_url": null,
+  "prompt": "Hello",
+  "prompt_mode": "token_ids",
+  "prompt_token_ids": [
+    9419
+  ],
+  "rendered_prompt": "Hello",
+  "stop_sequences": [],
+  "decode_mode": "sample",
+  "max_output_tokens": 2,
+  "repeats": 2,
+  "steady_state_concurrency": 1,
+  "load_s": 4.679984727,
+  "temperature": 0.8,
+  "top_k": 40,
+  "top_p": 0.9,
+  "min_p": null,
+  "typical_p": null,
+  "mirostat": null,
+  "mirostat_tau": null,
+  "mirostat_eta": null,
+  "repeat_penalty": 1.0,
+  "repeat_last_n": 64,
+  "presence_penalty": 0.0,
+  "frequency_penalty": 0.0,
+  "seed": 42,
+  "structured_output": {
+    "mode": "none",
+    "schema_name": null,
+    "schema": null
+  },
+  "psionic_cuda_startup": {
+    "load_s": 4.679984727,
+    "runtime_contract": {
+      "family": "qwen38",
+      "model_id": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+      "artifact_digest": "856754ef326b28d184777e5440058da85fff5ff1f3c847f9bd8716f079233cf9",
+      "execution_plan_namespace": "qwen38-native-cuda|v1",
+      "execution_plan_digest": "a3df827e77e693698f784a7a723a26222a06fe8919b6eb6c61da1506f483dafb",
+      "graph_cache_namespace": "qwen38-cuda-graph-cache|v1",
+      "graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+      "context_limit_tokens": 4096,
+      "artifact_bytes": 13441059904,
+      "device_capacity_bytes": 16711352320,
+      "device_free_bytes_at_preflight": 15808397312,
+      "preflight_required_device_bytes": 15275674688,
+      "preflight_margin_bytes": 532722624,
+      "preflight_status": "admitted_before_weight_upload",
+      "weight_device_bytes": 13221685248,
+      "recurrent_state_bytes": 156893184,
+      "kv_cache_bytes": 268435456,
+      "scratch_device_bytes": 7868312,
+      "planned_device_bytes": 13654882200,
+      "dense_f16_mirror_count": 0,
+      "quantization_modes": [
+        "ggml_q3_k",
+        "ggml_iq3_s",
+        "ggml_iq4_xs",
+        "ggml_q5_k"
+      ],
+      "raw_logits_materialization_observable": true,
+      "host_fallback_enabled": false
+    },
+    "allocator_measurement_scope": "psionic_owned_cuda_malloc_buffers_including_allocator_pool_cache",
+    "allocator_resident_device_bytes_after_load": 13229553560,
+    "allocator_peak_resident_device_bytes_after_load": 13229553560,
+    "allocator_resident_device_bytes_after_warmup": 13296621464,
+    "allocator_peak_resident_device_bytes_after_warmup": 13390641048,
+    "allocator_resident_device_bytes_after_measurements": 13296621464,
+    "allocator_peak_resident_device_bytes_after_measurements": 13390641048,
+    "cublas_handle_scope": "per_device_runtime_owner",
+    "cublas_stream_binding": "bind_stream_per_submission",
+    "cublas_lt_tuning_status": "ready_no_plans",
+    "cublas_lt_plan_cache_scope": "per_device_runtime_owner",
+    "cublas_lt_selected_plan_count": 0,
+    "cublas_lt_tuned_shape_count": 0,
+    "cublas_lt_fallback_shape_count": 0,
+    "cublas_lt_max_workspace_bytes": 0,
+    "cublas_lt_selected_plans": [],
+    "warmup_status": "explicit_warmup_completed",
+    "warmup_prompt_s": 0.207716463,
+    "warmup_decode_s": 0.179604124,
+    "warmup_total_s": 0.389797515,
+    "warmup_output_tokens": 2,
+    "warmup_host_fallback_evidence": {
+      "report_count": 0,
+      "op_count": 0,
+      "case_count": 0,
+      "fallback_invocations": 0,
+      "total_host_fallback_ms": 0,
+      "op_labels": []
+    },
+    "request_billed_to_user": false
+  },
+  "psionic_cuda_fast_path": {
+    "lane": "explicit_fallback_path",
+    "status": "compatibility_fallback_allowed",
+    "refusal_reason": null,
+    "required_output_modes": [
+      "argmax_only"
+    ],
+    "raw_logits_forbidden": true,
+    "host_fallback_forbidden": true,
+    "graph_capture_required": true,
+    "env_guards": [
+      {
+        "name": "PSIONIC_QWEN35_DISABLE_FAST_GREEDY",
+        "required_state": "unset",
+        "actual_state": "unset"
+      },
+      {
+        "name": "PSIONIC_QWEN35_DISABLE_FUSED_QKV_RMS_NORM",
+        "required_state": "unset",
+        "actual_state": "unset"
+      },
+      {
+        "name": "PSIONIC_QWEN35_DEBUG_ATTENTION",
+        "required_state": "unset",
+        "actual_state": "unset"
+      },
+      {
+        "name": "PSIONIC_QWEN35_DEBUG_FUSED_LAYERS",
+        "required_state": "unset",
+        "actual_state": "unset"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_index": 1,
+      "decode_mode": "sample",
+      "prompt_tokens": 1,
+      "output_tokens": 2,
+      "prompt_s": 0.185337442,
+      "decode_s": 0.183960291,
+      "total_s": 0.372225473,
+      "ttft_s": 0.000003957,
+      "itl_s": 0.18395453,
+      "decode_tok_s": 10.871911482244828,
+      "qwen35_output_modes": [
+        "top_k_candidates:40"
+      ],
+      "qwen35_readback_bytes": 640,
+      "qwen35_raw_logits": false,
+      "qwen35_graph_hits": 1,
+      "qwen35_graph_misses": 1,
+      "qwen35_graph_captures": 1,
+      "qwen35_graph_shape_drifts": 0,
+      "qwen35_graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+      "cuda_allocator_resident_device_bytes_after_run": 13296621464,
+      "cuda_allocator_peak_resident_device_bytes_after_run": 13390641048,
+      "qwen35_attention_layer_invocations": 32,
+      "qwen35_attention_backends": [
+        {
+          "requested_backend": "fa3_split_kv_f16_kv_graph",
+          "executed_backend": "fa3_split_kv_f16_kv_graph",
+          "graph_capture_compatible": true,
+          "split_count": 1,
+          "architecture": "ada",
+          "compute_capability": "8.9"
+        }
+      ],
+      "qwen35_host_fallback_evidence": {
+        "report_count": 0,
+        "op_count": 0,
+        "case_count": 0,
+        "fallback_invocations": 0,
+        "total_host_fallback_ms": 0,
+        "op_labels": []
+      },
+      "termination": {
+        "observed": "max_output_tokens",
+        "classification": "max_output_tokens",
+        "matched_stop_sequence": null
+      },
+      "structured_output_mode": "none",
+      "structured_output_parser": "none",
+      "structured_output_kind": "none",
+      "structured_output_value": null,
+      "output_token_ids": [
+        11,
+        271
+      ],
+      "output_text": ",\n\n"
+    },
+    {
+      "run_index": 2,
+      "decode_mode": "sample",
+      "prompt_tokens": 1,
+      "output_tokens": 2,
+      "prompt_s": 0.185360608,
+      "decode_s": 0.183884758,
+      "total_s": 0.372164397,
+      "ttft_s": 0.000003522,
+      "itl_s": 0.18387949,
+      "decode_tok_s": 10.876377257978064,
+      "qwen35_output_modes": [
+        "top_k_candidates:40"
+      ],
+      "qwen35_readback_bytes": 640,
+      "qwen35_raw_logits": false,
+      "qwen35_graph_hits": 1,
+      "qwen35_graph_misses": 1,
+      "qwen35_graph_captures": 1,
+      "qwen35_graph_shape_drifts": 0,
+      "qwen35_graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+      "cuda_allocator_resident_device_bytes_after_run": 13296621464,
+      "cuda_allocator_peak_resident_device_bytes_after_run": 13390641048,
+      "qwen35_attention_layer_invocations": 32,
+      "qwen35_attention_backends": [
+        {
+          "requested_backend": "fa3_split_kv_f16_kv_graph",
+          "executed_backend": "fa3_split_kv_f16_kv_graph",
+          "graph_capture_compatible": true,
+          "split_count": 1,
+          "architecture": "ada",
+          "compute_capability": "8.9"
+        }
+      ],
+      "qwen35_host_fallback_evidence": {
+        "report_count": 0,
+        "op_count": 0,
+        "case_count": 0,
+        "fallback_invocations": 0,
+        "total_host_fallback_ms": 0,
+        "op_labels": []
+      },
+      "termination": {
+        "observed": "max_output_tokens",
+        "classification": "max_output_tokens",
+        "matched_stop_sequence": null
+      },
+      "structured_output_mode": "none",
+      "structured_output_parser": "none",
+      "structured_output_kind": "none",
+      "structured_output_value": null,
+      "output_token_ids": [
+        11,
+        271
+      ],
+      "output_text": ",\n\n"
+    }
+  ],
+  "mean_output_tokens": 2.0,
+  "mean_prompt_s": 0.185349025,
+  "mean_decode_s": 0.18392252450000002,
+  "mean_total_s": 0.372194935,
+  "mean_ttft_s": 0.0000037395000000000004,
+  "mean_itl_s": 0.18391701,
+  "mean_decode_tok_s": 10.874144370111445,
+  "qwen38_evidence": {
+    "phase": "R7",
+    "mode": "bounded_sample",
+    "artifact": {
+      "filename": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+      "byte_length": 13441059904,
+      "sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2"
+    },
+    "gpu_idle_check": {
+      "command": "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits",
+      "checked_at_unix_s": 1786983639,
+      "output": "",
+      "idle": true
+    },
+    "gpu_identity_csv": "NVIDIA GeForce RTX 4080, GPU-cccbddcf-71ba-4910-6ddf-d863642f64b3, 595.58.03, 16376",
+    "reference": {
+      "implementation": "ggml-org/llama.cpp",
+      "revision": "9b05354ec6fb58b4e665e9a39ebc40285c015638",
+      "prompt": "Hello",
+      "prompt_token_ids": [
+        9419
+      ],
+      "greedy_output_token_ids": [
+        11,
+        353
+      ]
+    },
+    "residency_measurement": {
+      "status": "measured_psionic_cuda_allocator_high_water_inside_live_preflight_envelope",
+      "scope": "psionic_owned_cuda_malloc_buffers_including_allocator_pool_cache",
+      "planned_peak_device_bytes": 13654882200,
+      "allocator_peak_resident_device_bytes": 13390641048,
+      "allocator_resident_device_bytes_after_measurements": 13296621464,
+      "preflight_free_device_bytes": 15808397312,
+      "preflight_total_device_bytes": 16711352320
+    },
+    "validation_scope": {
+      "context_tokens": 4096,
+      "larger_context_evidence": "not_claimed",
+      "server_publication": "deferred_to_R8"
+    }
+  }
+}

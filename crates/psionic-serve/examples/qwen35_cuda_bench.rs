@@ -9,7 +9,7 @@ use std::{
 use psionic_backend_cuda::{CudaAllocatorPoolTelemetry, CudaGemmTuningReport};
 use psionic_models::{
     GgufDecoderAdapterLoader, GgufRuntimeTokenizer, PromptMessage, PromptMessageRole,
-    PromptRenderOptions, TokenId, TokenizerBoundary,
+    PromptRenderOptions, TokenId, TokenSequence, TokenizerBoundary,
 };
 use psionic_runtime::{
     DEFAULT_PENALTY_LOOKBACK, PrefixCacheControl, PrefixCacheMode, StructuredOutputRequest,
@@ -64,6 +64,7 @@ struct BenchConfig {
     require_fallback_free_cuda: bool,
     prompt: String,
     raw_prompt: bool,
+    prompt_token_ids: Option<Vec<u32>>,
     max_output_tokens: usize,
     repeats: usize,
     decode_mode: BenchDecodeMode,
@@ -103,6 +104,7 @@ struct BenchReport {
     ollama_base_url: Option<String>,
     prompt: String,
     prompt_mode: String,
+    prompt_token_ids: Option<Vec<u32>>,
     rendered_prompt: String,
     stop_sequences: Vec<String>,
     decode_mode: String,
@@ -354,6 +356,7 @@ impl Default for BenchConfig {
             require_fallback_free_cuda: false,
             prompt: String::from("Explain what Psionic is in one sentence."),
             raw_prompt: false,
+            prompt_token_ids: None,
             max_output_tokens: 256,
             repeats: 3,
             decode_mode: BenchDecodeMode::Greedy,
@@ -428,6 +431,13 @@ impl BenchConfig {
                 }
                 "--raw-prompt" => {
                     config.raw_prompt = true;
+                }
+                "--prompt-token-ids" => {
+                    config.prompt_token_ids = Some(parse_token_ids(&next_arg(
+                        &raw_args,
+                        &mut index,
+                        "--prompt-token-ids",
+                    )?)?);
                 }
                 "--max-output-tokens" => {
                     config.max_output_tokens = parse_arg(
@@ -596,6 +606,16 @@ impl BenchConfig {
                 "`--require-fallback-free-cuda` is only available for `--backend psionic`",
             ));
         }
+        if self.prompt_token_ids.is_some() && self.raw_prompt {
+            return Err(String::from(
+                "`--prompt-token-ids` and `--raw-prompt` are mutually exclusive",
+            ));
+        }
+        if self.prompt_token_ids.is_some() && matches!(self.backend, BenchBackend::Ollama) {
+            return Err(String::from(
+                "`--prompt-token-ids` is only available for `--backend psionic`",
+            ));
+        }
         Ok(())
     }
 
@@ -754,7 +774,11 @@ impl BenchConfig {
 }
 
 fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
-    let bench_model = load_bench_model(&config.model_path, &config.prompt, config.raw_prompt)?;
+    let bench_model = load_bench_model(
+        &config.model_path,
+        &config.prompt,
+        config.raw_prompt || config.prompt_token_ids.is_some(),
+    )?;
     let mut fast_path_report = psionic_cuda_fast_path_report(config);
     if let Err(reason) = validate_psionic_cuda_fast_path_contract(config, &mut fast_path_report) {
         let report = build_bench_report(
@@ -788,16 +812,12 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         ..PrefixCacheControl::default()
     };
 
-    let warmup = GenerationRequest::new_text(
+    let warmup = psionic_generation_request(
+        config,
         String::from("warmup"),
         descriptor.clone(),
-        None,
-        bench_model.rendered.text.clone(),
-        build_generation_options(
-            config,
-            min_warmup_tokens(config.max_output_tokens),
-            &bench_model.rendered.stop_sequences,
-        ),
+        &bench_model.rendered,
+        min_warmup_tokens(config.max_output_tokens),
     )
     .with_prefix_cache_control(prefix_cache_bypass.clone());
     let warmup_response = service
@@ -891,16 +911,12 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
 
     let mut runs = Vec::with_capacity(config.repeats);
     for run_index in 0..config.repeats {
-        let request = GenerationRequest::new_text(
+        let request = psionic_generation_request(
+            config,
             format!("bench-{run_index}"),
             descriptor.clone(),
-            None,
-            bench_model.rendered.text.clone(),
-            build_generation_options(
-                config,
-                config.max_output_tokens,
-                &bench_model.rendered.stop_sequences,
-            ),
+            &bench_model.rendered,
+            config.max_output_tokens,
         )
         .with_prefix_cache_control(prefix_cache_bypass.clone());
         let response = service
@@ -1205,6 +1221,38 @@ fn build_generation_options(
     options
 }
 
+fn psionic_generation_request(
+    config: &BenchConfig,
+    request_id: String,
+    descriptor: psionic_models::DecoderModelDescriptor,
+    rendered: &RenderedPrompt,
+    max_output_tokens: usize,
+) -> GenerationRequest {
+    let options = build_generation_options(config, max_output_tokens, &rendered.stop_sequences);
+    match config.prompt_token_ids.as_ref() {
+        Some(prompt_token_ids) => GenerationRequest::new_tokens(
+            request_id,
+            descriptor,
+            None,
+            TokenSequence::new(
+                prompt_token_ids
+                    .iter()
+                    .copied()
+                    .map(TokenId)
+                    .collect::<Vec<_>>(),
+            ),
+            options,
+        ),
+        None => GenerationRequest::new_text(
+            request_id,
+            descriptor,
+            None,
+            rendered.text.clone(),
+            options,
+        ),
+    }
+}
+
 fn load_bench_model(
     model_path: &Path,
     prompt: &str,
@@ -1456,6 +1504,24 @@ where
         .map_err(|error| format!("invalid {name} `{value}`: {error}"))
 }
 
+fn parse_token_ids(value: &str) -> Result<Vec<u32>, String> {
+    if value.trim().is_empty() {
+        return Err(String::from("--prompt-token-ids must not be empty"));
+    }
+    value
+        .split(',')
+        .map(|field| {
+            let field = field.trim();
+            if field.is_empty() {
+                return Err(format!(
+                    "invalid --prompt-token-ids `{value}`: empty token field"
+                ));
+            }
+            parse_arg(field, "--prompt-token-ids")
+        })
+        .collect()
+}
+
 fn tokens_per_second(tokens: usize, duration_ns: u64) -> f64 {
     if tokens == 0 || duration_ns == 0 {
         return 0.0;
@@ -1493,7 +1559,7 @@ fn build_bench_report(
     let mean_itl_s = mean_optional_seconds(runs.iter().filter_map(|run| run.itl_s));
     let mean_decode_tok_s = runs.iter().map(|run| run.decode_tok_s).sum::<f64>() / repeats;
     BenchReport {
-        schema_version: 6,
+        schema_version: 7,
         report_kind: String::from("qwen35_cuda_bench"),
         run_status,
         refusal_reason,
@@ -1505,11 +1571,14 @@ fn build_bench_report(
         ollama_base_url: matches!(config.backend, BenchBackend::Ollama)
             .then(|| config.ollama_base_url.clone()),
         prompt: config.prompt.clone(),
-        prompt_mode: String::from(if config.raw_prompt {
+        prompt_mode: String::from(if config.prompt_token_ids.is_some() {
+            "token_ids"
+        } else if config.raw_prompt {
             "raw_text"
         } else {
             "chat_template"
         }),
+        prompt_token_ids: config.prompt_token_ids.clone(),
         rendered_prompt: rendered.text.clone(),
         stop_sequences: rendered.stop_sequences.clone(),
         decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
@@ -1830,6 +1899,46 @@ mod tests {
             .expect_err("repeated graph recapture should be refused");
         assert!(error.contains("repeated graph recapture"));
     }
+
+    #[test]
+    fn bench_config_parses_exact_prompt_token_ids() {
+        let config = BenchConfig::parse(
+            [
+                "--backend",
+                "psionic",
+                "--model-path",
+                "model.gguf",
+                "--prompt",
+                "Hello",
+                "--prompt-token-ids",
+                "9419, 11",
+            ]
+            .into_iter()
+            .map(String::from),
+        )
+        .expect("exact prompt token ids should parse");
+        assert_eq!(config.prompt_token_ids, Some(vec![9419, 11]));
+        assert!(!config.raw_prompt);
+    }
+
+    #[test]
+    fn bench_config_refuses_raw_text_with_exact_prompt_token_ids() {
+        let error = BenchConfig::parse(
+            [
+                "--backend",
+                "psionic",
+                "--model-path",
+                "model.gguf",
+                "--raw-prompt",
+                "--prompt-token-ids",
+                "9419",
+            ]
+            .into_iter()
+            .map(String::from),
+        )
+        .expect_err("raw and exact-token prompt modes must be exclusive");
+        assert!(error.contains("mutually exclusive"));
+    }
 }
 
 fn mark_fast_path_refused(report: &mut BenchPsionicCudaFastPathReport, reason: String) {
@@ -1965,7 +2074,7 @@ fn write_json_output<T: Serialize>(value: &T, output: Option<&PathBuf>) -> Resul
 
 fn usage() -> String {
     String::from(
-        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]",
+        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt | --prompt-token-ids 9419,11] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]",
     )
 }
 

@@ -1,9 +1,8 @@
 # Qwen3.8 First GGUF Target
 
-> Status: `implemented` on 2026-08-14 for R5 artifact qualification and
-> `partial` for R7 native CUDA generation. The runtime and portable CUDA
-> acceptance suite are implemented. Retained production-artifact CUDA rows
-> still require an idle RTX 4080 run.
+> Status: `implemented` on 2026-08-14 for R5 artifact qualification and on
+> 2026-08-17 for R7 native CUDA generation. The retained production-artifact
+> greedy and bounded-sampling rows pass on an idle RTX 4080.
 
 ## Decision
 
@@ -83,10 +82,13 @@ retained benchmark also records the exact high-water mark for Psionic-owned
 CUDA allocations, including allocator-pool buffers, at load, warmup, and
 completed-run barriers.
 
-R7 remains `partial` until
-`scripts/run-qwen38-cuda-generation-evidence.sh` completes on an idle admitted
-GPU and its greedy and bounded-sampling reports pass
-`scripts/check-qwen38-cuda-generation.sh`.
+R7 is `implemented`. `scripts/run-qwen38-cuda-generation-evidence.sh`
+completed on an idle NVIDIA GeForce RTX 4080, and its greedy and
+bounded-sampling reports pass `scripts/check-qwen38-cuda-generation.sh`. The
+reports retain exact `[9419]` prompt-token input, deterministic output IDs,
+zero host fallback, graph replay truth, and a `13,390,641,048` byte measured
+Psionic allocator high-water mark inside the admitted envelope. This evidence
+does not admit the separate 8,192-token context gate.
 
 ## Qualification Gates
 

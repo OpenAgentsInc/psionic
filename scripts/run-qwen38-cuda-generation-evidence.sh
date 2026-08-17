@@ -72,7 +72,7 @@ run_evidence() {
     --backend psionic \
     --model-path "${MODEL_PATH}" \
     --prompt Hello \
-    --raw-prompt \
+    --prompt-token-ids 9419 \
     --max-output-tokens 2 \
     --repeats 2 \
     "$@" \

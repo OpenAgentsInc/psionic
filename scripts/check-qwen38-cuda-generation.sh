@@ -20,7 +20,8 @@ check_common() {
       and .run_status == "ok"
       and .backend == "psionic"
       and .prompt == "Hello"
-      and .prompt_mode == "raw_text"
+      and .prompt_mode == "token_ids"
+      and .prompt_token_ids == [9419]
       and .rendered_prompt == "Hello"
       and .max_output_tokens == 2
       and .repeats == 2
@@ -64,6 +65,7 @@ check_common() {
       and ([.runs[].qwen35_graph_shape_drifts] | add) == 0
       and ([.runs[].qwen35_graph_hits] | add) > 0
       and ([.runs[].qwen35_graph_cache_identity] | unique) == [.psionic_cuda_startup.runtime_contract.graph_cache_identity]
+      and ([.runs[].prompt_tokens] | unique) == [1]
       and ([.runs[].decode_tok_s] | min) > 0
     ' "${report}" >/dev/null
 }

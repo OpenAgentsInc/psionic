@@ -1,8 +1,8 @@
 # Qwen3.8 Psionic Gap Analysis
 
-> Status: `partial` on 2026-08-14. R1-R6 are implemented. R7 native CUDA
-> execution and portable acceptance tests are implemented, while retained
-> production-artifact CUDA evidence remains open.
+> Status: `partial` on 2026-08-17. R1-R7 are implemented. Public serving and
+> later release, backend, multimodal, training, and performance milestones
+> remain open.
 
 ## Compatibility Result
 
@@ -203,13 +203,16 @@ R6 CPU generation is `implemented`. Its retained pinned llama.cpp comparison
 covers greedy output plus 28 recurrent-intermediate prefill/decode checks. The
 internal CPU service also exposes typed cooperative timeout diagnostics.
 
-R7 CUDA generation is `partial`. Native compressed weights, recurrent state,
-full-attention KV, graph capture/replay, greedy decode, bounded sampling, and
-raw-logit observability pass the portable acceptance suite. Qwen3.8-specific
-plan/cache namespaces and live pre-upload memory refusal are machine-readable.
-Psionic-owned current and peak CUDA allocation bytes are also machine-readable.
-The retained full-model greedy and bounded-sampling rows remain pending an idle
-RTX 4080 run.
+R7 CUDA generation is `implemented`. Native compressed weights, recurrent
+state, full-attention KV, graph capture/replay, greedy decode, bounded
+sampling, and raw-logit observability pass the portable acceptance suite.
+Qwen3.8-specific plan/cache namespaces and live pre-upload memory refusal are
+machine-readable. Psionic-owned current and peak CUDA allocation bytes are
+also machine-readable.
+Retained full-model greedy and bounded-sampling rows pass on an idle RTX 4080
+with exact prompt token `[9419]`, deterministic outputs, zero host fallback,
+and a measured `13,390,641,048` byte allocator high-water mark inside the
+preflight envelope.
 
 The generic OpenAI server, Metal, media, adapters, session reuse, and MTP
 speculative-decoding surfaces still refuse Qwen3.8. R8 owns public server

@@ -1,11 +1,11 @@
 # Qwen3.8 Research
 
-> Status: `partial` on 2026-08-14. Upstream research, local artifact
+> Status: `partial` on 2026-08-17. Upstream research, local artifact
 > acquisition, R1 product/artifact identity, R2 prompt/tokenizer contracts, R3
 > checkpoint admission, R4 bounded BF16 evidence, and R5 GGUF qualification are
 > `implemented`. R6 native CPU generation is `implemented` for the internal
-> execution lane. Public serving, accelerated generation, training, and
-> multimodal support remain outside the current claim.
+> execution lane. R7 native CUDA generation is `implemented`. Public serving,
+> training, and multimodal support remain outside the current claim.
 
 This directory tracks the work required to add honest Qwen3.8 support to
 Psionic.
@@ -179,6 +179,16 @@ decode. All 28 comparisons pass; maximum normalized RMSE is
 allocation, context and memory refusal, cancellation, and typed cooperative
 timeout evidence. This is an internal CPU execution claim. The generic OpenAI
 server continues to refuse Qwen3.8 until R8.
+
+R7 adds native CUDA generation for the same selected artifact with compressed
+weights, Qwen3.8-specific execution-plan and graph-cache identities, live
+memory preflight, allocator high-water telemetry, and no host fallback. The
+retained reports in `fixtures/qwen38/reports/` use exact prompt token `[9419]`.
+Greedy output is `[11, 353]` on both repeats at mean
+`10.995421174982495` tokens/s. Seeded bounded-sampling output is `[11, 271]`
+on both repeats at mean `10.874144370111445` tokens/s. The measured allocator
+peak is `13,390,641,048` bytes inside the admitted 4,096-token envelope. R7
+does not publish the generic OpenAI server or an 8,192-token context claim.
 
 ## Primary Source
 
