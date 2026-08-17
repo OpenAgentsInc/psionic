@@ -83,6 +83,11 @@ That answer has to name both the shipped foundations and the still-open holes.
 | Product-class serving acceptance | whether Psionic can honestly claim portability, throughput-serving, or structured-agent serving envelopes | it does not prove framework-core autodiff, reusable optimizer, or local multi-device closure |
 | Train benchmark acceptance | whether the current train substrate meets typed performance thresholds | it does not prove general framework-core completeness or full autodiff closure |
 
+The Qwen3.8 R9 gate at
+`scripts/release/check-psionic-qwen38-release.sh` is product-class serving
+acceptance. Its retained correctness, comparator, CUDA, and publication
+evidence does not change any framework-core category in this matrix.
+
 If a future issue tries to close one of these claim families with evidence from
 another, that issue is wrong by definition and should update this document
 first.
