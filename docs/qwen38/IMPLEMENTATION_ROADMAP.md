@@ -1017,10 +1017,19 @@ row proves that checkpoint-at-step-one plus resume produces the exact same
 step-two weights, moments, state digest, and loss as uninterrupted execution;
 tampering with checkpoint state refuses before resume.
 
-This tranche writes no adapter artifact and does not admit real-checkpoint
-training, native CPU/CUDA/Metal backward execution, decoder-layer or vision
-targets, adapter serving, real/native checkpoint recovery, evaluation gains,
-or promotion. Those remain required before R12 can become `implemented`.
+The step-two tiny adapter is retained at
+`fixtures/qwen38/adapters/qwen38_lm_head_lora_tiny_v1.safetensors`. Its two
+F32 tensors reload exactly through `LmHeadLoraAdapterArtifact`, the artifact
+identity and hot-swap binding pin the canonical Qwen3.8 base digest, generic
+LM-head overlay execution reproduces the reference logits exactly, replay is
+deterministic, and payload digest drift refuses before load. This closes only
+the tiny save/load/generic-overlay parity row. It does not admit adapter
+execution inside the native Qwen3.8 CPU, CUDA, or Metal decoder.
+
+This tranche does not admit real-checkpoint training, native CPU/CUDA/Metal
+backward execution, decoder-layer or vision targets, native Qwen3.8 adapter
+serving, real/native checkpoint recovery, evaluation gains, or promotion.
+Those remain required before R12 can become `implemented`.
 
 Training remains separate from inference support. Reuse the Qwen legal and
 open-adapter substrate only after native base-model execution is stable.

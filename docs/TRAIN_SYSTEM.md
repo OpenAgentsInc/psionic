@@ -273,10 +273,14 @@ finite differences. The retained report is
 with `scripts/check-qwen38-training-adapter.sh`. The tiny lane also checkpoints
 the LoRA matrices, AdamW moments, step, optimizer config, base/adapter binding,
 lineage, and seed; resumed step two exactly matches uninterrupted step two, and
-checkpoint tampering refuses. No adapter artifact is written, and
-real-checkpoint/native-backend training, decoder/vision backward kernels,
-adapter serving, real/native recovery, evaluation gains, and promotion remain
-open.
+checkpoint tampering refuses. The trained tiny state is also retained as
+`fixtures/qwen38/adapters/qwen38_lm_head_lora_tiny_v1.safetensors`: export and
+reload preserve both LoRA matrices exactly, the artifact identity and hosted
+binding pin the Qwen3.8 base digest, generic LM-head overlay execution matches
+the reference logits exactly, and digest drift refuses before load. This is
+not native Qwen3.8 adapter serving. Real-checkpoint/native-backend training,
+decoder/vision backward kernels, native adapter serving, real/native recovery,
+evaluation gains, and promotion remain open.
 The Qwen3.6-27B legal fine-tuning milestone command is
 `cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads
 the Qwen3.6-27B smoke target artifacts, runs the base model through the public

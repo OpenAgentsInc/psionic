@@ -1,13 +1,16 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use psionic_adapters::{
-    AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterTargetFamily,
+    AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
+    AdapterServingBinding, AdapterTargetFamily, LmHeadLoraAdapterArtifact, LmHeadLoraLoadError,
+    LmHeadLoraRuntimeError,
 };
 use psionic_core::QuantizationMode;
 use psionic_models::{
     QWEN38_27B_MODEL_ID, QWEN38_27B_SERVED_MODEL_ID, QWEN38_27B_UPSTREAM_REVISION,
     canonical_qwen38_27b_artifact_facts,
 };
+use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -28,8 +31,14 @@ pub const QWEN38_LM_HEAD_CHECKPOINT_SCHEMA_VERSION: &str =
     "psionic.qwen38.lm_head_lora_checkpoint.v1";
 pub const QWEN38_LM_HEAD_RECOVERY_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.qwen38.lm_head_lora_recovery_receipt.v1";
+pub const QWEN38_LM_HEAD_ADAPTER_ARTIFACT_RECEIPT_SCHEMA_VERSION: &str =
+    "psionic.qwen38.lm_head_lora_adapter_artifact_receipt.v1";
+pub const QWEN38_LM_HEAD_ADAPTER_ARTIFACT_METADATA_SCHEMA_VERSION: &str =
+    "psionic.qwen38.lm_head_lora_adapter_artifact_metadata.v1";
 pub const QWEN38_LM_HEAD_TARGET: &str = "lm_head.weight";
 pub const QWEN38_LM_HEAD_BACKWARD_CONTRACT: &str = "qwen38_lm_head_lora_f32_reference_backward_v1";
+pub const QWEN38_LM_HEAD_ADAPTER_ARTIFACT_REF: &str =
+    "fixtures/qwen38/adapters/qwen38_lm_head_lora_tiny_v1.safetensors";
 pub const QWEN38_DEFERRED_ADAPTER_TARGETS: &[&str] = &[
     "q_proj",
     "k_proj",
@@ -317,6 +326,57 @@ pub struct Qwen38LmHeadLoraRecoveryReceipt {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadLoraAdapterArtifactReceipt {
+    pub schema_version: String,
+    pub fixture_id: String,
+    pub artifact_ref: String,
+    pub trained_step: u64,
+    pub tensor_names: Vec<String>,
+    pub lora_a_shape: Vec<usize>,
+    pub lora_b_shape: Vec<usize>,
+    pub artifact_byte_length: usize,
+    pub artifact_sha256: String,
+    pub metadata: Qwen38LmHeadLoraAdapterArtifactMetadata,
+    pub adapter_identity: AdapterArtifactIdentity,
+    pub adapter_identity_digest: String,
+    pub serving_binding: AdapterServingBinding,
+    pub loaded_rank: usize,
+    pub loaded_hidden_size: usize,
+    pub loaded_vocabulary_size: usize,
+    pub loaded_lora_a_sha256: String,
+    pub loaded_lora_b_sha256: String,
+    pub expected_logits_sha256: String,
+    pub served_logits_sha256: String,
+    pub save_load_exact_match: bool,
+    pub serve_logits_exact_match: bool,
+    pub deterministic_serve_replay: bool,
+    pub tampered_artifact_refused: bool,
+    pub metadata_drift_refused: bool,
+    pub claim_boundary: String,
+    pub receipt_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Qwen38LmHeadLoraAdapterArtifactMetadata {
+    pub schema_version: String,
+    pub fixture_id: String,
+    pub base_model_id: String,
+    pub base_model_revision: String,
+    pub base_artifact_identity_digest: String,
+    pub adapter_id: String,
+    pub adapter_revision: String,
+    pub adapter_binding_digest: String,
+    pub plan_digest: String,
+    pub corpus_manifest_sha256: String,
+    pub evaluation_manifest_sha256: String,
+    pub seed: u64,
+    pub trained_step: u64,
+    pub target: String,
+    pub lora_rank: usize,
+    pub lora_alpha: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Qwen38TrainingAdapterEvidenceReport {
     pub schema_version: String,
     pub phase: String,
@@ -325,10 +385,12 @@ pub struct Qwen38TrainingAdapterEvidenceReport {
     pub admitted_plan: Qwen38TrainingAdapterPlan,
     pub backward_receipt: Qwen38LmHeadLoraBackwardReceipt,
     pub checkpoint_recovery: Qwen38LmHeadLoraRecoveryReceipt,
+    pub adapter_artifact: Qwen38LmHeadLoraAdapterArtifactReceipt,
     pub refusals: BTreeMap<String, Qwen38TrainingAdapterPlan>,
     pub real_checkpoint_training_admitted: bool,
     pub native_backward_admitted: bool,
     pub adapter_artifact_written: bool,
+    pub tiny_reference_adapter_serving_parity_admitted: bool,
     pub adapter_serving_admitted: bool,
     pub tiny_reference_checkpoint_recovery_admitted: bool,
     pub checkpoint_recovery_admitted: bool,
@@ -376,11 +438,33 @@ pub enum Qwen38TrainingRecoveryError {
 }
 
 #[derive(Debug, Error)]
+pub enum Qwen38AdapterArtifactError {
+    #[error(transparent)]
+    Recovery(#[from] Qwen38TrainingRecoveryError),
+    #[error(transparent)]
+    Identity(#[from] Qwen38AdapterIdentityError),
+    #[error("Qwen3.8 adapter safetensors encoding failed: {0}")]
+    Safetensors(String),
+    #[error("invalid Qwen3.8 adapter artifact metadata: {0}")]
+    ArtifactMetadata(String),
+    #[error(transparent)]
+    Load(#[from] LmHeadLoraLoadError),
+    #[error(transparent)]
+    Runtime(#[from] LmHeadLoraRuntimeError),
+    #[error("Qwen3.8 adapter artifact digest mismatch: expected {expected}, actual {actual}")]
+    ArtifactDigestMismatch { expected: String, actual: String },
+    #[error("Qwen3.8 adapter parameter count mismatch: expected {expected}, actual {actual}")]
+    ParameterCountMismatch { expected: u64, actual: u64 },
+}
+
+#[derive(Debug, Error)]
 pub enum Qwen38TrainingEvidenceError {
     #[error(transparent)]
     Backward(#[from] Qwen38LmHeadBackwardError),
     #[error(transparent)]
     Recovery(#[from] Qwen38TrainingRecoveryError),
+    #[error(transparent)]
+    Artifact(#[from] Qwen38AdapterArtifactError),
 }
 
 #[must_use]
@@ -521,7 +605,7 @@ pub fn admit_qwen38_training_adapter(
         seed: request.seed,
         cpu_budget: request.cpu_budget,
         claim_boundary: String::from(
-            "This admits deterministic tiny-reference CPU math for an F32 Qwen3.8 LM-head LoRA adapter. It does not admit real-checkpoint training, native CPU/CUDA/Metal backward execution, decoder-layer or vision targets, adapter serving, checkpoint recovery, evaluation gains, or promotion.",
+            "This admits deterministic tiny-reference CPU math for an F32 Qwen3.8 LM-head LoRA adapter. It does not admit real-checkpoint training, native CPU/CUDA/Metal backward execution, decoder-layer or vision targets, native adapter serving, real/native checkpoint recovery, evaluation gains, or promotion.",
         ),
         plan_digest: String::new(),
     })
@@ -860,6 +944,233 @@ pub fn qwen38_lm_head_checkpoint_recovery_evidence(
     Ok(receipt)
 }
 
+pub fn export_qwen38_lm_head_adapter_safetensors(
+    plan: &Qwen38TrainingAdapterPlan,
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+    state: &Qwen38LmHeadLoraTrainingState,
+) -> Result<Vec<u8>, Qwen38AdapterArtifactError> {
+    if !plan.is_admitted() || plan.adapter_binding.is_none() {
+        return Err(Qwen38TrainingRecoveryError::PlanNotAdmitted.into());
+    }
+    validate_backward_fixture(fixture).map_err(Qwen38TrainingRecoveryError::from)?;
+    validate_training_state(fixture, state)?;
+    if state.step == 0 {
+        return Err(Qwen38TrainingRecoveryError::InvalidState(String::from(
+            "adapter export requires at least one completed optimizer step",
+        ))
+        .into());
+    }
+
+    let binding = plan
+        .adapter_binding
+        .as_ref()
+        .ok_or(Qwen38TrainingRecoveryError::PlanNotAdmitted)?;
+    let artifact_metadata = Qwen38LmHeadLoraAdapterArtifactMetadata {
+        schema_version: String::from(QWEN38_LM_HEAD_ADAPTER_ARTIFACT_METADATA_SCHEMA_VERSION),
+        fixture_id: fixture.fixture_id.clone(),
+        base_model_id: plan.base_identity.model_id.clone(),
+        base_model_revision: plan.base_identity.upstream_revision.clone(),
+        base_artifact_identity_digest: plan.base_identity.base_artifact_identity_digest.clone(),
+        adapter_id: binding.adapter_id.clone(),
+        adapter_revision: binding.adapter_revision.clone(),
+        adapter_binding_digest: binding.binding_digest.clone(),
+        plan_digest: plan.plan_digest.clone(),
+        corpus_manifest_sha256: plan.corpus_manifest_sha256.clone(),
+        evaluation_manifest_sha256: plan.evaluation_manifest_sha256.clone(),
+        seed: plan.seed,
+        trained_step: state.step,
+        target: String::from(QWEN38_LM_HEAD_TARGET),
+        lora_rank: fixture.lora_rank,
+        lora_alpha: fixture.lora_alpha,
+    };
+    let mut safetensors_metadata = HashMap::new();
+    safetensors_metadata.insert(
+        String::from("psionic.qwen38_lm_head_lora"),
+        serde_json::to_string(&artifact_metadata)
+            .map_err(|error| Qwen38AdapterArtifactError::ArtifactMetadata(error.to_string()))?,
+    );
+    let lora_a_bytes = encode_f32_bytes(state.lora_a.as_slice());
+    let lora_b_bytes = encode_f32_bytes(state.lora_b.as_slice());
+    let view_a = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![fixture.lora_rank, fixture.hidden.len()],
+        lora_a_bytes.as_slice(),
+    )
+    .map_err(|error| Qwen38AdapterArtifactError::Safetensors(error.to_string()))?;
+    let view_b = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![fixture.base_logits.len(), fixture.lora_rank],
+        lora_b_bytes.as_slice(),
+    )
+    .map_err(|error| Qwen38AdapterArtifactError::Safetensors(error.to_string()))?;
+    serialize(
+        [
+            ("lm_head.lora_A.weight", view_a),
+            ("lm_head.lora_B.weight", view_b),
+        ],
+        Some(safetensors_metadata),
+    )
+    .map_err(|error| Qwen38AdapterArtifactError::Safetensors(error.to_string()))
+}
+
+pub fn load_qwen38_lm_head_adapter_safetensors(
+    bytes: &[u8],
+    identity: AdapterArtifactIdentity,
+    alpha: f32,
+) -> Result<LmHeadLoraAdapterArtifact, Qwen38AdapterArtifactError> {
+    validate_qwen38_adapter_identity(&identity)?;
+    let actual_digest = sha256_bytes(bytes);
+    if actual_digest != identity.artifact_digest {
+        return Err(Qwen38AdapterArtifactError::ArtifactDigestMismatch {
+            expected: identity.artifact_digest.clone(),
+            actual: actual_digest,
+        });
+    }
+    let metadata = read_qwen38_lm_head_adapter_metadata(bytes)?;
+    let expected_provenance = identity.provenance_digest.as_deref().unwrap_or_default();
+    if metadata.schema_version != QWEN38_LM_HEAD_ADAPTER_ARTIFACT_METADATA_SCHEMA_VERSION
+        || metadata.base_model_id != identity.base_model_id
+        || metadata.base_model_revision != identity.base_model_revision
+        || metadata.base_artifact_identity_digest != identity.base_served_artifact_digest
+        || metadata.adapter_id != identity.adapter_id
+        || metadata.adapter_revision != identity.adapter_revision
+        || metadata.plan_digest != expected_provenance
+        || metadata.target != QWEN38_LM_HEAD_TARGET
+        || !is_sha256(&metadata.adapter_binding_digest)
+        || !is_sha256(&metadata.corpus_manifest_sha256)
+        || !is_sha256(&metadata.evaluation_manifest_sha256)
+        || metadata.trained_step == 0
+        || metadata.lora_rank == 0
+        || !metadata.lora_alpha.is_finite()
+        || metadata.lora_alpha <= 0.0
+        || metadata.lora_alpha.to_bits() != alpha.to_bits()
+    {
+        return Err(Qwen38AdapterArtifactError::ArtifactMetadata(String::from(
+            "artifact identity, plan, lineage, target, rank, alpha, or trained step does not match the admitted Qwen3.8 adapter",
+        )));
+    }
+    let artifact = LmHeadLoraAdapterArtifact::from_safetensors_bytes(bytes, identity, alpha)?;
+    if artifact.rank != metadata.lora_rank {
+        return Err(Qwen38AdapterArtifactError::ArtifactMetadata(String::from(
+            "artifact metadata rank does not match the LoRA tensor rank",
+        )));
+    }
+    let actual_parameter_count = artifact
+        .lora_a()
+        .len()
+        .saturating_add(artifact.lora_b().len()) as u64;
+    if actual_parameter_count != artifact.identity.parameter_count {
+        return Err(Qwen38AdapterArtifactError::ParameterCountMismatch {
+            expected: artifact.identity.parameter_count,
+            actual: actual_parameter_count,
+        });
+    }
+    Ok(artifact)
+}
+
+pub fn qwen38_lm_head_adapter_artifact_evidence(
+    plan: &Qwen38TrainingAdapterPlan,
+    fixture: &Qwen38LmHeadLoraBackwardFixture,
+) -> Result<(Qwen38LmHeadLoraAdapterArtifactReceipt, Vec<u8>), Qwen38AdapterArtifactError> {
+    let optimizer = Qwen38LmHeadAdamWConfig::default();
+    let mut state = qwen38_lm_head_initial_training_state(fixture)?;
+    run_qwen38_lm_head_adamw_step(fixture, &optimizer, &mut state)?;
+    run_qwen38_lm_head_adamw_step(fixture, &optimizer, &mut state)?;
+    let artifact_bytes = export_qwen38_lm_head_adapter_safetensors(plan, fixture, &state)?;
+    let artifact_sha256 = sha256_bytes(artifact_bytes.as_slice());
+    let parameter_count = state.lora_a.len().saturating_add(state.lora_b.len()) as u64;
+    let identity =
+        finalize_qwen38_lm_head_adapter_identity(plan, artifact_sha256.as_str(), parameter_count)?;
+    let loaded = load_qwen38_lm_head_adapter_safetensors(
+        artifact_bytes.as_slice(),
+        identity.clone(),
+        fixture.lora_alpha,
+    )?;
+    let metadata = read_qwen38_lm_head_adapter_metadata(artifact_bytes.as_slice())?;
+    let serving_binding = AdapterServingBinding::new(
+        "qwen38-lm-head-reference-serving-v1",
+        plan.base_identity.model_id.clone(),
+        plan.base_identity.upstream_revision.clone(),
+        plan.base_identity.base_artifact_identity_digest.clone(),
+        AdapterResidencyMode::HotSwapOverlay,
+        vec![identity.clone()],
+    );
+    let expected_logits =
+        loss_and_logits(fixture, state.lora_a.as_slice(), state.lora_b.as_slice()).0;
+    let mut served_logits = fixture.base_logits.clone();
+    loaded.apply_to_logits(fixture.hidden.as_slice(), served_logits.as_mut_slice())?;
+    let mut replay_logits = fixture.base_logits.clone();
+    loaded.apply_to_logits(fixture.hidden.as_slice(), replay_logits.as_mut_slice())?;
+
+    let mut tampered_bytes = artifact_bytes.clone();
+    if let Some(last) = tampered_bytes.last_mut() {
+        *last ^= 1;
+    }
+    let tampered_artifact_refused = matches!(
+        load_qwen38_lm_head_adapter_safetensors(
+            tampered_bytes.as_slice(),
+            identity.clone(),
+            fixture.lora_alpha,
+        ),
+        Err(Qwen38AdapterArtifactError::ArtifactDigestMismatch { .. })
+    );
+    let metadata_drift_refused = matches!(
+        load_qwen38_lm_head_adapter_safetensors(
+            artifact_bytes.as_slice(),
+            identity.clone(),
+            fixture.lora_alpha + 1.0,
+        ),
+        Err(Qwen38AdapterArtifactError::ArtifactMetadata(_))
+    );
+    let mut receipt = Qwen38LmHeadLoraAdapterArtifactReceipt {
+        schema_version: String::from(QWEN38_LM_HEAD_ADAPTER_ARTIFACT_RECEIPT_SCHEMA_VERSION),
+        fixture_id: fixture.fixture_id.clone(),
+        artifact_ref: String::from(QWEN38_LM_HEAD_ADAPTER_ARTIFACT_REF),
+        trained_step: state.step,
+        tensor_names: vec![
+            String::from("lm_head.lora_A.weight"),
+            String::from("lm_head.lora_B.weight"),
+        ],
+        lora_a_shape: vec![fixture.lora_rank, fixture.hidden.len()],
+        lora_b_shape: vec![fixture.base_logits.len(), fixture.lora_rank],
+        artifact_byte_length: artifact_bytes.len(),
+        artifact_sha256,
+        metadata,
+        adapter_identity_digest: identity.stable_digest(),
+        adapter_identity: identity,
+        serving_binding,
+        loaded_rank: loaded.rank,
+        loaded_hidden_size: loaded.hidden_size,
+        loaded_vocabulary_size: loaded.vocab_size,
+        loaded_lora_a_sha256: sha256_f32(loaded.lora_a()),
+        loaded_lora_b_sha256: sha256_f32(loaded.lora_b()),
+        expected_logits_sha256: sha256_f32(expected_logits.as_slice()),
+        served_logits_sha256: sha256_f32(served_logits.as_slice()),
+        save_load_exact_match: loaded.lora_a() == state.lora_a.as_slice()
+            && loaded.lora_b() == state.lora_b.as_slice(),
+        serve_logits_exact_match: served_logits == expected_logits,
+        deterministic_serve_replay: replay_logits == served_logits,
+        tampered_artifact_refused,
+        metadata_drift_refused,
+        claim_boundary: String::from(
+            "This proves Qwen3.8-bound tiny-reference safetensors save/load parity and logits-overlay parity through the generic LM-head adapter runtime. It does not prove adapter execution on the native Qwen3.8 CPU, CUDA, or Metal decoder runtime.",
+        ),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest =
+        stable_json_digest(b"qwen38_lm_head_adapter_artifact_receipt|", &receipt);
+    Ok((receipt, artifact_bytes))
+}
+
+pub fn qwen38_training_adapter_artifact_bytes() -> Result<Vec<u8>, Qwen38AdapterArtifactError> {
+    let plan = admit_qwen38_training_adapter(&Qwen38TrainingAdapterRequest::default());
+    let (_, bytes) = qwen38_lm_head_adapter_artifact_evidence(
+        &plan,
+        &Qwen38LmHeadLoraBackwardFixture::default(),
+    )?;
+    Ok(bytes)
+}
+
 pub fn qwen38_training_adapter_evidence_report()
 -> Result<Qwen38TrainingAdapterEvidenceReport, Qwen38TrainingEvidenceError> {
     let request = Qwen38TrainingAdapterRequest::default();
@@ -867,6 +1178,10 @@ pub fn qwen38_training_adapter_evidence_report()
     let backward_receipt =
         run_qwen38_lm_head_lora_backward_reference(&Qwen38LmHeadLoraBackwardFixture::default())?;
     let checkpoint_recovery = qwen38_lm_head_checkpoint_recovery_evidence(
+        &admitted_plan,
+        &Qwen38LmHeadLoraBackwardFixture::default(),
+    )?;
+    let (adapter_artifact, _) = qwen38_lm_head_adapter_artifact_evidence(
         &admitted_plan,
         &Qwen38LmHeadLoraBackwardFixture::default(),
     )?;
@@ -925,16 +1240,18 @@ pub fn qwen38_training_adapter_evidence_report()
         admitted_plan,
         backward_receipt,
         checkpoint_recovery,
+        adapter_artifact,
         refusals,
         real_checkpoint_training_admitted: false,
         native_backward_admitted: false,
-        adapter_artifact_written: false,
+        adapter_artifact_written: true,
+        tiny_reference_adapter_serving_parity_admitted: true,
         adapter_serving_admitted: false,
         tiny_reference_checkpoint_recovery_admitted: true,
         checkpoint_recovery_admitted: false,
         promotion_admitted: false,
         claim_boundary: String::from(
-            "This report proves Qwen3.8-specific base/adapter admission, deterministic tiny-reference F32 LM-head LoRA gradients, and exact tiny-reference AdamW checkpoint recovery. It retains no trained adapter and makes no real-checkpoint training, native backward or recovery, serving, evaluation, or promotion claim.",
+            "This report proves Qwen3.8-specific base/adapter admission, deterministic tiny-reference F32 LM-head LoRA gradients, exact tiny-reference AdamW checkpoint recovery, and generic LM-head safetensors save/load/overlay parity. It makes no real-checkpoint training, native backward or recovery, native Qwen3.8 adapter serving, evaluation, or promotion claim.",
         ),
         report_digest: String::new(),
     };
@@ -1151,6 +1468,24 @@ fn checkpoint_digest(checkpoint: &Qwen38LmHeadLoraCheckpoint) -> String {
     stable_json_digest(b"qwen38_lm_head_checkpoint|", &digestible)
 }
 
+fn read_qwen38_lm_head_adapter_metadata(
+    bytes: &[u8],
+) -> Result<Qwen38LmHeadLoraAdapterArtifactMetadata, Qwen38AdapterArtifactError> {
+    let (_, metadata) = SafeTensors::read_metadata(bytes)
+        .map_err(|error| Qwen38AdapterArtifactError::Safetensors(error.to_string()))?;
+    let encoded = metadata
+        .metadata()
+        .as_ref()
+        .and_then(|values| values.get("psionic.qwen38_lm_head_lora"))
+        .ok_or_else(|| {
+            Qwen38AdapterArtifactError::ArtifactMetadata(String::from(
+                "missing `psionic.qwen38_lm_head_lora` metadata",
+            ))
+        })?;
+    serde_json::from_str(encoded)
+        .map_err(|error| Qwen38AdapterArtifactError::ArtifactMetadata(error.to_string()))
+}
+
 fn loss_and_logits(
     fixture: &Qwen38LmHeadLoraBackwardFixture,
     lora_a: &[f32],
@@ -1281,11 +1616,15 @@ fn stable_json_digest(prefix: &[u8], value: &impl Serialize) -> String {
 }
 
 fn sha256_f32(values: &[f32]) -> String {
-    let bytes = values
+    let bytes = encode_f32_bytes(values);
+    sha256_bytes(bytes.as_slice())
+}
+
+fn encode_f32_bytes(values: &[f32]) -> Vec<u8> {
+    values
         .iter()
         .flat_map(|value| value.to_le_bytes())
-        .collect::<Vec<_>>();
-    sha256_bytes(bytes.as_slice())
+        .collect()
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
@@ -1444,6 +1783,29 @@ mod tests {
             receipt.uninterrupted_state_digest,
             receipt.resumed_state_digest
         );
+    }
+
+    #[test]
+    fn qwen38_lm_head_adapter_roundtrips_and_serves_exact_reference_logits() {
+        let plan = admit_qwen38_training_adapter(&Qwen38TrainingAdapterRequest::default());
+        let (receipt, bytes) = qwen38_lm_head_adapter_artifact_evidence(
+            &plan,
+            &Qwen38LmHeadLoraBackwardFixture::default(),
+        )
+        .expect("adapter artifact evidence");
+
+        assert_eq!(receipt.trained_step, 2);
+        assert!(receipt.save_load_exact_match);
+        assert!(receipt.serve_logits_exact_match);
+        assert!(receipt.deterministic_serve_replay);
+        assert!(receipt.tampered_artifact_refused);
+        assert!(receipt.metadata_drift_refused);
+        assert_eq!(receipt.artifact_sha256, sha256_bytes(bytes.as_slice()));
+        assert_eq!(
+            receipt.serving_binding.base_served_artifact_digest,
+            plan.base_identity.base_artifact_identity_digest
+        );
+        assert_eq!(receipt.serving_binding.adapters.len(), 1);
     }
 
     #[test]
