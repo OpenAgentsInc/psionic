@@ -391,10 +391,11 @@ into one generic engine claim.
   RGB8 preprocessing plus the 27-layer encoder and 5,120-wide merger on CPU
   or feature-gated CUDA. Runtime receipts publish full-stack residency,
   timeout checks, attachment and processor identity, output identity, and a
-  refuse fallback policy. The first pinned Transformers comparator covers one
-  256x256 image probe. Vision-to-text embedding injection, native media serving,
-  retained video parity, and end-to-end image/video generation remain absent,
-  so prompt markers are still refused as understanding on the text-only lane.
+  refuse fallback policy. Retained pinned Transformers comparators cover one
+  256x256 image probe and one sampled eight-frame 256x256 video probe.
+  Vision-to-text embedding injection, native media serving, and end-to-end
+  image/video generation remain absent, so prompt markers are still refused as
+  understanding on the text-only lane.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`

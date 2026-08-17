@@ -861,19 +861,21 @@ rows. The image row uses one 256x256 decoded RGB8 frame. The video row uses
 eight 256x256 decoded RGB8 frames at 4 fps, verifies the upstream 2 fps sample
 indices `[0, 2, 5, 7]`, and verifies the temporal grid `[2, 16, 16]`. Both rows
 compare preprocessing and the complete 27-layer pooler output. The retained
-image row is
-`fixtures/qwen38/reports/qwen38_vision_parity_v1.json`, produced from Psionic
-revision `382a08fb3e1ab60f1565bbf53714ac63f2d72b48` on an idle RTX 4080 with
-driver `595.58.03`. Preprocessing is byte-identical. Encoder output has
-normalized RMSE `0.0667980101638391`, p99 absolute error `0.1171875`, and
-cosine similarity `0.9977859258651733` against pinned Transformers CUDA eager
-attention. The one-shot elapsed fields are diagnostic and do not establish a
-performance claim.
+rows are `fixtures/qwen38/reports/qwen38_vision_parity_v1.json` and
+`fixtures/qwen38/reports/qwen38_vision_video_parity_v1.json`, both produced
+from Psionic revision `4812efe2679e5dc68c0edd15b5d576d4f745c3f2` on an idle
+RTX 4080 with driver `595.58.03`. Preprocessing and sampling are byte-exact.
+The image encoder output has normalized RMSE `0.0667980101638391`, p99
+absolute error `0.1171875`, and cosine similarity `0.9977859258651733`. The
+video encoder output has normalized RMSE `0.05989835909389969`, p99 absolute
+error `0.1328125`, and cosine similarity `0.9983055591583252`. Both compare
+against pinned Transformers CUDA eager attention. The one-shot elapsed fields
+are diagnostic and do not establish a performance claim.
 
-This is an encoder-only milestone. R11 remains `partial` until retained video
-fixtures pass, vision embeddings replace the exact prompt pad spans in the
-native text decoder, and chat/responses media serving passes attachment,
-streaming, tool, bound, malformed-input, and refusal coverage.
+This is an encoder-only milestone. R11 remains `partial` until vision
+embeddings replace the exact prompt pad spans in the native text decoder and
+chat/responses media serving passes attachment, streaming, tool, bound,
+malformed-input, and refusal coverage.
 
 Native vision remains a separate roadmap lane after text support.
 
