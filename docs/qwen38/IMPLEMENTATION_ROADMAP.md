@@ -901,11 +901,14 @@ existing text graph binds scalar RoPE decode parameters. Full-attention layers
 run a fused F16-KV attention kernel with three positions, the GGUF MRoPE
 sections, and the GGUF interleaving flag. Recurrent layers apply the same
 per-head L2-equivalent Q/K normalization as the captured text graph before the
-delta-state update. Text-only generation retains its captured graph path.
+delta-state update. Every CUDA decode-attention variant initializes cached
+logits with a block-stride loop through the admitted 1,024-position kernel
+window. A 257-token MRoPE F16-KV regression covers the first position beyond
+the 256-thread block. Text-only generation retains its captured graph path.
 Multimodal calls bypass the token-only shared-prefix cache, refuse
-context-window prompt truncation, and retain the successful plan receipt. The bounded
-`qwen38_multimodal_cuda_smoke` example runs vision and decoder residency
-serially so the two full models do not overlap in VRAM.
+context-window prompt truncation, and retain the successful plan receipt. The
+bounded `qwen38_multimodal_cuda_smoke` example runs vision and decoder
+residency serially so the two full models do not overlap in VRAM.
 
 The retained end-to-end CUDA driver is
 `scripts/run-qwen38-multimodal-cuda-evidence.sh`; its checker is

@@ -3992,16 +3992,17 @@ __global__ void attention_decode_rope_cache_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x <= window_tokens) {
-        const bool current = threadIdx.x == window_tokens;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= window_tokens;
+         token_index += blockDim.x) {
+        const bool current = token_index == window_tokens;
         const float *key_head = current
             ? current_key_rotated
-            : cache_keys + (start + threadIdx.x) * cache_width + layer_offset + kv_head * head_dim;
+            : cache_keys + (start + token_index) * cache_width + layer_offset + kv_head * head_dim;
         float dot = 0.0f;
         for (int dim = 0; dim < head_dim; ++dim) {
             dot += query_rotated[dim] * key_head[dim];
         }
-        logits[threadIdx.x] = dot * scale;
+        logits[token_index] = dot * scale;
     }
     __syncthreads();
 
@@ -4151,14 +4152,15 @@ __global__ void attention_decode_rope_cache_f16_kv_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x < window_tokens) {
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
         const __half *key_head =
-            cache_keys + (start + threadIdx.x) * cache_width + layer_offset + kv_head * head_dim;
+            cache_keys + (start + token_index) * cache_width + layer_offset + kv_head * head_dim;
         float dot = 0.0f;
         for (int dim = 0; dim < head_dim; ++dim) {
             dot += query_rotated[dim] * __half2float(key_head[dim]);
         }
-        logits[threadIdx.x] = dot * scale;
+        logits[token_index] = dot * scale;
     }
     if (threadIdx.x == 0) {
         float dot = 0.0f;
@@ -4294,14 +4296,15 @@ __global__ void attention_decode_rope_cache_f16_kv_graph_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x < window_tokens) {
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
         const __half *key_head =
-            cache_keys + (start + threadIdx.x) * cache_width + layer_offset + kv_head * head_dim;
+            cache_keys + (start + token_index) * cache_width + layer_offset + kv_head * head_dim;
         float dot = 0.0f;
         for (int dim = 0; dim < head_dim; ++dim) {
             dot += query_rotated[dim] * __half2float(key_head[dim]);
         }
-        logits[threadIdx.x] = dot * scale;
+        logits[token_index] = dot * scale;
     }
     if (threadIdx.x == 0) {
         float dot = 0.0f;
@@ -4725,10 +4728,11 @@ __global__ void attention_decode_rope_cache_turboquant_kv_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x < window_tokens) {
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
         const Q81Block *key_blocks =
-            cache_keys + (start + threadIdx.x) * cache_row_blocks + layer_block_offset;
-        logits[threadIdx.x] = dot_query_q81_key(query_rotated, key_blocks, head_dim) * scale;
+            cache_keys + (start + token_index) * cache_row_blocks + layer_block_offset;
+        logits[token_index] = dot_query_q81_key(query_rotated, key_blocks, head_dim) * scale;
     }
     if (threadIdx.x == 0) {
         float dot = 0.0f;
@@ -4885,10 +4889,11 @@ __global__ void attention_decode_rope_cache_turboquant_kv_graph_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x < window_tokens) {
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
         const Q81Block *key_blocks =
-            cache_keys + (start + threadIdx.x) * cache_row_blocks + layer_block_offset;
-        logits[threadIdx.x] = dot_query_q81_key(query_rotated, key_blocks, head_dim) * scale;
+            cache_keys + (start + token_index) * cache_row_blocks + layer_block_offset;
+        logits[token_index] = dot_query_q81_key(query_rotated, key_blocks, head_dim) * scale;
     }
     if (threadIdx.x == 0) {
         float dot = 0.0f;
@@ -5029,10 +5034,11 @@ __global__ void attention_decode_rope_cache_f16_kv_q8_1_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x < window_tokens) {
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
         const __half *key_head =
-            cache_keys + (start + threadIdx.x) * cache_width + layer_offset + kv_head * head_dim;
-        logits[threadIdx.x] = dot_query_half_key_pairwise(query_rotated, key_head, head_dim) * scale;
+            cache_keys + (start + token_index) * cache_width + layer_offset + kv_head * head_dim;
+        logits[token_index] = dot_query_half_key_pairwise(query_rotated, key_head, head_dim) * scale;
     }
     if (threadIdx.x == 0) {
         float dot = 0.0f;
@@ -5188,10 +5194,11 @@ __global__ void attention_decode_rope_cache_f16_kv_graph_q8_1_kernel(
     }
     __syncthreads();
 
-    if (threadIdx.x < window_tokens) {
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
         const __half *key_head =
-            cache_keys + (start + threadIdx.x) * cache_width + layer_offset + kv_head * head_dim;
-        logits[threadIdx.x] = dot_query_half_key_pairwise(query_rotated, key_head, head_dim) * scale;
+            cache_keys + (start + token_index) * cache_width + layer_offset + kv_head * head_dim;
+        logits[token_index] = dot_query_half_key_pairwise(query_rotated, key_head, head_dim) * scale;
     }
     if (threadIdx.x == 0) {
         float dot = 0.0f;

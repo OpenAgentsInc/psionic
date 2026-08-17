@@ -23184,6 +23184,73 @@ mod tests {
     }
 
     #[test]
+    fn cuda_submission_f16_kv_mrope_initializes_logits_beyond_one_block_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let head_dim = 6usize;
+        let past_tokens = 257usize;
+        let cache_token_capacity = past_tokens + 1;
+        let mut qkv = vec![0.0_f32; head_dim * 3];
+        qkv[head_dim * 2..].fill(3.0);
+        let cache_keys = backend.byte_buffer(&vec![
+            0_u8;
+            cache_token_capacity
+                * head_dim
+                * std::mem::size_of::<u16>()
+        ])?;
+        let cache_values = backend.byte_buffer(&f32_slice_to_f16_le_bytes(&vec![
+            1.0_f32;
+            cache_token_capacity
+                * head_dim
+        ]))?;
+        let qkv = backend.input_buffer(Shape::new(vec![qkv.len()]), qkv)?;
+        let output = backend.f32_buffer(head_dim)?;
+
+        let mut submission = backend.begin_submission()?;
+        submission.attention_decode_mrope_cache_f16_kv(
+            &qkv,
+            0,
+            head_dim,
+            head_dim * 2,
+            &cache_keys,
+            &cache_values,
+            head_dim,
+            0,
+            past_tokens,
+            0,
+            1,
+            1,
+            head_dim,
+            head_dim,
+            [past_tokens; 3],
+            [1, 1, 1, 0],
+            true,
+            1.0,
+            0.0,
+            [0.0, 0.0],
+            0.5,
+            None,
+            &output,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 1);
+
+        let expected = (past_tokens as f32 + 3.0) / (past_tokens + 1) as f32;
+        let actual = output.read_f32()?;
+        assert!(actual.iter().all(|value| value.is_finite()));
+        assert_close(actual.as_slice(), vec![expected; head_dim].as_slice(), 1e-5);
+        Ok(())
+    }
+
+    #[test]
     fn cuda_submission_fused_attention_f16_kv_q8_1_matches_separate_attention_and_quantize_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();

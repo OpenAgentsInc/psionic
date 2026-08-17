@@ -404,12 +404,15 @@ into one generic engine claim.
   apply exact per-token MRoPE coordinates in full-attention layers, and apply
   the delta during decode. The CUDA lane uploads admitted embeddings directly
   into the resident hidden buffer and uses a fused three-axis MRoPE plus F16-KV
-  attention kernel. It keeps the captured scalar text graph unchanged and
-  uses uncaptured native submissions for multimodal positions. The uncaptured
-  hybrid path shares the fused per-head Q/K normalization used by captured text
-  graphs; raw post-convolution Q/K values never enter the recurrent delta-state
-  update. Both runtimes bypass token-only prefix reuse, refuse prompt
-  truncation, and retain the successful plan receipt. Metal decoder
+  attention kernel. Decode-attention kernels initialize every admitted cached
+  position with block-stride loops, including contexts beyond the 256-thread
+  CUDA block; a 257-token MRoPE F16-KV regression covers that boundary. The
+  lane keeps the captured scalar text graph unchanged and uses uncaptured
+  native submissions for multimodal positions. The uncaptured hybrid path
+  shares the fused per-head Q/K normalization used by captured text graphs;
+  raw post-convolution Q/K values never enter the recurrent delta-state update.
+  Both runtimes bypass token-only prefix reuse, refuse prompt truncation, and
+  retain the successful plan receipt. Metal decoder
   consumption remains absent. Retained CUDA
   image/video generation evidence binds both source artifacts and both encoder
   parity reports. It records 64 image tokens producing `The image` and 128
