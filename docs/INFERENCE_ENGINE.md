@@ -408,9 +408,12 @@ into one generic engine claim.
   graphs; raw post-convolution Q/K values never enter the recurrent delta-state
   update. Both runtimes bypass token-only prefix reuse, refuse prompt
   truncation, and retain the successful plan receipt. Metal decoder
-  consumption, native media serving, and retained end-to-end image/video
-  generation evidence remain absent, so HTTP prompt markers are still refused
-  as understanding on the text-only lane.
+  consumption and native media serving remain absent, so HTTP prompt markers
+  are still refused as understanding on the text-only lane. Retained CUDA
+  image/video generation evidence binds both source artifacts and both encoder
+  parity reports. It records 64 image tokens producing `The image` and 128
+  video tokens producing `The video`, with device argmax, a refuse fallback
+  policy, and no hidden fallback. The timings are diagnostic only.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`

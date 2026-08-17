@@ -1,0 +1,404 @@
+{
+  "schema_version": "psionic.qwen38.multimodal_cuda_evidence.v1",
+  "status": "implemented_early",
+  "phase": "R11",
+  "psionic_revision": "80b8059d8d762de51681b92a16246bb7d73cc541",
+  "artifacts": {
+    "official_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "vision_source_shard": {
+      "filename": "model-00001-of-00018.safetensors",
+      "byte_length": 3966730552,
+      "sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c"
+    },
+    "decoder_gguf": {
+      "filename": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+      "byte_length": 13441059904,
+      "sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2"
+    }
+  },
+  "linked_encoder_parity": {
+    "image_report": "fixtures/qwen38/reports/qwen38_vision_parity_v1.json",
+    "image_report_sha256": "cccf9763ffc3ceaf78c5e2ec532f8112ee8fbc71efdde01f838ab76562562217",
+    "video_report": "fixtures/qwen38/reports/qwen38_vision_video_parity_v1.json",
+    "video_report_sha256": "b5e1908dd0e0f0180b145ae74878643ea61e5e592e62010174d440d339021d4f"
+  },
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 4080",
+    "driver_version": "595.58.03"
+  },
+  "rows": [
+    {
+      "schema_version": "psionic.qwen38.multimodal_cuda_smoke.v1",
+      "media_kind": "image",
+      "official_model_dir": "/home/christopherdavid/code/psionic/target/models/qwen/Qwen3.8-27B",
+      "decoder_gguf": "/home/christopherdavid/code/psionic/target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf",
+      "decoder_model": {
+        "model": {
+          "model_id": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "family": "qwen38",
+          "revision": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693"
+        },
+        "config": {
+          "hidden_size": 5120,
+          "layer_count": 64,
+          "vocab_size": 248320,
+          "max_context": 262144,
+          "block": {
+            "attention": {
+              "head_count": 24,
+              "kv_head_count": 4,
+              "head_dim": 256,
+              "rotary_dim": 64
+            },
+            "feed_forward": {
+              "intermediate_size": 17408,
+              "activation": "Silu"
+            }
+          }
+        },
+        "tokenizer_family": "gpt2_bpe:qwen35",
+        "weights_digest": "856754ef326b28d184777e5440058da85fff5ff1f3c847f9bd8716f079233cf9",
+        "artifact_identity": {
+          "model_blob_digest": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "tokenizer_digest": "9000077839bea55984094f4e7dc399cbf22ecd251aa2ce2b78f6aedeea8c1a8f",
+          "chat_template_digest": "307a10de11a9d167bf12f64217fc792a2d4052d7e6dc3b09d8e163432710a017",
+          "generation_defaults_digest": "5dafc94b81eb2843494f2f8db1ba9585cf1e01323953542949c4871fabf13754"
+        }
+      },
+      "decoder_runtime": {
+        "family": "qwen38",
+        "model_id": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "artifact_digest": "856754ef326b28d184777e5440058da85fff5ff1f3c847f9bd8716f079233cf9",
+        "execution_plan_namespace": "qwen38-native-cuda|v1",
+        "execution_plan_digest": "a3df827e77e693698f784a7a723a26222a06fe8919b6eb6c61da1506f483dafb",
+        "graph_cache_namespace": "qwen38-cuda-graph-cache|v1",
+        "graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+        "context_limit_tokens": 4096,
+        "artifact_bytes": 13441059904,
+        "device_capacity_bytes": 16711352320,
+        "device_free_bytes_at_preflight": 15701114880,
+        "preflight_required_device_bytes": 15275674688,
+        "preflight_margin_bytes": 425440192,
+        "preflight_status": "admitted_before_weight_upload",
+        "weight_device_bytes": 13221685248,
+        "recurrent_state_bytes": 156893184,
+        "kv_cache_bytes": 268435456,
+        "scratch_device_bytes": 7868312,
+        "planned_device_bytes": 13654882200,
+        "dense_f16_mirror_count": 0,
+        "quantization_modes": [
+          "ggml_q3_k",
+          "ggml_iq3_s",
+          "ggml_iq4_xs",
+          "ggml_q5_k"
+        ],
+        "raw_logits_materialization_observable": true,
+        "host_fallback_enabled": false
+      },
+      "vision_runtime": {
+        "schema_version": "psionic.qwen38.vision_runtime.v1",
+        "backend": "cuda",
+        "execution_mode": "native",
+        "execution_engine": "psionic_candle_qwen38_vision_cuda",
+        "fallback_policy": "refuse",
+        "source_shard_sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c",
+        "image_processor_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+        "video_processor_sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+        "resident_tensor_count": 333,
+        "resident_tensor_bytes": 921460192,
+        "resident_layer_count": 27,
+        "expected_layer_count": 27,
+        "full_stack_resident": true,
+        "input_patch_count": 256,
+        "input_bytes": 1572864,
+        "output_token_count": 64,
+        "output_width": 5120,
+        "output_bytes": 1310720,
+        "output_sha256": "d9b5b55a20170b32d89de79892631c01ebd54ce4dc92cff8b933d452a4236b02",
+        "elapsed_ms": 86,
+        "timeout_ms": 120000,
+        "host_output_materialized": true,
+        "hidden_fallback_used": false
+      },
+      "multimodal_plan_receipt": {
+        "schema_version": "psionic.qwen38.multimodal_decoder_plan.v1",
+        "rendered_prompt_sha256": "ffab8e4ee36ed05c03d269236342ee1057f5d3c6955d4146046bc705bd9ae410",
+        "expanded_prompt_sha256": "039bb7a2ff3fef1fc20fce504e7a34d8f983c13eb0135f433f9da41d470fd157",
+        "token_ids_sha256": "9ac4536a51c0a251021f065bf775970fef6a4d9af07ed26ec8015e4e81136a4c",
+        "token_count": 87,
+        "text_token_count": 23,
+        "image_count": 1,
+        "image_token_count": 64,
+        "video_count": 0,
+        "video_token_count": 0,
+        "embedding_override_count": 64,
+        "embedding_width": 5120,
+        "mrope_position_delta": -56,
+        "preprocessing_receipt_sha256": [
+          "5e1f6f9369dfe211f81a327260aab0dcc165c4490ee11ada5ff940d830c9ed73"
+        ],
+        "vision_runtime_output_sha256": [
+          "d9b5b55a20170b32d89de79892631c01ebd54ce4dc92cff8b933d452a4236b02"
+        ],
+        "hidden_fallback_used": false
+      },
+      "output_token_ids": [
+        760,
+        2099
+      ],
+      "output_text": "The image",
+      "termination": "max_output_tokens",
+      "generation_metrics": {
+        "total_duration_ns": 15126465840,
+        "load_duration_ns": 2826588163,
+        "prompt_eval_count": 87,
+        "prompt_eval_duration_ns": 14947172175,
+        "context_window": {
+          "budget": {
+            "max_context_tokens": 4096,
+            "existing_context_tokens": 0,
+            "reserved_output_tokens": 2,
+            "available_prompt_tokens": 4094
+          },
+          "input_prompt_tokens": 87,
+          "retained_prompt_tokens": 87,
+          "truncated_prompt_tokens": 0,
+          "preserved_prefix_tokens": 0
+        },
+        "eval_count": 2,
+        "eval_duration_ns": 176787419,
+        "time_to_first_token_ns": 589,
+        "inter_token_latency_ns": 176784804,
+        "prefix_tokens_reused": 0,
+        "termination_detail": {
+          "cause": "max_output_tokens"
+        },
+        "qwen35_cuda_decode": {
+          "step_count": 2,
+          "output_modes": [
+            {
+              "kind": "argmax_only"
+            }
+          ],
+          "readback_bytes": 16,
+          "raw_logits_materialized": false,
+          "graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+          "attention_backend": {
+            "layer_invocation_count": 32,
+            "executions": [
+              {
+                "requested_backend": "dense_f16_kv_legacy",
+                "executed_backend": "dense_f16_kv_legacy",
+                "graph_capture_compatible": false,
+                "architecture": "ada",
+                "compute_capability": "8.9"
+              }
+            ]
+          }
+        }
+      },
+      "vision_duration_ns": 2242681980,
+      "decoder_load_duration_ns": 2935970439,
+      "generation_duration_ns": 15126473482,
+      "total_duration_ns": 20481573013,
+      "fallback_policy": "refuse",
+      "hidden_fallback_used": false,
+      "gpu_idle_check": {
+        "command": "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits",
+        "checked_at_unix_s": 1786998675,
+        "output": "",
+        "idle": true
+      }
+    },
+    {
+      "schema_version": "psionic.qwen38.multimodal_cuda_smoke.v1",
+      "media_kind": "video",
+      "official_model_dir": "/home/christopherdavid/code/psionic/target/models/qwen/Qwen3.8-27B",
+      "decoder_gguf": "/home/christopherdavid/code/psionic/target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf",
+      "decoder_model": {
+        "model": {
+          "model_id": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "family": "qwen38",
+          "revision": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693"
+        },
+        "config": {
+          "hidden_size": 5120,
+          "layer_count": 64,
+          "vocab_size": 248320,
+          "max_context": 262144,
+          "block": {
+            "attention": {
+              "head_count": 24,
+              "kv_head_count": 4,
+              "head_dim": 256,
+              "rotary_dim": 64
+            },
+            "feed_forward": {
+              "intermediate_size": 17408,
+              "activation": "Silu"
+            }
+          }
+        },
+        "tokenizer_family": "gpt2_bpe:qwen35",
+        "weights_digest": "856754ef326b28d184777e5440058da85fff5ff1f3c847f9bd8716f079233cf9",
+        "artifact_identity": {
+          "model_blob_digest": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "tokenizer_digest": "9000077839bea55984094f4e7dc399cbf22ecd251aa2ce2b78f6aedeea8c1a8f",
+          "chat_template_digest": "307a10de11a9d167bf12f64217fc792a2d4052d7e6dc3b09d8e163432710a017",
+          "generation_defaults_digest": "5dafc94b81eb2843494f2f8db1ba9585cf1e01323953542949c4871fabf13754"
+        }
+      },
+      "decoder_runtime": {
+        "family": "qwen38",
+        "model_id": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "artifact_digest": "856754ef326b28d184777e5440058da85fff5ff1f3c847f9bd8716f079233cf9",
+        "execution_plan_namespace": "qwen38-native-cuda|v1",
+        "execution_plan_digest": "a3df827e77e693698f784a7a723a26222a06fe8919b6eb6c61da1506f483dafb",
+        "graph_cache_namespace": "qwen38-cuda-graph-cache|v1",
+        "graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+        "context_limit_tokens": 4096,
+        "artifact_bytes": 13441059904,
+        "device_capacity_bytes": 16711352320,
+        "device_free_bytes_at_preflight": 15701114880,
+        "preflight_required_device_bytes": 15275674688,
+        "preflight_margin_bytes": 425440192,
+        "preflight_status": "admitted_before_weight_upload",
+        "weight_device_bytes": 13221685248,
+        "recurrent_state_bytes": 156893184,
+        "kv_cache_bytes": 268435456,
+        "scratch_device_bytes": 7868312,
+        "planned_device_bytes": 13654882200,
+        "dense_f16_mirror_count": 0,
+        "quantization_modes": [
+          "ggml_q3_k",
+          "ggml_iq3_s",
+          "ggml_iq4_xs",
+          "ggml_q5_k"
+        ],
+        "raw_logits_materialization_observable": true,
+        "host_fallback_enabled": false
+      },
+      "vision_runtime": {
+        "schema_version": "psionic.qwen38.vision_runtime.v1",
+        "backend": "cuda",
+        "execution_mode": "native",
+        "execution_engine": "psionic_candle_qwen38_vision_cuda",
+        "fallback_policy": "refuse",
+        "source_shard_sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c",
+        "image_processor_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+        "video_processor_sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+        "resident_tensor_count": 333,
+        "resident_tensor_bytes": 921460192,
+        "resident_layer_count": 27,
+        "expected_layer_count": 27,
+        "full_stack_resident": true,
+        "input_patch_count": 512,
+        "input_bytes": 3145728,
+        "output_token_count": 128,
+        "output_width": 5120,
+        "output_bytes": 2621440,
+        "output_sha256": "161a7c5f6839790b1a3c29a111fd5583d038d7f9f50a32d890aea671f371e92c",
+        "elapsed_ms": 90,
+        "timeout_ms": 120000,
+        "host_output_materialized": true,
+        "hidden_fallback_used": false
+      },
+      "multimodal_plan_receipt": {
+        "schema_version": "psionic.qwen38.multimodal_decoder_plan.v1",
+        "rendered_prompt_sha256": "67fe3a01ecd99d0eda7bee1ce4b5716cdec410e11655dd29c5757ead4cefb81e",
+        "expanded_prompt_sha256": "57eade7510f4ffb0001ba94165f9254876486ec2e4c0c221f28cb1ef19256165",
+        "token_ids_sha256": "66dd5711cfdb0510f0f8ccc62295ff3ea834cdc6ec10a6caab3d3aa9863d98b6",
+        "token_count": 167,
+        "text_token_count": 39,
+        "image_count": 0,
+        "image_token_count": 0,
+        "video_count": 1,
+        "video_token_count": 128,
+        "embedding_override_count": 128,
+        "embedding_width": 5120,
+        "mrope_position_delta": -112,
+        "preprocessing_receipt_sha256": [
+          "ba808627fbc7346c0f7944a10de2ca280813fb704bf71f72727001161ff3c9f8"
+        ],
+        "vision_runtime_output_sha256": [
+          "161a7c5f6839790b1a3c29a111fd5583d038d7f9f50a32d890aea671f371e92c"
+        ],
+        "hidden_fallback_used": false
+      },
+      "output_token_ids": [
+        760,
+        2678
+      ],
+      "output_text": "The video",
+      "termination": "max_output_tokens",
+      "generation_metrics": {
+        "total_duration_ns": 28874997340,
+        "load_duration_ns": 2670761058,
+        "prompt_eval_count": 167,
+        "prompt_eval_duration_ns": 28695530922,
+        "context_window": {
+          "budget": {
+            "max_context_tokens": 4096,
+            "existing_context_tokens": 0,
+            "reserved_output_tokens": 2,
+            "available_prompt_tokens": 4094
+          },
+          "input_prompt_tokens": 167,
+          "retained_prompt_tokens": 167,
+          "truncated_prompt_tokens": 0,
+          "preserved_prefix_tokens": 0
+        },
+        "eval_count": 2,
+        "eval_duration_ns": 176798147,
+        "time_to_first_token_ns": 785,
+        "inter_token_latency_ns": 176795606,
+        "prefix_tokens_reused": 0,
+        "termination_detail": {
+          "cause": "max_output_tokens"
+        },
+        "qwen35_cuda_decode": {
+          "step_count": 2,
+          "output_modes": [
+            {
+              "kind": "argmax_only"
+            }
+          ],
+          "readback_bytes": 16,
+          "raw_logits_materialized": false,
+          "graph_cache_identity": "f7864094854df0862a4cbf21d2438bb8f6060ada3cbf044d3307935d358b453b",
+          "attention_backend": {
+            "layer_invocation_count": 32,
+            "executions": [
+              {
+                "requested_backend": "dense_f16_kv_legacy",
+                "executed_backend": "dense_f16_kv_legacy",
+                "graph_capture_compatible": false,
+                "architecture": "ada",
+                "compute_capability": "8.9"
+              }
+            ]
+          }
+        }
+      },
+      "vision_duration_ns": 2233491241,
+      "decoder_load_duration_ns": 2762201347,
+      "generation_duration_ns": 28875008622,
+      "total_duration_ns": 34053482849,
+      "fallback_policy": "refuse",
+      "hidden_fallback_used": false,
+      "gpu_idle_check": {
+        "command": "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits",
+        "checked_at_unix_s": 1786998696,
+        "output": "",
+        "idle": true
+      }
+    }
+  ],
+  "claim_boundary": {
+    "cuda_image_generation": true,
+    "cuda_video_generation": true,
+    "metal_decoder_integration": false,
+    "openai_media_serving": false,
+    "performance_claim": false
+  }
+}

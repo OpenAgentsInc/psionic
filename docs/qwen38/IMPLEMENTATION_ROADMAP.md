@@ -899,12 +899,28 @@ the resident decoder hidden buffer before layer zero. Multimodal prefill and
 the position-delta decode steps use an uncaptured native CUDA path because the
 existing text graph binds scalar RoPE decode parameters. Full-attention layers
 run a fused F16-KV attention kernel with three positions, the GGUF MRoPE
-sections, and the GGUF interleaving flag. Recurrent layers remain unchanged.
-Text-only generation retains its captured graph path. Multimodal calls bypass
-the token-only shared-prefix cache, refuse context-window prompt truncation,
-and retain the successful plan receipt. The bounded
+sections, and the GGUF interleaving flag. Recurrent layers apply the same
+per-head L2-equivalent Q/K normalization as the captured text graph before the
+delta-state update. Text-only generation retains its captured graph path.
+Multimodal calls bypass the token-only shared-prefix cache, refuse
+context-window prompt truncation, and retain the successful plan receipt. The bounded
 `qwen38_multimodal_cuda_smoke` example runs vision and decoder residency
 serially so the two full models do not overlap in VRAM.
+
+The retained end-to-end CUDA driver is
+`scripts/run-qwen38-multimodal-cuda-evidence.sh`; its checker is
+`scripts/check-qwen38-multimodal-cuda.sh`. The report
+`fixtures/qwen38/reports/qwen38_multimodal_cuda_evidence_v1.json` was produced
+from clean `origin/main` revision
+`80b8059d8d762de51681b92a16246bb7d73cc541` on an idle RTX 4080 with driver
+`595.58.03`. It binds the official BF16 vision shard and selected Dynamic V3
+GGUF digests plus the retained image/video encoder-parity report digests. The
+image row injects 64 vision tokens into an 87-token prompt and greedily emits
+`[760, 2099]` (`The image`). The video row injects 128 vision tokens into a
+167-token prompt and emits `[760, 2678]` (`The video`). Both rows use native
+CUDA vision and decoder execution, device argmax with 16 bytes of readback,
+`fallback_policy = refuse`, and no hidden fallback. Elapsed fields are
+diagnostic and do not establish a performance claim.
 
 R11 remains `partial` until Metal consumes the plan and chat/responses media
 serving passes attachment, streaming, tool, bound, malformed-input, and refusal
