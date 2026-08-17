@@ -723,6 +723,8 @@ mod tests {
 
     const GOLDEN_FIXTURE: &str =
         include_str!("../../../fixtures/qwen38/qwen38_prompt_tokenizer_golden_v1.json");
+    const RELEASE_TEMPLATE_FIXTURE: &str =
+        include_str!("../../../fixtures/qwen38/qwen38_release_template_cases_v1.json");
 
     #[derive(Deserialize)]
     struct GoldenFixture {
@@ -770,6 +772,31 @@ mod tests {
     struct GoldenTokenizerCase {
         text: String,
         token_ids: Vec<u32>,
+    }
+
+    #[derive(Deserialize)]
+    struct ReleaseTemplateFixture {
+        schema_version: String,
+        source: ReleaseTemplateSource,
+        cases: Vec<ReleaseTemplateCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct ReleaseTemplateSource {
+        upstream_repository_id: String,
+        upstream_revision: String,
+        template_sha256: String,
+        comparator_implementation: String,
+        comparator_revision: String,
+        comparator_endpoint: String,
+    }
+
+    #[derive(Deserialize)]
+    struct ReleaseTemplateCase {
+        case_id: String,
+        messages: Vec<Qwen38PromptMessage>,
+        chat_template_kwargs: BTreeMap<String, String>,
+        expected_rendered_sha256: String,
     }
 
     fn user(content: &str) -> Qwen38PromptMessage {
@@ -946,6 +973,57 @@ mod tests {
                 "rendered bytes drifted for {case_id}"
             );
         }
+    }
+
+    #[test]
+    fn qwen38_release_template_cases_bind_all_reasoning_efforts() {
+        let fixture: ReleaseTemplateFixture = serde_json::from_str(RELEASE_TEMPLATE_FIXTURE)
+            .expect("Qwen3.8 release template fixture");
+        assert_eq!(
+            fixture.schema_version,
+            "psionic.qwen38.release_template_cases.v1"
+        );
+        assert_eq!(fixture.source.upstream_repository_id, QWEN38_27B_MODEL_ID);
+        assert_eq!(
+            fixture.source.upstream_revision,
+            "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+        );
+        assert_eq!(fixture.source.template_sha256, QWEN38_TEMPLATE_SHA256);
+        assert_eq!(
+            fixture.source.comparator_implementation,
+            "ggml-org/llama.cpp"
+        );
+        assert_eq!(
+            fixture.source.comparator_revision,
+            "9b05354ec6fb58b4e665e9a39ebc40285c015638"
+        );
+        assert_eq!(fixture.source.comparator_endpoint, "/apply-template");
+        assert_eq!(fixture.cases.len(), 3);
+
+        let mut observed_efforts = Vec::new();
+        for case in fixture.cases {
+            let reasoning_effort = case
+                .chat_template_kwargs
+                .get("reasoning_effort")
+                .cloned()
+                .expect("reasoning_effort template argument");
+            let rendered = render_qwen38_prompt(
+                &case.messages,
+                &Qwen38PromptOptions {
+                    reasoning_effort: Some(reasoning_effort.clone()),
+                    ..Qwen38PromptOptions::default()
+                },
+            )
+            .unwrap_or_else(|error| panic!("{} failed to render: {error}", case.case_id));
+            assert_eq!(
+                rendered.receipt.rendered_sha256, case.expected_rendered_sha256,
+                "{} rendered digest",
+                case.case_id
+            );
+            observed_efforts.push(reasoning_effort);
+        }
+        observed_efforts.sort();
+        assert_eq!(observed_efforts, ["low", "medium", "xhigh"]);
     }
 
     #[test]

@@ -655,6 +655,20 @@ checker and comparator gate.
 Add a release checker modeled on the existing Qwen3.5 pilot without reusing
 Qwen3.5 names or claims.
 
+The Qwen3.8-specific release inputs and commands are:
+
+- `fixtures/qwen38/qwen38_release_template_cases_v1.json`
+- `scripts/release/run-psionic-qwen38-release-gate.sh`
+- `scripts/release/check-psionic-qwen38-release.sh`
+
+The runner refuses unless Psionic is a clean `main` checkout equal to
+`origin/main`, the selected Dynamic V3 artifact matches its pinned byte length
+and SHA-256, and the CPU-only llama.cpp comparator checkout and binary both
+match the pinned revision. The checker replays the portable test matrix and
+validates the retained CPU, CUDA, fixture, source-revision, and comparator
+digests. The generated report remains incomplete evidence until it is reviewed
+and committed.
+
 The gate should run:
 
 - committed artifact and template fixtures
