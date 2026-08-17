@@ -23,6 +23,7 @@ tokio-runtime-telemetry-cpu = [
 csm-cuda = ["psionic-models/csm-cuda"]
 csm-metal = ["psionic-models/csm-metal"]
 medpsy-cuda = ["psionic-models/medpsy-cuda"]
+qwen38-vision-cuda = ["psionic-models/qwen38-vision-cuda"]
 
 [dependencies]
 axum = "0.8"

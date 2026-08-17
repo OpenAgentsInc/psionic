@@ -3394,6 +3394,109 @@ __device__ __forceinline__ float rope_neox_component(
                               : x0 * sin_theta + x1 * cos_theta;
 }
 
+__device__ __forceinline__ int mrope_position_for_pair(
+    int pair,
+    int position_t,
+    int position_h,
+    int position_w,
+    int section_t,
+    int section_h,
+    int section_w,
+    int section_extra,
+    int interleaved
+) {
+    const int section_dims = section_t + section_h + section_w + section_extra;
+    if (section_dims <= 0) {
+        return position_t;
+    }
+    const int sector = pair % section_dims;
+    if (interleaved != 0) {
+        if (sector % 3 == 1 && sector < 3 * section_h) {
+            return position_h;
+        }
+        if (sector % 3 == 2 && sector < 3 * section_w) {
+            return position_w;
+        }
+        if (sector % 3 == 0 && sector < 3 * section_t) {
+            return position_t;
+        }
+        return 0;
+    }
+    if (sector < section_t) {
+        return position_t;
+    }
+    if (sector < section_t + section_h) {
+        return position_h;
+    }
+    if (sector < section_t + section_h + section_w) {
+        return position_w;
+    }
+    return 0;
+}
+
+__device__ __forceinline__ float rope_neox_mrope_component(
+    const float *values,
+    int dim,
+    int head_dim,
+    int rotary_dim,
+    int position_t,
+    int position_h,
+    int position_w,
+    int section_t,
+    int section_h,
+    int section_w,
+    int section_extra,
+    int interleaved,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale
+) {
+    if (dim >= head_dim) {
+        return 0.0f;
+    }
+    const int bounded_rotary_dim = max(min(rotary_dim, head_dim), 2);
+    if (dim >= bounded_rotary_dim) {
+        return values[dim];
+    }
+
+    const int rotary_pairs = bounded_rotary_dim / 2;
+    const int pair = dim < rotary_pairs ? dim : dim - rotary_pairs;
+    const int index0 = pair;
+    const int index1 = pair + rotary_pairs;
+    const int position = mrope_position_for_pair(
+        pair,
+        position_t,
+        position_h,
+        position_w,
+        section_t,
+        section_h,
+        section_w,
+        section_extra,
+        interleaved
+    );
+    const float theta_base =
+        static_cast<float>(position) * powf(theta_scale, static_cast<float>(pair));
+    float cos_theta = 0.0f;
+    float sin_theta = 0.0f;
+    rope_yarn(
+        theta_base,
+        freq_scale,
+        corr_low,
+        corr_high,
+        pair * 2,
+        ext_factor,
+        theta_scale,
+        cos_theta,
+        sin_theta
+    );
+    const float x0 = values[index0];
+    const float x1 = values[index1];
+    return dim < rotary_pairs ? x0 * cos_theta - x1 * sin_theta
+                              : x0 * sin_theta + x1 * cos_theta;
+}
+
 template <typename T>
 __device__ __forceinline__ float load_attention_value(const T *values, int index);
 
@@ -3954,7 +4057,14 @@ __global__ void attention_decode_rope_cache_f16_kv_kernel(
     int kv_head_count,
     int head_dim,
     int rotary_dim,
-    int position,
+    int position_t,
+    int position_h,
+    int position_w,
+    int section_t,
+    int section_h,
+    int section_w,
+    int section_extra,
+    int mrope_interleaved,
     float freq_scale,
     float ext_factor,
     float corr_low,
@@ -3995,24 +4105,38 @@ __global__ void attention_decode_rope_cache_f16_kv_kernel(
     const float *current_value_head = qkv + value_offset + kv_head * head_dim;
 
     for (int dim = threadIdx.x; dim < head_dim; dim += blockDim.x) {
-        query_rotated[dim] = rope_neox_component(
+        query_rotated[dim] = rope_neox_mrope_component(
             query_head,
             dim,
             head_dim,
             rotary_dim,
-            position,
+            position_t,
+            position_h,
+            position_w,
+            section_t,
+            section_h,
+            section_w,
+            section_extra,
+            mrope_interleaved,
             freq_scale,
             ext_factor,
             corr_low,
             corr_high,
             theta_scale
         );
-        const float rotated_key = rope_neox_component(
+        const float rotated_key = rope_neox_mrope_component(
             current_key_head,
             dim,
             head_dim,
             rotary_dim,
-            position,
+            position_t,
+            position_h,
+            position_w,
+            section_t,
+            section_h,
+            section_w,
+            section_extra,
+            mrope_interleaved,
             freq_scale,
             ext_factor,
             corr_low,
@@ -8445,6 +8569,78 @@ extern "C" int psionic_cuda_rope_neox_in_place(
     return static_cast<int>(cudaGetLastError());
 }
 
+extern "C" int psionic_cuda_attention_decode_mrope_cache_f16_kv(
+    const void *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    void *cache_keys,
+    void *cache_values,
+    int cache_width,
+    int layer_offset,
+    int past_tokens,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    int position_t,
+    int position_h,
+    int position_w,
+    int section_t,
+    int section_h,
+    int section_w,
+    int section_extra,
+    int mrope_interleaved,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const void *attention_sinks,
+    void *output,
+    void *stream
+) {
+    const size_t shared_bytes = static_cast<size_t>(head_dim) * 2 * sizeof(float);
+    attention_decode_rope_cache_f16_kv_kernel<<<
+        head_count,
+        kAttentionBlockSize,
+        shared_bytes,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(qkv),
+        query_offset,
+        key_offset,
+        value_offset,
+        static_cast<__half *>(cache_keys),
+        static_cast<__half *>(cache_values),
+        cache_width,
+        layer_offset,
+        past_tokens,
+        sliding_window,
+        head_count,
+        kv_head_count,
+        head_dim,
+        rotary_dim,
+        position_t,
+        position_h,
+        position_w,
+        section_t,
+        section_h,
+        section_w,
+        section_extra,
+        mrope_interleaved,
+        freq_scale,
+        ext_factor,
+        corr_low,
+        corr_high,
+        theta_scale,
+        static_cast<const float *>(attention_sinks),
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
 extern "C" int psionic_cuda_rotary_embedding_backward(
     const void *grad_output,
     const void *cos,
@@ -8777,6 +8973,13 @@ extern "C" int psionic_cuda_attention_decode_rope_cache_f16_kv(
         head_dim,
         rotary_dim,
         position,
+        position,
+        position,
+        0,
+        0,
+        0,
+        0,
+        0,
         freq_scale,
         ext_factor,
         corr_low,

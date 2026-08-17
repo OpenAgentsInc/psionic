@@ -2993,6 +2993,64 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Applies three-axis MRoPE, writes the current F16 KV entry, and runs
+    /// decode attention in one CUDA kernel.
+    #[allow(clippy::too_many_arguments)]
+    pub fn attention_decode_mrope_cache_f16_kv(
+        &mut self,
+        qkv: &CudaBuffer,
+        query_offset: usize,
+        key_offset: usize,
+        value_offset: usize,
+        cache_keys: &CudaBuffer,
+        cache_values: &CudaBuffer,
+        cache_width: usize,
+        layer_offset: usize,
+        past_tokens: usize,
+        sliding_window: usize,
+        head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        rotary_dim: usize,
+        positions: [usize; 3],
+        sections: [usize; 4],
+        interleaved: bool,
+        freq_scale: f32,
+        ext_factor: f32,
+        corr_dims: [f32; 2],
+        theta_scale: f32,
+        attention_sinks: Option<&CudaBuffer>,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_attention_decode_mrope_cache_f16_kv(
+            &qkv.platform,
+            query_offset,
+            key_offset,
+            value_offset,
+            &cache_keys.platform,
+            &cache_values.platform,
+            cache_width,
+            layer_offset,
+            past_tokens,
+            sliding_window,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            positions,
+            sections,
+            interleaved,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            attention_sinks.map(|buffer| &buffer.platform),
+            &output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Variant of fused GPT-OSS decode attention that reads one TurboQuant
     /// prototype KV cache encoded as contiguous GGML `Q8_1` rows.
     #[allow(clippy::too_many_arguments)]
@@ -10768,6 +10826,38 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_attention_decode_mrope_cache_f16_kv(
+            qkv: *const c_void,
+            query_offset: c_int,
+            key_offset: c_int,
+            value_offset: c_int,
+            cache_keys: *mut c_void,
+            cache_values: *mut c_void,
+            cache_width: c_int,
+            layer_offset: c_int,
+            past_tokens: c_int,
+            sliding_window: c_int,
+            head_count: c_int,
+            kv_head_count: c_int,
+            head_dim: c_int,
+            rotary_dim: c_int,
+            position_t: c_int,
+            position_h: c_int,
+            position_w: c_int,
+            section_t: c_int,
+            section_h: c_int,
+            section_w: c_int,
+            section_extra: c_int,
+            mrope_interleaved: c_int,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_low: f32,
+            corr_high: f32,
+            theta_scale: f32,
+            attention_sinks: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_attention_decode_rope_cache_turboquant_kv(
             qkv: *const c_void,
             query_offset: c_int,
@@ -14360,6 +14450,104 @@ mod platform {
                     )
                 },
                 "psionic_cuda_attention_decode_rope_cache_f16_kv",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_mrope_cache_f16_kv(
+            &mut self,
+            qkv: &PlatformBuffer,
+            query_offset: usize,
+            key_offset: usize,
+            value_offset: usize,
+            cache_keys: &PlatformBuffer,
+            cache_values: &PlatformBuffer,
+            cache_width: usize,
+            layer_offset: usize,
+            past_tokens: usize,
+            sliding_window: usize,
+            head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_dim: usize,
+            positions: [usize; 3],
+            sections: [usize; 4],
+            interleaved: bool,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_dims: [f32; 2],
+            theta_scale: f32,
+            attention_sinks: Option<&PlatformBuffer>,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let to_c_int = |value: usize, name: &str| {
+                c_int::try_from(value).map_err(|_| {
+                    RuntimeError::Backend(format!(
+                        "cuda fused mrope attention(f16 kv) {name} exceeds c_int"
+                    ))
+                })
+            };
+            let query_offset = to_c_int(query_offset, "query offset")?;
+            let key_offset = to_c_int(key_offset, "key offset")?;
+            let value_offset = to_c_int(value_offset, "value offset")?;
+            let cache_width = to_c_int(cache_width, "cache width")?;
+            let layer_offset = to_c_int(layer_offset, "layer offset")?;
+            let past_tokens = to_c_int(past_tokens, "past token count")?;
+            let sliding_window = to_c_int(sliding_window, "sliding window")?;
+            let head_count = to_c_int(head_count, "head count")?;
+            let kv_head_count = to_c_int(kv_head_count, "kv head count")?;
+            let head_dim = to_c_int(head_dim, "head dim")?;
+            let rotary_dim = to_c_int(rotary_dim, "rotary dim")?;
+            let positions = [
+                to_c_int(positions[0], "temporal position")?,
+                to_c_int(positions[1], "height position")?,
+                to_c_int(positions[2], "width position")?,
+            ];
+            let sections = [
+                to_c_int(sections[0], "temporal section")?,
+                to_c_int(sections[1], "height section")?,
+                to_c_int(sections[2], "width section")?,
+                to_c_int(sections[3], "extra section")?,
+            ];
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_decode_mrope_cache_f16_kv(
+                        qkv.inner.device_ptr.cast(),
+                        query_offset,
+                        key_offset,
+                        value_offset,
+                        cache_keys.inner.device_ptr.cast(),
+                        cache_values.inner.device_ptr.cast(),
+                        cache_width,
+                        layer_offset,
+                        past_tokens,
+                        sliding_window,
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        positions[0],
+                        positions[1],
+                        positions[2],
+                        sections[0],
+                        sections[1],
+                        sections[2],
+                        sections[3],
+                        c_int::from(interleaved),
+                        freq_scale,
+                        ext_factor,
+                        corr_dims[0],
+                        corr_dims[1],
+                        theta_scale,
+                        attention_sinks
+                            .map(|buffer| buffer.inner.device_ptr.cast())
+                            .unwrap_or(std::ptr::null_mut()),
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_decode_mrope_cache_f16_kv",
             )
         }
 
@@ -18156,6 +18344,38 @@ mod platform {
             _head_dim: usize,
             _rotary_dim: usize,
             _position: usize,
+            _freq_scale: f32,
+            _ext_factor: f32,
+            _corr_dims: [f32; 2],
+            _theta_scale: f32,
+            _attention_sinks: Option<&PlatformBuffer>,
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_mrope_cache_f16_kv(
+            &mut self,
+            _qkv: &PlatformBuffer,
+            _query_offset: usize,
+            _key_offset: usize,
+            _value_offset: usize,
+            _cache_keys: &PlatformBuffer,
+            _cache_values: &PlatformBuffer,
+            _cache_width: usize,
+            _layer_offset: usize,
+            _past_tokens: usize,
+            _sliding_window: usize,
+            _head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_dim: usize,
+            _positions: [usize; 3],
+            _sections: [usize; 4],
+            _interleaved: bool,
             _freq_scale: f32,
             _ext_factor: f32,
             _corr_dims: [f32; 2],
@@ -22879,6 +23099,87 @@ mod tests {
             &cache_values_separate.read_f32()?,
             1e-5,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_f16_kv_mrope_uses_each_interleaved_axis_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let head_dim = 6usize;
+        let query = [0.5_f32, -0.25, 0.75, 1.0, -0.5, 0.125];
+        let key = [1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let value = [0.25_f32, 0.5, 0.75, 1.0, 1.25, 1.5];
+        let qkv = backend.input_buffer(
+            Shape::new(vec![head_dim * 3]),
+            query
+                .into_iter()
+                .chain(key)
+                .chain(value)
+                .collect::<Vec<_>>(),
+        )?;
+        let cache_keys = backend.f16_buffer(head_dim)?;
+        let cache_values = backend.f16_buffer(head_dim)?;
+        let output = backend.f32_buffer(head_dim)?;
+        let theta_scale = 0.5_f32;
+
+        let mut submission = backend.begin_submission()?;
+        submission.attention_decode_mrope_cache_f16_kv(
+            &qkv,
+            0,
+            head_dim,
+            head_dim * 2,
+            &cache_keys,
+            &cache_values,
+            head_dim,
+            0,
+            0,
+            0,
+            1,
+            1,
+            head_dim,
+            head_dim,
+            [2, 3, 4],
+            [1, 1, 1, 0],
+            true,
+            1.0,
+            0.0,
+            [0.0, 0.0],
+            theta_scale,
+            None,
+            &output,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 1);
+
+        let expected_key = [
+            (key[0] * 2.0_f32.cos()) - (key[3] * 2.0_f32.sin()),
+            (key[1] * 1.5_f32.cos()) - (key[4] * 1.5_f32.sin()),
+            (key[2] * 1.0_f32.cos()) - (key[5] * 1.0_f32.sin()),
+            (key[0] * 2.0_f32.sin()) + (key[3] * 2.0_f32.cos()),
+            (key[1] * 1.5_f32.sin()) + (key[4] * 1.5_f32.cos()),
+            (key[2] * 1.0_f32.sin()) + (key[5] * 1.0_f32.cos()),
+        ];
+        let actual_key = cache_keys
+            .read_bytes()?
+            .chunks_exact(std::mem::size_of::<u16>())
+            .map(|bytes| {
+                half::f16::from_bits(u16::from_ne_bytes(
+                    bytes.try_into().expect("f16 cache key bytes"),
+                ))
+                .to_f32()
+            })
+            .collect::<Vec<_>>();
+        assert_close(actual_key.as_slice(), &expected_key, 5e-3);
+        assert_close(&output.read_f32()?, &value, 1e-6);
         Ok(())
     }
 

@@ -95,7 +95,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R9 | `implemented` | Comparator and correctness-first release gate | Retained `implemented_early` claim |
 | R9A | `implemented` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
 | R10 | `partial` | Native Metal generation | Runtime admitted; retained Apple evidence pending |
-| R11 | `planned` | Native vision lane | Separate multimodal claim |
+| R11 | `partial` | Native vision lane | Separate multimodal claim |
 | R12 | `planned` | Training and adapter lane | Separate training claim |
 | R13 | `planned` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
 
@@ -893,9 +893,22 @@ The CPU lane refuses context-window prompt truncation and MTP speculative
 decode for multimodal calls because either would invalidate the admitted plan.
 The service retains the successful plan receipt for inspection.
 
-R11 remains `partial` until CUDA and Metal consume the plan and chat/responses
-media serving passes attachment, streaming, tool, bound, malformed-input, and
-refusal coverage with retained end-to-end generation evidence.
+The native CUDA decoder consumes the same plan through
+`generate_qwen38_multimodal`. Admitted 5,120-wide rows upload directly into
+the resident decoder hidden buffer before layer zero. Multimodal prefill and
+the position-delta decode steps use an uncaptured native CUDA path because the
+existing text graph binds scalar RoPE decode parameters. Full-attention layers
+run a fused F16-KV attention kernel with three positions, the GGUF MRoPE
+sections, and the GGUF interleaving flag. Recurrent layers remain unchanged.
+Text-only generation retains its captured graph path. Multimodal calls bypass
+the token-only shared-prefix cache, refuse context-window prompt truncation,
+and retain the successful plan receipt. The bounded
+`qwen38_multimodal_cuda_smoke` example runs vision and decoder residency
+serially so the two full models do not overlap in VRAM.
+
+R11 remains `partial` until Metal consumes the plan and chat/responses media
+serving passes attachment, streaming, tool, bound, malformed-input, and refusal
+coverage with retained end-to-end generation evidence.
 
 Native vision remains a separate roadmap lane after text support.
 
