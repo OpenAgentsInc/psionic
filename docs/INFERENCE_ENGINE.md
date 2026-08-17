@@ -392,9 +392,13 @@ into one generic engine claim.
   or feature-gated CUDA. Runtime receipts publish full-stack residency,
   timeout checks, attachment and processor identity, output identity, and a
   refuse fallback policy. Retained pinned Transformers comparators cover one
-  256x256 image probe and one sampled eight-frame 256x256 video probe.
-  Vision-to-text embedding injection, native media serving, and end-to-end
-  image/video generation remain absent, so prompt markers are still refused as
+  256x256 image probe and one sampled eight-frame 256x256 video probe. The
+  model layer also has an early decoder-input plan that validates those
+  receipts, expands exact image and timestamped video pad spans, binds each
+  5,120-wide encoder row to one pad token, and computes Qwen3.5-compatible
+  three-axis MRoPE positions and the generated-token position delta.
+  Decoder backend injection, native media serving, and end-to-end image/video
+  generation remain absent, so prompt markers are still refused as
   understanding on the text-only lane.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and

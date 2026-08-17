@@ -872,8 +872,17 @@ error `0.1328125`, and cosine similarity `0.9983055591583252`. Both compare
 against pinned Transformers CUDA eager attention. The one-shot elapsed fields
 are diagnostic and do not establish a performance claim.
 
-This is an encoder-only milestone. R11 remains `partial` until vision
-embeddings replace the exact prompt pad spans in the native text decoder and
+The model layer now also constructs a strict multimodal decoder-input plan.
+It expands each image marker to `grid_thw.prod() / 4` image pad tokens. Video
+markers expand to upstream-compatible one-decimal timestamps and one
+vision-delimited pad span per temporal grid. The plan validates full native
+encoder receipts and materialized output digests, binds every 5,120-wide row
+to an exact pad-token index, derives text/image/video token types, and computes
+the Qwen3.5 three-axis MRoPE positions plus generated-token position delta.
+Malformed dimensions, media ordering, token counts, output widths, runtime
+fallbacks, and output digests refuse before decoder execution.
+
+R11 remains `partial` until the native decoder backends consume that plan and
 chat/responses media serving passes attachment, streaming, tool, bound,
 malformed-input, and refusal coverage.
 

@@ -89,9 +89,10 @@ The text config also declares:
 | Spatial merge size | 2 |
 | Vision positions | 2,304 |
 
-The image processor identifies itself as `Qwen2VLImageProcessorFast`, and the
-video processor identifies itself as `Qwen3VLVideoProcessor`. Both are exposed
-through `Qwen3VLProcessor`.
+The pinned Transformers revision exposes the image processor as
+`Qwen2VLImageProcessor` with the explicit `torchvision` backend and the video
+processor as `Qwen3VLVideoProcessor`. Both are exposed through
+`Qwen3VLProcessor`.
 
 The released image and video processor files are byte-identical to the current
 Qwen3.6-27B processor files. This is a compatibility signal, not proof that the
