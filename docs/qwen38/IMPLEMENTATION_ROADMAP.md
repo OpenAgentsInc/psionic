@@ -94,7 +94,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R8 | `implemented_early` | OpenAI-compatible serving and agent behavior | Candidate `implemented_early` claim |
 | R9 | `implemented` | Comparator and correctness-first release gate | Retained `implemented_early` claim |
 | R9A | `implemented` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
-| R10 | `planned` | Native Metal generation | Separate Apple backend claim |
+| R10 | `partial` | Native Metal generation | Runtime admitted; retained Apple evidence pending |
 | R11 | `planned` | Native vision lane | Separate multimodal claim |
 | R12 | `planned` | Training and adapter lane | Separate training claim |
 | R13 | `planned` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
@@ -780,6 +780,33 @@ after partial rejection, a measured memory envelope, and a retained
 performance result. MTP presence in the artifact does not imply this claim.
 
 ## R10: Native Metal Generation
+
+Status: `partial` on 2026-08-17. The family-neutral Metal service now admits
+Qwen3.8 with a Qwen3.8-specific execution-plan namespace and a 4,096-token
+context envelope. Admission enumerates every required output, attention, SSM,
+and FFN projection before execution. Required projections without a native
+Metal quantized kernel are refused; the Qwen3.8 lane does not use the existing
+Qwen3.5 host-projection fallback. The qualified
+`Qwen3.8-27B-Q4_K_M.gguf` storage types are inside the admitted native set.
+
+The machine-readable Metal runtime contract reports artifact and plan
+identity, device capacity and execution budget when available, device-visible
+weight bytes, host recurrent-state and KV-cache bytes at the admitted context,
+full layer and projection counts, conversion count, host-stepped state truth,
+and host-projection fallback posture. Generic OpenAI serving now publishes
+Qwen3.8 Metal as `backend = metal`, `execution_mode = native`,
+`execution_engine = psionic`, and `fallback_policy = refuse`. Portable tests
+cover load-plan publication and preflight refusal. Device-gated tests cover
+bounded CPU/Metal logits, repeated request reset, runtime residency, and live
+generic-server publication.
+
+The serial retained-evidence driver is
+`scripts/run-qwen38-metal-generation-evidence.sh`; its checker is
+`scripts/check-qwen38-metal-generation.sh`. It runs one CPU row followed by two
+Metal rows from a clean `origin/main` checkout after checking for competing
+local model processes. R10 remains `partial` until that driver produces and
+retains `fixtures/qwen38/reports/qwen38_metal_generation_evidence_v1.json` on
+an idle Apple Silicon host. CUDA evidence does not fill this gap.
 
 Reuse the family-neutral runtime and qualified GGUF after CPU correctness is
 stable. Metal admission must keep quantization support, residency, cache, and

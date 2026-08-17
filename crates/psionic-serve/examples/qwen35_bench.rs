@@ -6,8 +6,8 @@ use psionic_models::{
 };
 use psionic_serve::{
     CpuGgufTextGenerationService, CudaGgufQwen35TextGenerationService, GenerationOptions,
-    GenerationRequest, GenerationResponse, MetalGgufQwen35TextGenerationService, TerminationReason,
-    TextGenerationExecutor,
+    GenerationRequest, GenerationResponse, MetalGgufQwen35TextGenerationService,
+    Qwen35MetalRuntimeContract, TerminationReason, TextGenerationExecutor,
 };
 use serde::Serialize;
 
@@ -210,6 +210,8 @@ struct BenchReport {
     mean_total_s: f64,
     mean_ttft_s: Option<f64>,
     mean_decode_tok_s: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metal_runtime_contract: Option<Qwen35MetalRuntimeContract>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -254,6 +256,13 @@ impl BenchRuntime {
             Self::Cpu(service) => service.generate(request).map_err(|error| error.to_string()),
             Self::Cuda(service) => service.generate(request).map_err(|error| error.to_string()),
             Self::Metal(service) => service.generate(request).map_err(|error| error.to_string()),
+        }
+    }
+
+    fn metal_runtime_contract(&self) -> Option<Qwen35MetalRuntimeContract> {
+        match self {
+            Self::Metal(service) => Some(service.metal_runtime_contract()),
+            Self::Cpu(_) | Self::Cuda(_) => None,
         }
     }
 }
@@ -322,6 +331,7 @@ fn run_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
     };
     let load_s = load_started.elapsed().as_secs_f64();
     let descriptor = runtime.descriptor();
+    let metal_runtime_contract = runtime.metal_runtime_contract();
     let mut runs = Vec::with_capacity(config.repeats);
     for run_index in 0..config.repeats {
         let request = GenerationRequest::new_tokens(
@@ -347,6 +357,7 @@ fn run_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
             .collect(),
         load_s,
         runs,
+        metal_runtime_contract,
     ))
 }
 
@@ -389,6 +400,7 @@ fn finish_report(
     prompt_token_ids: Vec<u32>,
     load_s: f64,
     runs: Vec<BenchRunReport>,
+    metal_runtime_contract: Option<Qwen35MetalRuntimeContract>,
 ) -> BenchReport {
     let mean_output_tokens = mean(
         runs.iter()
@@ -431,6 +443,7 @@ fn finish_report(
         mean_total_s,
         mean_ttft_s,
         mean_decode_tok_s,
+        metal_runtime_contract,
     }
 }
 

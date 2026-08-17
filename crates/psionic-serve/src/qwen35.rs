@@ -25,15 +25,16 @@ use psionic_models::{
     ModelLoadError, PagedTensorStorage, TokenId, TokenSequence, TokenizerBoundary,
 };
 use psionic_runtime::{
-    BackendHealthTracker, CacheInvalidationTrigger, DeviceDiscovery, LoadedModelResidency,
-    LocalRuntimeObservability, PrefixCacheIdentity, PrefixCacheMode, PrefixCacheRefusalReason,
-    PrefixCacheState, SamplingPolicy,
+    BackendHealthTracker, CacheInvalidationTrigger, DeviceDiscovery, DeviceMemoryBudget,
+    LoadedModelResidency, LocalRuntimeObservability, PrefixCacheIdentity, PrefixCacheMode,
+    PrefixCacheRefusalReason, PrefixCacheState, SamplingPolicy,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const QWEN38_CUDA_CONTEXT_LIMIT_TOKENS: usize = 4096;
 const QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES: u64 = 1_834_614_784;
+const QWEN38_METAL_CONTEXT_LIMIT_TOKENS: usize = 4096;
 
 use crate::{
     ContinuousBatchGenerationResult, CudaGraphReplayMetrics, CudaGraphReplayMode, DecodeStrategy,
@@ -91,6 +92,45 @@ pub struct Qwen35CudaRuntimeContract {
     pub quantization_modes: Vec<QuantizationMode>,
     pub raw_logits_materialization_observable: bool,
     pub host_fallback_enabled: bool,
+}
+
+/// Machine-readable residency and fallback contract for one native Qwen Metal service.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Qwen35MetalRuntimeContract {
+    pub family: GgufDecoderFamily,
+    pub model_id: String,
+    pub artifact_digest: String,
+    pub execution_plan_namespace: String,
+    pub execution_plan_digest: String,
+    pub context_limit_tokens: usize,
+    pub artifact_bytes: u64,
+    pub device_capacity_bytes: Option<u64>,
+    pub available_execution_bytes: Option<u64>,
+    pub weight_device_bytes: u64,
+    pub recurrent_state_host_bytes: u64,
+    pub kv_cache_host_bytes: u64,
+    pub planned_device_visible_bytes: u64,
+    pub admitted_layer_count: usize,
+    pub resident_layer_count: usize,
+    pub projection_count: usize,
+    pub native_projection_count: usize,
+    pub admitted_conversion_count: usize,
+    pub quantization_modes: Vec<QuantizationMode>,
+    pub host_stepped_state: bool,
+    pub host_projection_fallback_enabled: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Qwen38MetalProjectionRow {
+    name: String,
+    mode: QuantizationMode,
+    byte_length: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Qwen38MetalPreflight {
+    projection_count: usize,
+    projected_device_weight_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2650,7 +2690,11 @@ impl MetalGgufQwen35TextGenerationService {
                 )),
             ));
         }
-        let model = Arc::new(MetalQwen35Model::from_gguf_path(path, &mut backend)?);
+        let model = Arc::new(MetalQwen35Model::from_gguf_path(
+            path,
+            &mut backend,
+            runtime.device_memory_budget,
+        )?);
         let now_millis = current_time_millis();
         let mut backend_health = BackendHealthTracker::default();
         backend_health.observe("metal", backend.health(), now_millis);
@@ -2676,13 +2720,10 @@ impl MetalGgufQwen35TextGenerationService {
     #[must_use]
     pub fn runtime_support(&self) -> crate::GgufDecoderRuntimeSupport {
         crate::GgufDecoderRuntimeSupport {
-            family: GgufDecoderFamily::Qwen35,
+            family: self.model.family_metadata.family,
             supported_backends: vec![String::from("metal")],
             unsupported_backends: vec![String::from("cpu"), String::from("cuda")],
-            unsupported_features: vec![
-                String::from("adapter_serving"),
-                String::from("session_reuse"),
-            ],
+            unsupported_features: qwen35_unsupported_features(&self.model.family_metadata, false),
             quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
             adapter_runtime: crate::DecoderAdapterRuntimeSupport {
                 support_level: String::from("unsupported"),
@@ -2700,6 +2741,64 @@ impl MetalGgufQwen35TextGenerationService {
     pub fn plan_digest(&self, model_id: &str) -> Option<&str> {
         (model_id == self.model.descriptor.model.model_id)
             .then_some(self.model.plan_digest.as_str())
+    }
+
+    #[must_use]
+    pub fn metal_runtime_contract(&self) -> Qwen35MetalRuntimeContract {
+        let context_limit_tokens = self.model.metal_context_limit_tokens();
+        let (recurrent_state_host_bytes, kv_cache_host_bytes) =
+            self.model.planned_state_host_bytes(context_limit_tokens);
+        let weight_device_bytes = self.model.weight_device_bytes();
+        Qwen35MetalRuntimeContract {
+            family: self.model.family_metadata.family,
+            model_id: self.model.descriptor.model.model_id.clone(),
+            artifact_digest: self.model.descriptor.weights.digest.clone(),
+            execution_plan_namespace: String::from(match self.model.family_metadata.family {
+                GgufDecoderFamily::Qwen38 => "qwen38-native-metal|v1",
+                _ => "qwen35-native-metal|v1",
+            }),
+            execution_plan_digest: self.model.plan_digest.clone(),
+            context_limit_tokens,
+            artifact_bytes: self.model.memory_plan.weights_bytes,
+            device_capacity_bytes: self.model.device_memory_budget.total_bytes,
+            available_execution_bytes: self.model.device_memory_budget.available_execution_bytes,
+            weight_device_bytes,
+            recurrent_state_host_bytes,
+            kv_cache_host_bytes,
+            planned_device_visible_bytes: weight_device_bytes,
+            admitted_layer_count: self.model.layers.len(),
+            resident_layer_count: self.model.layers.len(),
+            projection_count: self.model.projection_count(),
+            native_projection_count: self.model.native_projection_count(),
+            admitted_conversion_count: 0,
+            quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
+            host_stepped_state: true,
+            host_projection_fallback_enabled: self.model.native_projection_count()
+                != self.model.projection_count(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_raw_logits(
+        &mut self,
+        tokens: &TokenSequence,
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let mut state = self
+            .model
+            .initial_state(self.model.metal_context_limit_tokens());
+        let mut logits = Vec::new();
+        for token in tokens.as_slice() {
+            logits = self
+                .model
+                .forward_token(
+                    &mut self.backend,
+                    &mut state,
+                    *token,
+                    MetalStepOutputMode::FullLogits,
+                )?
+                .logits;
+        }
+        Ok(logits)
     }
 
     pub fn create_session(
@@ -2852,7 +2951,7 @@ impl MetalGgufQwen35TextGenerationService {
         }
         let (prompt_tokens, context_window) = psionic_models::apply_context_window(
             &prompt_tokens,
-            self.model.descriptor.config.max_context,
+            self.model.metal_context_limit_tokens(),
             0,
             request.options.max_output_tokens,
             request.options.context_overflow_policy,
@@ -2865,10 +2964,10 @@ impl MetalGgufQwen35TextGenerationService {
         let cache_capacity_tokens = qwen35_cache_capacity_tokens(
             prompt_tokens.len(),
             request.options.max_output_tokens,
-            self.model.descriptor.config.max_context,
+            self.model.metal_context_limit_tokens(),
         );
         let mut state = self.model.initial_state(cache_capacity_tokens);
-        let mut history = crate::InMemoryKvCache::new(self.model.descriptor.config.max_context, 0);
+        let mut history = crate::InMemoryKvCache::new(self.model.metal_context_limit_tokens(), 0);
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
         let mut last_logits = Vec::new();
@@ -2920,7 +3019,7 @@ impl MetalGgufQwen35TextGenerationService {
                 );
             }
             if prompt_tokens.len().saturating_add(generated_tokens.len())
-                >= self.model.descriptor.config.max_context
+                >= self.model.metal_context_limit_tokens()
             {
                 break (
                     TerminationReason::ContextLimit,
@@ -3182,22 +3281,34 @@ struct MetalQwen35Model {
     plan_digest: String,
     load_duration_ns: u64,
     memory_plan: psionic_runtime::ModelMemoryPlan,
+    device_memory_budget: DeviceMemoryBudget,
 }
 
 impl MetalQwen35Model {
     fn from_gguf_path(
         path: impl AsRef<Path>,
         backend: &mut MetalBackend,
+        device_memory_budget: DeviceMemoryBudget,
     ) -> Result<Self, ReferenceTextGenerationError> {
         let load_start = Instant::now();
         let artifact = GgufBlobArtifact::open_path(&path, gguf_local_blob_open_options())?;
         let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
-        if adapter.family_metadata().family != GgufDecoderFamily::Qwen35 {
+        if !matches!(
+            adapter.family_metadata().family,
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38
+        ) {
             return Err(ModelLoadError::UnsupportedModel(
                 adapter.descriptor().model.model_id.clone(),
             )
             .into());
         }
+        let qwen38_preflight =
+            matches!(adapter.family_metadata().family, GgufDecoderFamily::Qwen38)
+                .then(|| {
+                    qwen38_metal_projection_rows(&artifact, adapter.tensor_layout())
+                        .and_then(|rows| qwen38_metal_projection_preflight(rows.as_slice()))
+                })
+                .transpose()?;
         let tokenizer = GgufRuntimeTokenizer::from_gguf(adapter.tokenizer()).map_err(|error| {
             ModelLoadError::ArtifactFormat {
                 format: String::from("gguf"),
@@ -3234,6 +3345,40 @@ impl MetalQwen35Model {
                 .map(MetalQwen35Layer::device_residency_bytes)
                 .fold(0usize, usize::saturating_add),
         ) as u64;
+        if let Some(preflight) = qwen38_preflight {
+            if preflight.projection_count
+                != layers
+                    .iter()
+                    .map(MetalQwen35Layer::projection_count)
+                    .fold(1usize, usize::saturating_add)
+                || preflight.projected_device_weight_bytes != resident_device_bytes
+            {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "qwen38 metal residency mismatch after upload: preflight projections={} bytes={}, resident projections={} bytes={resident_device_bytes}",
+                        preflight.projection_count,
+                        preflight.projected_device_weight_bytes,
+                        layers
+                            .iter()
+                            .map(MetalQwen35Layer::projection_count)
+                            .fold(1usize, usize::saturating_add),
+                    ),
+                }
+                .into());
+            }
+            if let Some(available) = device_memory_budget.available_execution_bytes {
+                if resident_device_bytes > available {
+                    return Err(ModelLoadError::ArtifactFormat {
+                        format: String::from("gguf"),
+                        message: format!(
+                            "qwen38 metal residency requires {resident_device_bytes} device-visible weight bytes, but the configured Metal execution budget exposes {available} bytes"
+                        ),
+                    }
+                    .into());
+                }
+            }
+        }
         Ok(Self {
             descriptor: adapter.descriptor().clone(),
             family_metadata: adapter.family_metadata().clone(),
@@ -3255,7 +3400,87 @@ impl MetalQwen35Model {
                 weights_bytes,
                 resident_device_bytes,
             ),
+            device_memory_budget,
         })
+    }
+
+    fn metal_context_limit_tokens(&self) -> usize {
+        if matches!(self.family_metadata.family, GgufDecoderFamily::Qwen38) {
+            self.descriptor
+                .config
+                .max_context
+                .min(QWEN38_METAL_CONTEXT_LIMIT_TOKENS)
+        } else {
+            self.descriptor.config.max_context
+        }
+    }
+
+    fn projection_count(&self) -> usize {
+        self.layers
+            .iter()
+            .map(MetalQwen35Layer::projection_count)
+            .fold(1usize, usize::saturating_add)
+    }
+
+    fn native_projection_count(&self) -> usize {
+        self.layers
+            .iter()
+            .map(MetalQwen35Layer::native_projection_count)
+            .fold(usize::from(self.output.is_native()), usize::saturating_add)
+    }
+
+    fn weight_device_bytes(&self) -> u64 {
+        self.output
+            .device_residency_bytes()
+            .saturating_add(
+                self.layers
+                    .iter()
+                    .map(MetalQwen35Layer::device_residency_bytes)
+                    .fold(0usize, usize::saturating_add),
+            )
+            .try_into()
+            .unwrap_or(u64::MAX)
+    }
+
+    fn planned_state_host_bytes(&self, cache_capacity_tokens: usize) -> (u64, u64) {
+        let mut recurrent_bytes = 0usize;
+        let mut kv_cache_bytes = 0usize;
+        for layer in &self.layers {
+            match &layer.kind {
+                MetalQwen35LayerKind::Hybrid(hybrid) => {
+                    recurrent_bytes = recurrent_bytes
+                        .saturating_add(
+                            hybrid.qkv_gate_alpha_beta.rows_per_projection[0]
+                                .saturating_mul(hybrid.conv_kernel.saturating_sub(1))
+                                .saturating_mul(std::mem::size_of::<f32>()),
+                        )
+                        .saturating_add(
+                            hybrid
+                                .time_step_rank
+                                .saturating_mul(hybrid.state_size)
+                                .saturating_mul(hybrid.state_size)
+                                .saturating_mul(std::mem::size_of::<f32>()),
+                        );
+                }
+                MetalQwen35LayerKind::FullAttention(full_attention) => {
+                    kv_cache_bytes = kv_cache_bytes
+                        .saturating_add(
+                            cache_capacity_tokens
+                                .saturating_mul(std::mem::size_of::<Qwen35FullAttentionEntry>()),
+                        )
+                        .saturating_add(
+                            cache_capacity_tokens
+                                .saturating_mul(full_attention.kv_width)
+                                .saturating_mul(std::mem::size_of::<f32>())
+                                .saturating_mul(2),
+                        );
+                }
+            }
+        }
+        (
+            recurrent_bytes.try_into().unwrap_or(u64::MAX),
+            kv_cache_bytes.try_into().unwrap_or(u64::MAX),
+        )
     }
 
     fn initial_state(&self, cache_capacity_tokens: usize) -> MetalQwen35State {
@@ -4562,6 +4787,46 @@ impl MetalQwen35Layer {
             })
     }
 
+    fn projection_count(&self) -> usize {
+        self.ffn_gate_up
+            .parts
+            .len()
+            .saturating_add(1)
+            .saturating_add(match &self.kind {
+                MetalQwen35LayerKind::Hybrid(layer) => {
+                    layer.qkv_gate_alpha_beta.parts.len().saturating_add(1)
+                }
+                MetalQwen35LayerKind::FullAttention(layer) => {
+                    layer.qkv.parts.len().saturating_add(1)
+                }
+            })
+    }
+
+    fn native_projection_count(&self) -> usize {
+        self.ffn_gate_up
+            .parts
+            .iter()
+            .filter(|matrix| matrix.is_native())
+            .count()
+            .saturating_add(usize::from(self.ffn_down.is_native()))
+            .saturating_add(match &self.kind {
+                MetalQwen35LayerKind::Hybrid(layer) => layer
+                    .qkv_gate_alpha_beta
+                    .parts
+                    .iter()
+                    .filter(|matrix| matrix.is_native())
+                    .count()
+                    .saturating_add(usize::from(layer.ssm_out.is_native())),
+                MetalQwen35LayerKind::FullAttention(layer) => layer
+                    .qkv
+                    .parts
+                    .iter()
+                    .filter(|matrix| matrix.is_native())
+                    .count()
+                    .saturating_add(usize::from(layer.output.is_native())),
+            })
+    }
+
     fn forward(
         &self,
         backend: &mut MetalBackend,
@@ -5781,6 +6046,99 @@ fn supports_native_metal_qwen35_projection(mode: QuantizationMode) -> bool {
             | QuantizationMode::GgmlQ8_0
             | QuantizationMode::GgmlMxfp4
     )
+}
+
+fn qwen35_metal_projection_names(
+    layout: &psionic_models::GgufDecoderTensorLayout,
+) -> Result<Vec<String>, ModelLoadError> {
+    let mut names = vec![
+        layout
+            .output
+            .as_ref()
+            .unwrap_or(&layout.token_embedding)
+            .clone(),
+    ];
+    for layer in &layout.layers {
+        names.extend([
+            required_tensor_name(layer.feed_forward_gate_weight.as_deref(), "ffn_gate")?
+                .to_string(),
+            required_tensor_name(layer.feed_forward_up_weight.as_deref(), "ffn_up")?.to_string(),
+            required_tensor_name(layer.feed_forward_down_weight.as_deref(), "ffn_down")?
+                .to_string(),
+        ]);
+        match layer.layer_kind {
+            GgufDecoderLayerKind::Qwen35Hybrid => names.extend([
+                required_tensor_name(layer.attention_qkv_weight.as_deref(), "attn_qkv")?
+                    .to_string(),
+                required_tensor_name(layer.attention_gate_weight.as_deref(), "attn_gate")?
+                    .to_string(),
+                required_tensor_name(layer.ssm_alpha_weight.as_deref(), "ssm_alpha")?.to_string(),
+                required_tensor_name(layer.ssm_beta_weight.as_deref(), "ssm_beta")?.to_string(),
+                required_tensor_name(layer.ssm_out_weight.as_deref(), "ssm_out")?.to_string(),
+            ]),
+            GgufDecoderLayerKind::Qwen35FullAttention => names.extend([
+                required_tensor_name(layer.attention_query_weight.as_deref(), "attn_q")?
+                    .to_string(),
+                required_tensor_name(layer.attention_key_weight.as_deref(), "attn_k")?.to_string(),
+                required_tensor_name(layer.attention_value_weight.as_deref(), "attn_v")?
+                    .to_string(),
+                required_tensor_name(layer.attention_output_weight.as_deref(), "attn_output")?
+                    .to_string(),
+            ]),
+            other => {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "qwen metal projection admission does not support layer kind `{other:?}`"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(names)
+}
+
+fn qwen38_metal_projection_rows(
+    artifact: &GgufBlobArtifact,
+    layout: &psionic_models::GgufDecoderTensorLayout,
+) -> Result<Vec<Qwen38MetalProjectionRow>, ModelLoadError> {
+    qwen35_metal_projection_names(layout)?
+        .into_iter()
+        .map(|name| {
+            let storage = artifact.paged_tensor(name.as_str())?;
+            Ok(Qwen38MetalProjectionRow {
+                name,
+                mode: storage.metadata().quantization,
+                byte_length: storage.byte_length().try_into().unwrap_or(u64::MAX),
+            })
+        })
+        .collect()
+}
+
+fn qwen38_metal_projection_preflight(
+    rows: &[Qwen38MetalProjectionRow],
+) -> Result<Qwen38MetalPreflight, ModelLoadError> {
+    let unsupported = rows
+        .iter()
+        .filter(|row| !supports_native_metal_qwen35_projection(row.mode))
+        .map(|row| format!("{}={:?}", row.name, row.mode))
+        .collect::<Vec<_>>();
+    if !unsupported.is_empty() {
+        return Err(ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "qwen38 metal preflight refused required projections without a native kernel or admitted conversion: {}",
+                unsupported.join(", ")
+            ),
+        });
+    }
+    Ok(Qwen38MetalPreflight {
+        projection_count: rows.len(),
+        projected_device_weight_bytes: rows
+            .iter()
+            .map(|row| row.byte_length)
+            .fold(0u64, u64::saturating_add),
+    })
 }
 
 fn qwen35_partitioned_top_k_block_override() -> Option<usize> {
@@ -14409,7 +14767,10 @@ fn digest_qwen35_metal_plan(
     hasher.update(descriptor.weights.digest.as_bytes());
     hasher.update(b"|");
     hasher.update(metadata.architecture.as_bytes());
-    hasher.update(b"|qwen35-native-metal|v1");
+    hasher.update(match metadata.family {
+        GgufDecoderFamily::Qwen38 => b"|qwen38-native-metal|v1".as_slice(),
+        _ => b"|qwen35-native-metal|v1".as_slice(),
+    });
     hex::encode(hasher.finalize())
 }
 
@@ -15165,8 +15526,9 @@ fn rope_yarn_ramp(low: f32, high: f32, i0: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES, qwen38_cuda_preflight,
-        qwen38_cuda_unsupported_quantization_modes, restore_qwen38_rejected_draft,
+        QWEN38_CUDA_PREFLIGHT_RUNTIME_RESERVE_BYTES, Qwen38MetalProjectionRow,
+        qwen38_cuda_preflight, qwen38_cuda_unsupported_quantization_modes,
+        qwen38_metal_projection_preflight, restore_qwen38_rejected_draft,
     };
     use psionic_backend_cuda::CudaDeviceMemoryInfo;
     use psionic_core::QuantizationMode;
@@ -15216,6 +15578,43 @@ mod tests {
             ]),
             vec![QuantizationMode::GgmlQ4_0, QuantizationMode::Int8Symmetric,]
         );
+    }
+
+    #[test]
+    fn qwen38_metal_preflight_admits_native_modes_and_refuses_host_projection_fallback() {
+        let admitted = qwen38_metal_projection_preflight(&[
+            Qwen38MetalProjectionRow {
+                name: String::from("output.weight"),
+                mode: QuantizationMode::GgmlQ6K,
+                byte_length: 4096,
+            },
+            Qwen38MetalProjectionRow {
+                name: String::from("blk.0.ffn_gate.weight"),
+                mode: QuantizationMode::GgmlQ4K,
+                byte_length: 2048,
+            },
+        ])
+        .expect("native Metal quantization should be admitted");
+        assert_eq!(admitted.projection_count, 2);
+        assert_eq!(admitted.projected_device_weight_bytes, 6144);
+
+        let error = qwen38_metal_projection_preflight(&[
+            Qwen38MetalProjectionRow {
+                name: String::from("blk.0.attn_q.weight"),
+                mode: QuantizationMode::GgmlQ4_0,
+                byte_length: 1024,
+            },
+            Qwen38MetalProjectionRow {
+                name: String::from("blk.0.attn_k.weight"),
+                mode: QuantizationMode::None,
+                byte_length: 2048,
+            },
+        ])
+        .expect_err("unsupported or dense host projections must be refused");
+        let message = error.to_string();
+        assert!(message.contains("blk.0.attn_q.weight=GgmlQ4_0"));
+        assert!(message.contains("blk.0.attn_k.weight=None"));
+        assert!(message.contains("without a native kernel or admitted conversion"));
     }
 
     #[test]

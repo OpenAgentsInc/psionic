@@ -4856,10 +4856,10 @@ fn qwen38_openai_capability(model: &OpenAiCompatLoadedModel) -> Option<Qwen38Ope
         preserve_thinking_by_default: true,
         tool_format: "qwen38_tool_xml",
         structured_output_contract: "runtime_masked_proven_subset",
-        raw_logits_contract: if model.backend_label() == "cuda" {
-            "bounded_candidate_fast_path_with_exact_raw_logits_fallback"
-        } else {
-            "native_cpu_full_logits"
+        raw_logits_contract: match model.backend_label() {
+            "cuda" => "bounded_candidate_fast_path_with_exact_raw_logits_fallback",
+            "metal" => "native_metal_full_logits_or_greedy_token",
+            _ => "native_cpu_full_logits",
         },
         response_state: "bounded_prompt_replay",
         session_reuse: "unsupported",
@@ -10992,18 +10992,14 @@ fn load_generic_decoder_model(
                 OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4
             }
         }
-        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35, false) => {
-            OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35
-        }
-        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen38, false) => {
-            return Err(format!(
-                "qwen38 native Metal generation is not admitted on the generic OpenAI surface until R10; `{}` remains CPU/CUDA-only",
-                model_path.display(),
-            ));
-        }
+        (
+            OpenAiCompatBackend::Metal,
+            GgufDecoderFamily::Qwen35 | GgufDecoderFamily::Qwen38,
+            false,
+        ) => OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35,
         (OpenAiCompatBackend::Metal, _, _) => {
             return Err(format!(
-                "generic OpenAI metal backend currently supports only gemma4 and qwen35 GGUF decoders; `{}` resolved to `{}`",
+                "generic OpenAI metal backend currently supports only gemma4, qwen35, and qwen38 GGUF decoders; `{}` resolved to `{}`",
                 model_path.display(),
                 decoder_family_label(family),
             ));
@@ -11142,6 +11138,7 @@ fn generic_decoder_serving_truth(
         (backend, family),
         (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35)
+            | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen38)
     ) {
         OpenAiCompatServingTruth::metal_native()
     } else {
@@ -11167,6 +11164,7 @@ fn generic_decoder_execution_profile(
             | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen38)
             | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35)
+            | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen38)
     ) {
         default_text_generation_execution_profile()
     } else {
@@ -14852,6 +14850,171 @@ mod tests {
     }
 
     #[test]
+    fn generic_metal_qwen38_load_plan_publishes_native_execution_contract()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-qwen38-metal.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny qwen38 metal",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "world",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors().as_slice(),
+        )?;
+
+        let (loaded_model, accepted_names, load_plan) =
+            load_generic_decoder_model(&qwen38_path, 0, OpenAiCompatBackend::Metal)?;
+
+        assert_eq!(
+            load_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35
+        );
+        assert_eq!(loaded_model.backend_label(), "metal");
+        assert_eq!(loaded_model.execution_mode_label(), "native");
+        assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(loaded_model.execution_refusal_reason(), None);
+        assert_eq!(
+            loaded_model.decoder().map(|decoder| decoder.family),
+            Some(GgufDecoderFamily::Qwen38)
+        );
+        assert_eq!(
+            super::qwen38_openai_capability(&loaded_model)
+                .expect("Qwen3.8 Metal capability")
+                .raw_logits_contract,
+            "native_metal_full_logits_or_greedy_token"
+        );
+        assert!(accepted_names.contains("tiny-qwen38-metal.gguf"));
+        Ok(())
+    }
+
+    #[test]
+    fn native_qwen38_metal_parity_residency_and_request_reset_hold_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-native-qwen38-metal.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny native qwen38 metal",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "world",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors().as_slice(),
+        )?;
+
+        let cpu = crate::CpuGgufQwen35TextGenerationService::from_gguf_path(&qwen38_path)?;
+        let mut metal = crate::MetalGgufQwen35TextGenerationService::from_gguf_path(&qwen38_path)?;
+        let prompt = TokenSequence::new(vec![TokenId(6), TokenId(7)]);
+        let cpu_logits = cpu.test_raw_logits(&prompt)?;
+        let metal_logits = metal.test_raw_logits(&prompt)?;
+        let max_abs_diff = cpu_logits
+            .iter()
+            .zip(metal_logits.iter())
+            .map(|(cpu, metal)| (cpu - metal).abs())
+            .fold(0.0_f32, f32::max);
+        assert_eq!(cpu_logits.len(), metal_logits.len());
+        assert!(max_abs_diff <= 1e-4, "max logit diff was {max_abs_diff}");
+
+        let contract = metal.metal_runtime_contract();
+        assert_eq!(contract.family, GgufDecoderFamily::Qwen38);
+        assert_eq!(contract.execution_plan_namespace, "qwen38-native-metal|v1");
+        assert_eq!(contract.context_limit_tokens, 4096);
+        assert_eq!(contract.admitted_layer_count, contract.resident_layer_count);
+        assert_eq!(contract.projection_count, contract.native_projection_count);
+        assert_eq!(contract.admitted_conversion_count, 0);
+        assert!(contract.host_stepped_state);
+        assert!(!contract.host_projection_fallback_enabled);
+
+        let request = GenerationRequest::new_tokens(
+            "qwen38-metal-reset-a",
+            metal.model_descriptor().clone(),
+            None,
+            prompt,
+            GenerationOptions::greedy(2),
+        );
+        let first = crate::TextGenerationExecutor::generate(&mut metal, &request)?;
+        let mut repeated_request = request.clone();
+        repeated_request.request_id = String::from("qwen38-metal-reset-b");
+        let second = crate::TextGenerationExecutor::generate(&mut metal, &repeated_request)?;
+        assert_eq!(first.output.tokens, second.output.tokens);
+        assert_eq!(first.output.text, second.output.text);
+        assert_eq!(first.termination, second.termination);
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_metal_service_refuses_required_host_projections_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-dense-qwen38-metal.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny dense qwen38 metal refusal",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "world",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen38_openai_decoder_tensors().as_slice(),
+        )?;
+
+        let error = match crate::MetalGgufQwen35TextGenerationService::from_gguf_path(&qwen38_path)
+        {
+            Ok(_) => panic!("dense Qwen3.8 projections must not execute as a hidden host fallback"),
+            Err(error) => error,
+        };
+        let message = error.to_string();
+        assert!(message.contains("qwen38 metal preflight refused required projections"));
+        assert!(message.contains("output.weight=None"));
+        assert!(message.contains("without a native kernel or admitted conversion"));
+        Ok(())
+    }
+
+    #[test]
     fn generic_cuda_gemma4_26b_load_plan_admits_single_node_sparse_native_runtime()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
@@ -17519,7 +17682,7 @@ mod tests {
     }
 
     #[test]
-    fn qwen38_openai_cpu_cuda_capability_rows_structured_envelope_and_media_refusals()
+    fn qwen38_openai_cpu_cuda_metal_capability_rows_structured_envelope_and_media_refusals()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let qwen38_path = temp.path().join("tiny-qwen38-capabilities.gguf");
@@ -17583,13 +17746,21 @@ mod tests {
         assert_eq!(cuda_capability.session_reuse, "unsupported");
         assert_eq!(cuda_capability.adapters, "unsupported");
 
-        let metal_error =
-            match load_generic_decoder_model(&qwen38_path, 0, OpenAiCompatBackend::Metal) {
-                Ok(_) => panic!("Qwen3.8 Metal must remain refused until R10"),
-                Err(error) => error,
-            };
-        assert!(metal_error.contains("until R10"));
-        assert!(metal_error.contains("CPU/CUDA-only"));
+        let (metal_model, _, metal_plan) =
+            load_generic_decoder_model(&qwen38_path, 0, OpenAiCompatBackend::Metal)?;
+        assert_eq!(
+            metal_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35
+        );
+        assert_eq!(metal_model.backend_label(), "metal");
+        assert_eq!(metal_model.execution_mode_label(), "native");
+        assert_eq!(metal_model.local_serving_truth().fallback_policy, "refuse");
+        assert_eq!(
+            super::qwen38_openai_capability(&metal_model)
+                .expect("Metal qwen38 capability")
+                .raw_logits_contract,
+            "native_metal_full_logits_or_greedy_token"
+        );
 
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen38_path))?;
         let runtime = tokio::runtime::Runtime::new()?;
@@ -17724,6 +17895,94 @@ mod tests {
         assert_eq!(
             header_value(response.headers(), "x-psionic-execution-engine"),
             Some(String::from("psionic"))
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert!(payload["choices"][0]["message"]["content"].is_string());
+        assert!(
+            payload["usage"]["completion_tokens"]
+                .as_u64()
+                .is_some_and(|count| count >= 1)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen38_native_metal_publication_and_generation_are_honest_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-qwen38-metal-server.gguf");
+        write_test_gguf(
+            &qwen38_path,
+            qwen38_openai_decoder_metadata_with_tokens(
+                "tiny native qwen38 metal server",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "world",
+                    "proxy",
+                    "qwen38",
+                ],
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors().as_slice(),
+        )?;
+        let mut config = OpenAiCompatConfig::new(&qwen38_path);
+        config.backend = OpenAiCompatBackend::Metal;
+        let server = OpenAiCompatServer::from_config(&config)?;
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.backend, "metal");
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+        assert_eq!(health.0.residency_mode, "metal_accelerated");
+        assert_eq!(health.0.fallback_policy, "refuse");
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|model| model.id == "tiny-qwen38-metal-server.gguf")
+            .expect("qwen38 metal model should be listed");
+        assert_eq!(model.psionic_served_backend, Some("metal"));
+        assert_eq!(model.psionic_execution_mode, Some("native"));
+        assert_eq!(model.psionic_execution_engine, Some("psionic"));
+        assert_eq!(model.psionic_fallback_policy, Some("refuse"));
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen38-metal-server")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(2),
+                ..Default::default()
+            },
+        ))?;
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-served-backend"),
+            Some(String::from("metal"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-mode"),
+            Some(String::from("native"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-fallback-policy"),
+            Some(String::from("refuse"))
         );
         let payload = runtime.block_on(response_json(response))?;
         assert!(payload["choices"][0]["message"]["content"].is_string());
