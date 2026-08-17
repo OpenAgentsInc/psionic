@@ -357,9 +357,9 @@ into one generic engine claim.
   prompt digests byte-for-byte. The bundle records zero CUDA fallback, graph,
   cache, allocator, latency, and throughput observations while publishing no
   performance claim. Qwen3.8 remains `partial` overall because retained
-  full-model Apple Metal evidence, Metal multimodal execution, retained HTTP
-  media evidence, training and adapters, MTP acceleration, long-context
-  widening, and the competitive performance milestone are not complete. The
+  full-model Apple Metal evidence, Metal multimodal execution, training and
+  adapters, MTP acceleration, long-context widening, and the competitive
+  performance milestone are not complete. The
   optional R9A CPU lane is `implemented` behind an explicit constructor.
   It conditionally loads the appended 15-tensor NextN block, shares the base
   embedding and LM head, keeps a separate dense-attention MTP KV cache, and
@@ -435,8 +435,12 @@ into one generic engine claim.
   turn refuses stateful continuation because binary attachments are not
   retained for replay. The server still publishes and enforces text-only
   refusal when the vision directory is omitted. Retained end-to-end HTTP
-  evidence and Metal decoder consumption remain pending, so R11 stays
-  `partial`.
+  evidence at
+  `fixtures/qwen38/reports/qwen38_openai_media_evidence_v1.json` covers a
+  complete image-conditioned tool call, streamed animated-video generation,
+  official Responses image input and storage, identity receipts, and bounded
+  refusal behavior on an idle RTX 4080. Metal decoder consumption remains
+  pending, so R11 stays `partial`.
 - Current `main` also admits native local execution for the real Hugging Face
   `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
   Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`

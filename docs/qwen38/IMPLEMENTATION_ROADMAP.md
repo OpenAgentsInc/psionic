@@ -957,9 +957,24 @@ contains media refuses continuation because binary attachment state is not yet
 retained for replay. A server without the explicit vision directory continues
 to publish and enforce the text-only media refusal.
 
-R11 remains `partial` until Metal consumes the plan and retained end-to-end
-OpenAI server evidence covers image, video, streaming, tools, bounds,
-malformed input, and refusal behavior.
+The retained HTTP driver is `scripts/run-qwen38-openai-media-evidence.sh`; its
+checker is `scripts/check-qwen38-openai-media.sh`. The report
+`fixtures/qwen38/reports/qwen38_openai_media_evidence_v1.json` was produced
+from clean `origin/main` revision
+`5b215c5e3cb2f0b87f6084e287d57c13a76d77e3` on an idle RTX 4080 with driver
+`595.58.03`. It binds the official vision shard and selected Dynamic V3 GGUF
+digests. The Chat image row injects 64 image tokens into a 374-token
+tool-enabled prompt, reports the CPU vision tower's `1,842,920,384` F32
+resident bytes, and completes one `record_visual_summary` call in 59 output
+tokens. The streamed animated-GIF row emits three events and `The video` while
+publishing attachment, multimodal-token, expanded-prompt, and backend identity
+headers. The official Responses image row emits `The image`, stores the turn,
+and then refuses binary-media continuation. Remote URLs, MP4, malformed base64,
+and five-attachment requests all return the expected bounded refusal. The
+report records native CUDA decode, `fallback_policy = refuse`, no hidden
+fallback, and no performance claim.
+
+R11 remains `partial` until Metal consumes the multimodal decoder plan.
 
 Native vision remains a separate roadmap lane after text support.
 

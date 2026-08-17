@@ -1,0 +1,1004 @@
+{
+  "schema_version": "psionic.qwen38.openai_media_evidence.v1",
+  "status": "implemented_early",
+  "phase": "R11",
+  "model_id": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+  "server": {
+    "health": {
+      "status": 200,
+      "headers": {},
+      "body": {
+        "status": "ok",
+        "backend": "cuda",
+        "execution_mode": "native",
+        "execution_engine": "psionic",
+        "default_model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+        "model_count": 1,
+        "residency_mode": "cuda_accelerated",
+        "hybrid_offload": "unsupported",
+        "fallback_policy": "refuse",
+        "performance_class": "nvidia_native",
+        "load_status": "loaded",
+        "warm_control": "not_implemented",
+        "unload_control": "not_implemented",
+        "memory_pressure_reporting": "not_implemented",
+        "default_model_supported_endpoints": [
+          "/v1/chat/completions",
+          "/v1/responses"
+        ],
+        "supported_endpoints": [
+          "/v1/chat/completions",
+          "/v1/responses"
+        ],
+        "structured_output_fallbacks": [
+          "choice_set",
+          "regex_subset",
+          "gbnf_subset",
+          "json_schema_subset",
+          "json_object",
+          "tagged_json_schema"
+        ],
+        "structured_output_capabilities": [
+          {
+            "kind": "choice",
+            "support_level": "fallback",
+            "mode": "fallback_choice",
+            "parser": "choice_set"
+          },
+          {
+            "kind": "regex",
+            "support_level": "fallback",
+            "mode": "fallback_regex",
+            "parser": "regex_subset"
+          },
+          {
+            "kind": "grammar",
+            "support_level": "fallback",
+            "mode": "fallback_grammar",
+            "parser": "gbnf_subset"
+          },
+          {
+            "kind": "json_schema",
+            "support_level": "fallback",
+            "mode": "fallback_json_schema",
+            "parser": "json_schema_subset"
+          },
+          {
+            "kind": "json_object",
+            "support_level": "fallback",
+            "mode": "fallback_json_object",
+            "parser": "json_object"
+          },
+          {
+            "kind": "tagged_structure",
+            "support_level": "fallback",
+            "mode": "fallback_tagged_structure",
+            "parser": "tagged_json_schema"
+          }
+        ],
+        "tool_calling": {
+          "support_level": "native",
+          "supported_modes": [
+            "none",
+            "auto",
+            "required",
+            "named"
+          ],
+          "parser": "qwen38_tool_xml",
+          "argument_validation": "json_schema_subset"
+        },
+        "response_state": {
+          "storage": "memory_only",
+          "retention_scope": "process_lifetime",
+          "cache_behavior": "prompt_replay_only",
+          "continuation_modes": [
+            "append_turn"
+          ],
+          "max_responses": 128,
+          "max_conversations": 64,
+          "max_items_per_conversation": 64
+        },
+        "execution_profile": {
+          "batch_posture": "single_request_only",
+          "queue_policy": {
+            "discipline": "direct_caller_backpressure",
+            "max_active_requests": 1,
+            "max_queued_requests": 0,
+            "per_model_serialization": true
+          },
+          "throughput_class": "latency_optimized",
+          "prefill_decode_capability": {
+            "supported_modes": [
+              "disaggregated_colocated"
+            ],
+            "supported_transports": [
+              "in_process_kv_state"
+            ],
+            "exposes_split_metrics": true,
+            "detail": "local text generation separates prompt-prefill and decode inside one runtime-owned KV seam"
+          }
+        },
+        "multimodal_projection_mode": "native_vision",
+        "multimodal_supported_media": [
+          "image",
+          "video"
+        ],
+        "qwen38": {
+          "prompt_template_id": "qwen3.8.chat_template.v1",
+          "prompt_template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+          "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+          "thinking_enabled_by_default": true,
+          "reasoning_effort_default": "xhigh",
+          "reasoning_effort_supported": [
+            "low",
+            "medium",
+            "xhigh"
+          ],
+          "preserve_thinking_by_default": true,
+          "tool_format": "qwen38_tool_xml",
+          "structured_output_contract": "runtime_masked_proven_subset",
+          "raw_logits_contract": "bounded_candidate_fast_path_with_exact_raw_logits_fallback",
+          "response_state": "bounded_prompt_replay",
+          "session_reuse": "unsupported",
+          "adapters": "unsupported",
+          "prefix_cache": "request_prefix_reuse",
+          "supported_sampling_controls": [
+            "temperature",
+            "top_k",
+            "top_p",
+            "min_p",
+            "typical_p",
+            "mirostat",
+            "mirostat_tau",
+            "mirostat_eta",
+            "repeat_penalty",
+            "repeat_last_n",
+            "presence_penalty",
+            "frequency_penalty",
+            "seed"
+          ],
+          "unsupported_sampling_controls": [
+            "logit_bias",
+            "n",
+            "best_of"
+          ],
+          "vision_backend": "cpu",
+          "image_input": "native_bounded_base64_data_url",
+          "video_input": "native_bounded_animated_gif_data_url"
+        }
+      }
+    },
+    "models": {
+      "status": 200,
+      "headers": {},
+      "body": {
+        "data": [
+          {
+            "id": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+            "object": "model",
+            "owned_by": "psionic",
+            "psionic_supported_endpoints": [
+              "/v1/chat/completions",
+              "/v1/responses"
+            ],
+            "psionic_model_family": "qwen38",
+            "psionic_artifact_sha256": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+            "psionic_route_workers": [
+              "local_cpu_0"
+            ],
+            "psionic_route_backends": [
+              "cuda"
+            ],
+            "psionic_route_execution_modes": [
+              "native"
+            ],
+            "psionic_route_execution_engines": [
+              "psionic"
+            ],
+            "psionic_route_localities": [
+              "local"
+            ],
+            "psionic_route_provenances": [
+              "local_execution"
+            ],
+            "psionic_served_backend": "cuda",
+            "psionic_execution_mode": "native",
+            "psionic_execution_engine": "psionic",
+            "psionic_residency_mode": "cuda_accelerated",
+            "psionic_hybrid_offload": "unsupported",
+            "psionic_fallback_policy": "refuse",
+            "psionic_performance_class": "nvidia_native",
+            "psionic_structured_outputs": [
+              "choice_set",
+              "regex_subset",
+              "gbnf_subset",
+              "json_schema_subset",
+              "json_object",
+              "tagged_json_schema"
+            ],
+            "psionic_structured_output_capabilities": [
+              {
+                "kind": "choice",
+                "support_level": "fallback",
+                "mode": "fallback_choice",
+                "parser": "choice_set"
+              },
+              {
+                "kind": "regex",
+                "support_level": "fallback",
+                "mode": "fallback_regex",
+                "parser": "regex_subset"
+              },
+              {
+                "kind": "grammar",
+                "support_level": "fallback",
+                "mode": "fallback_grammar",
+                "parser": "gbnf_subset"
+              },
+              {
+                "kind": "json_schema",
+                "support_level": "fallback",
+                "mode": "fallback_json_schema",
+                "parser": "json_schema_subset"
+              },
+              {
+                "kind": "json_object",
+                "support_level": "fallback",
+                "mode": "fallback_json_object",
+                "parser": "json_object"
+              },
+              {
+                "kind": "tagged_structure",
+                "support_level": "fallback",
+                "mode": "fallback_tagged_structure",
+                "parser": "tagged_json_schema"
+              }
+            ],
+            "psionic_tool_calling": {
+              "support_level": "native",
+              "supported_modes": [
+                "none",
+                "auto",
+                "required",
+                "named"
+              ],
+              "parser": "qwen38_tool_xml",
+              "argument_validation": "json_schema_subset"
+            },
+            "psionic_response_state": {
+              "storage": "memory_only",
+              "retention_scope": "process_lifetime",
+              "cache_behavior": "prompt_replay_only",
+              "continuation_modes": [
+                "append_turn"
+              ],
+              "max_responses": 128,
+              "max_conversations": 64,
+              "max_items_per_conversation": 64
+            },
+            "psionic_execution_profile": {
+              "batch_posture": "single_request_only",
+              "queue_policy": {
+                "discipline": "direct_caller_backpressure",
+                "max_active_requests": 1,
+                "max_queued_requests": 0,
+                "per_model_serialization": true
+              },
+              "throughput_class": "latency_optimized",
+              "prefill_decode_capability": {
+                "supported_modes": [
+                  "disaggregated_colocated"
+                ],
+                "supported_transports": [
+                  "in_process_kv_state"
+                ],
+                "exposes_split_metrics": true,
+                "detail": "local text generation separates prompt-prefill and decode inside one runtime-owned KV seam"
+              }
+            },
+            "psionic_multimodal_projection_mode": "native_vision",
+            "psionic_multimodal_supported_media": [
+              "image",
+              "video"
+            ],
+            "psionic_qwen38": {
+              "prompt_template_id": "qwen3.8.chat_template.v1",
+              "prompt_template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+              "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+              "thinking_enabled_by_default": true,
+              "reasoning_effort_default": "xhigh",
+              "reasoning_effort_supported": [
+                "low",
+                "medium",
+                "xhigh"
+              ],
+              "preserve_thinking_by_default": true,
+              "tool_format": "qwen38_tool_xml",
+              "structured_output_contract": "runtime_masked_proven_subset",
+              "raw_logits_contract": "bounded_candidate_fast_path_with_exact_raw_logits_fallback",
+              "response_state": "bounded_prompt_replay",
+              "session_reuse": "unsupported",
+              "adapters": "unsupported",
+              "prefix_cache": "request_prefix_reuse",
+              "supported_sampling_controls": [
+                "temperature",
+                "top_k",
+                "top_p",
+                "min_p",
+                "typical_p",
+                "mirostat",
+                "mirostat_tau",
+                "mirostat_eta",
+                "repeat_penalty",
+                "repeat_last_n",
+                "presence_penalty",
+                "frequency_penalty",
+                "seed"
+              ],
+              "unsupported_sampling_controls": [
+                "logit_bias",
+                "n",
+                "best_of"
+              ],
+              "vision_backend": "cpu",
+              "image_input": "native_bounded_base64_data_url",
+              "video_input": "native_bounded_animated_gif_data_url"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "generation": {
+    "chat_image_with_tools": {
+      "status": 200,
+      "headers": {
+        "x-psionic-artifact-sha256": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "x-psionic-backend": "cuda",
+        "x-psionic-batch-posture": "single_request_only",
+        "x-psionic-execution-engine": "psionic",
+        "x-psionic-execution-mode": "native",
+        "x-psionic-fallback-policy": "refuse",
+        "x-psionic-hybrid-offload": "unsupported",
+        "x-psionic-itl-ns": "178329629",
+        "x-psionic-model-key": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "x-psionic-performance-class": "nvidia_native",
+        "x-psionic-prefix-cache-refusal": "request_opt_out",
+        "x-psionic-prefix-cache-reused-tokens": "0",
+        "x-psionic-prefix-cache-state": "bypassed",
+        "x-psionic-qwen38-attachment-sha256": "0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f",
+        "x-psionic-qwen38-expanded-prompt-sha256": "a01348f76930b1c27f18e44c7257bc4f16151fa52032c3a56689c592206a14e0",
+        "x-psionic-qwen38-media-attachments": "1",
+        "x-psionic-qwen38-multimodal-token-sha256": "752f3e31dda7852d3d12f98c768435c3b9c38d828b18eaa4d377e81173ae49f4",
+        "x-psionic-qwen38-preserve-thinking": "true",
+        "x-psionic-qwen38-prompt-cache-identity": "e60d450051607a35670e796a5ef09bd68319e84801b76d3d62ea8eed49f62056",
+        "x-psionic-qwen38-template": "qwen3.8.chat_template.v1",
+        "x-psionic-qwen38-template-sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+        "x-psionic-qwen38-thinking": "disabled",
+        "x-psionic-qwen38-tokenizer-sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+        "x-psionic-qwen38-vision-backend": "cpu",
+        "x-psionic-raw-logits-materialized": "false",
+        "x-psionic-residency-mode": "cuda_accelerated",
+        "x-psionic-route-active-requests": "0",
+        "x-psionic-route-cache-matches": "0",
+        "x-psionic-route-eligible-workers": "1",
+        "x-psionic-route-locality": "local",
+        "x-psionic-route-provenance": "local_execution",
+        "x-psionic-route-sampled-workers": "1",
+        "x-psionic-route-strategy": "warm_aware",
+        "x-psionic-route-warm-workers": "1",
+        "x-psionic-route-worker": "local_cpu_0",
+        "x-psionic-served-backend": "cuda",
+        "x-psionic-served-model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+        "x-psionic-ttft-ns": "632"
+      },
+      "body": {
+        "id": "psionic-chatcmpl-1a011c4ad27-1ed07c-1",
+        "object": "chat.completion",
+        "created": 1787004573,
+        "model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "psionic-chatcmpl-1a011c4ad27-1ed07c-1-tool-0",
+                  "type": "function",
+                  "function": {
+                    "name": "record_visual_summary",
+                    "arguments": "{\"summary\":\"A smooth gradient image transitioning from magenta/pink in the upper right to green in the lower left, with a soft grayish-white diagonal band across the center.\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 374,
+          "completion_tokens": 59,
+          "total_tokens": 433
+        },
+        "psionic_tool_calls": [
+          {
+            "id": "psionic-chatcmpl-1a011c4ad27-1ed07c-1-tool-0",
+            "name": "record_visual_summary",
+            "arguments": {
+              "summary": "A smooth gradient image transitioning from magenta/pink in the upper right to green in the lower left, with a soft grayish-white diagonal band across the center."
+            },
+            "raw_arguments": "{\"summary\":\"A smooth gradient image transitioning from magenta/pink in the upper right to green in the lower left, with a soft grayish-white diagonal band across the center.\"}"
+          }
+        ],
+        "psionic_qwen38": {
+          "schema_version": "psionic.qwen38.openai_receipt.v1",
+          "model_key": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "served_model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "artifact_sha256": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "backend": "cuda",
+          "execution_mode": "native",
+          "execution_engine": "psionic",
+          "prompt": {
+            "schema_version": "psionic.qwen38.prompt_receipt.v1",
+            "model_id": "Qwen/Qwen3.8-27B",
+            "template_id": "qwen3.8.chat_template.v1",
+            "template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+            "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+            "thinking_enabled": false,
+            "preserve_thinking": true,
+            "add_generation_prompt": true,
+            "add_vision_id": false,
+            "tool_count": 1,
+            "rendered_sha256": "04611b9968bfb78e5f006515a3f850031234d4987efae47c60ea3352b46bd349",
+            "prompt_cache_identity": "e60d450051607a35670e796a5ef09bd68319e84801b76d3d62ea8eed49f62056"
+          },
+          "multimodal": {
+            "schema_version": "psionic.qwen38.openai_multimodal_receipt.v1",
+            "input_contract": "bounded_base64_data_urls",
+            "vision_backend": "cpu",
+            "vision_execution_engine": "psionic_candle_qwen38_vision_cpu",
+            "attachment_count": 1,
+            "attachments": [
+              {
+                "schema_version": "psionic.qwen38.openai_attachment.v1",
+                "attachment_id": "image-0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f",
+                "media_kind": "image",
+                "source_transport": "data_url_base64",
+                "source_mime_type": "image/png",
+                "source_bytes": 53588,
+                "source_sha256": "0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f"
+              }
+            ],
+            "preprocessing": [
+              {
+                "schema_version": "psionic.qwen38.vision_preprocessing.v1",
+                "media_kind": "image",
+                "attachment_id": "image-0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f",
+                "source_mime_type": "image/png",
+                "source_sha256": "65cac623d555a3bacf166208ddd8b53530268d1e8e5727bbe2d32c32048c0f20",
+                "source_bytes": 196608,
+                "source_frame_count": 1,
+                "sampled_frame_indices": [
+                  0
+                ],
+                "padded_frame_count": 2,
+                "width": 256,
+                "height": 256,
+                "grid_thw": [
+                  1,
+                  16,
+                  16
+                ],
+                "patch_vector_size": 1536,
+                "patch_count": 256,
+                "merged_token_count": 64,
+                "pixel_values_dtype": "f32",
+                "pixel_values_sha256": "62608d9e895b449ba81fc5f2f57873f3bf4f01ba1777fd78eb4498bebfb9b017",
+                "processor_name": "Qwen2VLImageProcessor",
+                "processor_config_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+                "resize_applied": false,
+                "normalization_mean": [
+                  0.5,
+                  0.5,
+                  0.5
+                ],
+                "normalization_std": [
+                  0.5,
+                  0.5,
+                  0.5
+                ],
+                "limits": {
+                  "minimum_image_pixels": 65536,
+                  "maximum_image_pixels": 262144,
+                  "minimum_video_frames": 4,
+                  "maximum_video_frames": 8,
+                  "maximum_video_frame_pixels": 65536,
+                  "maximum_total_patch_count": 1024,
+                  "maximum_attachment_bytes": 8388608,
+                  "timeout_ms": 120000,
+                  "resize_policy": "refuse_when_upstream_resize_is_required"
+                }
+              }
+            ],
+            "vision_runtime": [
+              {
+                "schema_version": "psionic.qwen38.vision_runtime.v1",
+                "backend": "cpu",
+                "execution_mode": "native",
+                "execution_engine": "psionic_candle_qwen38_vision_cpu",
+                "fallback_policy": "refuse",
+                "source_shard_sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c",
+                "image_processor_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+                "video_processor_sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+                "resident_tensor_count": 333,
+                "resident_tensor_bytes": 1842920384,
+                "resident_layer_count": 27,
+                "expected_layer_count": 27,
+                "full_stack_resident": true,
+                "input_patch_count": 256,
+                "input_bytes": 1572864,
+                "output_token_count": 64,
+                "output_width": 5120,
+                "output_bytes": 1310720,
+                "output_sha256": "b746ad153dce8b5f66d607186a7c2ba532741b1ad9b6ce055b203be6bea4d779",
+                "elapsed_ms": 954,
+                "timeout_ms": 120000,
+                "host_output_materialized": true,
+                "hidden_fallback_used": false
+              }
+            ],
+            "decoder_plan": {
+              "schema_version": "psionic.qwen38.multimodal_decoder_plan.v1",
+              "rendered_prompt_sha256": "04611b9968bfb78e5f006515a3f850031234d4987efae47c60ea3352b46bd349",
+              "expanded_prompt_sha256": "a01348f76930b1c27f18e44c7257bc4f16151fa52032c3a56689c592206a14e0",
+              "token_ids_sha256": "752f3e31dda7852d3d12f98c768435c3b9c38d828b18eaa4d377e81173ae49f4",
+              "token_count": 374,
+              "text_token_count": 310,
+              "image_count": 1,
+              "image_token_count": 64,
+              "video_count": 0,
+              "video_token_count": 0,
+              "embedding_override_count": 64,
+              "embedding_width": 5120,
+              "mrope_position_delta": -56,
+              "preprocessing_receipt_sha256": [
+                "ccbd2256aa9d1aa04296927953f2da2871544a00f7674de2f366baf3b451129a"
+              ],
+              "vision_runtime_output_sha256": [
+                "b746ad153dce8b5f66d607186a7c2ba532741b1ad9b6ce055b203be6bea4d779"
+              ],
+              "hidden_fallback_used": false
+            },
+            "hidden_fallback_used": false
+          },
+          "raw_logits_materialized": false
+        }
+      }
+    },
+    "chat_video_stream": {
+      "status": 200,
+      "headers": {
+        "x-psionic-artifact-sha256": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "x-psionic-backend": "cuda",
+        "x-psionic-batch-posture": "single_request_only",
+        "x-psionic-execution-engine": "psionic",
+        "x-psionic-execution-mode": "native",
+        "x-psionic-fallback-policy": "refuse",
+        "x-psionic-hybrid-offload": "unsupported",
+        "x-psionic-itl-ns": "177602891",
+        "x-psionic-model-key": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "x-psionic-performance-class": "nvidia_native",
+        "x-psionic-prefix-cache-refusal": "request_opt_out",
+        "x-psionic-prefix-cache-reused-tokens": "0",
+        "x-psionic-prefix-cache-state": "bypassed",
+        "x-psionic-qwen38-attachment-sha256": "a786b8f98734a0e0368871d72bcc8a5d7aa69180a8eb94d0c6417383a1ae2d16",
+        "x-psionic-qwen38-expanded-prompt-sha256": "57eade7510f4ffb0001ba94165f9254876486ec2e4c0c221f28cb1ef19256165",
+        "x-psionic-qwen38-media-attachments": "1",
+        "x-psionic-qwen38-multimodal-token-sha256": "66dd5711cfdb0510f0f8ccc62295ff3ea834cdc6ec10a6caab3d3aa9863d98b6",
+        "x-psionic-qwen38-preserve-thinking": "true",
+        "x-psionic-qwen38-prompt-cache-identity": "46a00e2e89136dbd4f248be382a034a404830fa5ece6f3e35df0650e6986eb70",
+        "x-psionic-qwen38-template": "qwen3.8.chat_template.v1",
+        "x-psionic-qwen38-template-sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+        "x-psionic-qwen38-thinking": "disabled",
+        "x-psionic-qwen38-tokenizer-sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+        "x-psionic-qwen38-vision-backend": "cpu",
+        "x-psionic-raw-logits-materialized": "false",
+        "x-psionic-residency-mode": "cuda_accelerated",
+        "x-psionic-route-active-requests": "0",
+        "x-psionic-route-cache-matches": "0",
+        "x-psionic-route-eligible-workers": "1",
+        "x-psionic-route-locality": "local",
+        "x-psionic-route-provenance": "local_execution",
+        "x-psionic-route-sampled-workers": "1",
+        "x-psionic-route-strategy": "warm_aware",
+        "x-psionic-route-warm-workers": "1",
+        "x-psionic-route-worker": "local_cpu_0",
+        "x-psionic-served-backend": "cuda",
+        "x-psionic-served-model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+        "x-psionic-ttft-ns": "685"
+      },
+      "event_count": 3,
+      "output_text": "The video",
+      "events": [
+        {
+          "id": "psionic-chatcmpl-1a011c4ad27-1ed07c-2",
+          "object": "chat.completion.chunk",
+          "created": 1787004604,
+          "model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": "The "
+              }
+            }
+          ]
+        },
+        {
+          "id": "psionic-chatcmpl-1a011c4ad27-1ed07c-2",
+          "object": "chat.completion.chunk",
+          "created": 1787004604,
+          "model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "video"
+              }
+            }
+          ]
+        },
+        {
+          "id": "psionic-chatcmpl-1a011c4ad27-1ed07c-2",
+          "object": "chat.completion.chunk",
+          "created": 1787004604,
+          "model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {},
+              "finish_reason": "length"
+            }
+          ]
+        }
+      ]
+    },
+    "responses_image": {
+      "status": 200,
+      "headers": {
+        "x-psionic-artifact-sha256": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "x-psionic-backend": "cuda",
+        "x-psionic-batch-posture": "single_request_only",
+        "x-psionic-execution-engine": "psionic",
+        "x-psionic-execution-mode": "native",
+        "x-psionic-fallback-policy": "refuse",
+        "x-psionic-hybrid-offload": "unsupported",
+        "x-psionic-itl-ns": "177403349",
+        "x-psionic-model-key": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+        "x-psionic-performance-class": "nvidia_native",
+        "x-psionic-prefix-cache-refusal": "request_opt_out",
+        "x-psionic-prefix-cache-reused-tokens": "0",
+        "x-psionic-prefix-cache-state": "bypassed",
+        "x-psionic-qwen38-attachment-sha256": "0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f",
+        "x-psionic-qwen38-expanded-prompt-sha256": "039bb7a2ff3fef1fc20fce504e7a34d8f983c13eb0135f433f9da41d470fd157",
+        "x-psionic-qwen38-media-attachments": "1",
+        "x-psionic-qwen38-multimodal-token-sha256": "9ac4536a51c0a251021f065bf775970fef6a4d9af07ed26ec8015e4e81136a4c",
+        "x-psionic-qwen38-preserve-thinking": "true",
+        "x-psionic-qwen38-prompt-cache-identity": "9802a9e25cbcecc51bd629c2b6f358761f71f1c2d22803d3195a47e1de511480",
+        "x-psionic-qwen38-template": "qwen3.8.chat_template.v1",
+        "x-psionic-qwen38-template-sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+        "x-psionic-qwen38-thinking": "disabled",
+        "x-psionic-qwen38-tokenizer-sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+        "x-psionic-qwen38-vision-backend": "cpu",
+        "x-psionic-raw-logits-materialized": "false",
+        "x-psionic-residency-mode": "cuda_accelerated",
+        "x-psionic-route-active-requests": "0",
+        "x-psionic-route-cache-matches": "0",
+        "x-psionic-route-eligible-workers": "1",
+        "x-psionic-route-locality": "local",
+        "x-psionic-route-provenance": "local_execution",
+        "x-psionic-route-sampled-workers": "1",
+        "x-psionic-route-strategy": "warm_aware",
+        "x-psionic-route-warm-workers": "1",
+        "x-psionic-route-worker": "local_cpu_0",
+        "x-psionic-served-backend": "cuda",
+        "x-psionic-served-model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+        "x-psionic-ttft-ns": "646"
+      },
+      "body": {
+        "id": "psionic-resp-1a011c4ad27-1ed07c-3",
+        "object": "response",
+        "created_at": 1787004620,
+        "status": "completed",
+        "model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+        "output": [
+          {
+            "id": "psionic-resp-1a011c4ad27-1ed07c-3-msg-0",
+            "type": "message",
+            "status": "completed",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "The image"
+              }
+            ]
+          }
+        ],
+        "output_text": "The image",
+        "usage": {
+          "input_tokens": 87,
+          "output_tokens": 2,
+          "total_tokens": 89
+        },
+        "conversation": {
+          "id": "psionic-conv-1",
+          "revision": 1,
+          "item_count": 2
+        },
+        "psionic_response_state": {
+          "storage": "memory_only",
+          "retention_scope": "process_lifetime",
+          "cache_behavior": "prompt_replay_only",
+          "stored": true,
+          "continuation": "append_turn",
+          "conversation_id": "psionic-conv-1",
+          "replayed_prompt_messages": 0,
+          "input_messages_appended": 1,
+          "assistant_messages_recorded": 1,
+          "max_responses": 128,
+          "max_conversations": 64,
+          "max_items_per_conversation": 64,
+          "conversation_item_count": 2
+        },
+        "psionic_qwen38": {
+          "schema_version": "psionic.qwen38.openai_receipt.v1",
+          "model_key": "qwen3-8-27b@local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "served_model": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "artifact_sha256": "local-unverified:51bd79e27453d55b69dd1d068b9289e69013b32df75318db58d9740936b44693",
+          "backend": "cuda",
+          "execution_mode": "native",
+          "execution_engine": "psionic",
+          "prompt": {
+            "schema_version": "psionic.qwen38.prompt_receipt.v1",
+            "model_id": "Qwen/Qwen3.8-27B",
+            "template_id": "qwen3.8.chat_template.v1",
+            "template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+            "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+            "thinking_enabled": false,
+            "preserve_thinking": true,
+            "add_generation_prompt": true,
+            "add_vision_id": false,
+            "tool_count": 0,
+            "rendered_sha256": "ffab8e4ee36ed05c03d269236342ee1057f5d3c6955d4146046bc705bd9ae410",
+            "prompt_cache_identity": "9802a9e25cbcecc51bd629c2b6f358761f71f1c2d22803d3195a47e1de511480"
+          },
+          "multimodal": {
+            "schema_version": "psionic.qwen38.openai_multimodal_receipt.v1",
+            "input_contract": "bounded_base64_data_urls",
+            "vision_backend": "cpu",
+            "vision_execution_engine": "psionic_candle_qwen38_vision_cpu",
+            "attachment_count": 1,
+            "attachments": [
+              {
+                "schema_version": "psionic.qwen38.openai_attachment.v1",
+                "attachment_id": "image-0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f",
+                "media_kind": "image",
+                "source_transport": "data_url_base64",
+                "source_mime_type": "image/png",
+                "source_bytes": 53588,
+                "source_sha256": "0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f"
+              }
+            ],
+            "preprocessing": [
+              {
+                "schema_version": "psionic.qwen38.vision_preprocessing.v1",
+                "media_kind": "image",
+                "attachment_id": "image-0d65b38b76586df1c48b70e2e70ce69afef52bf8f0e4aa0e5949aaacd12cc38f",
+                "source_mime_type": "image/png",
+                "source_sha256": "65cac623d555a3bacf166208ddd8b53530268d1e8e5727bbe2d32c32048c0f20",
+                "source_bytes": 196608,
+                "source_frame_count": 1,
+                "sampled_frame_indices": [
+                  0
+                ],
+                "padded_frame_count": 2,
+                "width": 256,
+                "height": 256,
+                "grid_thw": [
+                  1,
+                  16,
+                  16
+                ],
+                "patch_vector_size": 1536,
+                "patch_count": 256,
+                "merged_token_count": 64,
+                "pixel_values_dtype": "f32",
+                "pixel_values_sha256": "62608d9e895b449ba81fc5f2f57873f3bf4f01ba1777fd78eb4498bebfb9b017",
+                "processor_name": "Qwen2VLImageProcessor",
+                "processor_config_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+                "resize_applied": false,
+                "normalization_mean": [
+                  0.5,
+                  0.5,
+                  0.5
+                ],
+                "normalization_std": [
+                  0.5,
+                  0.5,
+                  0.5
+                ],
+                "limits": {
+                  "minimum_image_pixels": 65536,
+                  "maximum_image_pixels": 262144,
+                  "minimum_video_frames": 4,
+                  "maximum_video_frames": 8,
+                  "maximum_video_frame_pixels": 65536,
+                  "maximum_total_patch_count": 1024,
+                  "maximum_attachment_bytes": 8388608,
+                  "timeout_ms": 120000,
+                  "resize_policy": "refuse_when_upstream_resize_is_required"
+                }
+              }
+            ],
+            "vision_runtime": [
+              {
+                "schema_version": "psionic.qwen38.vision_runtime.v1",
+                "backend": "cpu",
+                "execution_mode": "native",
+                "execution_engine": "psionic_candle_qwen38_vision_cpu",
+                "fallback_policy": "refuse",
+                "source_shard_sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c",
+                "image_processor_sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+                "video_processor_sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+                "resident_tensor_count": 333,
+                "resident_tensor_bytes": 1842920384,
+                "resident_layer_count": 27,
+                "expected_layer_count": 27,
+                "full_stack_resident": true,
+                "input_patch_count": 256,
+                "input_bytes": 1572864,
+                "output_token_count": 64,
+                "output_width": 5120,
+                "output_bytes": 1310720,
+                "output_sha256": "b746ad153dce8b5f66d607186a7c2ba532741b1ad9b6ce055b203be6bea4d779",
+                "elapsed_ms": 1011,
+                "timeout_ms": 120000,
+                "host_output_materialized": true,
+                "hidden_fallback_used": false
+              }
+            ],
+            "decoder_plan": {
+              "schema_version": "psionic.qwen38.multimodal_decoder_plan.v1",
+              "rendered_prompt_sha256": "ffab8e4ee36ed05c03d269236342ee1057f5d3c6955d4146046bc705bd9ae410",
+              "expanded_prompt_sha256": "039bb7a2ff3fef1fc20fce504e7a34d8f983c13eb0135f433f9da41d470fd157",
+              "token_ids_sha256": "9ac4536a51c0a251021f065bf775970fef6a4d9af07ed26ec8015e4e81136a4c",
+              "token_count": 87,
+              "text_token_count": 23,
+              "image_count": 1,
+              "image_token_count": 64,
+              "video_count": 0,
+              "video_token_count": 0,
+              "embedding_override_count": 64,
+              "embedding_width": 5120,
+              "mrope_position_delta": -56,
+              "preprocessing_receipt_sha256": [
+                "ccbd2256aa9d1aa04296927953f2da2871544a00f7674de2f366baf3b451129a"
+              ],
+              "vision_runtime_output_sha256": [
+                "b746ad153dce8b5f66d607186a7c2ba532741b1ad9b6ce055b203be6bea4d779"
+              ],
+              "hidden_fallback_used": false
+            },
+            "hidden_fallback_used": false
+          },
+          "raw_logits_materialized": false
+        }
+      }
+    }
+  },
+  "refusals": {
+    "responses_media_continuation": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "error": {
+          "message": "stateful Qwen3.8 `/v1/responses` continuation cannot replay retained binary media yet; submit the media again in a new response request",
+          "type": "invalid_request_error"
+        }
+      }
+    },
+    "remote_image": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "error": {
+          "message": "Qwen3.8 media input supports bounded base64 data URLs only; remote URLs are refused",
+          "type": "invalid_request_error"
+        }
+      }
+    },
+    "mp4_video": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "error": {
+          "message": "Qwen3.8 video input MIME type `video/mp4` is unsupported; the bounded lane accepts animated image/gif data URLs only",
+          "type": "invalid_request_error"
+        }
+      }
+    },
+    "malformed_base64": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "error": {
+          "message": "Qwen3.8 media data URL has invalid base64: Invalid symbol 33, offset 16.",
+          "type": "invalid_request_error"
+        }
+      }
+    },
+    "five_attachments": {
+      "status": 400,
+      "headers": {},
+      "body": {
+        "error": {
+          "message": "Qwen3.8 OpenAI media requests admit at most 4 attachments",
+          "type": "invalid_request_error"
+        }
+      }
+    }
+  },
+  "request_contract": {
+    "image_transport": "base64_png_data_url",
+    "video_transport": "base64_animated_gif_data_url",
+    "video_source_frames": 8,
+    "video_source_fps": 4.0,
+    "chat_tools_present": true,
+    "chat_tool_choice": "auto",
+    "chat_max_tokens": 64,
+    "responses_official_input_parts": [
+      "input_image",
+      "input_text"
+    ]
+  },
+  "claim_boundary": {
+    "cpu_vision": true,
+    "cuda_decoder": true,
+    "chat_image_generation": true,
+    "chat_video_streaming": true,
+    "responses_image_generation": true,
+    "metal_decoder_integration": false,
+    "remote_media_fetch": false,
+    "mp4_decode": false,
+    "responses_binary_media_replay": false,
+    "performance_claim": false
+  },
+  "psionic_revision": "5b215c5e3cb2f0b87f6084e287d57c13a76d77e3",
+  "artifacts": {
+    "official_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "vision_source_shard": {
+      "filename": "model-00001-of-00018.safetensors",
+      "byte_length": 3966730552,
+      "sha256": "ba0ce20aae489ad196733da5064bcdf159a1fe84f53336648196e1ebb7751b1c"
+    },
+    "decoder_gguf": {
+      "filename": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+      "byte_length": 13441059904,
+      "sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2"
+    }
+  },
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 4080",
+    "driver_version": "595.58.03",
+    "idle_check": {
+      "command": "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits",
+      "checked_at_unix_s": 1787004489,
+      "output": "",
+      "idle": true
+    }
+  },
+  "server_log_sha256": "105f291d7ca5110f435a91a38e6ad56650609b63ecd1bcfe45580776dd2010b8"
+}
