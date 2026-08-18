@@ -275,12 +275,19 @@ the LoRA matrices, AdamW moments, step, optimizer config, base/adapter binding,
 lineage, and seed; resumed step two exactly matches uninterrupted step two, and
 checkpoint tampering refuses. The trained tiny state is also retained as
 `fixtures/qwen38/adapters/qwen38_lm_head_lora_tiny_v1.safetensors`: export and
-reload preserve both LoRA matrices exactly, the artifact identity and hosted
+reload preserve both LoRA matrices exactly, the artifact identity and hot-swap
 binding pin the Qwen3.8 base digest, generic LM-head overlay execution matches
-the reference logits exactly, and digest drift refuses before load. This is
-not native Qwen3.8 adapter serving. Real-checkpoint/native-backend training,
-decoder/vision backward kernels, native adapter serving, real/native recovery,
-evaluation gains, and promotion remain open.
+the reference logits exactly, and digest drift refuses before load. The native
+Qwen3.8 CPU decoder now consumes artifacts from the same exporter through a
+bounded hot-swap LM-head integration test: it validates the specialized
+Qwen3.8 metadata and identity, checks decoder hidden/vocabulary shape, changes
+the generated token through the native decoder, retains the exact binding in
+provenance, and refuses binding drift or detached bindings. The committed
+four-hidden/three-vocabulary artifact is still only generic overlay evidence;
+it cannot be registered against the real 27B shape. Real-checkpoint and
+native-backend training, decoder/vision backward kernels, real 27B native
+adapter evidence, CUDA/Metal adapter execution, merged residency, MTP-composed
+adapters, real/native recovery, evaluation gains, and promotion remain open.
 The Qwen3.6-27B legal fine-tuning milestone command is
 `cargo run -p psionic-train --example qwen36_27b_legal_ft_milestone`. It loads
 the Qwen3.6-27B smoke target artifacts, runs the base model through the public

@@ -392,7 +392,7 @@ impl CpuGgufTextGenerationService {
                 Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                     binding_id: binding_id.into(),
                     reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                        "LM-head LoRA serving is not implemented on the native gpt-oss CPU runtime",
                     ),
                 })
             }
@@ -403,14 +403,13 @@ impl CpuGgufTextGenerationService {
                 alpha,
                 residency_mode,
             ),
-            CpuGgufServiceKind::Qwen35(_) => {
-                Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
-                    binding_id: binding_id.into(),
-                    reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
-                    ),
-                })
-            }
+            CpuGgufServiceKind::Qwen35(service) => service.register_qwen38_lm_head_lora_adapter(
+                binding_id,
+                path,
+                identity,
+                alpha,
+                residency_mode,
+            ),
         }
     }
 
@@ -423,20 +422,15 @@ impl CpuGgufTextGenerationService {
                 Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                     binding_id: served_adapter_digest.to_string(),
                     reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                        "LM-head LoRA serving is not implemented on the native gpt-oss CPU runtime",
                     ),
                 })
             }
             CpuGgufServiceKind::Dense(service) => {
                 service.detach_adapter_binding(served_adapter_digest)
             }
-            CpuGgufServiceKind::Qwen35(_) => {
-                Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
-                    binding_id: served_adapter_digest.to_string(),
-                    reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
-                    ),
-                })
+            CpuGgufServiceKind::Qwen35(service) => {
+                service.detach_qwen38_adapter_binding(served_adapter_digest)
             }
         }
     }
@@ -450,7 +444,7 @@ impl CpuGgufTextGenerationService {
                 Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                     binding_id: served_adapter_digest.to_string(),
                     reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                        "LM-head LoRA serving is not implemented on the native gpt-oss CPU runtime",
                     ),
                 })
             }
@@ -461,7 +455,7 @@ impl CpuGgufTextGenerationService {
                 Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                     binding_id: served_adapter_digest.to_string(),
                     reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                        "native qwen38 CPU adapter serving supports hot-swap overlays only",
                     ),
                 })
             }
@@ -477,7 +471,7 @@ impl CpuGgufTextGenerationService {
                 Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                     binding_id: served_adapter_digest.to_string(),
                     reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                        "LM-head LoRA serving is not implemented on the native gpt-oss CPU runtime",
                     ),
                 })
             }
@@ -488,7 +482,7 @@ impl CpuGgufTextGenerationService {
                 Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                     binding_id: served_adapter_digest.to_string(),
                     reason: String::from(
-                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                        "native qwen38 CPU adapter serving supports hot-swap overlays only",
                     ),
                 })
             }
@@ -17265,9 +17259,11 @@ mod tests {
         FixedBudgetTrainingRun, GEMMA_E4B_CUDA_ADAPTER_CHECKPOINT_SCHEMA_VERSION,
         GEMMA_E4B_CUDA_ADAPTER_TARGET_SET_ID, GEMMA_E4B_FINETUNING_MVP_TRAINING_FAMILY_ID,
         GemmaE4bCudaAdapterCheckpoint, GemmaE4bCudaAdapterExportedArtifact,
-        GemmaE4bServedBaseModelBinding, TrainingLoopBudget, TrainingOptimizerConfig,
-        TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
-        TrainingTensorBuffer,
+        GemmaE4bServedBaseModelBinding, Qwen38LmHeadLoraBackwardFixture,
+        Qwen38LmHeadLoraTrainingState, Qwen38TrainingAdapterRequest, TrainingLoopBudget,
+        TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy, TrainingParameterClass,
+        TrainingParameterGroupState, TrainingTensorBuffer, admit_qwen38_training_adapter,
+        export_qwen38_lm_head_adapter_safetensors, finalize_qwen38_lm_head_adapter_identity,
     };
     use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
     use sha2::{Digest, Sha256};
@@ -18123,6 +18119,149 @@ mod tests {
                 .and_then(|diagnostic| diagnostic.backend),
             Some(String::from("cpu"))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn qwen38_cpu_native_runtime_applies_registered_lm_head_adapter()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let model_path = temp.path().join("tiny_qwen38_adapter.gguf");
+        write_test_gguf(
+            &model_path,
+            qwen38_decoder_metadata("tiny psionic qwen38 adapter").as_slice(),
+            qwen38_decoder_tensors().as_slice(),
+        )?;
+
+        let mut service = CpuGgufTextGenerationService::from_gguf_path(&model_path)?;
+        let descriptor = service.model_descriptor().clone();
+        let baseline_request = GenerationRequest::new_text(
+            "qwen38-adapter-baseline",
+            descriptor.clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        );
+        let baseline = service.generate(&baseline_request)?;
+        assert_eq!(baseline.output.text, "world");
+
+        let (hidden, base_logits) = match &service.inner {
+            CpuGgufServiceKind::Qwen35(service) => {
+                service.final_hidden_and_logits_for_text("hello")?
+            }
+            _ => panic!("qwen38 must route through the qwen35 CPU graph"),
+        };
+        let vocab_size = base_logits.len();
+        let target_token_id = 8;
+        let mut trained_lora_b = vec![0.0; vocab_size];
+        trained_lora_b[target_token_id] = 1_000.0;
+        let fixture = Qwen38LmHeadLoraBackwardFixture {
+            fixture_id: String::from("qwen38-native-cpu-adapter-tiny-v1"),
+            hidden: hidden.clone(),
+            base_logits,
+            lora_rank: 1,
+            lora_alpha: 1.0,
+            lora_a: hidden.clone(),
+            lora_b: vec![0.0; vocab_size],
+            target_token_id,
+            learning_rate: 0.01,
+            finite_difference_epsilon: 0.001,
+            gradient_tolerance: 0.001,
+        };
+        let state = Qwen38LmHeadLoraTrainingState {
+            step: 1,
+            lora_a: hidden,
+            lora_b: trained_lora_b,
+            adam_m_a: vec![0.0; fixture.lora_a.len()],
+            adam_v_a: vec![0.0; fixture.lora_a.len()],
+            adam_m_b: vec![0.0; fixture.lora_b.len()],
+            adam_v_b: vec![0.0; fixture.lora_b.len()],
+        };
+        let mut training_request = Qwen38TrainingAdapterRequest::default();
+        training_request.request_id = String::from("qwen38-native-cpu-adapter-tiny-v1");
+        training_request.adapter_id = String::from("qwen38-native-cpu-adapter-tiny-v1");
+        training_request.adapter_revision = String::from("trained-step-1");
+        training_request.lora_rank = fixture.lora_rank;
+        training_request.lora_alpha = fixture.lora_alpha;
+        let plan = admit_qwen38_training_adapter(&training_request);
+        assert!(plan.is_admitted());
+        let artifact_bytes = export_qwen38_lm_head_adapter_safetensors(&plan, &fixture, &state)?;
+        let artifact_sha256 = hex::encode(Sha256::digest(artifact_bytes.as_slice()));
+        let identity = finalize_qwen38_lm_head_adapter_identity(
+            &plan,
+            artifact_sha256.as_str(),
+            (fixture.lora_a.len() + fixture.lora_b.len()) as u64,
+        )?;
+        let adapter_path = temp.path().join("qwen38_lm_head_lora.safetensors");
+        fs::write(&adapter_path, artifact_bytes)?;
+
+        let binding = service.register_lm_head_lora_adapter(
+            "qwen38-native-cpu-adapter",
+            &adapter_path,
+            identity,
+            fixture.lora_alpha,
+            AdapterResidencyMode::HotSwapOverlay,
+        )?;
+        let support = service.runtime_support();
+        assert_eq!(
+            support.adapter_runtime.support_level,
+            "qwen38_lm_head_lora_cpu"
+        );
+        assert_eq!(
+            support.adapter_runtime.residency_modes,
+            vec![String::from("hot_swap_overlay")]
+        );
+        assert!(
+            !support
+                .unsupported_features
+                .contains(&String::from("adapter_serving"))
+        );
+
+        let adapted_request = GenerationRequest::new_text(
+            "qwen38-adapter-overlay",
+            descriptor.clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        )
+        .with_adapter_serving(binding.clone());
+        let adapted = service.generate(&adapted_request)?;
+        assert_eq!(adapted.output.text, "proxy");
+        assert_eq!(
+            adapted
+                .provenance
+                .as_ref()
+                .and_then(|value| value.adapter_serving.clone()),
+            Some(binding.clone())
+        );
+
+        let mut drifted_binding = binding.clone();
+        drifted_binding.binding_id.push_str("-drift");
+        let drift_error = service
+            .generate(
+                &GenerationRequest::new_text(
+                    "qwen38-adapter-binding-drift",
+                    descriptor.clone(),
+                    None,
+                    "hello",
+                    GenerationOptions::greedy(1),
+                )
+                .with_adapter_serving(drifted_binding),
+            )
+            .expect_err("binding drift must be refused");
+        assert!(drift_error.to_string().contains("does not exactly match"));
+
+        let merge_error = service
+            .merge_adapter_binding(binding.served_adapter_digest.as_str())
+            .expect_err("Qwen3.8 merged adapter residency must be refused");
+        assert!(merge_error.to_string().contains("hot-swap overlays only"));
+
+        let detached = service.detach_adapter_binding(binding.served_adapter_digest.as_str())?;
+        assert_eq!(detached, binding);
+        let detached_error = service
+            .generate(&adapted_request)
+            .expect_err("detached Qwen3.8 adapter must be refused");
+        assert!(detached_error.to_string().contains("not registered"));
         Ok(())
     }
 

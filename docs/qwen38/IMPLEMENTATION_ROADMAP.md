@@ -6,8 +6,10 @@
 > `implemented`; R6 native CPU generation is also `implemented` for the
 > internal CPU lane. R7 native CUDA generation is `implemented`. R8
 > OpenAI-compatible CPU/CUDA serving is `implemented_early`; R9 comparator and
-> release gating is `implemented`. Later backend, multimodal, training, and
-> performance milestones remain `planned`.
+> release gating is `implemented`. R10 Metal and R11 vision are `partial`.
+> R12 training and adapters is `implemented_early` for bounded reference math,
+> recovery, artifact parity, and native CPU LM-head hot-swap integration. R13
+> performance remains `planned`.
 
 ## Goal
 
@@ -50,7 +52,7 @@ The first claim excludes:
 - native image or video understanding
 - 1,000,000-token YaRN operation
 - full BF16 CUDA residency on the local 16 GiB RTX 4080
-- Qwen3.8 training, LoRA serving, DPO, GRPO, or adapter promotion
+- broad Qwen3.8 training, real-27B LoRA serving, DPO, GRPO, or adapter promotion
 - automatic compatibility with every community GGUF conversion
 - MTP acceleration, CUDA MTP, or multi-token draft batches
 - native Metal execution or performance claims
@@ -96,7 +98,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R9A | `implemented` | Optional CPU MTP speculative decoding and rollback | Correctness implementation; no acceleration claim |
 | R10 | `partial` | Native Metal generation | Runtime admitted; retained Apple evidence pending |
 | R11 | `partial` | Native vision lane | Separate multimodal claim |
-| R12 | `implemented_early` | Training and adapter identity/reference-gradient lane | Bounded reference claim; native training remains open |
+| R12 | `implemented_early` | Training, adapter artifact, and native CPU LM-head integration lane | Bounded reference claim; native real-checkpoint training and real-27B adapter evidence remain open |
 | R13 | `planned` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
 
 ## Issue Tracking
@@ -1023,12 +1025,26 @@ F32 tensors reload exactly through `LmHeadLoraAdapterArtifact`, the artifact
 identity and hot-swap binding pin the canonical Qwen3.8 base digest, generic
 LM-head overlay execution reproduces the reference logits exactly, replay is
 deterministic, and payload digest drift refuses before load. This closes only
-the tiny save/load/generic-overlay parity row. It does not admit adapter
-execution inside the native Qwen3.8 CPU, CUDA, or Metal decoder.
+the retained tiny save/load/generic-overlay parity row.
+
+The native Qwen3.8 CPU decoder now has an `implemented_early` LM-head hot-swap
+integration on the generic adapter-serving API. Registration uses the
+Qwen3.8-specific safetensors metadata and digest loader, preserves the official
+base-model identity in `AdapterServingBinding` while the served GGUF remains a
+separate provenance artifact, and refuses decoder hidden/vocabulary shape
+drift. The overlay executes after every native prompt and decode forward step,
+adds its projection work to the delivery proof, and publishes the exact
+binding in response provenance. Requests with an unregistered or drifted
+binding refuse, as do detached bindings, merged residency, and adapter plus MTP
+execution. The end-to-end test exports a matching tiny artifact through
+`psionic-train`, changes the native generated token, and exercises those
+refusals. The committed four-hidden/three-vocabulary artifact does not match
+the real decoder shape, so there is no retained real-27B adapter-serving claim.
 
 This tranche does not admit real-checkpoint training, native CPU/CUDA/Metal
-backward execution, decoder-layer or vision targets, native Qwen3.8 adapter
-serving, real/native checkpoint recovery, evaluation gains, or promotion.
+backward execution, decoder-layer or vision targets, real 27B adapter-serving
+evidence, CUDA/Metal adapter execution, merged residency, MTP-composed
+adapters, real/native checkpoint recovery, evaluation gains, or promotion.
 Those remain required before R12 can become `implemented`.
 
 Training remains separate from inference support. Reuse the Qwen legal and
@@ -1036,11 +1052,11 @@ open-adapter substrate only after native base-model execution is stable.
 
 Required follow-on work includes:
 
-- Qwen3.8-specific adapter identity
-- exact backward kernels for admitted targets
-- adapter serving on the same runtime
-- checkpoint and optimizer-state recovery
-- corpus and evaluation lineage
+- full-shape promoted Qwen3.8 adapter identity
+- native backward kernels for admitted targets
+- retained real-27B adapter serving on the same runtime
+- real/native checkpoint and optimizer-state recovery
+- real-run corpus and evaluation lineage
 - promotion receipts tied to the Qwen3.8 base digest
 
 Do not relabel Qwen3.6 or Qwen3.5 adapters as Qwen3.8-compatible.

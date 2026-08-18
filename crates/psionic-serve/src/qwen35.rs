@@ -5,6 +5,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+use psionic_adapters::{
+    AdapterArtifactIdentity, AdapterResidencyMode, AdapterServingBinding, LmHeadLoraAdapterArtifact,
+};
 use psionic_backend_cpu::{
     CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
 };
@@ -30,6 +33,7 @@ use psionic_runtime::{
     LoadedModelResidency, LocalRuntimeObservability, PrefixCacheIdentity, PrefixCacheMode,
     PrefixCacheRefusalReason, PrefixCacheState, SamplingPolicy,
 };
+use psionic_train::load_qwen38_lm_head_adapter_safetensors;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -1558,8 +1562,36 @@ pub struct CpuGgufQwen35TextGenerationService {
     memory_plan: psionic_runtime::ModelMemoryPlan,
     residency_policy: psionic_runtime::ModelResidencyPolicy,
     mtp_config: Option<Qwen38MtpConfig>,
+    adapters: BTreeMap<String, Qwen38CpuAdapterRuntime>,
     last_mtp_report: Option<Qwen38MtpExecutionReport>,
     last_multimodal_plan_receipt: Option<Qwen38MultimodalDecoderPlanReceipt>,
+}
+
+#[derive(Clone, Debug)]
+struct Qwen38CpuAdapterRuntime {
+    binding: AdapterServingBinding,
+    adapter: Arc<LmHeadLoraAdapterArtifact>,
+}
+
+impl Qwen38CpuAdapterRuntime {
+    fn apply_to_step(
+        &self,
+        step: &mut CpuQwen35ForwardStep,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        self.adapter
+            .apply_to_logits(step.final_hidden.as_slice(), step.logits.as_mut_slice())
+            .map_err(
+                |error| ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: self.binding.binding_id.clone(),
+                    reason: error.to_string(),
+                },
+            )?;
+        step.kernel_count = step.kernel_count.saturating_add(2);
+        step.bytes_moved = step
+            .bytes_moved
+            .saturating_add(self.adapter.identity.parameter_count.saturating_mul(4));
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1720,6 +1752,7 @@ impl CpuGgufQwen35TextGenerationService {
             memory_plan: model.memory_plan.clone(),
             residency_policy: psionic_runtime::ModelResidencyPolicy::default(),
             mtp_config,
+            adapters: BTreeMap::new(),
             last_mtp_report: None,
             last_multimodal_plan_receipt: None,
         })
@@ -1764,6 +1797,9 @@ impl CpuGgufQwen35TextGenerationService {
     pub fn runtime_support(&self) -> crate::GgufDecoderRuntimeSupport {
         let mut unsupported_features =
             qwen35_unsupported_features(&self.model.family_metadata, false);
+        if matches!(self.model.family_metadata.family, GgufDecoderFamily::Qwen38) {
+            unsupported_features.retain(|feature| feature != "adapter_serving");
+        }
         if self.model.mtp.is_some() {
             unsupported_features.retain(|feature| feature != "mtp_speculative_decoding_skipped");
             unsupported_features.push(String::from("mtp_non_greedy_decode"));
@@ -1775,16 +1811,144 @@ impl CpuGgufQwen35TextGenerationService {
             unsupported_backends: vec![String::from("cuda"), String::from("metal")],
             unsupported_features,
             quantization_modes: self.model.descriptor.weights.quantization_modes.clone(),
-            adapter_runtime: crate::DecoderAdapterRuntimeSupport {
-                support_level: String::from("unsupported"),
-                import_formats: Vec::new(),
-                residency_modes: Vec::new(),
-                batching_mode: String::from("not_available"),
-                unsupported_reasons: vec![String::from(
-                    "LM-head LoRA serving is not implemented on the native qwen35 cpu runtime",
-                )],
+            adapter_runtime: if matches!(
+                self.model.family_metadata.family,
+                GgufDecoderFamily::Qwen38
+            ) {
+                crate::DecoderAdapterRuntimeSupport {
+                    support_level: String::from("qwen38_lm_head_lora_cpu"),
+                    import_formats: vec![String::from("safetensors")],
+                    residency_modes: vec![String::from("hot_swap_overlay")],
+                    batching_mode: String::from("one_explicit_binding_per_request"),
+                    unsupported_reasons: vec![String::from(
+                        "merged-resident and MTP-composed adapter execution are not implemented",
+                    )],
+                }
+            } else {
+                crate::DecoderAdapterRuntimeSupport {
+                    support_level: String::from("unsupported"),
+                    import_formats: Vec::new(),
+                    residency_modes: Vec::new(),
+                    batching_mode: String::from("not_available"),
+                    unsupported_reasons: vec![String::from(
+                        "LM-head LoRA serving is not implemented on the native qwen35 cpu runtime",
+                    )],
+                }
             },
         }
+    }
+
+    pub fn register_qwen38_lm_head_lora_adapter(
+        &mut self,
+        binding_id: impl Into<String>,
+        path: impl AsRef<Path>,
+        identity: AdapterArtifactIdentity,
+        alpha: f32,
+        residency_mode: AdapterResidencyMode,
+    ) -> Result<AdapterServingBinding, ReferenceTextGenerationError> {
+        let binding_id = binding_id.into();
+        if !matches!(self.model.family_metadata.family, GgufDecoderFamily::Qwen38) {
+            return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id,
+                reason: String::from(
+                    "Qwen3.8 LM-head LoRA adapters require a native qwen38 CPU decoder",
+                ),
+            });
+        }
+        if residency_mode != AdapterResidencyMode::HotSwapOverlay {
+            return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id,
+                reason: String::from(
+                    "native qwen38 CPU adapter serving currently supports hot-swap overlays only",
+                ),
+            });
+        }
+        let bytes = std::fs::read(path.as_ref()).map_err(|error| {
+            ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: binding_id.clone(),
+                reason: format!(
+                    "failed to read Qwen3.8 adapter `{}`: {error}",
+                    path.as_ref().display()
+                ),
+            }
+        })?;
+        let adapter = load_qwen38_lm_head_adapter_safetensors(&bytes, identity.clone(), alpha)
+            .map_err(
+                |error| ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: binding_id.clone(),
+                    reason: error.to_string(),
+                },
+            )?;
+        if adapter.hidden_size != self.model.descriptor.config.hidden_size
+            || adapter.vocab_size != self.model.descriptor.config.vocab_size
+        {
+            return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id,
+                reason: format!(
+                    "Qwen3.8 adapter shape hidden={} vocab={} does not match native decoder hidden={} vocab={}",
+                    adapter.hidden_size,
+                    adapter.vocab_size,
+                    self.model.descriptor.config.hidden_size,
+                    self.model.descriptor.config.vocab_size,
+                ),
+            });
+        }
+        let binding = AdapterServingBinding::new(
+            binding_id,
+            identity.base_model_id.clone(),
+            identity.base_model_revision.clone(),
+            identity.base_served_artifact_digest.clone(),
+            residency_mode,
+            vec![identity],
+        );
+        self.adapters.insert(
+            binding.served_adapter_digest.clone(),
+            Qwen38CpuAdapterRuntime {
+                binding: binding.clone(),
+                adapter: Arc::new(adapter),
+            },
+        );
+        Ok(binding)
+    }
+
+    pub fn detach_qwen38_adapter_binding(
+        &mut self,
+        served_adapter_digest: &str,
+    ) -> Result<AdapterServingBinding, ReferenceTextGenerationError> {
+        self.adapters
+            .remove(served_adapter_digest)
+            .map(|runtime| runtime.binding)
+            .ok_or_else(|| ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: served_adapter_digest.to_string(),
+                reason: String::from("Qwen3.8 adapter binding is not registered"),
+            })
+    }
+
+    fn adapter_runtime_for_request(
+        &self,
+        request: &GenerationRequest,
+    ) -> Result<Option<Qwen38CpuAdapterRuntime>, ReferenceTextGenerationError> {
+        let Some(binding) = request.adapter_serving.as_ref() else {
+            return Ok(None);
+        };
+        let runtime = self
+            .adapters
+            .get(binding.served_adapter_digest.as_str())
+            .ok_or_else(|| ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: binding.binding_id.clone(),
+                reason: String::from(
+                    "Qwen3.8 adapter binding is not registered on this native CPU runtime",
+                ),
+            })?;
+        if runtime.binding != *binding {
+            return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: binding.binding_id.clone(),
+                reason: String::from(
+                    "Qwen3.8 request binding does not exactly match the registered runtime binding",
+                ),
+            });
+        }
+        Ok(Some(runtime.clone()))
     }
 
     #[cfg(test)]
@@ -1814,6 +1978,28 @@ impl CpuGgufQwen35TextGenerationService {
             }
         }
         summary
+    }
+
+    #[cfg(test)]
+    pub(crate) fn final_hidden_and_logits_for_text(
+        &self,
+        text: &str,
+    ) -> Result<(Vec<f32>, Vec<f32>), ReferenceTextGenerationError> {
+        let tokens = self.model.tokenizer.encode_with_defaults(text);
+        if tokens.is_empty() {
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+        let mut state = self.model.initial_state(qwen35_cache_capacity_tokens(
+            tokens.len(),
+            1,
+            self.model.descriptor.config.max_context,
+        ));
+        let mut final_step = None;
+        for token in tokens.as_slice() {
+            final_step = Some(self.model.forward_token(&mut state, *token)?);
+        }
+        let step = final_step.ok_or(ReferenceTextGenerationError::EmptyPrompt)?;
+        Ok((step.final_hidden, step.logits))
     }
 
     /// Captures layer-zero recurrent intermediates for supplied prefill and decode tokens.
@@ -2440,6 +2626,7 @@ impl CpuGgufQwen35TextGenerationService {
         request: &GenerationRequest,
         deadline: Option<Qwen35CpuGenerationDeadline>,
         multimodal_plan: Option<&Qwen38MultimodalDecoderPlan>,
+        adapter_runtime: Option<&Qwen38CpuAdapterRuntime>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
         if self.mtp_config.is_some() {
             if multimodal_plan.is_some() {
@@ -2516,12 +2703,15 @@ impl CpuGgufQwen35TextGenerationService {
             let mrope_position = multimodal_plan
                 .map(|plan| plan.mrope_position_ids()[token_index])
                 .unwrap_or([state.position; 3]);
-            let step = self.model.forward_token_with_embedding_and_mrope(
+            let mut step = self.model.forward_token_with_embedding_and_mrope(
                 &mut state,
                 *token,
                 embedding_override,
                 mrope_position,
             )?;
+            if let Some(adapter_runtime) = adapter_runtime {
+                adapter_runtime.apply_to_step(&mut step)?;
+            }
             if let Some(deadline) = deadline {
                 deadline.check()?;
             }
@@ -2620,12 +2810,15 @@ impl CpuGgufQwen35TextGenerationService {
                     ))
                 })?
                 .unwrap_or([state.position; 3]);
-            let step = self.model.forward_token_with_embedding_and_mrope(
+            let mut step = self.model.forward_token_with_embedding_and_mrope(
                 &mut state,
                 next_token,
                 None,
                 mrope_position,
             )?;
+            if let Some(adapter_runtime) = adapter_runtime {
+                adapter_runtime.apply_to_step(&mut step)?;
+            }
             if let Some(deadline) = deadline {
                 deadline.check()?;
             }
@@ -2679,7 +2872,7 @@ impl CpuGgufQwen35TextGenerationService {
                 "cpu",
                 &[],
             ),
-            adapter_serving: None,
+            adapter_serving: adapter_runtime.map(|runtime| runtime.binding.clone()),
             served_revision: None,
             execution_plan_digest: self.model.plan_digest.clone(),
             cluster_execution: None,
@@ -2746,7 +2939,7 @@ impl CpuGgufQwen35TextGenerationService {
         deadline: Option<Qwen35CpuGenerationDeadline>,
         multimodal_plan: Option<&Qwen38MultimodalDecoderPlan>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
-        if request.product_id != crate::TEXT_GENERATION_PRODUCT_ID {
+        if !crate::generation_product_supported(request) {
             return Err(ReferenceTextGenerationError::UnsupportedProduct(
                 request.product_id.clone(),
             ));
@@ -2756,7 +2949,8 @@ impl CpuGgufQwen35TextGenerationService {
                 request.model.model.model_id.clone(),
             ));
         }
-        if request.adapter_serving.is_some() {
+        let adapter_runtime = self.adapter_runtime_for_request(request)?;
+        if adapter_runtime.is_some() && self.mtp_config.is_some() {
             return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
                 binding_id: request
                     .adapter_serving
@@ -2764,7 +2958,7 @@ impl CpuGgufQwen35TextGenerationService {
                     .map(|binding| binding.binding_id.clone())
                     .unwrap_or_else(|| String::from("unknown")),
                 reason: String::from(
-                    "LM-head LoRA serving is not implemented on the native qwen35 cpu runtime",
+                    "native qwen38 CPU adapter serving does not compose with MTP speculative decoding",
                 ),
             });
         }
@@ -2786,7 +2980,8 @@ impl CpuGgufQwen35TextGenerationService {
         }
 
         self.residency.begin_request(current_time_millis());
-        let response = self.generate_inner(request, deadline, multimodal_plan);
+        let response =
+            self.generate_inner(request, deadline, multimodal_plan, adapter_runtime.as_ref());
         self.residency.finish_request(current_time_millis());
         self.last_multimodal_plan_receipt = response
             .as_ref()

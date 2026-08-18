@@ -337,9 +337,20 @@ into one generic engine claim.
   Metal/native/refuse publication are implemented, while retained full-model
   Apple parity and throughput evidence is still pending. Native bounded media
   serving is implemented early on the CPU and CUDA decoder lanes behind an
-  explicit official vision-model directory; Metal media, adapters, session
-  reuse, and generic-server MTP remain unsupported and are published or
-  refused explicitly. The internal CPU service now has a
+  explicit official vision-model directory; Metal media, CUDA/Metal adapters,
+  session reuse, and generic-server MTP remain unsupported and are published
+  or refused explicitly. The native CPU service now accepts one bounded
+  Qwen3.8 LM-head LoRA contract through the generic adapter-serving API.
+  Registration reads the Qwen3.8 safetensors artifact through its specialized
+  digest and metadata validator, preserves the official
+  base-model/revision/artifact binding separately from the served GGUF artifact
+  identity, and refuses hidden/vocabulary shape mismatch. The runtime applies
+  the hot-swap overlay to every prompt and decode logit step, requires an exact
+  registered binding on the adapter product, accounts for the added projection
+  work, and publishes that binding in generation provenance. Merged residency
+  and composition with MTP are refused. This is tiny-fixture native CPU
+  integration evidence; it does not establish a real 27B adapter-serving
+  result. The internal CPU service also has a
   typed cooperative generation timeout checked at token-step boundaries with
   stable `timed_out` and HTTP `504` diagnostics. R6 is `implemented` for the
   internal CPU lane.
@@ -357,9 +368,10 @@ into one generic engine claim.
   prompt digests byte-for-byte. The bundle records zero CUDA fallback, graph,
   cache, allocator, latency, and throughput observations while publishing no
   performance claim. Qwen3.8 remains `partial` overall because retained
-  full-model Apple Metal evidence, Metal multimodal execution, training and
-  adapters, MTP acceleration, long-context widening, and the competitive
-  performance milestone are not complete. The
+  full-model Apple Metal evidence, Metal multimodal execution, native
+  real-checkpoint training, real 27B adapter-serving evidence, accelerated
+  adapter backends, MTP acceleration, long-context widening, and the
+  competitive performance milestone are not complete. The
   optional R9A CPU lane is `implemented` behind an explicit constructor.
   It conditionally loads the appended 15-tensor NextN block, shares the base
   embedding and LM head, keeps a separate dense-attention MTP KV cache, and
