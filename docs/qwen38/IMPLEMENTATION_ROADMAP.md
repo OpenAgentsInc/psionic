@@ -99,7 +99,7 @@ hybrid decoder while keeping per-product admission and publication explicit.
 | R10 | `partial` | Native Metal generation | Runtime admitted; retained Apple evidence pending |
 | R11 | `partial` | Native vision lane | Separate multimodal claim |
 | R12 | `implemented_early` | Training, adapter artifact, and native CPU LM-head integration lane | Bounded reference claim; native real-checkpoint training and real-27B adapter evidence remain open |
-| R13 | `planned` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
+| R13 | `partial` | Psionic exceeds the pinned Unsloth-equivalent speed-test | Bounded performance claim |
 
 ## Issue Tracking
 
@@ -1116,6 +1116,21 @@ Before each measured GPU process, run the idle-process query required by the
 repository agent contract. Retain raw samples, summaries, exact replay
 commands, source and artifact revisions, hardware and runtime facts, output
 tokens, memory metrics, and the Psionic commit that produced the winning row.
+
+The first retained baseline at `f15f874a` lives at
+`fixtures/qwen38/reports/qwen38_speed_gate_baseline_v1.json`. On the RTX 4080
+lane with the admitted `UD-Q3_K_XL` artifact, Psionic decoded at 5.68 median
+tokens per second against 43.59 for the pinned llama.cpp comparator, a delta
+of -87.0 percent, with zero host fallbacks and full CUDA graph replay. Both
+lanes produced identical token ids for the first 96 greedy tokens and
+diverged at token 97 on a near-tied argmax. The baseline fails the speed gate
+on output-token parity and on the winning metric. Profile sampling during
+decode showed full SM occupancy at roughly 14 percent memory utilization, so
+the gap is instruction-bound in the quantized dot path: `SuperBlockQ81Dot`
+re-decodes the Q3_K scale table per element and accumulates in scalar float,
+where llama.cpp decodes scales once per super-block and accumulates with
+integer `dp4a` dots. Closing the gap requires vectorized integer dot kernels
+for the super-block quant types.
 
 ## Test Matrix
 
