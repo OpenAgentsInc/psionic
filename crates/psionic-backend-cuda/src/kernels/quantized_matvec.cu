@@ -658,19 +658,27 @@ struct Iq4XsQ81Dot {
         ) | (static_cast<int>((scale_high >> (2 * scale_block)) & 3) << 4);
         const uint8_t *quants = block + 8 + scale_block * 16;
         const Q81Block *input_block = input + input_block_index;
+        // The block base plus 8 keeps the 16 quant bytes 8-byte aligned.
+        const int2 quant_words_lo = *reinterpret_cast<const int2 *>(quants);
+        const int2 quant_words_hi = *reinterpret_cast<const int2 *>(quants + 8);
         int sum = 0;
 #pragma unroll
         for (int word = 0; word < 4; ++word) {
-            const int2 dequantized =
-                get_int_from_table_16(get_int_b1(quants, word), kIq4NlValues);
+            const int2 dequantized = get_int_from_table_16(
+                word == 0   ? quant_words_lo.x
+                : word == 1 ? quant_words_lo.y
+                : word == 2 ? quant_words_hi.x
+                            : quant_words_hi.y,
+                kIq4NlValues
+            );
             sum = dp4a_i8(
                 dequantized.x,
-                get_int_b1(input_block->bytes + 4, word),
+                get_int_b4(input_block->bytes + 4, word),
                 sum
             );
             sum = dp4a_i8(
                 dequantized.y,
-                get_int_b1(input_block->bytes + 4, word + 4),
+                get_int_b4(input_block->bytes + 4, word + 4),
                 sum
             );
         }
@@ -706,7 +714,7 @@ struct Iq3SQ81Dot {
                 __vsub4(magnitudes ^ sign_bytes_expanded, sign_bytes_expanded);
             sum = dp4a_i8(
                 static_cast<int>(weights),
-                get_int_b1(input_block->bytes + 4, word),
+                get_int_b4(input_block->bytes + 4, word),
                 sum
             );
         }
@@ -732,17 +740,18 @@ struct Q5KQ81Dot {
         const uint8_t *quants = block + 48 + quant_chunk * 32;
         const int low_shift = (scale_block & 1) * 4;
         const Q81Block *input_block = input + input_block_index;
+        // The 32 quant bytes and the 32 high-bit bytes are 4-byte aligned.
         int sum = 0;
         int input_sum = 0;
 #pragma unroll
         for (int word = 0; word < 8; ++word) {
             const uint32_t packed =
-                static_cast<uint32_t>(get_int_b1(quants, word));
+                static_cast<uint32_t>(get_int_b4(quants, word));
             const uint32_t low = (packed >> low_shift) & 0x0f0f0f0fu;
             const uint32_t high = (static_cast<uint32_t>(
-                get_int_b1(block + 16, word)) >> scale_block) & 0x01010101u;
+                get_int_b4(block + 16, word)) >> scale_block) & 0x01010101u;
             const uint32_t weights = low | (high << 4);
-            const int input_word = get_int_b1(input_block->bytes + 4, word);
+            const int input_word = get_int_b4(input_block->bytes + 4, word);
             sum = dp4a_i8(static_cast<int>(weights), input_word, sum);
             input_sum = dp4a_i8(0x01010101, input_word, input_sum);
         }
