@@ -639,6 +639,122 @@ struct SuperBlockQ81Dot {
     }
 };
 
+// Specialized integer dots for the super-block quant types decode each block's
+// scales once per 32-element input block and accumulate with dp4a int8 dot
+// products instead of running the scalar per-element value functor.
+
+struct Iq4XsQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int input_block_index,
+        const Q81Block *input
+    ) const {
+        const uint8_t *block = row_weights + (input_block_index >> 3) * kIq4XsBlockBytes;
+        const int scale_block = input_block_index & 7;
+        const uint16_t scale_high = load_u16_le(block + 2);
+        const uint8_t scale_low = block[4 + scale_block / 2];
+        const int packed_scale = static_cast<int>(
+            (scale_low >> (4 * (scale_block % 2))) & 0x0f
+        ) | (static_cast<int>((scale_high >> (2 * scale_block)) & 3) << 4);
+        const uint8_t *quants = block + 8 + scale_block * 16;
+        const Q81Block *input_block = input + input_block_index;
+        int sum = 0;
+#pragma unroll
+        for (int word = 0; word < 4; ++word) {
+            const int2 dequantized =
+                get_int_from_table_16(get_int_b1(quants, word), kIq4NlValues);
+            sum = dp4a_i8(
+                dequantized.x,
+                get_int_b1(input_block->bytes + 4, word),
+                sum
+            );
+            sum = dp4a_i8(
+                dequantized.y,
+                get_int_b1(input_block->bytes + 4, word + 4),
+                sum
+            );
+        }
+        return half_to_float(load_u16_le(block)) *
+            static_cast<float>(packed_scale - 32) * static_cast<float>(sum) *
+            half_to_float(load_u16_le(input_block->bytes));
+    }
+};
+
+struct Iq3SQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int input_block_index,
+        const Q81Block *input
+    ) const {
+        const uint8_t *block = row_weights + (input_block_index >> 3) * kIq3SBlockBytes;
+        const int scale_block = input_block_index & 7;
+        const Q81Block *input_block = input + input_block_index;
+        const uint8_t *code_bytes = block + 2 + scale_block * 8;
+        const uint8_t high_byte = block[66 + scale_block];
+        const uint8_t *sign_bytes = block + 74 + scale_block * 4;
+        int sum = 0;
+#pragma unroll
+        for (int word = 0; word < 8; ++word) {
+            const int code_index = static_cast<int>(code_bytes[word]) |
+                (static_cast<int>((high_byte >> word) & 1) << 8);
+            const uint32_t magnitudes = kIq3SGrid[code_index];
+            const uint32_t sign_nibble =
+                (sign_bytes[word >> 1] >> (4 * (word & 1))) & 0x0fu;
+            const uint32_t sign_bytes_expanded =
+                ((sign_nibble * 0x00204081u) & 0x01010101u) * 0xffu;
+            const uint32_t weights =
+                __vsub4(magnitudes ^ sign_bytes_expanded, sign_bytes_expanded);
+            sum = dp4a_i8(
+                static_cast<int>(weights),
+                get_int_b1(input_block->bytes + 4, word),
+                sum
+            );
+        }
+        const uint8_t packed_scale = block[106 + scale_block / 2];
+        const int local_scale = 1 + 2 * static_cast<int>(
+            scale_block % 2 == 0 ? (packed_scale & 0x0f) : (packed_scale >> 4)
+        );
+        return half_to_float(load_u16_le(block)) *
+            static_cast<float>(local_scale * sum) *
+            half_to_float(load_u16_le(input_block->bytes));
+    }
+};
+
+struct Q5KQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *row_weights,
+        int input_block_index,
+        const Q81Block *input
+    ) const {
+        const uint8_t *block = row_weights + (input_block_index >> 3) * kQ5KBlockBytes;
+        const int scale_block = input_block_index & 7;
+        const int quant_chunk = scale_block >> 1;
+        const uint8_t *quants = block + 48 + quant_chunk * 32;
+        const int low_shift = (scale_block & 1) * 4;
+        const Q81Block *input_block = input + input_block_index;
+        int sum = 0;
+        int input_sum = 0;
+#pragma unroll
+        for (int word = 0; word < 8; ++word) {
+            const uint32_t packed =
+                static_cast<uint32_t>(get_int_b1(quants, word));
+            const uint32_t low = (packed >> low_shift) & 0x0f0f0f0fu;
+            const uint32_t high = (static_cast<uint32_t>(
+                get_int_b1(block + 16, word)) >> scale_block) & 0x01010101u;
+            const uint32_t weights = low | (high << 4);
+            const int input_word = get_int_b1(input_block->bytes + 4, word);
+            sum = dp4a_i8(static_cast<int>(weights), input_word, sum);
+            input_sum = dp4a_i8(0x01010101, input_word, input_sum);
+        }
+        const int2 scale_min = decode_q4_k_scale_min(scale_block, block + 4);
+        return (half_to_float(load_u16_le(block)) *
+                    static_cast<float>(scale_min.x) * static_cast<float>(sum) -
+                half_to_float(load_u16_le(block + 2)) *
+                    static_cast<float>(scale_min.y) * static_cast<float>(input_sum)) *
+            half_to_float(load_u16_le(input_block->bytes));
+    }
+};
+
 __global__ void quantize_q8_1_rows_kernel(
     const float *input,
     int rows,
@@ -7024,7 +7140,7 @@ extern "C" int psionic_cuda_quantized_kernels_compiled(void) {
     return 1;
 }
 
-#define PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(NAME, VALUE_FN)                                      \
+#define PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(NAME, VALUE_FN, Q81_DOT)                                      \
 extern "C" int psionic_cuda_##NAME##_matvec(                                                   \
     const void *weights, int rows, int cols, int row_stride,                                    \
     const void *input, void *output, void *stream                                                \
@@ -7058,7 +7174,7 @@ extern "C" int psionic_cuda_##NAME##_matvec_q8_1(                               
         static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
         static_cast<const Q81Block *>(input_q8_1), static_cast<const float *>(bias),             \
         static_cast<float *>(output), static_cast<cudaStream_t>(stream),                         \
-        SuperBlockQ81Dot<VALUE_FN>{}                                                             \
+        Q81_DOT{}                                                             \
     );                                                                                           \
     return static_cast<int>(cudaGetLastError());                                                 \
 }                                                                                                \
@@ -7070,15 +7186,15 @@ extern "C" int psionic_cuda_##NAME##_matvec_q8_1_argmax(                        
         static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
         static_cast<const Q81Block *>(input_q8_1), static_cast<const float *>(bias),             \
         static_cast<unsigned long long *>(output), static_cast<cudaStream_t>(stream),            \
-        SuperBlockQ81Dot<VALUE_FN>{}                                                             \
+        Q81_DOT{}                                                             \
     );                                                                                           \
     return static_cast<int>(cudaGetLastError());                                                 \
 }
 
-PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q3_k, Q3KValue)
-PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q5_k, Q5KValue)
-PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq3_s, Iq3SValue)
-PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq4_xs, Iq4XsValue)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q3_k, Q3KValue, SuperBlockQ81Dot<Q3KValue>)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q5_k, Q5KValue, Q5KQ81Dot)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq3_s, Iq3SValue, Iq3SQ81Dot)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq4_xs, Iq4XsValue, Iq4XsQ81Dot)
 
 #undef PSIONIC_DEFINE_SUPER_BLOCK_KERNELS
 
