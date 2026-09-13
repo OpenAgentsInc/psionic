@@ -639,25 +639,32 @@ struct SuperBlockQ81Dot {
     }
 };
 
-// Specialized integer dots for the super-block quant types decode each block's
-// scales once per 32-element input block and accumulate with dp4a int8 dot
-// products instead of running the scalar per-element value functor.
+// Specialized integer dots for the super-block quant types in the mmvq kernel
+// shape: (weights, input, weight_block_index, input_block_index, quant_index).
+// With Vdr = 4 and Qi = 32, eight threads share one super-block and thread
+// `quant_index >> 2` owns one 32-element sub-block, so each thread reads
+// contiguous weight bytes and accumulates with dp4a int8 dots instead of the
+// scalar per-element value functor.
 
 struct Iq4XsQ81Dot {
     __device__ __forceinline__ float operator()(
-        const uint8_t *row_weights,
+        const uint8_t *weights,
+        const Q81Block *input,
+        int weight_block_index,
         int input_block_index,
-        const Q81Block *input
+        int quant_index
     ) const {
-        const uint8_t *block = row_weights + (input_block_index >> 3) * kIq4XsBlockBytes;
-        const int scale_block = input_block_index & 7;
+        const uint8_t *block =
+            weights + static_cast<size_t>(weight_block_index) * kIq4XsBlockBytes;
+        const int scale_block = quant_index >> 2;
         const uint16_t scale_high = load_u16_le(block + 2);
         const uint8_t scale_low = block[4 + scale_block / 2];
         const int packed_scale = static_cast<int>(
             (scale_low >> (4 * (scale_block % 2))) & 0x0f
         ) | (static_cast<int>((scale_high >> (2 * scale_block)) & 3) << 4);
         const uint8_t *quants = block + 8 + scale_block * 16;
-        const Q81Block *input_block = input + input_block_index;
+        const Q81Block *input_block =
+            input + static_cast<size_t>(input_block_index) * 8 + scale_block;
         // The block base plus 8 keeps the 16 quant bytes 8-byte aligned.
         const int2 quant_words_lo = *reinterpret_cast<const int2 *>(quants);
         const int2 quant_words_hi = *reinterpret_cast<const int2 *>(quants + 8);
@@ -690,13 +697,17 @@ struct Iq4XsQ81Dot {
 
 struct Iq3SQ81Dot {
     __device__ __forceinline__ float operator()(
-        const uint8_t *row_weights,
+        const uint8_t *weights,
+        const Q81Block *input,
+        int weight_block_index,
         int input_block_index,
-        const Q81Block *input
+        int quant_index
     ) const {
-        const uint8_t *block = row_weights + (input_block_index >> 3) * kIq3SBlockBytes;
-        const int scale_block = input_block_index & 7;
-        const Q81Block *input_block = input + input_block_index;
+        const uint8_t *block =
+            weights + static_cast<size_t>(weight_block_index) * kIq3SBlockBytes;
+        const int scale_block = quant_index >> 2;
+        const Q81Block *input_block =
+            input + static_cast<size_t>(input_block_index) * 8 + scale_block;
         const uint8_t *code_bytes = block + 2 + scale_block * 8;
         const uint8_t high_byte = block[66 + scale_block];
         const uint8_t *sign_bytes = block + 74 + scale_block * 4;
@@ -730,16 +741,20 @@ struct Iq3SQ81Dot {
 
 struct Q5KQ81Dot {
     __device__ __forceinline__ float operator()(
-        const uint8_t *row_weights,
+        const uint8_t *weights,
+        const Q81Block *input,
+        int weight_block_index,
         int input_block_index,
-        const Q81Block *input
+        int quant_index
     ) const {
-        const uint8_t *block = row_weights + (input_block_index >> 3) * kQ5KBlockBytes;
-        const int scale_block = input_block_index & 7;
+        const uint8_t *block =
+            weights + static_cast<size_t>(weight_block_index) * kQ5KBlockBytes;
+        const int scale_block = quant_index >> 2;
         const int quant_chunk = scale_block >> 1;
         const uint8_t *quants = block + 48 + quant_chunk * 32;
         const int low_shift = (scale_block & 1) * 4;
-        const Q81Block *input_block = input + input_block_index;
+        const Q81Block *input_block =
+            input + static_cast<size_t>(input_block_index) * 8 + scale_block;
         // The 32 quant bytes and the 32 high-bit bytes are 4-byte aligned.
         int sum = 0;
         int input_sum = 0;
@@ -750,9 +765,9 @@ struct Q5KQ81Dot {
             const uint32_t low = (packed >> low_shift) & 0x0f0f0f0fu;
             const uint32_t high = (static_cast<uint32_t>(
                 get_int_b4(block + 16, word)) >> scale_block) & 0x01010101u;
-            const uint32_t weights = low | (high << 4);
+            const uint32_t w = low | (high << 4);
             const int input_word = get_int_b4(input_block->bytes + 4, word);
-            sum = dp4a_i8(static_cast<int>(weights), input_word, sum);
+            sum = dp4a_i8(static_cast<int>(w), input_word, sum);
             input_sum = dp4a_i8(0x01010101, input_word, input_sum);
         }
         const int2 scale_min = decode_q4_k_scale_min(scale_block, block + 4);
@@ -760,6 +775,53 @@ struct Q5KQ81Dot {
                     static_cast<float>(scale_min.x) * static_cast<float>(sum) -
                 half_to_float(load_u16_le(block + 2)) *
                     static_cast<float>(scale_min.y) * static_cast<float>(input_sum)) *
+            half_to_float(load_u16_le(input_block->bytes));
+    }
+};
+
+struct Q3KQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *weights,
+        const Q81Block *input,
+        int weight_block_index,
+        int input_block_index,
+        int quant_index
+    ) const {
+        const uint8_t *block =
+            weights + static_cast<size_t>(weight_block_index) * kQ3KBlockBytes;
+        const int scale_block = quant_index >> 2;
+        const int half_index = scale_block >> 2;
+        const int shift_group = scale_block & 3;
+        const uint8_t *quants = block + 32 + half_index * 32;
+        const int high_shift = half_index * 4 + shift_group;
+        const int low_shift = 2 * shift_group;
+        const Q81Block *input_block =
+            input + static_cast<size_t>(input_block_index) * 8 + scale_block;
+        int sum_low = 0;
+        int sum_high = 0;
+#pragma unroll
+        for (int word = 0; word < 8; ++word) {
+            const uint32_t packed =
+                static_cast<uint32_t>(get_int_b1(quants, word));
+            const uint32_t low = (packed >> low_shift) & 0x03030303u;
+            const uint32_t high = (static_cast<uint32_t>(
+                get_int_b1(block, word)) >> high_shift) & 0x01010101u;
+            const uint32_t w = __vsub4(low, high << 2);
+            const int input_word = get_int_b4(input_block->bytes + 4, word);
+            if (word < 4) {
+                sum_low = dp4a_i8(static_cast<int>(w), input_word, sum_low);
+            } else {
+                sum_high = dp4a_i8(static_cast<int>(w), input_word, sum_high);
+            }
+        }
+        const float d = half_to_float(load_u16_le(block + 108));
+        const int scale_low =
+            q3_k_scale(block + 96, half_index * 8 + shift_group * 2);
+        const int scale_high =
+            q3_k_scale(block + 96, half_index * 8 + shift_group * 2 + 1);
+        return d *
+            (static_cast<float>(scale_low * sum_low) +
+             static_cast<float>(scale_high * sum_high)) *
             half_to_float(load_u16_le(input_block->bytes));
     }
 };
@@ -7149,7 +7211,7 @@ extern "C" int psionic_cuda_quantized_kernels_compiled(void) {
     return 1;
 }
 
-#define PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(NAME, VALUE_FN, Q81_DOT)                                      \
+#define PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(NAME, VALUE_FN, MMVQ_DOT)                                      \
 extern "C" int psionic_cuda_##NAME##_matvec(                                                   \
     const void *weights, int rows, int cols, int row_stride,                                    \
     const void *input, void *output, void *stream                                                \
@@ -7179,11 +7241,18 @@ extern "C" int psionic_cuda_##NAME##_matvec_q8_1(                               
     const void *weights, int rows, int cols, int row_stride,                                    \
     const void *input_q8_1, const void *bias, void *output, void *stream                         \
 ) {                                                                                              \
-    launch_quantized_matvec_q8_1_regular(                                                        \
-        static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
+    const int block_count = cols / 256;                                                          \
+    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);                                             \
+    quantized_matvec_q8_1_mmvq_kernel<MMVQ_DOT, 4, 32><<<                                        \
+        rows,                                                                                    \
+        block_dims,                                                                              \
+        0,                                                                                       \
+        static_cast<cudaStream_t>(stream)                                                        \
+    >>>(                                                                                         \
+        static_cast<const uint8_t *>(weights), row_stride, rows, block_count,                    \
         static_cast<const Q81Block *>(input_q8_1), static_cast<const float *>(bias),             \
-        static_cast<float *>(output), static_cast<cudaStream_t>(stream),                         \
-        Q81_DOT{}                                                             \
+        static_cast<float *>(output),                                                            \
+        MMVQ_DOT{}                                                                               \
     );                                                                                           \
     return static_cast<int>(cudaGetLastError());                                                 \
 }                                                                                                \
@@ -7191,16 +7260,16 @@ extern "C" int psionic_cuda_##NAME##_matvec_q8_1_argmax(                        
     const void *weights, int rows, int cols, int row_stride,                                    \
     const void *input_q8_1, const void *bias, void *output, void *stream                         \
 ) {                                                                                              \
-    launch_quantized_matvec_q8_1_argmax_regular(                                                 \
+    launch_quantized_matvec_q8_1_grouped_argmax_mmvq<MMVQ_DOT, 4, 32, 4, 1>(                     \
         static_cast<const uint8_t *>(weights), rows, cols, row_stride,                           \
         static_cast<const Q81Block *>(input_q8_1), static_cast<const float *>(bias),             \
         static_cast<unsigned long long *>(output), static_cast<cudaStream_t>(stream),            \
-        Q81_DOT{}                                                             \
+        MMVQ_DOT{}                                                                               \
     );                                                                                           \
     return static_cast<int>(cudaGetLastError());                                                 \
 }
 
-PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q3_k, Q3KValue, SuperBlockQ81Dot<Q3KValue>)
+PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q3_k, Q3KValue, Q3KQ81Dot)
 PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(q5_k, Q5KValue, Q5KQ81Dot)
 PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq3_s, Iq3SValue, Iq3SQ81Dot)
 PSIONIC_DEFINE_SUPER_BLOCK_KERNELS(iq4_xs, Iq4XsValue, Iq4XsQ81Dot)
