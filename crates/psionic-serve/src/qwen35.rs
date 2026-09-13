@@ -2013,8 +2013,10 @@ impl CpuGgufQwen35TextGenerationService {
         summary
     }
 
-    #[cfg(test)]
-    pub(crate) fn final_hidden_and_logits_for_text(
+    /// Captures the final hidden state and logits for supplied text.
+    ///
+    /// This is a diagnostic comparator path and does not perform sampling.
+    pub fn final_hidden_and_logits_for_text(
         &self,
         text: &str,
     ) -> Result<(Vec<f32>, Vec<f32>), ReferenceTextGenerationError> {
