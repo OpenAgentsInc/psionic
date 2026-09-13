@@ -1311,15 +1311,27 @@ struct LlamaCppCompletionResponse {
 }
 
 fn run_llama_cpp_benchmark(config: &BenchConfig) -> Result<(), String> {
-    let bench_model = load_bench_model(&config.model_path, &config.prompt, config.raw_prompt)?;
-    let prompt_token_ids = match config.prompt_token_ids.as_ref() {
-        Some(token_ids) => token_ids.clone(),
-        None => token_ids(
-            bench_model
-                .tokenizer
-                .encode(bench_model.rendered.text.as_str())
-                .as_slice(),
+    // Token-id prompts skip chat-template rendering, matching the psionic
+    // lane; a pure token array also keeps llama-server from inserting BOS.
+    let (rendered, prompt_token_ids) = match config.prompt_token_ids.as_ref() {
+        Some(token_ids) => (
+            RenderedPrompt {
+                text: String::new(),
+                stop_sequences: Vec::new(),
+            },
+            token_ids.clone(),
         ),
+        None => {
+            let bench_model =
+                load_bench_model(&config.model_path, &config.prompt, config.raw_prompt)?;
+            let ids = token_ids(
+                bench_model
+                    .tokenizer
+                    .encode(bench_model.rendered.text.as_str())
+                    .as_slice(),
+            );
+            (bench_model.rendered, ids)
+        }
     };
 
     let version_output = Command::new(&config.llama_server_bin)
@@ -1407,7 +1419,7 @@ fn run_llama_cpp_benchmark(config: &BenchConfig) -> Result<(), String> {
         &prompt_token_ids,
         warmup_tokens,
         config,
-        &bench_model.rendered,
+        &rendered,
     )?;
 
     let mut runs = Vec::with_capacity(config.repeats);
@@ -1419,7 +1431,7 @@ fn run_llama_cpp_benchmark(config: &BenchConfig) -> Result<(), String> {
             &prompt_token_ids,
             config.max_output_tokens,
             config,
-            &bench_model.rendered,
+            &rendered,
         )?;
         let wall_s = started.elapsed().as_secs_f64();
         if response.truncated || response.tokens_cached > 0 {
@@ -1452,7 +1464,7 @@ fn run_llama_cpp_benchmark(config: &BenchConfig) -> Result<(), String> {
             (timings.predicted_per_token_ms > 0.0).then(|| timings.predicted_per_token_ms / 1000.0);
         let termination = llama_cpp_termination_report(
             &response,
-            &bench_model.rendered.stop_sequences,
+            &rendered.stop_sequences,
             config.max_output_tokens,
         );
         let output_text = response.content.clone();
@@ -1524,7 +1536,7 @@ fn run_llama_cpp_benchmark(config: &BenchConfig) -> Result<(), String> {
     };
     let report = build_bench_report(
         config,
-        &bench_model.rendered,
+        &rendered,
         None,
         Some(load_s),
         None,
