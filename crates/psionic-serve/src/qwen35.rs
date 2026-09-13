@@ -1788,6 +1788,39 @@ impl CpuGgufQwen35TextGenerationService {
         Ok(logits)
     }
 
+    #[cfg(test)]
+    pub(crate) fn test_raw_logits_with_embedding_and_mrope(
+        &self,
+        tokens: &TokenSequence,
+        embedding_overrides: &[(usize, Vec<f32>)],
+        mrope_positions: &[[usize; 3]],
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let mut state = self
+            .model
+            .initial_state(self.model.descriptor.config.max_context);
+        let mut logits = Vec::new();
+        for (index, token) in tokens.as_slice().iter().enumerate() {
+            let embedding_override = embedding_overrides
+                .iter()
+                .find(|(token_index, _)| *token_index == index)
+                .map(|(_, embedding)| embedding.as_slice());
+            let mrope_position = mrope_positions
+                .get(index)
+                .copied()
+                .unwrap_or([state.position; 3]);
+            logits = self
+                .model
+                .forward_token_with_embedding_and_mrope(
+                    &mut state,
+                    *token,
+                    embedding_override,
+                    mrope_position,
+                )?
+                .logits;
+        }
+        Ok(logits)
+    }
+
     #[must_use]
     pub fn model_descriptor(&self) -> &DecoderModelDescriptor {
         &self.model.descriptor
@@ -3073,6 +3106,7 @@ pub struct MetalGgufQwen35TextGenerationService {
     residency: LoadedModelResidency,
     memory_plan: psionic_runtime::ModelMemoryPlan,
     residency_policy: psionic_runtime::ModelResidencyPolicy,
+    last_multimodal_plan_receipt: Option<Qwen38MultimodalDecoderPlanReceipt>,
 }
 
 impl MetalGgufQwen35TextGenerationService {
@@ -3107,12 +3141,21 @@ impl MetalGgufQwen35TextGenerationService {
             ),
             memory_plan: model.memory_plan.clone(),
             residency_policy: psionic_runtime::ModelResidencyPolicy::default(),
+            last_multimodal_plan_receipt: None,
         })
     }
 
     #[must_use]
     pub fn model_descriptor(&self) -> &DecoderModelDescriptor {
         &self.model.descriptor
+    }
+
+    /// Qwen3.8 multimodal generation.
+    #[must_use]
+    pub fn last_qwen38_multimodal_plan_receipt(
+        &self,
+    ) -> Option<&Qwen38MultimodalDecoderPlanReceipt> {
+        self.last_multimodal_plan_receipt.as_ref()
     }
 
     #[must_use]
@@ -3192,6 +3235,41 @@ impl MetalGgufQwen35TextGenerationService {
                     &mut self.backend,
                     &mut state,
                     *token,
+                    MetalStepOutputMode::FullLogits,
+                )?
+                .logits;
+        }
+        Ok(logits)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_raw_logits_with_embedding_and_mrope(
+        &mut self,
+        tokens: &TokenSequence,
+        embedding_overrides: &[(usize, Vec<f32>)],
+        mrope_positions: &[[usize; 3]],
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let mut state = self
+            .model
+            .initial_state(self.model.metal_context_limit_tokens());
+        let mut logits = Vec::new();
+        for (index, token) in tokens.as_slice().iter().enumerate() {
+            let embedding_override = embedding_overrides
+                .iter()
+                .find(|(token_index, _)| *token_index == index)
+                .map(|(_, embedding)| embedding.as_slice());
+            let mrope_position = mrope_positions
+                .get(index)
+                .copied()
+                .unwrap_or([state.position; 3]);
+            logits = self
+                .model
+                .forward_token_with_embedding_and_mrope(
+                    &mut self.backend,
+                    &mut state,
+                    *token,
+                    embedding_override,
+                    mrope_position,
                     MetalStepOutputMode::FullLogits,
                 )?
                 .logits;
@@ -3338,11 +3416,21 @@ impl MetalGgufQwen35TextGenerationService {
     fn generate_inner(
         &mut self,
         request: &GenerationRequest,
+        multimodal_plan: Option<&Qwen38MultimodalDecoderPlan>,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
         let prompt_eval_start = Instant::now();
-        let prompt_tokens = match &request.prompt {
-            GenerationInput::Text(text) => self.model.tokenizer.encode_with_defaults(text),
-            GenerationInput::Tokens(tokens) => tokens.clone(),
+        let prompt_tokens = match multimodal_plan {
+            Some(plan) => TokenSequence::new(
+                plan.token_ids()
+                    .iter()
+                    .copied()
+                    .map(TokenId)
+                    .collect::<Vec<_>>(),
+            ),
+            None => match &request.prompt {
+                GenerationInput::Text(text) => self.model.tokenizer.encode_with_defaults(text),
+                GenerationInput::Tokens(tokens) => tokens.clone(),
+            },
         };
         if prompt_tokens.is_empty() {
             return Err(ReferenceTextGenerationError::EmptyPrompt);
@@ -3358,6 +3446,13 @@ impl MetalGgufQwen35TextGenerationService {
                     == Some(self.model.tokenizer.vocabulary().bos_id()),
             ),
         )?;
+        if multimodal_plan.is_some_and(|plan| prompt_tokens.len() != plan.token_ids().len()) {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen38 Metal multimodal generation refuses context-window prompt truncation",
+                )),
+            ));
+        }
 
         let cache_capacity_tokens = qwen35_cache_capacity_tokens(
             prompt_tokens.len(),
@@ -3371,22 +3466,44 @@ impl MetalGgufQwen35TextGenerationService {
         let mut last_logits = Vec::new();
         let output_mode = qwen35_metal_output_mode(&request.options);
         let mut pending_selected_token = None;
+        let mut embedding_overrides = multimodal_plan
+            .map(Qwen38MultimodalDecoderPlan::embedding_overrides)
+            .unwrap_or_default()
+            .iter()
+            .peekable();
         if let Some((last_prompt_token, prompt_prefix)) = prompt_tokens.as_slice().split_last() {
-            for token in prompt_prefix {
-                let step = self.model.forward_token(
+            for (token_index, token) in prompt_prefix.iter().enumerate() {
+                let embedding_override = embedding_overrides
+                    .next_if(|value| value.token_index == token_index)
+                    .map(|value| value.embedding.as_slice());
+                let mrope_position = multimodal_plan
+                    .map(|plan| plan.mrope_position_ids()[token_index])
+                    .unwrap_or([state.position; 3]);
+                let step = self.model.forward_token_with_embedding_and_mrope(
                     &mut self.backend,
                     &mut state,
                     *token,
+                    embedding_override,
+                    mrope_position,
                     MetalStepOutputMode::NoOutput,
                 )?;
                 history.append(*token, Vec::new(), Vec::new())?;
                 kernel_count = kernel_count.saturating_add(step.kernel_count);
                 bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             }
-            let step = self.model.forward_token(
+            let last_token_index = prompt_tokens.len().saturating_sub(1);
+            let embedding_override = embedding_overrides
+                .next_if(|value| value.token_index == last_token_index)
+                .map(|value| value.embedding.as_slice());
+            let mrope_position = multimodal_plan
+                .map(|plan| plan.mrope_position_ids()[last_token_index])
+                .unwrap_or([state.position; 3]);
+            let step = self.model.forward_token_with_embedding_and_mrope(
                 &mut self.backend,
                 &mut state,
                 *last_prompt_token,
+                embedding_override,
+                mrope_position,
                 output_mode,
             )?;
             history.append(*last_prompt_token, Vec::new(), Vec::new())?;
@@ -3394,6 +3511,13 @@ impl MetalGgufQwen35TextGenerationService {
             pending_selected_token = step.selected_token;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+        }
+        if embedding_overrides.next().is_some() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen38 Metal multimodal decoder plan contains an out-of-range embedding override",
+                )),
+            ));
         }
 
         let prompt_eval_duration_ns = prompt_eval_start
@@ -3474,9 +3598,23 @@ impl MetalGgufQwen35TextGenerationService {
                 );
             }
 
-            let step =
-                self.model
-                    .forward_token(&mut self.backend, &mut state, next_token, output_mode)?;
+            let mrope_position = multimodal_plan
+                .map(|plan| plan.generated_position(state.position))
+                .transpose()
+                .map_err(|error| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::UnsupportedStep(
+                        error.to_string(),
+                    ))
+                })?
+                .unwrap_or([state.position; 3]);
+            let step = self.model.forward_token_with_embedding_and_mrope(
+                &mut self.backend,
+                &mut state,
+                next_token,
+                None,
+                mrope_position,
+                output_mode,
+            )?;
             history.append(next_token, Vec::new(), Vec::new())?;
             last_logits = step.logits;
             pending_selected_token = step.selected_token;
@@ -3585,6 +3723,14 @@ impl MetalGgufQwen35TextGenerationService {
         &mut self,
         request: &GenerationRequest,
     ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        self.generate_with_qwen38_multimodal_plan(request, None)
+    }
+
+    fn generate_with_qwen38_multimodal_plan(
+        &mut self,
+        request: &GenerationRequest,
+        multimodal_plan: Option<&Qwen38MultimodalDecoderPlan>,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
         if request.product_id != crate::TEXT_GENERATION_PRODUCT_ID {
             return Err(ReferenceTextGenerationError::UnsupportedProduct(
                 request.product_id.clone(),
@@ -3614,11 +3760,34 @@ impl MetalGgufQwen35TextGenerationService {
                 )),
             ));
         }
+        if multimodal_plan.is_some()
+            && self.model.family_metadata.family != GgufDecoderFamily::Qwen38
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "native multimodal decoder plans require a qwen38 artifact",
+                )),
+            ));
+        }
 
         self.residency.begin_request(current_time_millis());
-        let response = self.generate_inner(request);
+        let response = self.generate_inner(request, multimodal_plan);
         self.residency.finish_request(current_time_millis());
+        self.last_multimodal_plan_receipt = response
+            .as_ref()
+            .ok()
+            .and_then(|_| multimodal_plan.map(|plan| plan.receipt().clone()));
         response
+    }
+
+    /// Runs one native Qwen3.8 Metal generation with admitted vision
+    /// embeddings and explicit multimodal rotary positions.
+    pub fn generate_qwen38_multimodal(
+        &mut self,
+        request: &GenerationRequest,
+        plan: &Qwen38MultimodalDecoderPlan,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        self.generate_with_qwen38_multimodal_plan(request, Some(plan))
     }
 }
 
@@ -3892,11 +4061,31 @@ impl MetalQwen35Model {
         }
     }
 
+    #[cfg(test)]
     fn forward_token(
         &self,
         backend: &mut MetalBackend,
         state: &mut MetalQwen35State,
         token: TokenId,
+        output_mode: MetalStepOutputMode,
+    ) -> Result<MetalQwen35ForwardStep, ReferenceTextGenerationError> {
+        self.forward_token_with_embedding_and_mrope(
+            backend,
+            state,
+            token,
+            None,
+            [state.position; 3],
+            output_mode,
+        )
+    }
+
+    fn forward_token_with_embedding_and_mrope(
+        &self,
+        backend: &mut MetalBackend,
+        state: &mut MetalQwen35State,
+        token: TokenId,
+        embedding_override: Option<&[f32]>,
+        mrope_position: [usize; 3],
         output_mode: MetalStepOutputMode,
     ) -> Result<MetalQwen35ForwardStep, ReferenceTextGenerationError> {
         if token.as_u32() as usize >= self.descriptor.config.vocab_size {
@@ -3905,9 +4094,26 @@ impl MetalQwen35Model {
                 vocab_size: self.descriptor.config.vocab_size,
             });
         }
-        let mut hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
+        if embedding_override
+            .is_some_and(|embedding| embedding.len() != self.descriptor.config.hidden_size)
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(format!(
+                    "qwen38 Metal decoder embedding override width must be {}, received {}",
+                    self.descriptor.config.hidden_size,
+                    embedding_override.map_or(0, <[f32]>::len),
+                )),
+            ));
+        }
+        let mut hidden = match embedding_override {
+            Some(embedding) => embedding.to_vec(),
+            None => self.token_embedding.decode_row(token.as_u32() as usize)?,
+        };
         let mut kernel_count = 1usize;
-        let mut bytes_moved = self.token_embedding.host_residency_bytes() as u64;
+        let mut bytes_moved = embedding_override.map_or_else(
+            || self.token_embedding.host_residency_bytes() as u64,
+            |embedding| embedding.len().saturating_mul(std::mem::size_of::<f32>()) as u64,
+        );
         for (layer, layer_state) in self.layers.iter().zip(state.layers.iter_mut()) {
             let step = layer.forward(
                 backend,
@@ -3916,7 +4122,7 @@ impl MetalQwen35Model {
                 self.descriptor.config.block.attention.head_count,
                 self.descriptor.config.block.attention.head_dim,
                 self.descriptor.config.block.attention.rotary_dim,
-                state.position,
+                mrope_position,
                 hidden,
                 layer_state,
             )?;
@@ -5260,7 +5466,7 @@ impl MetalQwen35Layer {
         head_count: usize,
         head_dim: usize,
         rotary_dim: usize,
-        position: usize,
+        mrope_position: [usize; 3],
         input_hidden: Vec<f32>,
         state: &mut MetalQwen35LayerState,
     ) -> Result<MetalQwen35LayerStep, ReferenceTextGenerationError> {
@@ -5271,7 +5477,7 @@ impl MetalQwen35Layer {
                     family_metadata,
                     hidden_size,
                     hybrid,
-                    position,
+                    mrope_position[0],
                     input_hidden,
                     hybrid_state,
                 )
@@ -5287,7 +5493,7 @@ impl MetalQwen35Layer {
                 head_dim,
                 rotary_dim,
                 full_attention,
-                position,
+                mrope_position,
                 input_hidden,
                 full_attention_state,
             ),
@@ -5467,7 +5673,7 @@ impl MetalQwen35Layer {
         head_dim: usize,
         rotary_dim: usize,
         full_attention: &MetalQwen35FullAttentionLayer,
-        position: usize,
+        mrope_position: [usize; 3],
         input_hidden: Vec<f32>,
         state: &mut MetalQwen35FullAttentionState,
     ) -> Result<MetalQwen35LayerStep, ReferenceTextGenerationError> {
@@ -5530,20 +5736,20 @@ impl MetalQwen35Layer {
             epsilon,
         );
         let attention_scale = qwen35_attention_scale(family_metadata, head_dim);
-        apply_rope_neox(
+        apply_rope_neox_mrope(
             query.as_mut_slice(),
             head_count,
             head_dim,
             rotary_dim,
-            position,
+            mrope_position,
             family_metadata,
         );
-        apply_rope_neox(
+        apply_rope_neox_mrope(
             key.as_mut_slice(),
             kv_head_count,
             head_dim,
             rotary_dim,
-            position,
+            mrope_position,
             family_metadata,
         );
         let attention = attend_full_attention(
@@ -16039,24 +16245,6 @@ fn attend_full_attention(
         axpy(destination, current_value, *weights.last().unwrap_or(&0.0));
     }
     output
-}
-
-fn apply_rope_neox(
-    values: &mut [f32],
-    head_count: usize,
-    head_dim: usize,
-    rotary_dim: usize,
-    position: usize,
-    metadata: &GgufDecoderFamilyMetadata,
-) {
-    apply_rope_neox_mrope(
-        values,
-        head_count,
-        head_dim,
-        rotary_dim,
-        [position; 3],
-        metadata,
-    );
 }
 
 fn apply_rope_neox_mrope(

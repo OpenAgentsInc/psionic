@@ -3722,11 +3722,6 @@ impl OpenAiCompatServer {
                 && let Some(decoder) = loaded_model.decoder_mut()
                 && matches!(decoder.family, GgufDecoderFamily::Qwen38)
             {
-                if matches!(config.backend, OpenAiCompatBackend::Metal) {
-                    return Err(OpenAiCompatServerError::Config(String::from(
-                        "Qwen3.8 OpenAI media serving is not implemented on the Metal decoder lane; omit `--qwen38-vision-model-dir` or use the CPU/CUDA decoder backend",
-                    )));
-                }
                 decoder.multimodal_lane = Some(OpenAiCompatMultimodalLane::Qwen38Native(
                     Qwen38NativeMultimodalLane::cpu_vision(),
                 ));
@@ -4109,9 +4104,25 @@ impl OpenAiCompatWorker {
                                     let model_key =
                                         service.model_descriptor().model.model_id.clone();
                                     generation_services.insert(
-                                        model_key,
+                                        model_key.clone(),
                                         OpenAiCompatGenerationService::Qwen35Metal(service),
                                     );
+                                    if let Some(model_dir) =
+                                        load_plan.qwen38_vision_model_dir.as_deref()
+                                    {
+                                        match Qwen38OpenAiMultimodalRuntime::from_official_model_dir(
+                                            model_dir,
+                                        ) {
+                                            Ok(runtime) => {
+                                                qwen38_multimodal_runtimes
+                                                    .insert(model_key, runtime);
+                                            }
+                                            Err(error) => {
+                                                let _ = ready_tx.send(Err::<(), String>(error));
+                                                return;
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(error) => {
                                     let _ = ready_tx.send(Err::<(), String>(error.to_string()));
@@ -4176,6 +4187,8 @@ impl OpenAiCompatWorker {
                                     OpenAiCompatGenerationService::Cpu(service) => service
                                         .generate_qwen38_multimodal(&request, &plan),
                                     OpenAiCompatGenerationService::Qwen35Cuda(service) => service
+                                        .generate_qwen38_multimodal(&request, &plan),
+                                    OpenAiCompatGenerationService::Qwen35Metal(service) => service
                                         .generate_qwen38_multimodal(&request, &plan),
                                     _ => Err(qwen38_multimodal_generation_error(format!(
                                         "model `{model_key}` does not support native Qwen3.8 multimodal generation"
@@ -15460,6 +15473,108 @@ mod tests {
     }
 
     #[test]
+    fn native_qwen38_metal_multimodal_step_matches_cpu_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let qwen38_path = temp.path().join("tiny-native-qwen38-metal-multimodal.gguf");
+        let mut metadata = qwen38_openai_decoder_metadata_with_tokens(
+            "tiny native qwen38 metal multimodal",
+            vec![
+                "<|bos|>",
+                "<|eos|>",
+                "<|im_start|>",
+                "<|im_end|>",
+                "<think>",
+                "</think>",
+                "hello",
+                "world",
+                "proxy",
+                "qwen38",
+            ],
+        );
+        for (key, value) in &mut metadata {
+            if key == "qwen35.rope.freq_base" {
+                *value = GgufMetadataValue::F32(100.0);
+            }
+        }
+        metadata.extend([
+            (
+                String::from("qwen35.mrope_sections"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::U32(2),
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(0),
+                ]),
+            ),
+            (
+                String::from("qwen35.rope.mrope_interleaved"),
+                GgufMetadataValue::Bool(false),
+            ),
+        ]);
+        write_test_gguf(
+            &qwen38_path,
+            metadata.as_slice(),
+            qwen38_mrope_step_decoder_tensors().as_slice(),
+        )?;
+
+        let cpu = crate::CpuGgufQwen35TextGenerationService::from_gguf_path(&qwen38_path)?;
+        let mut metal = crate::MetalGgufQwen35TextGenerationService::from_gguf_path(&qwen38_path)?;
+        let tokens = TokenSequence::new(vec![TokenId(6), TokenId(7), TokenId(8)]);
+        let embedding_overrides = vec![(2usize, vec![0.5_f32; 32])];
+        let mrope_positions = vec![[0usize; 3], [1usize; 3], [2usize, 5, 7]];
+        let cpu_logits = cpu.test_raw_logits_with_embedding_and_mrope(
+            &tokens,
+            embedding_overrides.as_slice(),
+            mrope_positions.as_slice(),
+        )?;
+        let metal_logits = metal.test_raw_logits_with_embedding_and_mrope(
+            &tokens,
+            embedding_overrides.as_slice(),
+            mrope_positions.as_slice(),
+        )?;
+        assert_eq!(cpu_logits.len(), metal_logits.len());
+        let max_abs_diff = cpu_logits
+            .iter()
+            .zip(metal_logits.iter())
+            .map(|(cpu, metal)| (cpu - metal).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(max_abs_diff <= 1e-4, "max logit diff was {max_abs_diff}");
+
+        let uniform_positions = vec![[0usize; 3], [1usize; 3], [2usize; 3]];
+        let metal_uniform_mrope = metal.test_raw_logits_with_embedding_and_mrope(
+            &tokens,
+            embedding_overrides.as_slice(),
+            uniform_positions.as_slice(),
+        )?;
+        let mrope_diff = metal_logits
+            .iter()
+            .zip(metal_uniform_mrope.iter())
+            .map(|(left, right)| (left - right).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            mrope_diff > 1e-6,
+            "non-uniform mrope positions must change the decoder output"
+        );
+        let metal_plain = metal.test_raw_logits(&tokens)?;
+        let override_diff = metal_logits
+            .iter()
+            .zip(metal_plain.iter())
+            .map(|(left, right)| (left - right).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            override_diff > 1e-6,
+            "an admitted embedding override must change the decoder output"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn qwen38_metal_service_refuses_required_host_projections_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let backend = psionic_backend_metal::MetalBackend::new();
@@ -24425,13 +24540,54 @@ mod tests {
         shape: Vec<usize>,
         row_index: usize,
     ) -> TestGgufTensor {
+        quantized_q8_0_tensor_with_weight_rows(name, shape, &[row_index])
+    }
+
+    fn quantized_q8_0_tensor_with_weight_rows(
+        name: &str,
+        shape: Vec<usize>,
+        row_indices: &[usize],
+    ) -> TestGgufTensor {
         let rows = shape
             .iter()
             .take(shape.len().saturating_sub(1))
             .product::<usize>();
         let mut bytes = repeated_q8_0_bytes(rows);
-        bytes[row_index * 34 + 2] = 1;
+        for row_index in row_indices {
+            bytes[row_index * 34 + 2] = 1;
+        }
         TestGgufTensor::new(name, shape, GgufTensorType::Q8_0, bytes)
+    }
+
+    fn qwen38_mrope_step_decoder_tensors() -> Vec<TestGgufTensor> {
+        let mut embeddings = vec![0.0_f32; 10 * 32];
+        for row in embeddings.chunks_exact_mut(32) {
+            row[0] = 1.0;
+        }
+        vec![
+            dense_tensor("token_embd.weight", vec![10, 32], embeddings),
+            dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
+            quantized_q8_0_tensor_with_first_weight("output.weight", vec![10, 32], 7),
+            dense_tensor("blk.0.attn_norm.weight", vec![32], vec![1.0; 32]),
+            quantized_q8_0_tensor("blk.0.ffn_gate.weight", vec![32, 32]),
+            quantized_q8_0_tensor("blk.0.ffn_up.weight", vec![32, 32]),
+            quantized_q8_0_tensor("blk.0.ffn_down.weight", vec![32, 32]),
+            dense_tensor("blk.0.post_attention_norm.weight", vec![32], vec![1.0; 32]),
+            quantized_q8_0_tensor_with_weight_rows(
+                "blk.0.attn_q.weight",
+                vec![64, 32],
+                &[2, 3, 6, 7],
+            ),
+            quantized_q8_0_tensor_with_weight_rows(
+                "blk.0.attn_k.weight",
+                vec![16, 32],
+                &[2, 3, 6, 7],
+            ),
+            quantized_q8_0_tensor_with_first_weight("blk.0.attn_v.weight", vec![16, 32], 0),
+            quantized_q8_0_tensor_with_first_weight("blk.0.attn_output.weight", vec![32, 32], 0),
+            dense_tensor("blk.0.attn_q_norm.weight", vec![8], vec![1.0; 8]),
+            dense_tensor("blk.0.attn_k_norm.weight", vec![8], vec![1.0; 8]),
+        ]
     }
 
     fn qwen35_native_full_attention_decoder_tensors_with_vocab(

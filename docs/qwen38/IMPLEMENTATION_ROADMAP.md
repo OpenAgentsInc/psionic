@@ -912,6 +912,16 @@ context-window prompt truncation, and retain the successful plan receipt. The
 bounded `qwen38_multimodal_cuda_smoke` example runs vision and decoder
 residency serially so the two full models do not overlap in VRAM.
 
+The native Metal decoder consumes the same plan through
+`generate_qwen38_multimodal`. Prefill injects each admitted 5,120-wide encoder
+row at its exact pad-token index and passes the planned three-axis coordinate
+through the full-attention MRoPE application. Generated tokens use the
+physical KV-cache position plus the retained MRoPE delta. Multimodal calls
+refuse context-window prompt truncation and out-of-range embedding overrides,
+and the service retains the successful plan receipt. A tiny-fixture test
+exercises an embedding override and non-uniform MRoPE positions on both the
+CPU and Metal decoders and requires the Metal output to change under each.
+
 The retained end-to-end CUDA driver is
 `scripts/run-qwen38-multimodal-cuda-evidence.sh`; its checker is
 `scripts/check-qwen38-multimodal-cuda.sh`. The report
@@ -930,10 +940,10 @@ diagnostic and do not establish a performance claim.
 The generic OpenAI-compatible server now has an early native Qwen3.8 media
 lane behind `--qwen38-vision-model-dir <official-model-dir>`. The lane loads
 the official tokenizer and native vision stack on CPU, then sends the strict
-decoder-input plan to the admitted CPU or CUDA decoder. Keeping vision on CPU
-prevents its full-model residency from overlapping the CUDA decoder weights.
-Metal configuration refuses because Metal decoder consumption is not
-implemented. The CPU vision loader materializes the admitted BF16 source
+decoder-input plan to the admitted CPU, CUDA, or Metal decoder. Keeping
+vision on CPU prevents its full-model residency from overlapping the
+accelerated decoder weights. The CPU vision loader materializes the admitted
+BF16 source
 weights as F32 because Candle CPU matmul does not support BF16. Runtime receipts
 therefore report `1,842,920,384` resident tensor bytes on CPU while preserving
 the original BF16 shard digest and tensor-byte identity. CUDA vision keeps
@@ -976,7 +986,12 @@ and five-attachment requests all return the expected bounded refusal. The
 report records native CUDA decode, `fallback_policy = refuse`, no hidden
 fallback, and no performance claim.
 
-R11 remains `partial` until Metal consumes the multimodal decoder plan.
+R11 remains `partial` until a retained full-model Metal multimodal evidence
+run exists. The Metal decoder now consumes the plan in code and tiny-fixture
+tests cover embedding injection and non-uniform MRoPE positions, but no
+Metal-specific evidence script or retained report binds a qualified vision
+artifact, a full decoder artifact, and serial execution on an idle Apple
+Silicon host.
 
 Native vision remains a separate roadmap lane after text support.
 
