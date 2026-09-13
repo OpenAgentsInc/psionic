@@ -1,0 +1,135 @@
+{
+  "schema_version": "psionic.qwen38.adapter_serving_evidence.v1",
+  "phase": "R12",
+  "status": "partial",
+  "decoder_gguf": "/Users/christopherdavid/work/psionic/target/models/qwen/unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf",
+  "decoder_model": {
+    "model": {
+      "model_id": "qwen3-8-27b@local-unverified:65ea28e3fe9f881bbaed9d2eaa49c9c065bf0e6ae7077c9d4cf4ec2feb07d938",
+      "family": "qwen38",
+      "revision": "local-unverified:65ea28e3fe9f881bbaed9d2eaa49c9c065bf0e6ae7077c9d4cf4ec2feb07d938"
+    },
+    "config": {
+      "hidden_size": 5120,
+      "layer_count": 64,
+      "vocab_size": 248320,
+      "max_context": 262144,
+      "block": {
+        "attention": {
+          "head_count": 24,
+          "kv_head_count": 4,
+          "head_dim": 256,
+          "rotary_dim": 64
+        },
+        "feed_forward": {
+          "intermediate_size": 17408,
+          "activation": "Silu"
+        }
+      }
+    },
+    "tokenizer_family": "gpt2_bpe:qwen35",
+    "weights_digest": "ad696aff7d2a0729ea5173d03b0365870df5d6501a47e89e904301395908282d",
+    "artifact_identity": {
+      "model_blob_digest": "local-unverified:65ea28e3fe9f881bbaed9d2eaa49c9c065bf0e6ae7077c9d4cf4ec2feb07d938",
+      "tokenizer_digest": "9000077839bea55984094f4e7dc399cbf22ecd251aa2ce2b78f6aedeea8c1a8f",
+      "chat_template_digest": "307a10de11a9d167bf12f64217fc792a2d4052d7e6dc3b09d8e163432710a017",
+      "generation_defaults_digest": "5dafc94b81eb2843494f2f8db1ba9585cf1e01323953542949c4871fabf13754"
+    }
+  },
+  "adapter_runtime_support": {
+    "support_level": "qwen38_lm_head_lora_cpu",
+    "import_formats": [
+      "safetensors"
+    ],
+    "residency_modes": [
+      "hot_swap_overlay"
+    ],
+    "batching_mode": "one_explicit_binding_per_request",
+    "unsupported_reasons": [
+      "merged-resident and MTP-composed adapter execution are not implemented"
+    ]
+  },
+  "adapter_artifact": {
+    "path": "/Users/christopherdavid/work/psionic/fixtures/qwen38/adapters/qwen38_lm_head_lora_real_27b_v1.safetensors",
+    "sha256": "9f2fb7aa47940ea1dafc07341846204f15086ca64828a60c2a0eec8afacc41e1",
+    "byte_len": 1014904,
+    "identity": [
+      {
+        "adapter_id": "qwen38-adapter-serving-real-27b-v1",
+        "adapter_revision": "trained-step-1",
+        "kind": "lora",
+        "format": "safetensors",
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "base_model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "base_served_artifact_digest": "08993463336337b3d04e626e2c96174f4df9108ad981bcf7263e1f96603b98c9",
+        "artifact_digest": "9f2fb7aa47940ea1dafc07341846204f15086ca64828a60c2a0eec8afacc41e1",
+        "quantization": "none",
+        "target_family": "decoder_composite",
+        "parameter_count": 253440,
+        "provenance_digest": "45615fdbace86d5c195171fd225d3ae6c0f64694d1882488a73bcb621062859b"
+      }
+    ],
+    "recipe": "deterministic: lora_a is the real decoder hidden state, lora_b seeds a decisive logit boost on the runner-up token, then one admitted AdamW step executes",
+    "trained_step": 1,
+    "lora_rank": 1,
+    "lora_alpha": 1.0,
+    "plan_digest": "45615fdbace86d5c195171fd225d3ae6c0f64694d1882488a73bcb621062859b",
+    "corpus_manifest_sha256": "448da5475ce861faa7b94e002f173137cd80d9985e9b59f35c2b22ae19f674df",
+    "evaluation_manifest_sha256": "7d2b4362011ec53ad50614e6fc2888a639fc5cfcc24c1a4f44bd1d9079e049f2",
+    "seed": 38,
+    "adamw_step_loss_before": -0.0,
+    "adamw_step_loss_after": -0.0
+  },
+  "prompt": "Name one reason local inference matters.",
+  "baseline": {
+    "output_token_ids": [
+      271,
+      657
+    ],
+    "output_text": "\n\nName",
+    "argmax_token_id": 271
+  },
+  "adapted": {
+    "output_token_ids": [
+      198,
+      198
+    ],
+    "output_text": "\n\n",
+    "target_token_id": 198,
+    "first_token_is_target": true,
+    "provenance_binding_matches": true
+  },
+  "refusals": {
+    "merged_residency_refused": true,
+    "merged_residency_error": "unsupported adapter binding `qwen38-adapter-serving-real-27b-merged`: native qwen38 CPU adapter serving currently supports hot-swap overlays only",
+    "drifted_binding_refused": true,
+    "drifted_binding_error": "unsupported adapter binding `qwen38-adapter-serving-real-27b-drift`: Qwen3.8 request binding does not exactly match the registered runtime binding",
+    "detached_binding_refused": true,
+    "detached_binding_error": "unsupported adapter binding `qwen38-adapter-serving-real-27b`: Qwen3.8 adapter binding is not registered on this native CPU runtime",
+    "detached_binding_matches": true
+  },
+  "decoder_load_duration_ns": 126304541,
+  "baseline_duration_ns": 128313696667,
+  "activations_duration_ns": 91284721875,
+  "adapted_duration_ns": 138942007458,
+  "total_duration_ns": 358687919416,
+  "fallback_policy": "refuse",
+  "hidden_fallback_used": false,
+  "claim_boundary": "This proves real-shape Qwen3.8 LM-head LoRA adapter registration, hot-swap overlay execution, provenance binding, and refusal posture on the admitted 27B decoder on the native CPU runtime. Registration validates adapter shape and identity metadata against the declared 27B base identity; the served decoder is the qualified Q4_K_M GGUF quantization of that base. The adapter artifact is deterministic recipe output trained one AdamW step on real model activations; it is not a trained-model quality or promotion claim. Durations are diagnostic and do not establish a performance claim.",
+  "source": {
+    "revision": "da7d5b83d3e2385af4e17182c3267f7b672d45c0",
+    "dirty": false
+  },
+  "artifact": {
+    "repository_id": "unsloth/Qwen3.8-27B-GGUF",
+    "repository_revision": "fdd03b8bbd279c1694563650e79d85a2373d9934",
+    "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+    "byte_length": 17106775008,
+    "sha256": "7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169"
+  },
+  "hardware": {
+    "host": "Christophers-MacBook-Pro-2.local",
+    "architecture": "arm64",
+    "os": "Darwin"
+  }
+}
