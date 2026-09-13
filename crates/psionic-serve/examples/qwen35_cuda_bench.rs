@@ -1,9 +1,11 @@
 use std::{
     collections::BTreeSet,
     env, fs,
+    io::Read,
+    net::TcpListener,
     path::{Path, PathBuf},
-    process::ExitCode,
-    time::Instant,
+    process::{Child, Command, ExitCode, Stdio},
+    time::{Duration, Instant},
 };
 
 use psionic_backend_cuda::{CudaAllocatorPoolTelemetry, CudaGemmTuningReport};
@@ -39,6 +41,7 @@ fn run() -> Result<(), String> {
     match config.backend {
         BenchBackend::Psionic => run_psionic_benchmark(&config),
         BenchBackend::Ollama => run_ollama_benchmark(&config),
+        BenchBackend::LlamaCpp => run_llama_cpp_benchmark(&config),
     }
 }
 
@@ -46,6 +49,7 @@ fn run() -> Result<(), String> {
 enum BenchBackend {
     Psionic,
     Ollama,
+    LlamaCpp,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,6 +64,10 @@ struct BenchConfig {
     model_path: PathBuf,
     ollama_model: Option<String>,
     ollama_base_url: String,
+    llama_server_bin: PathBuf,
+    llama_server_port: u16,
+    llama_gpu_layers: i32,
+    llama_context_size: usize,
     json_out: Option<PathBuf>,
     require_fallback_free_cuda: bool,
     prompt: String,
@@ -126,6 +134,7 @@ struct BenchReport {
     frequency_penalty: Option<f32>,
     seed: Option<u64>,
     structured_output: BenchStructuredOutputConfigReport,
+    llama_cpp_server: Option<BenchLlamaCppServerReport>,
     psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
     psionic_cuda_fast_path: Option<BenchPsionicCudaFastPathReport>,
     runs: Vec<BenchRunReport>,
@@ -199,6 +208,21 @@ struct BenchQwen35OutputMetricsReport {
     graph_cache_identity: Option<String>,
     attention_layer_invocations: usize,
     attention_backends: Vec<psionic_serve::Qwen35CudaAttentionBackendExecution>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct BenchLlamaCppServerReport {
+    server_bin: String,
+    server_version: String,
+    launch_args: Vec<String>,
+    base_url: String,
+    gpu_layers: i32,
+    context_size: usize,
+    warmup_output_tokens: usize,
+    gpu_memory_used_mib_after_load: Option<u64>,
+    gpu_memory_used_mib_after_runs: Option<u64>,
+    host_rss_kib_after_load: Option<u64>,
+    host_rss_kib_after_runs: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -352,6 +376,10 @@ impl Default for BenchConfig {
             model_path: PathBuf::new(),
             ollama_model: None,
             ollama_base_url: String::from("http://127.0.0.1:11434"),
+            llama_server_bin: default_llama_server_bin(),
+            llama_server_port: 0,
+            llama_gpu_layers: 99,
+            llama_context_size: 4096,
             json_out: None,
             require_fallback_free_cuda: false,
             prompt: String::from("Explain what Psionic is in one sentence."),
@@ -399,9 +427,10 @@ impl BenchConfig {
                     config.backend = match next_arg(&raw_args, &mut index, "--backend")?.as_str() {
                         "psionic" => BenchBackend::Psionic,
                         "ollama" => BenchBackend::Ollama,
+                        "llama_cpp" => BenchBackend::LlamaCpp,
                         value => {
                             return Err(format!(
-                                "invalid --backend `{value}`; expected `psionic` or `ollama`"
+                                "invalid --backend `{value}`; expected `psionic`, `ollama`, or `llama_cpp`"
                             ));
                         }
                     };
@@ -415,6 +444,28 @@ impl BenchConfig {
                 }
                 "--ollama-base-url" => {
                     config.ollama_base_url = next_arg(&raw_args, &mut index, "--ollama-base-url")?;
+                }
+                "--llama-server-bin" => {
+                    config.llama_server_bin =
+                        PathBuf::from(next_arg(&raw_args, &mut index, "--llama-server-bin")?);
+                }
+                "--llama-server-port" => {
+                    config.llama_server_port = parse_arg(
+                        &next_arg(&raw_args, &mut index, "--llama-server-port")?,
+                        "--llama-server-port",
+                    )?;
+                }
+                "--llama-gpu-layers" => {
+                    config.llama_gpu_layers = parse_arg(
+                        &next_arg(&raw_args, &mut index, "--llama-gpu-layers")?,
+                        "--llama-gpu-layers",
+                    )?;
+                }
+                "--llama-context-size" => {
+                    config.llama_context_size = parse_arg(
+                        &next_arg(&raw_args, &mut index, "--llama-context-size")?,
+                        "--llama-context-size",
+                    )?;
                 }
                 "--json-out" => {
                     config.json_out = Some(PathBuf::from(next_arg(
@@ -613,7 +664,13 @@ impl BenchConfig {
         }
         if self.prompt_token_ids.is_some() && matches!(self.backend, BenchBackend::Ollama) {
             return Err(String::from(
-                "`--prompt-token-ids` is only available for `--backend psionic`",
+                "`--prompt-token-ids` is only available for `--backend psionic` or `--backend llama_cpp`",
+            ));
+        }
+        if matches!(self.backend, BenchBackend::LlamaCpp) && !self.llama_server_bin.is_file() {
+            return Err(format!(
+                "missing llama-server binary: {} (set --llama-server-bin or PSIONIC_LLAMA_SERVER_BIN)",
+                self.llama_server_bin.display()
             ));
         }
         Ok(())
@@ -703,63 +760,65 @@ impl BenchConfig {
 
     fn effective_temperature_for_backend(&self, backend: BenchBackend) -> Option<f32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(0.0),
             _ => self.effective_temperature(),
         }
     }
 
     fn effective_top_k_for_backend(&self, backend: BenchBackend) -> Option<usize> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(1),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(1),
             _ => self.effective_top_k(),
         }
     }
 
     fn effective_top_p_for_backend(&self, backend: BenchBackend) -> Option<f32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(1.0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(1.0),
             _ => self.effective_top_p(),
         }
     }
 
     fn effective_min_p_for_backend(&self, backend: BenchBackend) -> Option<f32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(0.0),
             _ => self.effective_min_p(),
         }
     }
 
     fn effective_repeat_penalty_for_backend(&self, backend: BenchBackend) -> Option<f32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(1.0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(1.0),
             _ => self.effective_repeat_penalty(),
         }
     }
 
     fn effective_repeat_last_n_for_backend(&self, backend: BenchBackend) -> Option<i32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(0),
             _ => self.effective_repeat_last_n(),
         }
     }
 
     fn effective_presence_penalty_for_backend(&self, backend: BenchBackend) -> Option<f32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(0.0),
             _ => self.effective_presence_penalty(),
         }
     }
 
     fn effective_frequency_penalty_for_backend(&self, backend: BenchBackend) -> Option<f32> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => Some(0.0),
             _ => self.effective_frequency_penalty(),
         }
     }
 
     fn effective_seed_for_backend(&self, backend: BenchBackend) -> Option<u64> {
         match (backend, self.decode_mode) {
-            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(self.seed.unwrap_or(42)),
+            (BenchBackend::Ollama | BenchBackend::LlamaCpp, BenchDecodeMode::Greedy) => {
+                Some(self.seed.unwrap_or(42))
+            }
             _ => self.effective_seed(),
         }
     }
@@ -787,6 +846,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             None,
             None,
             Some(fast_path_report),
+            None,
             String::from("refused"),
             Some(reason.clone()),
             Vec::new(),
@@ -881,6 +941,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             Some(startup_report),
             Some(load_s),
             Some(fast_path_report),
+            None,
             String::from("refused"),
             Some(reason.clone()),
             Vec::new(),
@@ -1013,6 +1074,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
                 Some(startup_report.clone()),
                 Some(load_s),
                 Some(fast_path_report),
+                None,
                 String::from("refused"),
                 Some(reason.clone()),
                 runs,
@@ -1053,6 +1115,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         Some(startup_report.clone()),
         Some(startup_report.load_s),
         Some(fast_path_report),
+        None,
         String::from("ok"),
         None,
         runs,
@@ -1173,6 +1236,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
         None,
         None,
         None,
+        None,
         String::from("ok"),
         None,
         runs,
@@ -1183,6 +1247,450 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
     );
     write_json_output(&report, config.json_out.as_ref())?;
     Ok(())
+}
+
+fn default_llama_server_bin() -> PathBuf {
+    env::var("PSIONIC_LLAMA_SERVER_BIN")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            if cfg!(target_os = "macos") {
+                PathBuf::from("/Users/christopherdavid/code/llama.cpp/build/bin/llama-server")
+            } else {
+                PathBuf::from("/home/christopherdavid/code/llama.cpp/build/bin/llama-server")
+            }
+        })
+}
+
+struct LlamaCppServerGuard {
+    child: Child,
+}
+
+impl Drop for LlamaCppServerGuard {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct LlamaCppTimingsReport {
+    #[serde(default)]
+    prompt_n: usize,
+    #[serde(default)]
+    prompt_ms: f64,
+    #[serde(default)]
+    predicted_n: usize,
+    #[serde(default)]
+    predicted_ms: f64,
+    #[serde(default)]
+    predicted_per_second: f64,
+    #[serde(default)]
+    predicted_per_token_ms: f64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct LlamaCppCompletionResponse {
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    tokens: Vec<u32>,
+    #[serde(default)]
+    stop_type: Option<String>,
+    #[serde(default)]
+    stopping_word: Option<String>,
+    #[serde(default)]
+    tokens_predicted: usize,
+    #[serde(default)]
+    tokens_cached: usize,
+    #[serde(default)]
+    truncated: bool,
+    #[serde(default)]
+    timings: Option<LlamaCppTimingsReport>,
+    #[serde(default)]
+    error: Option<Value>,
+}
+
+fn run_llama_cpp_benchmark(config: &BenchConfig) -> Result<(), String> {
+    let bench_model = load_bench_model(&config.model_path, &config.prompt, config.raw_prompt)?;
+    let prompt_token_ids = match config.prompt_token_ids.as_ref() {
+        Some(token_ids) => token_ids.clone(),
+        None => token_ids(
+            bench_model
+                .tokenizer
+                .encode(bench_model.rendered.text.as_str())
+                .as_slice(),
+        ),
+    };
+
+    let version_output = Command::new(&config.llama_server_bin)
+        .arg("--version")
+        .output()
+        .map_err(|error| format!("failed to run llama-server --version: {error}"))?;
+    let mut version_text = String::from_utf8_lossy(&version_output.stdout).into_owned();
+    if version_text.trim().is_empty() {
+        version_text = String::from_utf8_lossy(&version_output.stderr).into_owned();
+    }
+    let server_version = version_text.lines().next().unwrap_or_default().to_string();
+
+    let port = if config.llama_server_port != 0 {
+        config.llama_server_port
+    } else {
+        TcpListener::bind("127.0.0.1:0")
+            .map_err(|error| format!("failed to reserve a llama-server port: {error}"))?
+            .local_addr()
+            .map_err(|error| format!("failed to read the reserved port: {error}"))?
+            .port()
+    };
+    let base_url = format!("http://127.0.0.1:{port}");
+    let launch_args = vec![
+        String::from("-m"),
+        config.model_path.display().to_string(),
+        String::from("--host"),
+        String::from("127.0.0.1"),
+        String::from("--port"),
+        port.to_string(),
+        String::from("-ngl"),
+        config.llama_gpu_layers.to_string(),
+        String::from("-c"),
+        config.llama_context_size.to_string(),
+        String::from("--no-webui"),
+        String::from("--metrics"),
+    ];
+    let server_child = Command::new(&config.llama_server_bin)
+        .args(&launch_args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|error| format!("failed to spawn llama-server: {error}"))?;
+    let server_pid = server_child.id();
+    let mut server = LlamaCppServerGuard {
+        child: server_child,
+    };
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(600))
+        .build()
+        .map_err(|error| format!("failed to build llama.cpp HTTP client: {error}"))?;
+
+    let load_started = Instant::now();
+    loop {
+        if let Some(status) = server
+            .child
+            .try_wait()
+            .map_err(|error| format!("failed to poll llama-server status: {error}"))?
+        {
+            return Err(format!("llama-server exited during startup with {status}"));
+        }
+        let ready = client
+            .get(format!("{base_url}/health"))
+            .send()
+            .map(|response| response.status().is_success())
+            .unwrap_or(false);
+        if ready {
+            break;
+        }
+        if load_started.elapsed() > Duration::from_secs(600) {
+            return Err(String::from(
+                "llama-server did not become healthy within 600s",
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    let load_s = load_started.elapsed().as_secs_f64();
+    let gpu_memory_after_load = nvidia_smi_memory_used_mib();
+    let host_rss_after_load = process_rss_kib(server_pid);
+
+    let warmup_tokens = min_warmup_tokens(config.max_output_tokens);
+    let _ = llama_cpp_completion(
+        &client,
+        &base_url,
+        &prompt_token_ids,
+        warmup_tokens,
+        config,
+        &bench_model.rendered,
+    )?;
+
+    let mut runs = Vec::with_capacity(config.repeats);
+    for run_index in 0..config.repeats {
+        let started = Instant::now();
+        let response = llama_cpp_completion(
+            &client,
+            &base_url,
+            &prompt_token_ids,
+            config.max_output_tokens,
+            config,
+            &bench_model.rendered,
+        )?;
+        let wall_s = started.elapsed().as_secs_f64();
+        if response.truncated || response.tokens_cached > 0 {
+            eprintln!(
+                "backend=llama_cpp run={} warning: truncated={} tokens_cached={}",
+                run_index + 1,
+                response.truncated,
+                response.tokens_cached,
+            );
+        }
+        let timings = response.timings.clone().unwrap_or_default();
+        let output_tokens = if response.tokens.is_empty() {
+            timings.predicted_n.max(response.tokens_predicted)
+        } else {
+            response.tokens.len()
+        };
+        let prompt_s = timings.prompt_ms / 1000.0;
+        let decode_s = timings.predicted_ms / 1000.0;
+        let total_s = if prompt_s + decode_s > 0.0 {
+            prompt_s + decode_s
+        } else {
+            wall_s
+        };
+        let decode_tok_s = if timings.predicted_per_second > 0.0 {
+            timings.predicted_per_second
+        } else {
+            tokens_per_second(output_tokens, (decode_s * 1e9) as u64)
+        };
+        let itl_s =
+            (timings.predicted_per_token_ms > 0.0).then(|| timings.predicted_per_token_ms / 1000.0);
+        let termination = llama_cpp_termination_report(
+            &response,
+            &bench_model.rendered.stop_sequences,
+            config.max_output_tokens,
+        );
+        let output_text = response.content.clone();
+        let printable_output_text = output_text.replace('\n', "\\n");
+        runs.push(BenchRunReport {
+            run_index: run_index + 1,
+            decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
+            prompt_tokens: timings.prompt_n.max(prompt_token_ids.len()),
+            output_tokens,
+            prompt_s,
+            decode_s,
+            total_s,
+            ttft_s: None,
+            itl_s,
+            decode_tok_s,
+            qwen35_output_modes: Vec::new(),
+            qwen35_readback_bytes: 0,
+            qwen35_raw_logits: false,
+            qwen35_graph_hits: 0,
+            qwen35_graph_misses: 0,
+            qwen35_graph_captures: 0,
+            qwen35_graph_shape_drifts: 0,
+            qwen35_graph_cache_identity: None,
+            cuda_allocator_resident_device_bytes_after_run: None,
+            cuda_allocator_peak_resident_device_bytes_after_run: None,
+            qwen35_attention_layer_invocations: 0,
+            qwen35_attention_backends: Vec::new(),
+            qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport::default(),
+            termination: termination.clone(),
+            structured_output_mode: String::from("none"),
+            structured_output_parser: String::from("none"),
+            structured_output_kind: String::from("none"),
+            structured_output_value: None,
+            output_token_ids: response.tokens.clone(),
+            output_text,
+        });
+        println!(
+            "backend=llama_cpp run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} output={}",
+            run_index + 1,
+            bench_decode_mode_label(config.decode_mode),
+            timings.prompt_n.max(prompt_token_ids.len()),
+            output_tokens,
+            prompt_s,
+            decode_s,
+            total_s,
+            decode_tok_s,
+            termination.observed,
+            termination.classification,
+            termination
+                .matched_stop_sequence
+                .as_deref()
+                .unwrap_or("none"),
+            printable_output_text,
+        );
+    }
+
+    let server_report = BenchLlamaCppServerReport {
+        server_bin: config.llama_server_bin.display().to_string(),
+        server_version,
+        launch_args,
+        base_url,
+        gpu_layers: config.llama_gpu_layers,
+        context_size: config.llama_context_size,
+        warmup_output_tokens: warmup_tokens,
+        gpu_memory_used_mib_after_load: gpu_memory_after_load,
+        gpu_memory_used_mib_after_runs: nvidia_smi_memory_used_mib(),
+        host_rss_kib_after_load: host_rss_after_load,
+        host_rss_kib_after_runs: process_rss_kib(server_pid),
+    };
+    let report = build_bench_report(
+        config,
+        &bench_model.rendered,
+        None,
+        Some(load_s),
+        None,
+        Some(server_report),
+        String::from("ok"),
+        None,
+        runs,
+    );
+    println!(
+        "backend=llama_cpp mean_decode_tok_s={:.2}",
+        report.mean_decode_tok_s
+    );
+    write_json_output(&report, config.json_out.as_ref())?;
+    Ok(())
+}
+
+fn llama_cpp_completion(
+    client: &Client,
+    base_url: &str,
+    prompt_token_ids: &[u32],
+    max_output_tokens: usize,
+    config: &BenchConfig,
+    rendered: &RenderedPrompt,
+) -> Result<LlamaCppCompletionResponse, String> {
+    let mut payload = serde_json::json!({
+        "prompt": prompt_token_ids,
+        "n_predict": max_output_tokens,
+        "cache_prompt": false,
+        "return_tokens": true,
+        "stream": false,
+    });
+    if let Some(temperature) = config.effective_temperature_for_backend(BenchBackend::LlamaCpp) {
+        payload["temperature"] = serde_json::json!(temperature);
+    }
+    if let Some(top_k) = config.effective_top_k_for_backend(BenchBackend::LlamaCpp) {
+        payload["top_k"] = serde_json::json!(top_k);
+    }
+    if let Some(top_p) = config.effective_top_p_for_backend(BenchBackend::LlamaCpp) {
+        payload["top_p"] = serde_json::json!(top_p);
+    }
+    if let Some(min_p) = config.effective_min_p_for_backend(BenchBackend::LlamaCpp) {
+        payload["min_p"] = serde_json::json!(min_p);
+    }
+    if let Some(typical_p) = config.effective_typical_p() {
+        payload["typical_p"] = serde_json::json!(typical_p);
+    }
+    if let Some(mirostat) = config.effective_mirostat() {
+        payload["mirostat"] = serde_json::json!(mirostat);
+    }
+    if let Some(mirostat_tau) = config.effective_mirostat_tau() {
+        payload["mirostat_tau"] = serde_json::json!(mirostat_tau);
+    }
+    if let Some(mirostat_eta) = config.effective_mirostat_eta() {
+        payload["mirostat_eta"] = serde_json::json!(mirostat_eta);
+    }
+    if let Some(repeat_penalty) =
+        config.effective_repeat_penalty_for_backend(BenchBackend::LlamaCpp)
+    {
+        payload["repeat_penalty"] = serde_json::json!(repeat_penalty);
+    }
+    if let Some(repeat_last_n) = config.effective_repeat_last_n_for_backend(BenchBackend::LlamaCpp)
+    {
+        payload["repeat_last_n"] = serde_json::json!(repeat_last_n);
+    }
+    if let Some(presence_penalty) =
+        config.effective_presence_penalty_for_backend(BenchBackend::LlamaCpp)
+    {
+        payload["presence_penalty"] = serde_json::json!(presence_penalty);
+    }
+    if let Some(frequency_penalty) =
+        config.effective_frequency_penalty_for_backend(BenchBackend::LlamaCpp)
+    {
+        payload["frequency_penalty"] = serde_json::json!(frequency_penalty);
+    }
+    if let Some(seed) = config.effective_seed_for_backend(BenchBackend::LlamaCpp) {
+        payload["seed"] = serde_json::json!(seed);
+    }
+    if !rendered.stop_sequences.is_empty() {
+        payload["stop"] = serde_json::json!(rendered.stop_sequences);
+    }
+    match config.structured_output.as_ref() {
+        Some(BenchStructuredOutput::JsonObject) => {
+            payload["json_schema"] = serde_json::json!({"type": "object"});
+        }
+        Some(BenchStructuredOutput::JsonSchema { schema, .. }) => {
+            payload["json_schema"] = schema.clone();
+        }
+        None => {}
+    }
+    let url = format!("{}/completion", base_url.trim_end_matches('/'));
+    let response = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .map_err(|error| format!("failed to call llama-server completion endpoint: {error}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .map_err(|error| format!("failed to read llama-server response body: {error}"))?;
+    if !status.is_success() {
+        return Err(format!(
+            "llama-server completion failed with status {status}: {body}"
+        ));
+    }
+    let parsed: LlamaCppCompletionResponse = serde_json::from_str(&body)
+        .map_err(|error| format!("failed to parse llama-server response: {error}"))?;
+    if let Some(error) = parsed.error.as_ref() {
+        return Err(format!(
+            "llama-server completion returned an error: {error}"
+        ));
+    }
+    Ok(parsed)
+}
+
+fn llama_cpp_termination_report(
+    response: &LlamaCppCompletionResponse,
+    stop_sequences: &[String],
+    max_output_tokens: usize,
+) -> BenchTerminationReport {
+    let observed = response
+        .stop_type
+        .clone()
+        .unwrap_or_else(|| String::from("unknown"));
+    let classification = match response.stop_type.as_deref() {
+        Some("eos") => String::from("eos_token"),
+        Some("limit") => String::from("max_output_tokens"),
+        Some("word") => String::from("stop_sequence"),
+        Some(other) => other.replace('-', "_"),
+        None if response.tokens_predicted >= max_output_tokens => String::from("max_output_tokens"),
+        None => String::from("unknown"),
+    };
+    let matched_stop_sequence = response
+        .stopping_word
+        .clone()
+        .filter(|word| !word.is_empty() && stop_sequences.iter().any(|stop| stop == word));
+    BenchTerminationReport {
+        observed,
+        classification,
+        matched_stop_sequence,
+    }
+}
+
+fn nvidia_smi_memory_used_mib() -> Option<u64> {
+    let output = Command::new("nvidia-smi")
+        .args(["--query-gpu=memory.used", "--format=csv,noheader,nounits"])
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .parse()
+        .ok()
+}
+
+fn process_rss_kib(pid: u32) -> Option<u64> {
+    let mut status = String::new();
+    fs::File::open(format!("/proc/{pid}/status"))
+        .ok()?
+        .read_to_string(&mut status)
+        .ok()?;
+    status.lines().find_map(|line| {
+        line.strip_prefix("VmRSS:")
+            .and_then(|value| value.trim().strip_suffix(" kB"))
+            .and_then(|value| value.trim().parse().ok())
+    })
 }
 
 fn build_generation_options(
@@ -1546,6 +2054,7 @@ fn build_bench_report(
     psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
     load_s: Option<f64>,
     psionic_cuda_fast_path: Option<BenchPsionicCudaFastPathReport>,
+    llama_cpp_server: Option<BenchLlamaCppServerReport>,
     run_status: String,
     refusal_reason: Option<String>,
     runs: Vec<BenchRunReport>,
@@ -1600,6 +2109,7 @@ fn build_bench_report(
         frequency_penalty: config.effective_frequency_penalty_for_backend(config.backend),
         seed: config.effective_seed_for_backend(config.backend),
         structured_output: structured_output_config_report(config.structured_output.as_ref()),
+        llama_cpp_server,
         psionic_cuda_startup,
         psionic_cuda_fast_path,
         runs,
@@ -2041,6 +2551,7 @@ fn bench_backend_label(backend: BenchBackend) -> &'static str {
     match backend {
         BenchBackend::Psionic => "psionic",
         BenchBackend::Ollama => "ollama",
+        BenchBackend::LlamaCpp => "llama_cpp",
     }
 }
 
@@ -2048,6 +2559,7 @@ fn bench_report_class(backend: BenchBackend) -> &'static str {
     match backend {
         BenchBackend::Psionic => "direct_engine",
         BenchBackend::Ollama => "http",
+        BenchBackend::LlamaCpp => "http",
     }
 }
 
@@ -2074,7 +2586,7 @@ fn write_json_output<T: Serialize>(value: &T, output: Option<&PathBuf>) -> Resul
 
 fn usage() -> String {
     String::from(
-        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt | --prompt-token-ids 9419,11] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]",
+        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt | --prompt-token-ids 9419,11] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--raw-prompt] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend llama_cpp --model-path <model.gguf> [--llama-server-bin <path>] [--llama-server-port <port>] [--llama-gpu-layers 99] [--llama-context-size 4096] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--seed 42] [--json-out report.json] [--prompt <text>] [--raw-prompt | --prompt-token-ids 9419,11] [--max-output-tokens 128] [--repeats 3]",
     )
 }
 
