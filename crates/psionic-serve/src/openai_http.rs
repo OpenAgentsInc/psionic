@@ -15416,7 +15416,7 @@ mod tests {
                 ],
             )
             .as_slice(),
-            qwen35_native_full_attention_decoder_tensors().as_slice(),
+            qwen35_native_full_attention_decoder_tensors_with_output(10, 7).as_slice(),
         )?;
 
         let cpu = crate::CpuGgufQwen35TextGenerationService::from_gguf_path(&qwen38_path)?;
@@ -18423,7 +18423,7 @@ mod tests {
                 ],
             )
             .as_slice(),
-            qwen35_native_full_attention_decoder_tensors().as_slice(),
+            qwen35_native_full_attention_decoder_tensors_with_output(10, 7).as_slice(),
         )?;
         let mut config = OpenAiCompatConfig::new(&qwen38_path);
         config.backend = OpenAiCompatBackend::Metal;
@@ -18473,7 +18473,10 @@ mod tests {
             Some(String::from("refuse"))
         );
         let payload = runtime.block_on(response_json(response))?;
-        assert!(payload["choices"][0]["message"]["content"].is_string());
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("worldworld")
+        );
         assert!(
             payload["usage"]["completion_tokens"]
                 .as_u64()
@@ -24384,6 +24387,51 @@ mod tests {
 
     fn qwen35_native_full_attention_decoder_tensors() -> Vec<TestGgufTensor> {
         qwen35_native_full_attention_decoder_tensors_with_vocab(10)
+    }
+
+    fn qwen35_native_full_attention_decoder_tensors_with_output(
+        vocab_size: usize,
+        output_token_index: usize,
+    ) -> Vec<TestGgufTensor> {
+        let mut embeddings = vec![0.0_f32; vocab_size * 32];
+        for row in embeddings.chunks_exact_mut(32) {
+            row[0] = 1.0;
+        }
+        let mut tensors = vec![
+            dense_tensor("token_embd.weight", vec![vocab_size, 32], embeddings),
+            dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
+        ];
+        tensors.extend(
+            qwen35_native_full_attention_decoder_tensors_with_vocab(vocab_size)
+                .into_iter()
+                .skip(2)
+                .map(|tensor| {
+                    if tensor.name == "output.weight" {
+                        quantized_q8_0_tensor_with_first_weight(
+                            "output.weight",
+                            vec![vocab_size, 32],
+                            output_token_index,
+                        )
+                    } else {
+                        tensor
+                    }
+                }),
+        );
+        tensors
+    }
+
+    fn quantized_q8_0_tensor_with_first_weight(
+        name: &str,
+        shape: Vec<usize>,
+        row_index: usize,
+    ) -> TestGgufTensor {
+        let rows = shape
+            .iter()
+            .take(shape.len().saturating_sub(1))
+            .product::<usize>();
+        let mut bytes = repeated_q8_0_bytes(rows);
+        bytes[row_index * 34 + 2] = 1;
+        TestGgufTensor::new(name, shape, GgufTensorType::Q8_0, bytes)
     }
 
     fn qwen35_native_full_attention_decoder_tensors_with_vocab(
