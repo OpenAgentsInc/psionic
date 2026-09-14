@@ -19179,6 +19179,7 @@ mod tests {
             &[
                 "input",
                 "constant",
+                "cast",
                 "matmul",
                 "add",
                 "mul",
@@ -19189,7 +19190,11 @@ mod tests {
                 "leaky_relu_squared_backward",
                 "silu",
                 "silu_backward",
+                "parameter_golf_token_embedding_lookup",
                 "parameter_golf_banked_linear",
+                "parameter_golf_banked_linear_input_backward",
+                "parameter_golf_banked_linear_weight_backward",
+                "parameter_golf_token_embedding_lookup_backward",
                 "parameter_golf_projection_loss",
                 "parameter_golf_projection_token_losses",
                 "parameter_golf_projection_loss_backward",
@@ -22427,8 +22432,9 @@ mod tests {
             let output = backend.f32_buffer(2)?;
             let mut argmax_output = backend.byte_buffer(&vec![0_u8; std::mem::size_of::<u64>()])?;
             argmax_output.write_bytes(
-                &(((u64::from(i32::MAX as u32)) << 32) | u64::from(f32::NEG_INFINITY.to_bits()))
-                    .to_ne_bytes(),
+                &(((u64::from(!f32::NEG_INFINITY.to_bits())) << 32)
+                    | u64::from(u32::MAX - i32::MAX as u32))
+                .to_ne_bytes(),
             )?;
 
             let mut submission = backend.begin_submission()?;
@@ -24834,8 +24840,9 @@ mod tests {
         let mut submission = backend.begin_submission()?;
         submission.quantize_f32_to_q8_1(&input_buffer, 1, 32, &q8_1_buffer)?;
         argmax_output.write_bytes(
-            &(((u64::from(i32::MAX as u32)) << 32) | u64::from(f32::NEG_INFINITY.to_bits()))
-                .to_ne_bytes(),
+            &(((u64::from(!f32::NEG_INFINITY.to_bits())) << 32)
+                | u64::from(u32::MAX - i32::MAX as u32))
+            .to_ne_bytes(),
         )?;
         submission.quantized_matvec_q8_1_argmax(
             &weights,
@@ -24937,8 +24944,9 @@ mod tests {
         let mut submission = backend.begin_submission()?;
         submission.quantize_f32_to_q8_1(&input_buffer, 1, 256, &q8_1_buffer)?;
         argmax_output.write_bytes(
-            &(((u64::from(i32::MAX as u32)) << 32) | u64::from(f32::NEG_INFINITY.to_bits()))
-                .to_ne_bytes(),
+            &(((u64::from(!f32::NEG_INFINITY.to_bits())) << 32)
+                | u64::from(u32::MAX - i32::MAX as u32))
+            .to_ne_bytes(),
         )?;
         submission.quantized_matvec_q8_1_argmax(
             &weights,
