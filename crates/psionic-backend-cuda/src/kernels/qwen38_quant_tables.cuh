@@ -1,6 +1,11 @@
 // Derived mechanically from ggml-common.h at llama.cpp revision
 // 9b05354ec6fb58b4e665e9a39ebc40285c015638 (MIT).
-__device__ __constant__ uint32_t kIq3SGrid[512] = {
+// The table lives in global memory, not __constant__ memory: grid codes are
+// data-dependent, so lanes in one warp index divergent entries and constant
+// memory would serialize one transaction per distinct address. Global memory
+// serves the same 2 KiB working set through L1 in parallel. llama.cpp keeps
+// iq3s_grid in global device memory for the same reason.
+__device__ uint32_t kIq3SGrid[512] = {
     0x01010101, 0x01010103, 0x01010105, 0x0101010b, 0x0101010f, 0x01010301, 0x01010303, 0x01010305,
     0x01010309, 0x0101030d, 0x01010501, 0x01010503, 0x0101050b, 0x01010707, 0x01010901, 0x01010905,
     0x0101090b, 0x0101090f, 0x01010b03, 0x01010b07, 0x01010d01, 0x01010d05, 0x01010f03, 0x01010f09,
