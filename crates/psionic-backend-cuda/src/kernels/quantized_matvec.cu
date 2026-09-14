@@ -866,12 +866,11 @@ __global__ void quantize_q8_1_rows_kernel(
     }
 }
 
-__device__ __forceinline__ void quantize_q8_1_shared_block(
-    const float *input,
+__device__ __forceinline__ void quantize_q8_1_warp_value(
+    float value,
     Q81Block *output,
     int lane
 ) {
-    const float value = input[lane];
     float amax = fabsf(value);
     float sum = value;
     for (int offset = 16; offset > 0; offset >>= 1) {
@@ -892,6 +891,14 @@ __device__ __forceinline__ void quantize_q8_1_shared_block(
         output->bytes[2] = static_cast<uint8_t>(sum_bits & 0xffu);
         output->bytes[3] = static_cast<uint8_t>((sum_bits >> 8) & 0xffu);
     }
+}
+
+__device__ __forceinline__ void quantize_q8_1_shared_block(
+    const float *input,
+    Q81Block *output,
+    int lane
+) {
+    quantize_q8_1_warp_value(input[lane], output, lane);
 }
 
 struct Q80Dequant {
@@ -2948,12 +2955,24 @@ __global__ void rms_norm_q8_1_kernel(
     Q81Block *output
 ) {
     __shared__ float scratch[kBlockSize];
-    __shared__ float normalized_blocks[kBlockSize];
 
+    const int vec4_count = element_count >> 2;
     float sum = 0.0f;
-    for (int index = threadIdx.x; index < element_count; index += blockDim.x) {
-        const float value = input[index];
-        sum += value * value;
+    if ((reinterpret_cast<uintptr_t>(input) & 15) == 0) {
+        const float4 *input4 = reinterpret_cast<const float4 *>(input);
+        for (int index = static_cast<int>(threadIdx.x); index < vec4_count; index += blockDim.x) {
+            const float4 value = input4[index];
+            sum += value.x * value.x + value.y * value.y + value.z * value.z + value.w * value.w;
+        }
+        for (int index = (vec4_count << 2) + static_cast<int>(threadIdx.x); index < element_count; index += blockDim.x) {
+            const float value = input[index];
+            sum += value * value;
+        }
+    } else {
+        for (int index = static_cast<int>(threadIdx.x); index < element_count; index += blockDim.x) {
+            const float value = input[index];
+            sum += value * value;
+        }
     }
     scratch[threadIdx.x] = sum;
     __syncthreads();
@@ -2971,23 +2990,10 @@ __global__ void rms_norm_q8_1_kernel(
     const int warp_count = blockDim.x / kWarpSize;
     const int blocks_per_row = element_count / kQ81ElementsPerBlock;
 
-    for (int tile = 0; tile < blocks_per_row; tile += warp_count) {
-        const int block_index = tile + warp_id;
-        if (block_index < blocks_per_row) {
-            const int index = block_index * kQ81ElementsPerBlock + lane;
-            normalized_blocks[threadIdx.x] = input[index] * weight[index] * inv_rms;
-        } else {
-            normalized_blocks[threadIdx.x] = 0.0f;
-        }
-        __syncthreads();
-        if (block_index < blocks_per_row) {
-            quantize_q8_1_shared_block(
-                normalized_blocks + warp_id * kQ81ElementsPerBlock,
-                output + block_index,
-                lane
-            );
-        }
-        __syncthreads();
+    for (int block_index = warp_id; block_index < blocks_per_row; block_index += warp_count) {
+        const int index = block_index * kQ81ElementsPerBlock + lane;
+        const float normalized = input[index] * weight[index] * inv_rms;
+        quantize_q8_1_warp_value(normalized, output + block_index, lane);
     }
 }
 
@@ -3043,10 +3049,29 @@ __global__ void add_residual_rms_norm_q8_1_kernel(
     Q81Block *quantized_output
 ) {
     __shared__ float scratch[kBlockSize];
-    __shared__ float normalized_blocks[kBlockSize];
 
+    const int vec4_count = element_count >> 2;
+    const bool vectorized =
+        (reinterpret_cast<uintptr_t>(input) & 15) == 0 &&
+        (reinterpret_cast<uintptr_t>(residual) & 15) == 0 &&
+        (input_bias == nullptr || (reinterpret_cast<uintptr_t>(input_bias) & 15) == 0);
     float sum = 0.0f;
-    for (int index = threadIdx.x; index < element_count; index += blockDim.x) {
+    if (vectorized) {
+        const float4 *input4 = reinterpret_cast<const float4 *>(input);
+        const float4 *residual4 = reinterpret_cast<const float4 *>(residual);
+        const float4 *bias4 = reinterpret_cast<const float4 *>(input_bias);
+        for (int index = static_cast<int>(threadIdx.x); index < vec4_count; index += blockDim.x) {
+            const float4 a = input4[index];
+            const float4 b = residual4[index];
+            const float4 c = input_bias != nullptr ? bias4[index] : make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            const float v0 = a.x + b.x + c.x;
+            const float v1 = a.y + b.y + c.y;
+            const float v2 = a.z + b.z + c.z;
+            const float v3 = a.w + b.w + c.w;
+            sum += v0 * v0 + v1 * v1 + v2 * v2 + v3 * v3;
+        }
+    }
+    for (int index = (vectorized ? (vec4_count << 2) : 0) + static_cast<int>(threadIdx.x); index < element_count; index += blockDim.x) {
         const float value =
             input[index] +
             residual[index] +
@@ -3069,30 +3094,16 @@ __global__ void add_residual_rms_norm_q8_1_kernel(
     const int warp_count = blockDim.x / kWarpSize;
     const int blocks_per_row = element_count / kQ81ElementsPerBlock;
 
-    for (int tile = 0; tile < blocks_per_row; tile += warp_count) {
-        const int block_index = tile + warp_id;
-        if (block_index < blocks_per_row) {
-            const int index = block_index * kQ81ElementsPerBlock + lane;
-            const float value =
-                input[index] +
-                residual[index] +
-                (input_bias != nullptr ? input_bias[index] : 0.0f);
-            const float normalized = value * weight[index] * inv_rms;
-            summed_output[index] = value;
-            normalized_output[index] = normalized;
-            normalized_blocks[threadIdx.x] = normalized;
-        } else {
-            normalized_blocks[threadIdx.x] = 0.0f;
-        }
-        __syncthreads();
-        if (block_index < blocks_per_row) {
-            quantize_q8_1_shared_block(
-                normalized_blocks + warp_id * kQ81ElementsPerBlock,
-                quantized_output + block_index,
-                lane
-            );
-        }
-        __syncthreads();
+    for (int block_index = warp_id; block_index < blocks_per_row; block_index += warp_count) {
+        const int index = block_index * kQ81ElementsPerBlock + lane;
+        const float value =
+            input[index] +
+            residual[index] +
+            (input_bias != nullptr ? input_bias[index] : 0.0f);
+        const float normalized = value * weight[index] * inv_rms;
+        summed_output[index] = value;
+        normalized_output[index] = normalized;
+        quantize_q8_1_warp_value(normalized, quantized_output + block_index, lane);
     }
 }
 
