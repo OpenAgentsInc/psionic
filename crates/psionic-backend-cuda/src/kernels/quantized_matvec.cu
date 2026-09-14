@@ -1362,11 +1362,6 @@ __global__ void quantized_matvec_q8_1_grouped_mmvq_shared_input_kernel(
 }
 
 __device__ __forceinline__ unsigned long long pack_argmax_pair(float value, int index);
-__device__ __forceinline__ void unpack_argmax_pair(
-    unsigned long long packed,
-    float & value,
-    int & index
-);
 __device__ __forceinline__ void atomic_update_argmax_pair(
     unsigned long long *state,
     float value,
@@ -1450,17 +1445,10 @@ __global__ void quantized_matvec_q8_1_grouped_mmvq_argmax_kernel(
 }
 
 __device__ __forceinline__ unsigned long long pack_argmax_pair(float value, int index) {
-    return (static_cast<unsigned long long>(static_cast<uint32_t>(index)) << 32) |
-        static_cast<unsigned long long>(__float_as_uint(value));
-}
-
-__device__ __forceinline__ void unpack_argmax_pair(
-    unsigned long long packed,
-    float & value,
-    int & index
-) {
-    value = __uint_as_float(static_cast<uint32_t>(packed & 0xffffffffu));
-    index = static_cast<int>(packed >> 32);
+    const uint32_t bits = __float_as_uint(value);
+    const uint32_t ordered = (bits & 0x80000000u) != 0u ? ~bits : (bits | 0x80000000u);
+    return (static_cast<unsigned long long>(ordered) << 32) |
+        static_cast<unsigned long long>(0xffffffffu - static_cast<uint32_t>(index));
 }
 
 __device__ __forceinline__ void atomic_update_argmax_pair(
@@ -1468,21 +1456,11 @@ __device__ __forceinline__ void atomic_update_argmax_pair(
     float value,
     int index
 ) {
-    unsigned long long observed = *state;
-    while (true) {
-        float observed_value = 0.0f;
-        int observed_index = 0;
-        unpack_argmax_pair(observed, observed_value, observed_index);
-        if (value < observed_value || (value == observed_value && index >= observed_index)) {
-            return;
-        }
-        const unsigned long long desired = pack_argmax_pair(value, index);
-        const unsigned long long previous = atomicCAS(state, observed, desired);
-        if (previous == observed) {
-            return;
-        }
-        observed = previous;
+    const unsigned long long packed = pack_argmax_pair(value, index);
+    if (packed <= *state) {
+        return;
     }
+    atomicMax(state, packed);
 }
 
 template <typename DotFn, int Vdr, int Qi>

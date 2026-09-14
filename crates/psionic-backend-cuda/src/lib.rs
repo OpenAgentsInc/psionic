@@ -22462,7 +22462,7 @@ mod tests {
                     .try_into()
                     .expect("packed argmax buffer should be eight bytes"),
             );
-            assert_eq!((packed >> 32) as usize, 1, "mode {mode:?}");
+            assert_eq!((u32::MAX - packed as u32) as usize, 1, "mode {mode:?}");
         }
         Ok(())
     }
@@ -24856,7 +24856,7 @@ mod tests {
                 .try_into()
                 .expect("packed argmax buffer should be eight bytes"),
         );
-        let actual_index = (packed >> 32) as usize;
+        let actual_index = (u32::MAX - packed as u32) as usize;
         let expected_index = if expected[0] >= expected[1] { 0 } else { 1 };
         assert_eq!(actual_index, expected_index);
         Ok(())
@@ -24959,7 +24959,7 @@ mod tests {
                 .try_into()
                 .expect("packed argmax buffer should be eight bytes"),
         );
-        let actual_index = (packed >> 32) as usize;
+        let actual_index = (u32::MAX - packed as u32) as usize;
         let expected_index = if expected[0] >= expected[1] { 0 } else { 1 };
         assert_eq!(actual_index, expected_index);
         Ok(())

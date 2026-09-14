@@ -6831,7 +6831,8 @@ fn qwen35_partitioned_top_k_block_count(top_k: usize, override_blocks: Option<us
 }
 
 fn initial_cuda_argmax_pair_bytes() -> [u8; std::mem::size_of::<u64>()] {
-    let packed = (u64::from(i32::MAX as u32) << 32) | u64::from(f32::NEG_INFINITY.to_bits());
+    let ordered = !f32::NEG_INFINITY.to_bits();
+    let packed = (u64::from(ordered) << 32) | u64::from(u32::MAX - i32::MAX as u32);
     packed.to_ne_bytes()
 }
 
@@ -6858,7 +6859,7 @@ fn cuda_argmax_token_from_packed_host_buffer(
             )))
         },
     )?);
-    cuda_argmax_token_id((packed >> 32) as i32)
+    cuda_argmax_token_id((u32::MAX - packed as u32) as i32)
 }
 
 fn cuda_top_k_candidates_from_indices(

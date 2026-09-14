@@ -206,7 +206,8 @@ fn gpt_oss_cuda_graph_replay_metrics(
 }
 
 fn initial_cuda_argmax_pair_bytes() -> [u8; std::mem::size_of::<u64>()] {
-    let packed = (u64::from(i32::MAX as u32) << 32) | u64::from(f32::NEG_INFINITY.to_bits());
+    let ordered = !f32::NEG_INFINITY.to_bits();
+    let packed = (u64::from(ordered) << 32) | u64::from(u32::MAX - i32::MAX as u32);
     packed.to_ne_bytes()
 }
 
@@ -233,7 +234,7 @@ fn cuda_argmax_token_from_packed_host_buffer(
             )))
         },
     )?);
-    cuda_argmax_token_id((packed >> 32) as i32)
+    cuda_argmax_token_id((u32::MAX - packed as u32) as i32)
 }
 
 fn can_use_cuda_argmax_fast_path(options: &GenerationOptions) -> bool {
@@ -6465,7 +6466,7 @@ impl GptOssCudaModelInner {
                                 ))
                             })?,
                     );
-                    (packed >> 32) as i32
+                    (u32::MAX - packed as u32) as i32
                 } else {
                     plan.next_token_host_buffer.read_i32().map_err(|error| {
                         ReferenceTextGenerationError::Runtime(super::RuntimeError::Backend(
