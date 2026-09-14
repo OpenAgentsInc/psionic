@@ -1132,6 +1132,26 @@ where llama.cpp decodes scales once per super-block and accumulates with
 integer `dp4a` dots. Closing the gap requires vectorized integer dot kernels
 for the super-block quant types.
 
+The follow-up evidence at `358c1f63` lives at
+`fixtures/qwen38/reports/qwen38_speed_gate_evidence_v2.json`. Psionic decodes
+at 43.97 median tokens per second against 43.27 for the pinned llama.cpp
+comparator, a delta of +1.6 percent, and meets the winning metric. The decode
+gap closed through four measured kernel changes: `dp4a`-based MMVQ dot
+products for the `IQ3_S`, `IQ4_XS`, `Q5_K`, and `Q3_K` types; a grouped
+`RowsPerBlock=4` launch that gives each warp an independent output row; a
+`block_count` unit fix that stopped the K-quant argmax launchers from running
+eight times the intended dot iterations; and register-staged RMS-norm Q8_1
+quantization that removes shared-memory round trips. The `IQ3_S` grid table
+moved from constant to global device memory so divergent indices resolve in
+parallel.
+
+Output-token parity still diverges at token 97. The comparator's own
+top-two logprobs at that position are -0.7055 for `specific` and -0.7062 for
+`particularly`, a margin of 0.0007 nats, and the same pinned llama.cpp build
+selects `particularly` when it runs on its CPU backend. The comparator is not
+self-consistent across its own backends at this position, so bit-parity
+against its CUDA lane is not a stable correctness criterion at this step.
+
 ## Test Matrix
 
 | Layer | Synthetic fixture | Official BF16 | Qualified GGUF | CPU | CUDA | Metal |

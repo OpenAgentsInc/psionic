@@ -806,7 +806,7 @@ struct Q3KQ81Dot {
             const uint32_t low = (packed >> low_shift) & 0x03030303u;
             const uint32_t high = (static_cast<uint32_t>(
                 get_int_b1(block, word)) >> high_shift) & 0x01010101u;
-            const uint32_t w = __vsub4(low, high << 2);
+            const uint32_t w = __vsub4(low | (high << 2), 0x04040404u);
             const int input_word = get_int_b4(input_block->bytes + 4, word);
             if (word < 4) {
                 sum_low = dp4a_i8(static_cast<int>(w), input_word, sum_low);
