@@ -7242,9 +7242,11 @@ extern "C" int psionic_cuda_##NAME##_matvec_q8_1(                               
     const void *input_q8_1, const void *bias, void *output, void *stream                         \
 ) {                                                                                              \
     const int block_count = cols / 256;                                                          \
-    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);                                             \
-    quantized_matvec_q8_1_mmvq_kernel<MMVQ_DOT, 4, 32><<<                                        \
-        rows,                                                                                    \
+    constexpr int rows_per_block = 4;                                                            \
+    const dim3 grid_dims((rows + rows_per_block - 1) / rows_per_block, 1, 1);                    \
+    const dim3 block_dims(kWarpSize, rows_per_block, 1);                                         \
+    quantized_matvec_q8_1_grouped_mmvq_kernel<MMVQ_DOT, 4, 32, rows_per_block, 1><<<             \
+        grid_dims,                                                                               \
         block_dims,                                                                              \
         0,                                                                                       \
         static_cast<cudaStream_t>(stream)                                                        \
