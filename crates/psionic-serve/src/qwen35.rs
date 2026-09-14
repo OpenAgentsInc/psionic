@@ -2021,6 +2021,16 @@ impl CpuGgufQwen35TextGenerationService {
         text: &str,
     ) -> Result<(Vec<f32>, Vec<f32>), ReferenceTextGenerationError> {
         let tokens = self.model.tokenizer.encode_with_defaults(text);
+        self.final_hidden_and_logits_for_tokens(tokens.as_slice())
+    }
+
+    /// Captures the final hidden state and logits for supplied token ids.
+    ///
+    /// This is a diagnostic comparator path and does not perform sampling.
+    pub fn final_hidden_and_logits_for_tokens(
+        &self,
+        tokens: &[TokenId],
+    ) -> Result<(Vec<f32>, Vec<f32>), ReferenceTextGenerationError> {
         if tokens.is_empty() {
             return Err(ReferenceTextGenerationError::EmptyPrompt);
         }
@@ -2030,7 +2040,7 @@ impl CpuGgufQwen35TextGenerationService {
             self.model.descriptor.config.max_context,
         ));
         let mut final_step = None;
-        for token in tokens.as_slice() {
+        for token in tokens {
             final_step = Some(self.model.forward_token(&mut state, *token)?);
         }
         let step = final_step.ok_or(ReferenceTextGenerationError::EmptyPrompt)?;
